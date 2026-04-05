@@ -1,0 +1,91 @@
+=== KINETIC EDITORIAL COLOR SYSTEM ===
+
+[ SURFACE / BACKGROUND ]
+surface = #121416
+surface-container-low = #1A1C1E
+surface-container = #222426
+surface-container-high = #282A2C
+surface-container-lowest = #0C0E10
+surface-bright = #2F3133
+
+[ PRIMARY ]
+primary = #0052FF
+primary-light = #B7C4FF
+primary-container = #0036B3
+on-primary = #FFFFFF
+on-primary-container = #DDE4FF
+
+[ SECONDARY ]
+secondary = #434656
+secondary-light = #6B7280
+secondary-container = #2A2D30
+on-secondary = #C3C5D9
+on-secondary-container = #E5E7EB
+
+[ TERTIARY / SUCCESS ]
+tertiary = #4AE176
+tertiary-container = #007633
+tertiary-light = #78FF96
+on-tertiary = #003B1F
+on-tertiary-container = #78FF96
+
+[ ERROR ]
+error = #EF4444
+error-container = #7F1D1D
+error-light = #FCA5A5
+on-error = #FFFFFF
+on-error-container = #FEE2E2
+
+[ WARNING ]
+warning = #F59E0B
+warning-container = #78350F
+warning-light = #FCD34D
+on-warning = #1F2937
+on-warning-container = #FEF3C7
+
+[ TYPOGRAPHY ]
+on-surface = #FFFFFF
+on-surface-variant = #C3C5D9
+on-surface-muted = #8A8F98
+
+[ TOASTS ]
+success-toast-bg = #007633
+success-toast-text = #78FF96
+
+error-toast-bg = #7F1D1D
+error-toast-text = #FCA5A5
+
+warning-toast-bg = #78350F
+warning-toast-text = #FCD34D
+
+info-toast-bg = #0036B3
+info-toast-text = #DDE4FF
+
+neutral-toast-bg = #1A1C1E
+neutral-toast-text = #C3C5D9
+
+
+Shorten
+
+=== CORE COLORS ===
+
+surface = #121416
+surface-low = #1A1C1E
+surface-high = #282A2C
+
+primary = #0052FF
+primary-light = #B7C4FF
+
+secondary = #434656
+
+tertiary = #4AE176
+tertiary-bg = #007633
+
+error = #EF4444
+error-bg = #7F1D1D
+
+warning = #F59E0B
+
+text-main = #FFFFFF
+text-normal = #C3C5D9
+text-muted = #8A8F98

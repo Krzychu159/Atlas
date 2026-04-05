@@ -1,0 +1,16 @@
+zasady:
+między sekcjami: 32px
+w cardzie: 24px
+między elementami: 12–16px
+
+Sidebar: 240px
+Content: 1fr
+Max width: 1440px
+Padding: 32px
+
+<div className="p-card" />
+<section className="py-section" />
+<div className="gap-section" />
+
+<div className="shadow-soft" />
+<div className="shadow-ambient" />
