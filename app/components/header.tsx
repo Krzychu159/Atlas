@@ -7,7 +7,7 @@ import {
 
 export function Header() {
   return (
-    <header className="my-4 mx-8 grid grid-cols-[1fr_auto] items-center">
+    <header className="mt-4 mb-12 mx-8 grid grid-cols-[1fr_auto] items-center">
       <div className="flex justify-between border-r-2 border-surface-container pr-4">
         <div className="relative">
           <Search

@@ -18,7 +18,11 @@ const navItems = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
-export function SidebarNav() {
+type SidebarNavProps = {
+  onNavigate?: () => void;
+};
+
+export function SidebarNav({ onNavigate }: SidebarNavProps) {
   const pathname = usePathname();
 
   return (
@@ -31,10 +35,11 @@ export function SidebarNav() {
           <Link
             key={item.href}
             href={item.href}
+            onClick={onNavigate}
             className={[
-              "group flex items-center  px-3 py-3 transition-all duration-200",
+              "group flex items-center px-3 py-3 transition-all duration-200",
               isActive
-                ? "bg-surface-container border-l-4 border-primary text-primary-light shadow-soft "
+                ? "border-l-4 border-primary bg-surface-container text-primary-light shadow-soft"
                 : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface",
             ].join(" ")}
           >
