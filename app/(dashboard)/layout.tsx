@@ -19,17 +19,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
           ].join(" ")}
         >
-          <div className="mb-10 mt-4 flex items-center justify-between gap-3 px-3 pt-2">
+          <div className="mb-10 mt-4 flex items-center justify-between gap-3  pt-2">
             <div className="flex items-center gap-3">
               <div className="rounded bg-primary p-3 text-on-primary">
                 <Dumbbell className="h-6 w-6" />
               </div>
               <div className="flex flex-col justify-between">
-                <h1 className="font-display text-headline-sm leading-tight text-on-surface">
-                  Atlas CRM
+                <h1 className="font-display text-headline-sm leading-tight text-primary-light font-bold tracking-widest ">
+                  Atlas
                 </h1>
                 <p className="text-label text-on-surface-muted">
-                  Studio Managment
+                  Studio Manage
                 </p>
               </div>
             </div>
@@ -58,13 +58,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         {/* DESKTOP */}
         <aside className="hidden md:flex md:flex-col md:bg-surface-container-low md:px-4 md:py-4">
-          <div className="mb-10 mt-4 flex items-center gap-3 px-3 pt-2">
+          <div className="mb-10 mt-4 flex items-center gap-3 pt-2">
             <div className="rounded bg-primary p-3 text-on-primary">
               <Dumbbell className="h-6 w-6" />
             </div>
             <div className="flex flex-col justify-between">
-              <h1 className="font-display text-headline-sm leading-tight text-on-surface">
-                Atlas CRM
+              <h1 className="font-display text-2xl leading-tight text-primary-light font-bold tracking-widest ">
+                Atlas
               </h1>
               <p className="text-label text-on-surface-muted">
                 Studio Managment
