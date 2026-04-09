@@ -18,7 +18,7 @@ const trainers = [
     rating: "4.9",
     exp: "6y",
     status: "Active",
-    badge: "PRO",
+    badge: "SJ",
   },
   {
     name: "Marcus Thorne",
@@ -135,13 +135,13 @@ export default function TrainersPage() {
                       </span>
                     </div>
 
-                    <p className="mt-3 text-on-surface-variant text-sm leading-5">
+                    <p className="mt-2 text-on-surface-variant text-sm leading-5">
                       {trainer.role}
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 mt-5">
+                <div className="grid grid-cols-3 gap-3 mt-3">
                   <div className="bg-surface-container-low rounded-[var(--radius-md)] px-3 py-3">
                     <div className="flex items-center gap-1.5 text-on-surface-muted">
                       <Dumbbell size={12} />
@@ -179,7 +179,7 @@ export default function TrainersPage() {
                   </div>
                 </div>
 
-                <button className="w-full mt-4 rounded-[var(--radius-md)] bg-surface-container-low hover:bg-surface-container-high transition-colors px-4 py-3 flex items-center justify-center gap-2 text-sm font-medium">
+                <button className="w-full mt-3 rounded-[var(--radius-md)] bg-surface-container-low hover:bg-surface-container-high transition-colors px-4 py-3 flex items-center justify-center gap-2 text-sm font-medium">
                   View Profile
                   <ChevronRight size={14} />
                 </button>

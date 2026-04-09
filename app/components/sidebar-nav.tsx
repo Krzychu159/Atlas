@@ -8,6 +8,7 @@ import {
   Users,
   CalendarDays,
   Settings,
+  Wallet,
 } from "lucide-react";
 
 const navItems = [
@@ -15,6 +16,7 @@ const navItems = [
   { label: "Trainers", href: "/trainers", icon: UserPen },
   { label: "Clients", href: "/clients", icon: Users },
   { label: "Schedule", href: "/schedule", icon: CalendarDays },
+  { label: "Packages", href: "/packages", icon: Wallet },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
