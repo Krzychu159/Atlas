@@ -279,3 +279,193 @@ body {
     box-shadow: var(--shadow-soft);
   }
 }
+
+/* =========================
+   SCHEDULE CALENDAR
+========================= */
+
+.schedule-calendar {
+  --fc-border-color: color-mix(
+    in srgb,
+    var(--color-secondary) 10%,
+    transparent
+  );
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: transparent;
+  --fc-list-event-hover-bg-color: transparent;
+  --fc-today-bg-color: color-mix(in srgb, var(--color-primary) 6%, transparent);
+  --fc-now-indicator-color: var(--color-primary-light);
+  --fc-event-border-color: transparent;
+  font-family: var(--font-body);
+}
+
+.schedule-calendar .fc {
+  font-family: var(--font-body);
+  color: var(--color-on-surface);
+}
+
+.schedule-calendar .fc-theme-standard td,
+.schedule-calendar .fc-theme-standard th,
+.schedule-calendar .fc-theme-standard .fc-scrollgrid {
+  border-color: color-mix(in srgb, var(--color-secondary) 10%, transparent);
+}
+
+.schedule-calendar .fc-scrollgrid {
+  border: none;
+}
+
+.schedule-calendar .fc-col-header-cell {
+  background: transparent;
+  border-top: none;
+  padding: 0.75rem 0 1rem;
+}
+
+.schedule-calendar .fc-col-header-cell-cushion {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-on-surface-muted);
+  font-weight: 700;
+}
+
+.schedule-calendar .fc-timegrid-axis-cushion {
+  color: var(--color-on-surface-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.schedule-calendar .fc-timegrid-slot {
+  height: 4.4rem;
+}
+
+.schedule-calendar .fc-timegrid-slot-label {
+  vertical-align: top;
+  padding-top: 0.35rem;
+}
+
+.schedule-calendar .fc-timegrid-divider {
+  display: none;
+}
+
+.schedule-calendar .fc-timegrid-col.fc-day-today {
+  background: color-mix(in srgb, var(--color-primary) 7%, transparent);
+}
+
+.schedule-calendar .fc-timegrid-now-indicator-line {
+  border-color: color-mix(in srgb, var(--color-primary-light) 80%, transparent);
+}
+
+.schedule-calendar .fc-timegrid-now-indicator-arrow {
+  border-top-color: var(--color-primary-light);
+  border-bottom-color: var(--color-primary-light);
+}
+
+.schedule-calendar .fc-timegrid-col-events {
+  margin: 0 0.2rem;
+}
+
+.schedule-calendar .fc-v-event {
+  border: none;
+  border-radius: 1rem;
+  box-shadow: var(--shadow-soft);
+}
+
+.schedule-calendar .fc-event-primary {
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-container),
+    var(--color-primary)
+  ) !important;
+}
+
+.schedule-calendar .fc-event-success {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-tertiary-container) 92%, transparent),
+    color-mix(
+      in srgb,
+      var(--color-tertiary) 78%,
+      var(--color-tertiary-container)
+    )
+  ) !important;
+}
+
+.schedule-calendar .fc-event-neutral {
+  background: linear-gradient(
+    135deg,
+    var(--color-surface-container),
+    var(--color-surface-container-high)
+  ) !important;
+}
+
+.schedule-calendar .fc-event-muted {
+  background: linear-gradient(
+    135deg,
+    var(--color-surface-container-low),
+    var(--color-surface-container)
+  ) !important;
+}
+
+.schedule-calendar .fc-custom-event {
+  padding: 0.55rem 0.65rem 0.65rem;
+}
+
+.schedule-calendar .fc-custom-event-tag {
+  font-size: 0.62rem;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  opacity: 0.88;
+  margin-bottom: 0.55rem;
+}
+
+.schedule-calendar .fc-custom-event-title {
+  font-size: 0.95rem;
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--color-on-surface);
+  margin-bottom: 0.45rem;
+}
+
+.schedule-calendar .fc-custom-event-meta {
+  font-size: 0.76rem;
+  line-height: 1.2;
+  color: color-mix(in srgb, var(--color-on-surface) 78%, transparent);
+  margin-bottom: 0.6rem;
+}
+
+.schedule-calendar .fc-custom-event-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.schedule-calendar .fc-custom-event-time {
+  font-size: 0.72rem;
+  line-height: 1;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-on-surface) 90%, transparent);
+}
+
+.schedule-calendar .fc-scroller {
+  overflow: hidden !important;
+}
+
+@media (max-width: 1024px) {
+  .schedule-calendar .fc-timegrid-slot {
+    height: 4rem;
+  }
+
+  .schedule-calendar .fc-custom-event-title {
+    font-size: 0.82rem;
+  }
+
+  .schedule-calendar .fc-custom-event-meta {
+    font-size: 0.7rem;
+  }
+
+  .schedule-calendar .fc-custom-event-time {
+    font-size: 0.66rem;
+  }
+}

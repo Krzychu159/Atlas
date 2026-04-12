@@ -1,3 +1,4 @@
+import { Button } from "@/app/components/ui/button";
 import {
   Search,
   Plus,
@@ -271,24 +272,25 @@ export default function ClientsPage() {
       <div className="hidden md:block">
         <div className="flex flex-col gap-6">
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <p className="text-page-title">Clients</p>
-                <span className="px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-sm">
-                  1,248 total
-                </span>
-              </div>
-
-              <p className="mt-2 text-base text-on-surface-variant">
-                Manage your athletes, track their goals, and monitor client
-                momentum.
+            <div className="max-w-[560px]">
+              <p className="text-label text-primary-light">
+                Define your studio offer
               </p>
+              <h1 className="mt-2 text-[2.25rem] leading-[0.95] mb-3 font-semibold font-display tracking-tight flex items-center gap-3">
+                Twoi <span className="text-primary-light">Klienci</span>
+                <span className="px-3 py-1 rounded-full bg-surface-container text-success-toast-text text-sm">
+                  68 aktywnych
+                </span>
+              </h1>
             </div>
 
-            <button className="bg-primary text-on-primary rounded-[var(--radius-lg)] px-6 py-4 font-semibold shadow-ambient flex items-center gap-3 shrink-0">
-              <UserPlus size={18} />
-              Add Client
-            </button>
+            <Button
+              variant="primary"
+              icon={<UserPlus size={16} />}
+              className="h-16"
+            >
+              Add New Client
+            </Button>
           </div>
 
           <div className="flex items-center gap-4">

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import TrainingCalendar from "@/app/components/TrainingCalendar";
+import TodayScheduleCard from "@/app/components/TodayScheduleCard";
 
 const boxes = [
   {
@@ -174,23 +175,8 @@ export default function DashboardPage() {
             />
           ))}
 
-          <div className="col-span-2 card-shell p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-section-title">Week Overview</p>
-              </div>
-
-              <Link
-                href="/schedule"
-                className="text-label text-primary-light h-fit"
-              >
-                Check More
-              </Link>
-            </div>
-
-            <div className="mt-4 text-sm text-on-surface-variant">
-              <TrainingCalendar />
-            </div>
+          <div className="col-span-2">
+            <TodayScheduleCard />
           </div>
 
           <div className="card-shell p-6">
