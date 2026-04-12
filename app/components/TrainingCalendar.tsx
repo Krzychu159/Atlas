@@ -2,7 +2,6 @@
 
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
-import type { EventClickArg } from "@fullcalendar/core";
 
 export type SessionEvent = {
   id: string;
@@ -135,7 +134,13 @@ type TrainingCalendarProps = {
 export default function TrainingCalendar({
   onSelectSession,
 }: TrainingCalendarProps) {
-  const handleEventClick = (arg: EventClickArg) => {
+  type CalendarClickArg = {
+    event: {
+      extendedProps: unknown;
+    };
+  };
+
+  const handleEventClick = (arg: CalendarClickArg) => {
     const session = arg.event.extendedProps as SessionEvent;
     onSelectSession(session);
   };
