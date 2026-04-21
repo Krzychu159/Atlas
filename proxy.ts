@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
-function getDashboardByRole(role?: string) {
+function getHomeByRole(role?: string) {
   switch (role) {
-    case "Owner":
+    case "owner":
       return "/owner";
-    case "Trainer":
+    case "trainer":
       return "/trainer";
-    case "Client":
+    case "client":
       return "/client";
     default:
       return "/login";
@@ -16,37 +16,56 @@ function getDashboardByRole(role?: string) {
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  const token = req.cookies.get("auth_token")?.value;
-  const role = req.cookies.get("user_role")?.value;
+  const token = req.cookies.get("accessToken")?.value;
+  const role = req.cookies.get("role")?.value;
 
-  const isAuthPage = pathname.startsWith("/login");
+  const isAuthPage =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/forgot-password");
+
   const isOwnerRoute = pathname.startsWith("/owner");
   const isTrainerRoute = pathname.startsWith("/trainer");
   const isClientRoute = pathname.startsWith("/client");
 
-  if (!token && (isOwnerRoute || isTrainerRoute || isClientRoute)) {
+  if (pathname === "/") {
+    return NextResponse.redirect(new URL(getHomeByRole(role), req.url));
+  }
+
+  if (isAuthPage) {
+    if (token && role) {
+      return NextResponse.redirect(new URL(getHomeByRole(role), req.url));
+    }
+    return NextResponse.next();
+  }
+
+  if (!token || !role) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  if (token && isAuthPage) {
-    return NextResponse.redirect(new URL(getDashboardByRole(role), req.url));
+  if (isOwnerRoute && role !== "owner") {
+    return NextResponse.redirect(new URL(getHomeByRole(role), req.url));
   }
 
-  if (token && isOwnerRoute && role !== "Owner") {
-    return NextResponse.redirect(new URL(getDashboardByRole(role), req.url));
+  if (isTrainerRoute && role !== "trainer") {
+    return NextResponse.redirect(new URL(getHomeByRole(role), req.url));
   }
 
-  if (token && isTrainerRoute && role !== "Trainer") {
-    return NextResponse.redirect(new URL(getDashboardByRole(role), req.url));
-  }
-
-  if (token && isClientRoute && role !== "Client") {
-    return NextResponse.redirect(new URL(getDashboardByRole(role), req.url));
+  if (isClientRoute && role !== "client") {
+    return NextResponse.redirect(new URL(getHomeByRole(role), req.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/login", "/owner/:path*", "/trainer/:path*", "/client/:path*"],
+  matcher: [
+    "/",
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/owner/:path*",
+    "/trainer/:path*",
+    "/client/:path*",
+  ],
 };

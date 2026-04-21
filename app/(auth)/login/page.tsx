@@ -6,14 +6,14 @@ import { AtSign, Lock, ArrowRight, Eye, EyeOff, Dumbbell } from "lucide-react";
 
 function getRedirectPath(role?: string) {
   switch (role) {
-    case "Owner":
+    case "owner":
       return "/owner";
-    case "Trainer":
+    case "trainer":
       return "/trainer";
-    case "Client":
+    case "client":
       return "/client";
     default:
-      return "/";
+      return "/login";
   }
 }
 
@@ -36,7 +36,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/login", {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -55,7 +55,7 @@ export default function LoginPage() {
       }
 
       const role = data?.user?.role;
-      router.push(getRedirectPath(role));
+      router.replace(getRedirectPath(role));
       router.refresh();
     } catch (err) {
       setError(
@@ -67,32 +67,31 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-surface text-on-surface overflow-hidden">
+    <div className="min-h-screen overflow-hidden bg-surface text-on-surface">
       <div className="relative min-h-screen">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,82,255,0.14),transparent_30%)] pointer-events-none" />
-        <div className="absolute left-0 bottom-0 h-[320px] w-[320px] bg-[radial-gradient(circle,rgba(0,118,51,0.12),transparent_60%)] pointer-events-none" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,82,255,0.14),transparent_30%)]" />
+        <div className="pointer-events-none absolute bottom-0 left-0 h-[320px] w-[320px] bg-[radial-gradient(circle,rgba(0,118,51,0.12),transparent_60%)]" />
 
-        {/* Desktop */}
-        <div className="hidden lg:flex min-h-screen flex-col">
+        <div className="hidden min-h-screen flex-col lg:flex">
           <header className="relative z-10 px-9 pt-8">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-2xl bg-primary flex items-center justify-center shadow-soft">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary shadow-soft">
                   <Dumbbell size={18} className="text-on-primary" />
                 </div>
 
                 <div>
-                  <p className="text-[2rem] leading-none font-semibold tracking-tight">
+                  <p className="text-[2rem] font-semibold leading-none tracking-tight">
                     ATLAS
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-9">
-                <button className="text-label text-on-surface-variant hover:text-on-surface transition-colors">
+                <button className="text-label text-on-surface-variant transition-colors hover:text-on-surface">
                   Poproś o dostęp
                 </button>
-                <button className="text-label text-on-surface-variant hover:text-on-surface transition-colors">
+                <button className="text-label text-on-surface-variant transition-colors hover:text-on-surface">
                   Wsparcie
                 </button>
               </div>
@@ -101,8 +100,8 @@ export default function LoginPage() {
 
           <main className="relative z-10 flex-1 px-9 pb-8 pt-10">
             <div className="mx-auto max-w-[1180px]">
-              <div className="grid grid-cols-[1fr_0.92fr] rounded-[32px] overflow-hidden border border-white/8 bg-surface-container shadow-[0_24px_80px_rgba(0,0,0,0.32)]">
-                <section className="relative min-h-[690px] p-12 flex flex-col justify-between overflow-hidden">
+              <div className="grid overflow-hidden rounded-[32px] border border-white/8 bg-surface-container shadow-[0_24px_80px_rgba(0,0,0,0.32)] grid-cols-[1fr_0.92fr]">
+                <section className="relative flex min-h-[690px] flex-col justify-between overflow-hidden p-12">
                   <div className="absolute inset-0">
                     <img
                       src="https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1600&auto=format&fit=crop"
@@ -114,7 +113,7 @@ export default function LoginPage() {
                   </div>
 
                   <div className="relative z-10 max-w-[470px]">
-                    <h1 className="mt-10 text-[4.6rem] leading-[0.92] font-semibold font-display tracking-[-0.04em]">
+                    <h1 className="mt-10 font-display text-[4.6rem] font-semibold leading-[0.92] tracking-[-0.04em]">
                       Zarządzaj swoim
                       <br />
                       <span className="text-primary-light">Studiem</span>
@@ -131,7 +130,7 @@ export default function LoginPage() {
 
                   <div className="relative z-10 flex items-center gap-7">
                     <div>
-                      <p className="text-[2.3rem] leading-none font-semibold">
+                      <p className="text-[2.3rem] font-semibold leading-none">
                         4.9/5
                       </p>
                       <p className="mt-2 text-label text-white/70">
@@ -142,7 +141,7 @@ export default function LoginPage() {
                     <div className="h-11 w-px bg-white/12" />
 
                     <div>
-                      <p className="text-[2.3rem] leading-none font-semibold">
+                      <p className="text-[2.3rem] font-semibold leading-none">
                         12k+
                       </p>
                       <p className="mt-2 text-label text-white/70">
@@ -152,35 +151,35 @@ export default function LoginPage() {
                   </div>
                 </section>
 
-                <section className="bg-surface-container p-12 flex flex-col justify-between">
+                <section className="flex flex-col justify-between bg-surface-container p-12">
                   <div>
-                    <div className="max-w-[460px] mx-auto">
-                      <h2 className="text-[2.25rem] leading-none font-semibold tracking-tight">
+                    <div className="mx-auto max-w-[460px]">
+                      <h2 className="text-[2.25rem] font-semibold leading-none tracking-tight">
                         Zaloguj się
                       </h2>
-                      <p className="mt-4 text-[1.05rem] text-on-surface-variant leading-8">
+                      <p className="mt-4 text-[1.05rem] leading-8 text-on-surface-variant">
                         Wprowadź swoje dane, aby uzyskać dostęp.
                       </p>
 
                       <form className="mt-12 space-y-7" onSubmit={handleSubmit}>
                         <div>
-                          <label className="block mb-3 text-label text-on-surface-variant">
+                          <label className="mb-3 block text-label text-on-surface-variant">
                             Adres e-mail
                           </label>
 
-                          <div className="h-16 rounded-[24px] bg-surface-container-lowest px-5 flex items-center gap-4">
+                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5">
                             <input
                               type="email"
                               placeholder="nazwa@studio.pl"
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
-                              className="w-full bg-transparent outline-none text-[1.05rem] placeholder:text-on-surface-muted"
+                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted"
                               autoComplete="email"
                               required
                             />
                             <AtSign
                               size={22}
-                              className="text-on-surface-muted shrink-0"
+                              className="shrink-0 text-on-surface-muted"
                             />
                           </div>
                         </div>
@@ -193,19 +192,19 @@ export default function LoginPage() {
 
                             <button
                               type="button"
-                              className="text-label text-primary-light hover:text-on-surface transition-colors"
+                              className="text-label text-primary-light transition-colors hover:text-on-surface"
                             >
                               Zapomniałeś hasła?
                             </button>
                           </div>
 
-                          <div className="h-16 rounded-[24px] bg-surface-container-lowest px-5 flex items-center gap-4">
+                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5">
                             <input
                               type={showPassword ? "text" : "password"}
                               placeholder="••••••••"
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
-                              className="w-full bg-transparent outline-none text-[1.05rem] placeholder:text-on-surface-muted"
+                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted"
                               autoComplete="current-password"
                               required
                             />
@@ -213,7 +212,7 @@ export default function LoginPage() {
                             <button
                               type="button"
                               onClick={() => setShowPassword((prev) => !prev)}
-                              className="text-on-surface-muted shrink-0"
+                              className="shrink-0 text-on-surface-muted"
                               aria-label={
                                 showPassword ? "Ukryj hasło" : "Pokaż hasło"
                               }
@@ -227,12 +226,12 @@ export default function LoginPage() {
                           </div>
                         </div>
 
-                        <label className="flex items-center gap-4 cursor-pointer select-none">
+                        <label className="flex cursor-pointer select-none items-center gap-4">
                           <input
                             type="checkbox"
                             checked={rememberMe}
                             onChange={(e) => setRememberMe(e.target.checked)}
-                            className="h-5 w-5 rounded border border-white/10 bg-surface-container-lowest shrink-0"
+                            className="h-5 w-5 shrink-0 rounded border border-white/10 bg-surface-container-lowest"
                           />
                           <span className="text-[1rem] text-on-surface-variant">
                             Zapamiętaj mnie przez 30 dni
@@ -246,7 +245,7 @@ export default function LoginPage() {
                         <button
                           type="submit"
                           disabled={isSubmitting}
-                          className="w-full h-[66px] rounded-[24px] bg-primary-gradient text-white font-semibold text-[1.05rem] shadow-ambient flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed"
+                          className="flex h-[66px] w-full items-center justify-center gap-3 rounded-[24px] bg-primary-gradient text-[1.05rem] font-semibold text-white shadow-ambient disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {isSubmitting ? "Logowanie..." : "Zaloguj się"}
                           <ArrowRight size={18} />
@@ -256,7 +255,7 @@ export default function LoginPage() {
                       <div className="mt-12 border-t border-white/5 pt-10 text-center">
                         <p className="text-[1rem] text-on-surface-variant">
                           Pierwszy raz w Atlas?{" "}
-                          <button className="font-semibold text-on-surface hover:text-primary-light transition-colors">
+                          <button className="font-semibold text-on-surface transition-colors hover:text-primary-light">
                             Poproś o dostęp operacyjny
                           </button>
                         </p>
@@ -269,63 +268,62 @@ export default function LoginPage() {
           </main>
 
           <footer className="relative z-10 px-9 pb-8">
-            <div className="mx-auto max-w-[1180px] flex items-center justify-center gap-8 text-on-surface-muted">
+            <div className="mx-auto flex max-w-[1180px] items-center justify-center gap-8 text-on-surface-muted">
               <span className="text-label">© 2024 Atlas Kinetic Ops</span>
-              <button className="text-label hover:text-on-surface transition-colors">
+              <button className="text-label transition-colors hover:text-on-surface">
                 Prywatność
               </button>
-              <button className="text-label hover:text-on-surface transition-colors">
+              <button className="text-label transition-colors hover:text-on-surface">
                 Warunki
               </button>
-              <button className="text-label hover:text-on-surface transition-colors">
+              <button className="text-label transition-colors hover:text-on-surface">
                 Wsparcie
               </button>
             </div>
           </footer>
         </div>
 
-        {/* Mobile */}
-        <div className="lg:hidden min-h-screen flex flex-col px-6 pt-8 pb-10">
+        <div className="flex min-h-screen flex-col px-6 pb-10 pt-8 lg:hidden">
           <header className="flex items-center gap-4">
-            <div className="h-10 w-10 rounded-2xl bg-primary flex items-center justify-center shadow-soft">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary shadow-soft">
               <Dumbbell size={18} className="text-on-primary" />
             </div>
 
-            <p className="text-[2rem] leading-none font-semibold tracking-tight">
+            <p className="text-[2rem] font-semibold leading-none tracking-tight">
               ATLAS
             </p>
           </header>
 
-          <main className="flex-1 flex flex-col pt-10">
+          <main className="flex flex-1 flex-col pt-10">
             <div>
-              <h1 className="text-[4.2rem] leading-[0.88] font-semibold font-display tracking-[-0.05em]">
+              <h1 className="font-display text-[4.2rem] font-semibold leading-[0.88] tracking-[-0.05em]">
                 UWOLNIJ
                 <br />
                 <span className="text-primary">POTENCJAŁ.</span>
               </h1>
 
-              <p className="mt-5 text-[1.05rem] leading-8 text-on-surface-muted uppercase tracking-[0.03em]">
+              <p className="mt-5 text-[1.05rem] uppercase leading-8 tracking-[0.03em] text-on-surface-muted">
                 Zaloguj się do swojego centrum dowodzenia
               </p>
             </div>
 
             <form className="mt-12 space-y-7" onSubmit={handleSubmit}>
               <div>
-                <label className="block mb-3 text-label text-on-surface-variant">
+                <label className="mb-3 block text-label text-on-surface-variant">
                   Adres e-mail
                 </label>
 
-                <div className="h-16 rounded-[24px] bg-surface-container-lowest px-5 flex items-center gap-4">
+                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5">
                   <AtSign
                     size={22}
-                    className="text-on-surface-muted shrink-0"
+                    className="shrink-0 text-on-surface-muted"
                   />
                   <input
                     type="email"
                     placeholder="nazwa@atlasops.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-transparent outline-none text-[1.05rem] placeholder:text-on-surface-muted"
+                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted"
                     autoComplete="email"
                     required
                   />
@@ -333,25 +331,25 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block mb-3 text-label text-on-surface-variant">
+                <label className="mb-3 block text-label text-on-surface-variant">
                   Klucz bezpieczeństwa
                 </label>
 
-                <div className="h-16 rounded-[24px] bg-surface-container-lowest px-5 flex items-center gap-4">
-                  <Lock size={22} className="text-on-surface-muted shrink-0" />
+                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5">
+                  <Lock size={22} className="shrink-0 text-on-surface-muted" />
                   <input
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-transparent outline-none text-[1.05rem] placeholder:text-on-surface-muted"
+                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted"
                     autoComplete="current-password"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    className="text-on-surface-muted shrink-0"
+                    className="shrink-0 text-on-surface-muted"
                     aria-label={showPassword ? "Ukryj hasło" : "Pokaż hasło"}
                   >
                     {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
@@ -360,14 +358,14 @@ export default function LoginPage() {
               </div>
 
               <div className="flex items-center justify-between gap-4">
-                <label className="flex items-center gap-4 cursor-pointer select-none">
+                <label className="flex cursor-pointer select-none items-center gap-4">
                   <input
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="h-5 w-5 rounded border border-white/10 bg-surface-container-lowest shrink-0"
+                    className="h-5 w-5 shrink-0 rounded border border-white/10 bg-surface-container-lowest"
                   />
-                  <span className="text-[1rem] text-on-surface-variant uppercase tracking-[0.04em]">
+                  <span className="text-[1rem] uppercase tracking-[0.04em] text-on-surface-variant">
                     Zapamiętaj mnie
                   </span>
                 </label>
@@ -385,7 +383,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full h-[74px] rounded-[26px] bg-primary-gradient text-white font-semibold text-[1.15rem] shadow-ambient flex items-center justify-center gap-4 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex h-[74px] w-full items-center justify-center gap-4 rounded-[26px] bg-primary-gradient text-[1.15rem] font-semibold text-white shadow-ambient disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSubmitting ? "Logowanie..." : "Zaloguj się"}
                 <ArrowRight size={22} />
@@ -393,15 +391,15 @@ export default function LoginPage() {
             </form>
 
             <div className="mt-14 grid grid-cols-2 gap-4">
-              <button className="h-28 rounded-[26px] bg-surface-container px-6 flex items-center justify-center gap-4">
-                <div className="h-8 w-8 rounded-[10px] bg-surface-container-low flex items-center justify-center text-primary-light text-sm font-semibold">
+              <button className="flex h-28 items-center justify-center gap-4 rounded-[26px] bg-surface-container px-6">
+                <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-surface-container-low text-sm font-semibold text-primary-light">
                   G
                 </div>
                 <span className="text-label text-on-surface">Google</span>
               </button>
 
-              <button className="h-28 rounded-[26px] bg-surface-container px-6 flex items-center justify-center gap-4">
-                <div className="h-8 w-8 rounded-[10px] bg-surface-container-low flex items-center justify-center text-on-surface text-sm font-semibold">
+              <button className="flex h-28 items-center justify-center gap-4 rounded-[26px] bg-surface-container px-6">
+                <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-surface-container-low text-sm font-semibold text-on-surface">
                   iOS
                 </div>
                 <span className="text-label text-on-surface">Apple ID</span>
@@ -415,13 +413,13 @@ export default function LoginPage() {
             </p>
 
             <div className="mt-8 flex items-center justify-center gap-8">
-              <button className="text-label text-on-surface-muted hover:text-on-surface transition-colors">
+              <button className="text-label text-on-surface-muted transition-colors hover:text-on-surface">
                 Prywatność
               </button>
-              <button className="text-label text-on-surface-muted hover:text-on-surface transition-colors">
+              <button className="text-label text-on-surface-muted transition-colors hover:text-on-surface">
                 Warunki
               </button>
-              <button className="text-label text-on-surface-muted hover:text-on-surface transition-colors">
+              <button className="text-label text-on-surface-muted transition-colors hover:text-on-surface">
                 Wsparcie
               </button>
             </div>
