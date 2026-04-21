@@ -31,6 +31,8 @@ export const navigationByRole: Record<AppRole, NavItem[]> = {
   ],
   client: [
     { label: "Dashboard", href: "/client", icon: LayoutDashboard },
+    { label: "Pay", href: "/client/payments", icon: Wallet },
+    { label: "Schedule", href: "/client/schedule", icon: CalendarDays },
     { label: "Settings", href: "/client/settings", icon: Settings },
   ],
 };

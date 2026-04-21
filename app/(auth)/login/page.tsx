@@ -269,7 +269,7 @@ export default function LoginPage() {
 
           <footer className="relative z-10 px-9 pb-8">
             <div className="mx-auto flex max-w-[1180px] items-center justify-center gap-8 text-on-surface-muted">
-              <span className="text-label">© 2024 Atlas Kinetic Ops</span>
+              <span className="text-label">© 2026 Atlas </span>
               <button className="text-label transition-colors hover:text-on-surface">
                 Prywatność
               </button>

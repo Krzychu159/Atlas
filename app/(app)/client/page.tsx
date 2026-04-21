@@ -1,252 +1,228 @@
-import { Button } from "@/app/components/ui/button";
 import {
-  Download,
   CalendarDays,
-  Banknote,
-  Users,
-  UserPlus,
-  CirclePlus,
-  CalendarPlus,
-  CircleDollarSign,
-  ChevronRight,
+  Clock3,
+  CreditCard,
+  Dumbbell,
+  MessageCircle,
+  ArrowRight,
+  TrendingUp,
+  Activity,
 } from "lucide-react";
-import Link from "next/link";
-import TrainingCalendar from "@/app/components/TrainingCalendar";
-import TodayScheduleCard from "@/app/components/TodayScheduleCard";
-import { LogoutButton } from "@/app/components/logoutButton";
-
-const boxes = [
-  {
-    title: "Monthly Revenue",
-    value: "$24,500",
-    change: "+12.5%",
-    subtitle: "+$4.2k from last month",
-    icon: <Banknote size={22} />,
-  },
-  {
-    title: "Active Members",
-    value: "48",
-    change: "+5.2%",
-    subtitle: "Current active clients",
-    icon: <Users size={22} />,
-  },
-  {
-    title: "New Signups",
-    value: "12",
-    change: "+2.1%",
-    subtitle: "Last 30 days",
-    icon: <UserPlus size={22} />,
-  },
-];
-
-const topTrainers = [
-  {
-    name: "Jordan Davis",
-    role: "HIIT & Strength",
-    sessions: 142,
-  },
-  {
-    name: "Sarah Rivera",
-    role: "Yoga & Mobility",
-    sessions: 128,
-  },
-  {
-    name: "Marcus Chen",
-    role: "Boxing & Cardio",
-    sessions: 115,
-  },
-];
-
-const quickActions = [
-  {
-    title: "Add New Member",
-    description: "Register client to the system",
-    icon: <CirclePlus size={18} />,
-  },
-  {
-    title: "Schedule Session",
-    description: "Open training calendar",
-    icon: <CalendarPlus size={18} />,
-  },
-  {
-    title: "Change Packages",
-    description: "Update client subscription",
-    icon: <CircleDollarSign size={18} />,
-  },
-];
-
-function DashboardStatCard({
-  title,
-  value,
-  change,
-  subtitle,
-  icon,
-}: {
-  title: string;
-  value: string;
-  change: string;
-  subtitle: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="card-shell p-5 md:p-6 h-full">
-      <div className="flex justify-between items-start">
-        <div className="text-primary-light bg-surface-container-low p-3 rounded-2xl h-fit">
-          {icon}
-        </div>
-
-        <p className="text-success-toast-text text-label-sm bg-green-900/70 rounded-full px-2.5 py-1 h-fit">
-          {change}
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-2 mt-5">
-        <p className="text-sm md:text-base text-on-surface-variant">{title}</p>
-        <p className="text-[2rem] md:text-4xl font-semibold leading-none tracking-tight">
-          {value}
-        </p>
-        <p className="text-label text-primary-light mt-1">{subtitle}</p>
-      </div>
-    </div>
-  );
-}
-
-function MobileMiniStat({
-  title,
-  value,
-  change,
-}: {
-  title: string;
-  value: string;
-  change: string;
-}) {
-  return (
-    <div className="card-shell p-5">
-      <p className="text-label text-on-surface-variant">{title}</p>
-      <div className="mt-4 flex items-end justify-between gap-3">
-        <p className="text-[2.4rem] font-semibold leading-none tracking-tight">
-          {value}
-        </p>
-        <p className="text-sm font-medium text-success-toast-text">{change}</p>
-      </div>
-    </div>
-  );
-}
 
 export default function DashboardPage() {
   return (
     <div className="max-w-[1000px] mx-auto">
       {/* Desktop */}
       <div className="hidden md:block">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-5">
-          <div className="max-w-[560px]">
-            <p className="text-label text-primary-light">Performance Hub</p>
-            <h1 className="mt-2 text-[2.25rem] leading-[0.95] mb-3 font-semibold font-display tracking-tight">
-              Dashboard <span className="text-primary-light">Overview</span>
-            </h1>
-            <LogoutButton />
+        <div className="flex flex-col gap-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="max-w-[760px]">
+              <p className="text-label text-on-surface-variant ">
+                Witaj, Marek!
+              </p>
+              <h1 className="mt-2 text-[2.25rem] leading-[0.95] font-semibold font-display tracking-tight">
+                Dziś jest środa, &nbsp;
+                <span className="text-primary-light">
+                  życzymy udanego treningu!
+                </span>
+              </h1>
+            </div>
           </div>
 
-          <div className="flex gap-4 ">
-            <Button
-              variant="secondary"
-              icon={<CalendarDays size={16} />}
-              className="h-16"
-            >
-              Last 30 Days
-            </Button>
+          <div className="grid grid-cols-[1.8fr_320px] gap-4 items-stretch">
+            <div className="card-shell p-6 min-h-[290px] flex flex-col justify-between relative overflow-hidden">
+              <div className="absolute right-8 top-8 text-on-surface-muted/25">
+                <Dumbbell size={96} strokeWidth={1.5} />
+              </div>
 
-            <Button
-              variant="primary"
-              icon={<Download size={16} className="h-16" />}
-            >
-              Export Reports
-            </Button>
-          </div>
-        </div>
+              <div className="relative z-10 max-w-[520px]">
+                <span className="inline-flex px-4 py-2 rounded-full bg-surface-container-low text-label text-primary-light">
+                  Kolejny trening
+                </span>
 
-        <div className="mt-4 grid grid-cols-3 gap-4">
-          {boxes.map((box, index) => (
-            <DashboardStatCard
-              key={index}
-              title={box.title}
-              value={box.value}
-              change={box.change}
-              subtitle={box.subtitle}
-              icon={box.icon}
-            />
-          ))}
+                <h2 className="mt-12 text-[2rem] leading-[1.1] font-semibold tracking-tight">
+                  Trening Personalny
+                  <br />z Jakubem Kowalskim
+                </h2>
+              </div>
 
-          <div className="col-span-2">
-            <TodayScheduleCard />
-          </div>
-
-          <div className="card-shell p-6">
-            <p className="text-section-title">Quick Actions</p>
-
-            <div className="flex flex-col gap-4 mt-5">
-              {quickActions.map((action) => (
-                <div
-                  key={action.title}
-                  className="bg-surface-container-low rounded-2xl p-3 flex gap-3 items-center"
-                >
-                  <div className="bg-surface-container p-3 rounded-xl text-primary-light shrink-0">
-                    {action.icon}
+              <div className="relative z-10 flex items-end justify-between gap-6">
+                <div>
+                  <div className="flex items-center gap-2 text-on-surface-variant">
+                    <CalendarDays size={15} />
+                    <p className="text-label">Jutro, 15 października</p>
                   </div>
 
-                  <div className="min-w-0">
-                    <p className="text-base font-medium truncate">
-                      {action.title}
-                    </p>
-                    <p className="text-xs text-on-surface-variant truncate">
-                      {action.description}
+                  <div className="mt-3 flex items-center gap-3">
+                    <Clock3 size={18} className="text-primary-light" />
+                    <p className="text-[2rem] leading-none font-semibold">
+                      10:30
                     </p>
                   </div>
                 </div>
-              ))}
+
+                <button className="h-14 px-7 rounded-[var(--radius-lg)] bg-primary text-on-primary font-semibold shadow-soft flex items-center gap-3 shrink-0">
+                  Potwierdź obecność
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="card-shell p-6 flex flex-col items-center text-center justify-between">
+              <div>
+                <p className="text-label text-on-surface-variant">
+                  Twój trener
+                </p>
+
+                <div className="relative mt-8 inline-flex">
+                  <div className="h-28 w-28 rounded-full p-[4px] bg-primary-gradient">
+                    <div className="h-full w-full rounded-full overflow-hidden bg-surface-container-low">
+                      <img
+                        src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=800&auto=format&fit=crop"
+                        alt="Jakub Kowalski"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  </div>
+
+                  <span className="absolute right-1 bottom-2 h-6 w-6 rounded-full bg-tertiary-light border-4 border-surface-container" />
+                </div>
+
+                <p className="mt-6 text-[1.75rem] leading-none font-semibold">
+                  Jakub Kowalski
+                </p>
+                <p className="mt-4 text-label text-primary-light leading-6">
+                  Specjalizacja: siła i
+                  <br />
+                  hipertrofia
+                </p>
+              </div>
+
+              <div className="mt-8 grid grid-cols-2 gap-3 w-full">
+                <button className="h-14 rounded-[var(--radius-lg)] bg-surface-container-low text-on-surface font-medium">
+                  Wiadomość
+                </button>
+                <button className="h-14 rounded-[var(--radius-lg)] bg-surface-container-low text-on-surface font-medium">
+                  Plan
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="col-span-2 card-shell p-6">
-            <div className="flex items-center justify-between">
-              <p className="text-section-title">Top Trainers</p>
-              <Link href="/trainers" className="text-label text-primary-light">
-                View All
-              </Link>
-            </div>
-
-            <div className="mt-5 grid grid-cols-3 gap-3">
-              {topTrainers.map((trainer) => (
-                <div
-                  key={trainer.name}
-                  className="bg-surface-container-low rounded-2xl px-4 py-4"
-                >
-                  <p className="text-base font-semibold">{trainer.name}</p>
-                  <p className="text-sm text-on-surface-variant mt-1">
-                    {trainer.role}
+          <div className="grid grid-cols-[1.15fr_1.15fr] gap-4">
+            <div className="card-shell p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-label text-on-surface-variant">
+                    Postęp w pakiecie
                   </p>
+                  <h3 className="mt-4 text-[2rem] leading-[1.12] font-semibold tracking-tight">
+                    Wykorzystano 8 z 12
+                    <br />
+                    treningów
+                  </h3>
+                </div>
 
-                  <div className="mt-4">
-                    <p className="text-2xl font-semibold leading-none">
-                      {trainer.sessions}
+                <span className="px-3 py-1 rounded-full bg-tertiary-container text-tertiary-light text-sm font-semibold shrink-0">
+                  67%
+                </span>
+              </div>
+
+              <div className="mt-8 h-4 rounded-full bg-surface-container-low overflow-hidden">
+                <div className="h-full w-[67%] rounded-full bg-primary-gradient" />
+              </div>
+
+              <div className="mt-5 flex items-center justify-between text-on-surface-variant">
+                <p className="text-label">Zrealizowane: 8</p>
+                <p className="text-label">Pozostało: 4</p>
+              </div>
+            </div>
+
+            <div className="card-shell p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 text-on-surface-variant">
+                    <CreditCard size={15} />
+                    <p className="text-label">Płatności</p>
+                  </div>
+
+                  <div className="mt-4 flex items-end gap-3">
+                    <p className="text-[3rem] leading-none font-semibold tracking-tight">
+                      150 PLN
                     </p>
-                    <p className="text-label text-on-surface-muted mt-1">
-                      Sessions
+                    <p className="text-base text-on-surface-variant mb-1">
+                      do zapłaty
                     </p>
                   </div>
                 </div>
-              ))}
+              </div>
+
+              <div className="mt-7 h-px bg-white/6" />
+
+              <div className="mt-6 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-label text-on-surface-variant">
+                    Termin płatności
+                  </p>
+                  <p className="mt-3 text-[1.45rem] leading-none font-semibold">
+                    25.10.2024
+                  </p>
+                </div>
+
+                <button className="h-14 px-7 rounded-[var(--radius-full)] bg-white text-black font-semibold shrink-0">
+                  Opłać teraz
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="card-shell p-6 bg-tertiary-container">
-            <p className="text-section-title text-tertiary-light">Retention</p>
-            <p className="text-sm text-green-100/80 mt-3 leading-6">
-              Your studio retention is up by 4.2% this month.
-            </p>
+          <div className="card-shell p-7 bg-surface-container-lowest">
+            <div className="grid grid-cols-[220px_1fr_1fr_1fr_1fr] gap-6 items-end">
+              <div>
+                <p className="text-[5rem] leading-none font-semibold tracking-tight text-primary-light">
+                  42
+                </p>
+                <p className="mt-4 text-[1.1rem] leading-[1.35] font-semibold">
+                  Łącznie
+                  <br />
+                  wykonano
+                  <br />
+                  treningów
+                  <br />w Atlas
+                </p>
+              </div>
 
-            <div className="mt-5 h-2 w-full rounded-full bg-white/15 overflow-hidden">
-              <div className="h-full w-[78%] rounded-full bg-tertiary-light" />
+              <div>
+                <p className="text-label text-on-surface-variant">Kalorie</p>
+                <p className="mt-4 text-[2rem] leading-none font-semibold">
+                  24,500 kcal
+                </p>
+              </div>
+
+              <div>
+                <p className="text-label text-on-surface-variant">Czas</p>
+                <p className="mt-4 text-[2rem] leading-none font-semibold">
+                  63h 20m
+                </p>
+              </div>
+
+              <div>
+                <p className="text-label text-on-surface-variant">Ciężar</p>
+                <p className="mt-4 text-[2rem] leading-none font-semibold">
+                  12,400 kg
+                </p>
+              </div>
+
+              <div>
+                <p className="text-label text-on-surface-variant">Aktywność</p>
+                <div className="mt-3 flex items-end gap-2 h-14">
+                  <span className="w-2 rounded-full bg-primary-light/50 h-4" />
+                  <span className="w-2 rounded-full bg-primary-light/60 h-8" />
+                  <span className="w-2 rounded-full bg-primary-light h-11" />
+                  <span className="w-2 rounded-full bg-primary-light/70 h-6" />
+                  <span className="w-2 rounded-full bg-primary-light/85 h-9" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -256,157 +232,121 @@ export default function DashboardPage() {
       <div className="md:hidden px-1 pb-6">
         <div className="flex flex-col gap-5">
           <div>
-            <p className="text-label text-primary-light">Morning, Coach</p>
-            <p className="text-page-title mt-2">Atlas Dashboard</p>
+            <p className="text-page-title">
+              Cześć Marek!
+              <br />
+              <span className="text-primary-light">Miłej środy!</span>
+            </p>
+            <p className="mt-5 text-label text-on-surface-variant">
+              Dzisiaj masz dzień regeneracji
+            </p>
           </div>
 
-          <div className="flex flex-col gap-3">
-            <Button
-              variant="secondary"
-              icon={<CalendarDays size={16} />}
-              className="w-fit"
-            >
-              Last 30 Days
-            </Button>
+          <div className="card-shell p-5 relative overflow-hidden">
+            <div className="absolute right-5 top-5 text-on-surface-muted/25">
+              <CalendarDays size={54} strokeWidth={1.5} />
+            </div>
 
-            <Button
-              variant="primary"
-              icon={<Download size={16} />}
-              className="w-fit"
-            >
-              Generate Report
-            </Button>
-          </div>
+            <p className="text-label text-primary-light">Kolejny trening</p>
+            <p className="mt-6 text-[2rem] leading-none font-semibold">
+              Jutro o 10:30
+            </p>
 
-          <div className="space-y-4">
-            <MobileMiniStat
-              title="Total Revenue"
-              value="$42.8k"
-              change="+12%"
-            />
-
-            <div className="card-shell p-5">
-              <p className="text-label text-on-surface-variant">
-                Active Members
+            <div className="mt-6 flex items-center gap-3">
+              <span className="h-3.5 w-3.5 rounded-full bg-tertiary-light" />
+              <p className="text-[1.1rem] text-on-surface-variant">
+                Gotowy na wyzwanie?
               </p>
+            </div>
+          </div>
 
-              <div className="mt-4 flex items-end gap-2">
-                <p className="text-[2.4rem] font-semibold leading-none tracking-tight">
-                  1,284
-                </p>
-                <p className="text-sm text-on-surface-variant mb-1">
-                  / 1,500 cap
-                </p>
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="card-shell p-5 min-h-[190px] flex flex-col justify-between">
+              <TrendingUp size={24} className="text-on-surface-variant" />
 
-              <div className="mt-5 h-1.5 w-full rounded-full bg-surface-container-lowest overflow-hidden">
-                <div className="h-full w-[82%] rounded-full bg-primary" />
+              <div>
+                <p className="text-[3.5rem] leading-none font-semibold text-primary-light">
+                  42
+                </p>
+                <p className="mt-4 text-label text-on-surface-variant leading-6">
+                  Treningi łącznie
+                </p>
               </div>
             </div>
 
-            <div className="card-shell p-5">
-              <p className="text-label text-on-surface-variant">New Signups</p>
+            <div className="card-shell p-5 min-h-[190px] flex flex-col justify-between border border-white/10">
+              <div className="flex items-start justify-between gap-3">
+                <CreditCard size={24} className="text-primary-light" />
+                <span className="px-3 py-1 rounded-full bg-error-container text-error-light text-sm font-semibold">
+                  Zaległość
+                </span>
+              </div>
 
-              <div className="mt-4 flex items-end gap-3">
-                <p className="text-[2.4rem] font-semibold leading-none tracking-tight">
-                  84
+              <div>
+                <p className="text-[2.4rem] leading-none font-semibold">
+                  150 PLN
                 </p>
-                <div className="flex -space-x-2 mb-1">
-                  <div className="h-8 w-8 rounded-full bg-surface-container-high border-2 border-surface" />
-                  <div className="h-8 w-8 rounded-full bg-surface-container-high border-2 border-surface" />
-                  <div className="h-8 w-8 rounded-full bg-surface-container-high border-2 border-surface" />
-                  <div className="h-8 min-w-8 px-2 rounded-full bg-surface-container-high border-2 border-surface text-[10px] flex items-center justify-center text-on-surface-variant">
-                    +12
-                  </div>
-                </div>
+                <p className="mt-4 text-label text-on-surface-variant">
+                  Do opłacenia
+                </p>
               </div>
             </div>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between">
-              <p className="text-section-title">Top Trainers</p>
-              <Link href="/trainers" className="text-label text-primary-light">
-                View All
-              </Link>
+          <div className="card-shell p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-label text-on-surface-variant">
+                  Twój pakiet
+                </p>
+                <p className="mt-4 text-[2rem] leading-none font-semibold">
+                  8/12 treningów
+                </p>
+              </div>
+
+              <p className="text-[2.3rem] leading-none font-semibold text-primary-light">
+                66%
+              </p>
             </div>
 
-            <div className="card-shell p-4 mt-4">
-              {topTrainers.map((trainer, index) => (
-                <div
-                  key={trainer.name}
-                  className={`flex items-center justify-between gap-3 py-3 ${
-                    index !== topTrainers.length - 1
-                      ? "border-b border-white/5"
-                      : ""
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <p className="text-base font-semibold truncate">
-                      {trainer.name}
-                    </p>
-                    <p className="text-sm text-on-surface-variant truncate">
-                      {trainer.role}
-                    </p>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <p className="text-2xl font-semibold leading-none">
-                      {trainer.sessions}
-                    </p>
-                    <p className="text-label text-on-surface-muted mt-1">
-                      Sessions
-                    </p>
-                  </div>
-                </div>
-              ))}
+            <div className="mt-6 h-3 rounded-full bg-surface-container-low overflow-hidden">
+              <div className="h-full w-[66%] rounded-full bg-primary-gradient" />
             </div>
           </div>
 
-          <div>
-            <p className="text-section-title">Quick Actions</p>
+          <div className="card-shell p-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="h-24 w-24 rounded-[18px] overflow-hidden bg-surface-container-low shrink-0">
+                <img
+                  src="https://images.unsplash.com/photo-1566753323558-f4e0952af115?q=80&w=800&auto=format&fit=crop"
+                  alt="Jakub Kowalski"
+                  className="h-full w-full object-cover"
+                />
+              </div>
 
-            <div className="mt-4 flex flex-col gap-4">
-              {quickActions.map((action) => (
-                <button
-                  key={action.title}
-                  className="card-shell p-4 flex items-center justify-between gap-4 text-left"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-12 w-12 rounded-full bg-surface-container-high flex items-center justify-center text-primary-light shrink-0">
-                      {action.icon}
-                    </div>
-
-                    <div className="min-w-0">
-                      <p className="text-base font-medium truncate">
-                        {action.title}
-                      </p>
-                      <p className="text-sm text-on-surface-variant truncate">
-                        {action.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  <ChevronRight
-                    size={18}
-                    className="text-on-surface-variant shrink-0"
-                  />
-                </button>
-              ))}
+              <div className="min-w-0">
+                <p className="text-label text-on-surface-variant">
+                  Twój trener
+                </p>
+                <p className="mt-3 text-[1.9rem] leading-none font-semibold truncate">
+                  Jakub Kowalski
+                </p>
+              </div>
             </div>
+
+            <button className="h-14 w-14 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant shrink-0">
+              <MessageCircle size={22} />
+            </button>
           </div>
 
-          <div className="card-shell p-5 bg-tertiary-container">
-            <p className="text-section-title text-tertiary-light">
-              Member Retention
-            </p>
-            <p className="mt-3 text-sm leading-6 text-green-100/80">
-              Your studio retention is up by 4.2% this month.
+          <div className="rounded-[28px] bg-primary-gradient p-8 text-[#06256d] shadow-ambient">
+            <p className="text-[2rem] leading-[1.25] font-medium max-w-[320px]">
+              Sprawdź nowe plany posiłków na ten tydzień!
             </p>
 
-            <div className="mt-5 h-2 w-full rounded-full bg-white/15 overflow-hidden">
-              <div className="h-full w-[93%] rounded-full bg-tertiary-light" />
-            </div>
+            <button className="mt-10 h-12 px-7 rounded-[18px] bg-white/80 text-primary font-semibold">
+              Odkryj teraz
+            </button>
           </div>
         </div>
       </div>
