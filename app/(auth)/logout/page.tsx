@@ -7,7 +7,7 @@ export default function LogoutPage() {
   const router = useRouter();
 
   useEffect(() => {
-    let isMounted = true;
+    let cancelled = false;
 
     async function logout() {
       try {
@@ -15,9 +15,10 @@ export default function LogoutPage() {
           method: "POST",
           cache: "no-store",
         });
-      } catch {
+      } catch (error) {
+        console.error("Logout error:", error);
       } finally {
-        if (isMounted) {
+        if (!cancelled) {
           router.replace("/login");
           router.refresh();
         }
@@ -27,7 +28,7 @@ export default function LogoutPage() {
     logout();
 
     return () => {
-      isMounted = false;
+      cancelled = true;
     };
   }, [router]);
 

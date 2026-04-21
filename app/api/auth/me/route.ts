@@ -9,7 +9,10 @@ export async function GET() {
   const userId = cookieStore.get("userId")?.value;
 
   if (!accessToken || !role || !userId) {
-    return NextResponse.json({ authenticated: false }, { status: 401 });
+    return NextResponse.json(
+      { authenticated: false, user: null },
+      { status: 401 },
+    );
   }
 
   return NextResponse.json({

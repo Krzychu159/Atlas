@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { Menu, X, Dumbbell, CircleUserRound } from "lucide-react";
 import { SidebarNav } from "@/app/components/sidebar-nav";
-import { Header } from "../components/header";
+import { Header } from "@/app/components/header";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
