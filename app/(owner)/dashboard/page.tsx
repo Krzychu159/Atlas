@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import TrainingCalendar from "@/app/components/TrainingCalendar";
 import TodayScheduleCard from "@/app/components/TodayScheduleCard";
+import { LogoutButton } from "@/app/components/logoutButton";
 
 const boxes = [
   {
@@ -143,6 +144,7 @@ export default function DashboardPage() {
             <h1 className="mt-2 text-[2.25rem] leading-[0.95] mb-3 font-semibold font-display tracking-tight">
               Dashboard <span className="text-primary-light">Overview</span>
             </h1>
+            <LogoutButton />
           </div>
 
           <div className="flex gap-4 ">

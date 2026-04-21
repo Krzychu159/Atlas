@@ -1,13 +1,71 @@
-import {
-  AtSign,
-  Lock,
-  ArrowRight,
-  Eye,
-  Dumbbell,
-  ChevronRight,
-} from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { AtSign, Lock, ArrowRight, Eye, EyeOff, Dumbbell } from "lucide-react";
+
+function getRedirectPath(role?: string) {
+  switch (role) {
+    case "Owner":
+      return "/owner";
+    case "Trainer":
+      return "/trainer";
+    case "Client":
+      return "/client";
+    default:
+      return "/";
+  }
+}
 
 export default function LoginPage() {
+  const router = useRouter();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    if (isSubmitting) return;
+
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          rememberMe,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Logowanie nie powiodło się.");
+      }
+
+      const role = data?.user?.role;
+      router.push(getRedirectPath(role));
+      router.refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Wystąpił nieoczekiwany błąd.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-surface text-on-surface overflow-hidden">
       <div className="relative min-h-screen">
@@ -56,10 +114,6 @@ export default function LoginPage() {
                   </div>
 
                   <div className="relative z-10 max-w-[470px]">
-                    <span className="inline-flex px-4 py-2 rounded-full bg-primary/30 text-primary-light text-label">
-                      Operacje kinetyczne
-                    </span>
-
                     <h1 className="mt-10 text-[4.6rem] leading-[0.92] font-semibold font-display tracking-[-0.04em]">
                       Zarządzaj swoim
                       <br />
@@ -108,7 +162,7 @@ export default function LoginPage() {
                         Wprowadź swoje dane, aby uzyskać dostęp.
                       </p>
 
-                      <form className="mt-12 space-y-7">
+                      <form className="mt-12 space-y-7" onSubmit={handleSubmit}>
                         <div>
                           <label className="block mb-3 text-label text-on-surface-variant">
                             Adres e-mail
@@ -118,7 +172,11 @@ export default function LoginPage() {
                             <input
                               type="email"
                               placeholder="nazwa@studio.pl"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
                               className="w-full bg-transparent outline-none text-[1.05rem] placeholder:text-on-surface-muted"
+                              autoComplete="email"
+                              required
                             />
                             <AtSign
                               size={22}
@@ -143,29 +201,54 @@ export default function LoginPage() {
 
                           <div className="h-16 rounded-[24px] bg-surface-container-lowest px-5 flex items-center gap-4">
                             <input
-                              type="password"
+                              type={showPassword ? "text" : "password"}
                               placeholder="••••••••"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
                               className="w-full bg-transparent outline-none text-[1.05rem] placeholder:text-on-surface-muted"
+                              autoComplete="current-password"
+                              required
                             />
-                            <Lock
-                              size={22}
+
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword((prev) => !prev)}
                               className="text-on-surface-muted shrink-0"
-                            />
+                              aria-label={
+                                showPassword ? "Ukryj hasło" : "Pokaż hasło"
+                              }
+                            >
+                              {showPassword ? (
+                                <EyeOff size={22} />
+                              ) : (
+                                <Eye size={22} />
+                              )}
+                            </button>
                           </div>
                         </div>
 
                         <label className="flex items-center gap-4 cursor-pointer select-none">
-                          <span className="h-5 w-5 rounded-full border border-white/10 bg-surface-container-lowest shrink-0" />
+                          <input
+                            type="checkbox"
+                            checked={rememberMe}
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                            className="h-5 w-5 rounded border border-white/10 bg-surface-container-lowest shrink-0"
+                          />
                           <span className="text-[1rem] text-on-surface-variant">
                             Zapamiętaj mnie przez 30 dni
                           </span>
                         </label>
 
+                        {error ? (
+                          <p className="text-sm text-red-400">{error}</p>
+                        ) : null}
+
                         <button
                           type="submit"
-                          className="w-full h-[66px] rounded-[24px] bg-primary-gradient text-white font-semibold text-[1.05rem] shadow-ambient flex items-center justify-center gap-3"
+                          disabled={isSubmitting}
+                          className="w-full h-[66px] rounded-[24px] bg-primary-gradient text-white font-semibold text-[1.05rem] shadow-ambient flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                          Zaloguj się
+                          {isSubmitting ? "Logowanie..." : "Zaloguj się"}
                           <ArrowRight size={18} />
                         </button>
                       </form>
@@ -226,7 +309,7 @@ export default function LoginPage() {
               </p>
             </div>
 
-            <form className="mt-12 space-y-7">
+            <form className="mt-12 space-y-7" onSubmit={handleSubmit}>
               <div>
                 <label className="block mb-3 text-label text-on-surface-variant">
                   Adres e-mail
@@ -240,7 +323,11 @@ export default function LoginPage() {
                   <input
                     type="email"
                     placeholder="nazwa@atlasops.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-transparent outline-none text-[1.05rem] placeholder:text-on-surface-muted"
+                    autoComplete="email"
+                    required
                   />
                 </div>
               </div>
@@ -253,17 +340,33 @@ export default function LoginPage() {
                 <div className="h-16 rounded-[24px] bg-surface-container-lowest px-5 flex items-center gap-4">
                   <Lock size={22} className="text-on-surface-muted shrink-0" />
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     className="w-full bg-transparent outline-none text-[1.05rem] placeholder:text-on-surface-muted"
+                    autoComplete="current-password"
+                    required
                   />
-                  <Eye size={22} className="text-on-surface-muted shrink-0" />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="text-on-surface-muted shrink-0"
+                    aria-label={showPassword ? "Ukryj hasło" : "Pokaż hasło"}
+                  >
+                    {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
+                  </button>
                 </div>
               </div>
 
               <div className="flex items-center justify-between gap-4">
                 <label className="flex items-center gap-4 cursor-pointer select-none">
-                  <span className="h-5 w-5 rounded-[8px] border border-white/10 bg-surface-container-lowest shrink-0" />
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-5 w-5 rounded border border-white/10 bg-surface-container-lowest shrink-0"
+                  />
                   <span className="text-[1rem] text-on-surface-variant uppercase tracking-[0.04em]">
                     Zapamiętaj mnie
                   </span>
@@ -277,11 +380,14 @@ export default function LoginPage() {
                 </button>
               </div>
 
+              {error ? <p className="text-sm text-red-400">{error}</p> : null}
+
               <button
                 type="submit"
-                className="w-full h-[74px] rounded-[26px] bg-primary-gradient text-white font-semibold text-[1.15rem] shadow-ambient flex items-center justify-center gap-4"
+                disabled={isSubmitting}
+                className="w-full h-[74px] rounded-[26px] bg-primary-gradient text-white font-semibold text-[1.15rem] shadow-ambient flex items-center justify-center gap-4 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Zaloguj się
+                {isSubmitting ? "Logowanie..." : "Zaloguj się"}
                 <ArrowRight size={22} />
               </button>
             </form>
