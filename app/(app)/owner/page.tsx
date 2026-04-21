@@ -11,7 +11,6 @@ import {
   ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
-import TrainingCalendar from "@/app/components/TrainingCalendar";
 import TodayScheduleCard from "@/app/components/TodayScheduleCard";
 import { LogoutButton } from "@/app/components/logoutButton";
 

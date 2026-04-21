@@ -5,14 +5,34 @@ import { useState } from "react";
 import { Menu, X, Dumbbell, CircleUserRound } from "lucide-react";
 import { SidebarNav } from "@/app/components/sidebar-nav";
 import { Header } from "@/app/components/header";
+import { navigationByRole, type AppRole } from "@/app/components/navigation";
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+type AppShellProps = {
+  children: ReactNode;
+  role: AppRole;
+};
+
+function getRoleSubtitle(role: AppRole) {
+  switch (role) {
+    case "owner":
+      return "Studio Management";
+    case "trainer":
+      return "Trainer Panel";
+    case "client":
+      return "Client Portal";
+    default:
+      return "Atlas";
+  }
+}
+
+export function AppShell({ children, role }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const subtitle = getRoleSubtitle(role);
+  const navItems = navigationByRole[role];
 
   return (
     <div className="min-h-screen bg-surface text-on-surface">
       <div className="min-h-screen md:grid md:grid-cols-[280px_1fr]">
-        {/* MOBILE */}
         <aside
           className={[
             "fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col bg-surface-container-low p-4 transition-transform duration-300 md:hidden",
@@ -28,9 +48,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <h1 className="font-display text-headline-sm font-bold leading-tight tracking-widest text-primary-light">
                   Atlas
                 </h1>
-                <p className="text-label text-on-surface-muted">
-                  Studio Manage
-                </p>
+                <p className="text-label text-on-surface-muted">{subtitle}</p>
               </div>
             </div>
 
@@ -45,7 +63,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <SidebarNav onNavigate={() => setMobileMenuOpen(false)} />
+            <SidebarNav
+              items={navItems}
+              onNavigate={() => setMobileMenuOpen(false)}
+            />
           </div>
 
           <div className="px-3 pb-2 pt-6">
@@ -58,7 +79,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        {/* DESKTOP */}
         <aside className="hidden md:block">
           <div className="sticky top-0 flex h-screen flex-col bg-surface-container-low px-4 py-4">
             <div className="mb-10 mt-4 flex items-center gap-3 pt-2">
@@ -69,14 +89,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <h1 className="font-display text-2xl font-bold leading-tight tracking-widest text-primary-light">
                   Atlas
                 </h1>
-                <p className="text-label text-on-surface-muted">
-                  Studio Management
-                </p>
+                <p className="text-label text-on-surface-muted">{subtitle}</p>
               </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <SidebarNav />
+              <SidebarNav items={navItems} />
             </div>
 
             <div className="px-3 pb-2 pt-6">
@@ -91,7 +109,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </aside>
 
         <div className="min-w-0">
-          {/* MOBILE HEADER */}
           <header className="sticky top-0 z-30 mb-6 flex max-w-full items-center justify-between bg-surface-container-low px-4 py-4 md:hidden">
             <div className="flex items-center justify-center gap-2">
               <button
@@ -114,7 +131,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <CircleUserRound width={32} height={32} />
           </header>
 
-          {/* DESKTOP HEADER */}
           <div className="hidden md:block">
             <Header />
           </div>
@@ -125,7 +141,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      {/* MOBILE OVERLAY */}
       {mobileMenuOpen && (
         <button
           type="button"
