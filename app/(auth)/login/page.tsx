@@ -17,6 +17,47 @@ function getRedirectPath(role?: string) {
   }
 }
 
+function LoginLoadingOverlay() {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-surface-bright/60 px-6 backdrop-blur-[20px]"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="relative w-full max-w-[380px] overflow-hidden rounded-[32px] bg-surface-container-high p-8 shadow-[0_20px_40px_rgba(12,14,16,0.55)]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(183,196,255,0.18),transparent_42%)]" />
+
+        <div className="relative flex flex-col items-center text-center">
+          <div className="relative flex h-20 w-20 items-center justify-center rounded-[28px] bg-surface-container-lowest">
+            <div className="absolute h-20 w-20 animate-spin rounded-[28px] border-[3px] border-white/10 border-t-primary-light" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-gradient shadow-ambient">
+              <Dumbbell size={20} className="text-white" />
+            </div>
+          </div>
+
+          <p className="mt-7 text-label uppercase tracking-[0.08em] text-primary-light">
+            Autoryzacja
+          </p>
+
+          <h3 className="mt-3 text-[1.8rem] font-semibold leading-none tracking-tight text-on-surface">
+            Logowanie...
+          </h3>
+
+          <p className="mt-4 max-w-[280px] text-[0.98rem] leading-7 text-on-surface-variant">
+            Sprawdzamy dane i przygotowujemy Twój panel Atlas.
+          </p>
+
+          <div className="mt-7 flex w-full gap-2">
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-container-lowest">
+              <div className="h-full w-2/3 animate-pulse rounded-full bg-primary-gradient" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
 
@@ -61,13 +102,15 @@ export default function LoginPage() {
       setError(
         err instanceof Error ? err.message : "Wystąpił nieoczekiwany błąd.",
       );
-    } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <div className="min-h-screen overflow-hidden bg-surface text-on-surface">
+    <div
+      className="min-h-screen overflow-hidden bg-surface text-on-surface"
+      aria-busy={isSubmitting}
+    >
       <div className="relative min-h-screen">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,82,255,0.14),transparent_30%)]" />
         <div className="pointer-events-none absolute bottom-0 left-0 h-[320px] w-[320px] bg-[radial-gradient(circle,rgba(0,118,51,0.12),transparent_60%)]" />
@@ -88,10 +131,18 @@ export default function LoginPage() {
               </div>
 
               <div className="flex items-center gap-9">
-                <button className="text-label text-on-surface-variant transition-colors hover:text-on-surface">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  className="text-label text-on-surface-variant transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+                >
                   Poproś o dostęp
                 </button>
-                <button className="text-label text-on-surface-variant transition-colors hover:text-on-surface">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  className="text-label text-on-surface-variant transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+                >
                   Wsparcie
                 </button>
               </div>
@@ -100,7 +151,7 @@ export default function LoginPage() {
 
           <main className="relative z-10 flex-1 px-9 pb-8 pt-10">
             <div className="mx-auto max-w-[1180px]">
-              <div className="grid overflow-hidden rounded-[32px] border border-white/8 bg-surface-container shadow-[0_24px_80px_rgba(0,0,0,0.32)] grid-cols-[1fr_0.92fr]">
+              <div className="grid grid-cols-[1fr_0.92fr] overflow-hidden rounded-[32px] bg-surface-container shadow-[0_24px_80px_rgba(0,0,0,0.32)] outline outline-1 outline-white/[0.08]">
                 <section className="relative flex min-h-[690px] flex-col justify-between overflow-hidden p-12">
                   <div className="absolute inset-0">
                     <img
@@ -142,10 +193,10 @@ export default function LoginPage() {
 
                     <div>
                       <p className="text-[2.3rem] font-semibold leading-none">
-                        12k+
+                        100+
                       </p>
                       <p className="mt-2 text-label text-white/70">
-                        Aktywne studia
+                        Użytkowników
                       </p>
                     </div>
                   </div>
@@ -167,13 +218,14 @@ export default function LoginPage() {
                             Adres e-mail
                           </label>
 
-                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5">
+                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
                             <input
                               type="email"
                               placeholder="nazwa@studio.pl"
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
-                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted"
+                              disabled={isSubmitting}
+                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                               autoComplete="email"
                               required
                             />
@@ -192,19 +244,21 @@ export default function LoginPage() {
 
                             <button
                               type="button"
-                              className="text-label text-primary-light transition-colors hover:text-on-surface"
+                              disabled={isSubmitting}
+                              className="text-label text-primary-light transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
                             >
                               Zapomniałeś hasła?
                             </button>
                           </div>
 
-                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5">
+                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
                             <input
                               type={showPassword ? "text" : "password"}
                               placeholder="••••••••"
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
-                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted"
+                              disabled={isSubmitting}
+                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                               autoComplete="current-password"
                               required
                             />
@@ -212,7 +266,8 @@ export default function LoginPage() {
                             <button
                               type="button"
                               onClick={() => setShowPassword((prev) => !prev)}
-                              className="shrink-0 text-on-surface-muted"
+                              disabled={isSubmitting}
+                              className="shrink-0 text-on-surface-muted disabled:pointer-events-none disabled:opacity-50"
                               aria-label={
                                 showPassword ? "Ukryj hasło" : "Pokaż hasło"
                               }
@@ -231,10 +286,11 @@ export default function LoginPage() {
                             type="checkbox"
                             checked={rememberMe}
                             onChange={(e) => setRememberMe(e.target.checked)}
-                            className="h-5 w-5 shrink-0 rounded border border-white/10 bg-surface-container-lowest"
+                            disabled={isSubmitting}
+                            className="h-5 w-5 shrink-0 rounded border border-white/10 bg-surface-container-lowest disabled:cursor-not-allowed"
                           />
                           <span className="text-[1rem] text-on-surface-variant">
-                            Zapamiętaj mnie przez 30 dni
+                            Zapamiętaj mnie
                           </span>
                         </label>
 
@@ -245,7 +301,7 @@ export default function LoginPage() {
                         <button
                           type="submit"
                           disabled={isSubmitting}
-                          className="flex h-[66px] w-full items-center justify-center gap-3 rounded-[24px] bg-primary-gradient text-[1.05rem] font-semibold text-white shadow-ambient disabled:cursor-not-allowed disabled:opacity-60"
+                          className="flex h-[66px] w-full items-center justify-center gap-3 rounded-[24px] bg-primary-gradient text-[1.05rem] font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
                         >
                           {isSubmitting ? "Logowanie..." : "Zaloguj się"}
                           <ArrowRight size={18} />
@@ -255,8 +311,12 @@ export default function LoginPage() {
                       <div className="mt-12 border-t border-white/5 pt-10 text-center">
                         <p className="text-[1rem] text-on-surface-variant">
                           Pierwszy raz w Atlas?{" "}
-                          <button className="font-semibold text-on-surface transition-colors hover:text-primary-light">
-                            Poproś o dostęp operacyjny
+                          <button
+                            type="button"
+                            disabled={isSubmitting}
+                            className="font-semibold text-on-surface transition-colors hover:text-primary-light disabled:pointer-events-none disabled:opacity-50"
+                          >
+                            Poproś o dostęp
                           </button>
                         </p>
                       </div>
@@ -270,13 +330,25 @@ export default function LoginPage() {
           <footer className="relative z-10 px-9 pb-8">
             <div className="mx-auto flex max-w-[1180px] items-center justify-center gap-8 text-on-surface-muted">
               <span className="text-label">© 2026 Atlas </span>
-              <button className="text-label transition-colors hover:text-on-surface">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                className="text-label transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+              >
                 Prywatność
               </button>
-              <button className="text-label transition-colors hover:text-on-surface">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                className="text-label transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+              >
                 Warunki
               </button>
-              <button className="text-label transition-colors hover:text-on-surface">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                className="text-label transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+              >
                 Wsparcie
               </button>
             </div>
@@ -313,7 +385,7 @@ export default function LoginPage() {
                   Adres e-mail
                 </label>
 
-                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5">
+                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
                   <AtSign
                     size={22}
                     className="shrink-0 text-on-surface-muted"
@@ -323,7 +395,8 @@ export default function LoginPage() {
                     placeholder="nazwa@atlasops.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted"
+                    disabled={isSubmitting}
+                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                     autoComplete="email"
                     required
                   />
@@ -335,21 +408,23 @@ export default function LoginPage() {
                   Klucz bezpieczeństwa
                 </label>
 
-                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5">
+                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
                   <Lock size={22} className="shrink-0 text-on-surface-muted" />
                   <input
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted"
+                    disabled={isSubmitting}
+                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                     autoComplete="current-password"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    className="shrink-0 text-on-surface-muted"
+                    disabled={isSubmitting}
+                    className="shrink-0 text-on-surface-muted disabled:pointer-events-none disabled:opacity-50"
                     aria-label={showPassword ? "Ukryj hasło" : "Pokaż hasło"}
                   >
                     {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
@@ -363,7 +438,8 @@ export default function LoginPage() {
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="h-5 w-5 shrink-0 rounded border border-white/10 bg-surface-container-lowest"
+                    disabled={isSubmitting}
+                    className="h-5 w-5 shrink-0 rounded border border-white/10 bg-surface-container-lowest disabled:cursor-not-allowed"
                   />
                   <span className="text-[1rem] uppercase tracking-[0.04em] text-on-surface-variant">
                     Zapamiętaj mnie
@@ -372,7 +448,8 @@ export default function LoginPage() {
 
                 <button
                   type="button"
-                  className="text-[1rem] font-medium uppercase tracking-[0.04em] text-primary-light"
+                  disabled={isSubmitting}
+                  className="text-[1rem] font-medium uppercase tracking-[0.04em] text-primary-light disabled:pointer-events-none disabled:opacity-50"
                 >
                   Zapomniałeś hasła?
                 </button>
@@ -383,7 +460,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex h-[74px] w-full items-center justify-center gap-4 rounded-[26px] bg-primary-gradient text-[1.15rem] font-semibold text-white shadow-ambient disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex h-[74px] w-full items-center justify-center gap-4 rounded-[26px] bg-primary-gradient text-[1.15rem] font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
               >
                 {isSubmitting ? "Logowanie..." : "Zaloguj się"}
                 <ArrowRight size={22} />
@@ -391,14 +468,22 @@ export default function LoginPage() {
             </form>
 
             <div className="mt-14 grid grid-cols-2 gap-4">
-              <button className="flex h-28 items-center justify-center gap-4 rounded-[26px] bg-surface-container px-6">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                className="flex h-28 items-center justify-center gap-4 rounded-[26px] bg-surface-container px-6 disabled:pointer-events-none disabled:opacity-50"
+              >
                 <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-surface-container-low text-sm font-semibold text-primary-light">
                   G
                 </div>
                 <span className="text-label text-on-surface">Google</span>
               </button>
 
-              <button className="flex h-28 items-center justify-center gap-4 rounded-[26px] bg-surface-container px-6">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                className="flex h-28 items-center justify-center gap-4 rounded-[26px] bg-surface-container px-6 disabled:pointer-events-none disabled:opacity-50"
+              >
                 <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-surface-container-low text-sm font-semibold text-on-surface">
                   iOS
                 </div>
@@ -409,22 +494,36 @@ export default function LoginPage() {
 
           <footer className="pt-14 text-center">
             <p className="text-label text-on-surface-muted">
-              © 2024 Atlas Kinetic Ops
+              © 2026 Atlas Kinetic Ops
             </p>
 
             <div className="mt-8 flex items-center justify-center gap-8">
-              <button className="text-label text-on-surface-muted transition-colors hover:text-on-surface">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                className="text-label text-on-surface-muted transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+              >
                 Prywatność
               </button>
-              <button className="text-label text-on-surface-muted transition-colors hover:text-on-surface">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                className="text-label text-on-surface-muted transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+              >
                 Warunki
               </button>
-              <button className="text-label text-on-surface-muted transition-colors hover:text-on-surface">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                className="text-label text-on-surface-muted transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+              >
                 Wsparcie
               </button>
             </div>
           </footer>
         </div>
+
+        {isSubmitting ? <LoginLoadingOverlay /> : null}
       </div>
     </div>
   );
