@@ -1,9 +1,5 @@
-import {
-  Bell,
-  CircleQuestionMark,
-  Search,
-  CircleUserRound,
-} from "lucide-react";
+import { Bell, LogOut, Search, CircleUserRound } from "lucide-react";
+import Link from "next/link";
 
 export function Header() {
   return (
@@ -22,7 +18,10 @@ export function Header() {
         </div>
         <div className="flex items-center gap-4 ml-16">
           <Bell width={18} height={18} />
-          <CircleQuestionMark width={18} height={18} />
+          <Link href="/logout">
+            {" "}
+            <LogOut width={18} height={18} />
+          </Link>
         </div>
       </div>
       <div className="flex px-4 gap-4">

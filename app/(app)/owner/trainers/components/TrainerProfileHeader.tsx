@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ChevronRight, Mail, Phone, Pencil, ShieldCheck } from "lucide-react";
+import { CornerDownLeft, Mail, Phone, Pencil, ShieldCheck } from "lucide-react";
 import type { Trainer } from "@/app/lib/owner/trainers";
+import { Button } from "@/app/components/ui/button";
 
 function getInitials(trainer: Trainer) {
   const name = trainer.fullName || `${trainer.firstName} ${trainer.lastName}`;
@@ -71,18 +72,17 @@ export default function TrainerProfileHeader({
         </div>
 
         <div className="flex md:flex-col gap-3 md:min-w-[190px]">
-          <button className="h-12 md:h-14 flex-1 rounded-[var(--radius-lg)] bg-primary text-on-primary font-semibold flex items-center justify-center gap-2">
+          <Button className="h-12 md:h-14 flex-1 rounded-[var(--radius-lg)] bg-primary text-on-primary font-semibold flex items-center justify-center gap-2">
             <Pencil size={16} />
             Edytuj
-          </button>
+          </Button>
 
-          <Link
-            href="/owner/trainers"
-            className="h-12 md:h-14 flex-1 rounded-[var(--radius-lg)] bg-surface-container-low text-on-surface font-semibold flex items-center justify-center gap-2"
-          >
-            Wróć
-            <ChevronRight size={16} />
-          </Link>
+          <Button className="h-12 md:h-14 flex-1 rounded-[var(--radius-lg)] bg-surface-container-low text-on-surface font-semibold flex items-center justify-center gap-2">
+            <Link href="/owner/trainers" className="flex items-center gap-2">
+              <CornerDownLeft size={16} />
+              Wróć
+            </Link>
+          </Button>
         </div>
       </div>
     </div>
