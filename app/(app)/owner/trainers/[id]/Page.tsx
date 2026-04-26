@@ -9,7 +9,6 @@ import TrainerProfileDetails from "../components/TrainerProfileDetails";
 
 export default function TrainerPage() {
   const params = useParams<{ id: string }>();
-
   const [trainer, setTrainer] = useState<Trainer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -22,7 +21,7 @@ export default function TrainerPage() {
         const trainerId = Number(params.id);
 
         if (!trainerId) {
-          setError("Nieprawidłowe ID trenera");
+          setError("Nieprawidłowe ID trenera.");
           return;
         }
 
@@ -30,7 +29,7 @@ export default function TrainerPage() {
         setTrainer(data);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Nie udało się pobrać trenera",
+          err instanceof Error ? err.message : "Nie udało się pobrać trenera.",
         );
       } finally {
         setIsLoading(false);
