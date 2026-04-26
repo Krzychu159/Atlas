@@ -1,33 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Camera, Link as LinkIcon, X } from "lucide-react";
-import type { CreateClientPayload } from "@/app/lib/owner/clients";
+import { Camera, X } from "lucide-react";
+import type { CreateTrainerPayload } from "@/app/lib/owner/trainers";
 
-type AddClientModalProps = {
+type AddTrainerModalProps = {
   open: boolean;
   isSubmitting: boolean;
   onClose: () => void;
-  onSubmit: (payload: CreateClientPayload) => Promise<void>;
+  onSubmit: (payload: CreateTrainerPayload) => Promise<void>;
 };
 
 const initialForm = {
   firstName: "",
   lastName: "",
   email: "",
-  phoneNumber: "",
+  password: "",
+  phone: "",
+  bio: "",
   avatarUrl: "",
-  goal: "",
-  notes: "",
-  googleSheetUrl: "",
+  experienceYears: "",
+  hourlyRate: "",
 };
 
-export default function AddClientModal({
+export default function AddTrainerModal({
   open,
   isSubmitting,
   onClose,
   onSubmit,
-}: AddClientModalProps) {
+}: AddTrainerModalProps) {
   const [form, setForm] = useState(initialForm);
 
   useEffect(() => {
@@ -48,21 +49,18 @@ export default function AddClientModal({
 
   const handleSubmit = async () => {
     await onSubmit({
-      trainerId: 0,
-      activePackageId: 0,
+      email: form.email,
+      password: form.password,
       firstName: form.firstName,
       lastName: form.lastName,
-      email: form.email,
-      phoneNumber: form.phoneNumber,
+      bio: form.bio,
+      phone: form.phone,
       avatarUrl: form.avatarUrl,
-      goal: form.goal,
-      notes: form.notes || form.googleSheetUrl,
-      progressPercent: 0,
-      billingStatus: "Oczekujący",
-      status: "active",
-      nextSessionAt: null,
+      status: "Active",
+      experienceYears: Number(form.experienceYears || 0),
+      hourlyRate: Number(form.hourlyRate || 0),
       createdBy: 0,
-      locationId: 0,
+      locationIds: [],
     });
 
     setForm(initialForm);
@@ -86,10 +84,10 @@ export default function AddClientModal({
 
         <div className="pr-10">
           <p className="text-[2rem] leading-none font-semibold tracking-tight">
-            Dodaj Nowego Klienta
+            Dodaj Nowego Trenera
           </p>
           <p className="mt-4 text-base leading-7 text-on-surface-variant">
-            Wprowadź dane klienta, aby rozpocząć współpracę.
+            Wprowadź dane trenera, aby dodać go do zespołu studia.
           </p>
         </div>
 
@@ -124,7 +122,20 @@ export default function AddClientModal({
           <input
             value={form.email}
             onChange={(event) => updateField("email", event.target.value)}
-            placeholder="jan.kowalski@example.com"
+            placeholder="trainer@atlas-crm.com"
+            className="mt-2 h-14 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 outline-none placeholder:text-on-surface-muted"
+          />
+        </div>
+
+        <div className="mt-5">
+          <label className="text-label text-on-surface-variant">
+            Hasło startowe
+          </label>
+          <input
+            value={form.password}
+            onChange={(event) => updateField("password", event.target.value)}
+            type="password"
+            placeholder="••••••••"
             className="mt-2 h-14 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 outline-none placeholder:text-on-surface-muted"
           />
         </div>
@@ -135,21 +146,24 @@ export default function AddClientModal({
               Telefon
             </label>
             <input
-              value={form.phoneNumber}
-              onChange={(event) =>
-                updateField("phoneNumber", event.target.value)
-              }
+              value={form.phone}
+              onChange={(event) => updateField("phone", event.target.value)}
               placeholder="+48 500 000 000"
               className="mt-2 h-14 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 outline-none placeholder:text-on-surface-muted"
             />
           </div>
 
           <div>
-            <label className="text-label text-on-surface-variant">Cel</label>
+            <label className="text-label text-on-surface-variant">
+              Doświadczenie (lata)
+            </label>
             <input
-              value={form.goal}
-              onChange={(event) => updateField("goal", event.target.value)}
-              placeholder="Redukcja"
+              value={form.experienceYears}
+              onChange={(event) =>
+                updateField("experienceYears", event.target.value)
+              }
+              type="number"
+              placeholder="6"
               className="mt-2 h-14 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 outline-none placeholder:text-on-surface-muted"
             />
           </div>
@@ -157,10 +171,23 @@ export default function AddClientModal({
 
         <div className="mt-5">
           <label className="text-label text-on-surface-variant">
-            Dodaj zdjęcie / URL avatara
+            Stawka godzinowa
+          </label>
+          <input
+            value={form.hourlyRate}
+            onChange={(event) => updateField("hourlyRate", event.target.value)}
+            type="number"
+            placeholder="150"
+            className="mt-2 h-14 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 outline-none placeholder:text-on-surface-muted"
+          />
+        </div>
+
+        <div className="mt-5">
+          <label className="text-label text-on-surface-variant">
+            Zdjęcie / URL avatara
           </label>
           <div className="mt-2 rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest p-5">
-            <div className="flex items-center justify-center gap-3 text-on-surface-variant">
+            <div className="flex items-center gap-3 text-on-surface-variant">
               <Camera size={22} />
               <input
                 value={form.avatarUrl}
@@ -175,30 +202,36 @@ export default function AddClientModal({
         </div>
 
         <div className="mt-5">
-          <div className="flex items-center justify-between">
-            <label className="text-label text-on-surface-variant">
-              Link do arkusza Google
-            </label>
-            <LinkIcon size={15} className="text-primary-light" />
-          </div>
-
-          <input
-            value={form.googleSheetUrl}
-            onChange={(event) =>
-              updateField("googleSheetUrl", event.target.value)
-            }
-            placeholder="https://docs.google.com/spreadsheets/..."
-            className="mt-2 h-14 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 outline-none placeholder:text-on-surface-muted"
+          <label className="text-label text-on-surface-variant">Bio</label>
+          <textarea
+            value={form.bio}
+            onChange={(event) => updateField("bio", event.target.value)}
+            placeholder="Specjalizacja, doświadczenie, styl pracy..."
+            rows={3}
+            className="mt-2 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-4 outline-none placeholder:text-on-surface-muted resize-none"
           />
         </div>
 
         <div className="mt-7 flex flex-col gap-3">
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || !form.firstName || !form.lastName}
+            disabled={
+              isSubmitting ||
+              !form.firstName ||
+              !form.lastName ||
+              !form.email ||
+              !form.password
+            }
             className="h-16 rounded-[var(--radius-lg)] bg-primary-gradient text-white text-lg font-semibold disabled:opacity-60"
           >
-            {isSubmitting ? "Dodawanie..." : "Dodaj Klienta"}
+            {isSubmitting ? "Dodawanie..." : "Dodaj Trenera"}
+          </button>
+
+          <button
+            onClick={onClose}
+            className="h-14 rounded-[var(--radius-lg)] bg-surface-container text-on-surface-variant font-semibold"
+          >
+            Anuluj
           </button>
         </div>
       </div>
