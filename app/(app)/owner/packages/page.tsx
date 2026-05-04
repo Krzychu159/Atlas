@@ -1,395 +1,264 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import {
-  Plus,
-  Pencil,
-  Trash2,
-  CalendarRange,
-  Users,
-  ClipboardList,
-} from "lucide-react";
+  createPackage,
+  deletePackage,
+  getPackages,
+  type CreatePackagePayload,
+  type Package,
+} from "@/app/lib/owner/packages";
+import AddPackageModal from "./components/AddPackageModal";
+import PackageCard from "./components/PackageCard";
+import PackageFilters, {
+  type PackageFilter,
+} from "./components/PackageFilters";
 
-const personalPackages = [
-  {
-    name: "Standard 12",
-    description: "1:1 individual training",
-    price: "1800 PLN",
-    unit: "150 PLN / session",
-    volume: "12",
-    volumeLabel: "sessions",
-    tag: "Premium",
-    accent: "neutral",
-  },
-  {
-    name: "Intro 4",
-    description: "Starter pack for new clients",
-    price: "640 PLN",
-    unit: "160 PLN / session",
-    volume: "4",
-    volumeLabel: "sessions",
-    tag: "Popular",
-    accent: "neutral",
-  },
-  {
-    name: "Pro 24",
-    description: "Maximum progression plan",
-    price: "3120 PLN",
-    unit: "130 PLN / session",
-    volume: "24",
-    volumeLabel: "sessions",
-    tag: "Elite",
-    accent: "neutral",
-  },
-];
-
-const semiPackages = [
-  {
-    name: "Squad 8",
-    description: "Small training group",
-    price: "800 PLN",
-    unit: "100 PLN / session",
-    volume: "8",
-    volumeLabel: "sessions",
-    tag: "Group Max 4",
-    accent: "success",
-  },
-  {
-    name: "Squad 12",
-    description: "Full month in group",
-    price: "1080 PLN",
-    unit: "90 PLN / session",
-    volume: "12",
-    volumeLabel: "sessions",
-    tag: "Group Max 4",
-    accent: "success",
-  },
-];
-
-const consultationPackages = [
-  {
-    name: "FMS Assessment",
-    description: "Movement pattern analysis",
-    price: "250 PLN",
-    unit: "One-time",
-    volume: "1",
-    volumeLabel: "session",
-    tag: "Diagnostics",
-    accent: "muted",
-  },
-  {
-    name: "Nutrition Plan",
-    description: "Custom diet strategy",
-    price: "400 PLN",
-    unit: "Project",
-    volume: "∞",
-    volumeLabel: "access",
-    tag: "Diet",
-    accent: "muted",
-  },
-];
-
-function getTagStyles(accent: string) {
-  if (accent === "success") {
-    return "bg-tertiary-container text-tertiary-light";
-  }
-
-  if (accent === "muted") {
-    return "bg-surface-container-high text-on-surface-variant";
-  }
-
-  return "bg-surface-container-high text-on-surface-variant";
+function normalize(value: string) {
+  return value.toLowerCase().trim();
 }
 
-function getVolumeStyles(accent: string) {
-  if (accent === "success") {
-    return "text-tertiary-light";
-  }
-
-  return "text-primary-light";
-}
-
-function SectionHeader({ title, label }: { title: string; label?: string }) {
-  return (
-    <div className="flex items-center gap-4">
-      <p className="text-section-title shrink-0">{title}</p>
-      <div className="h-px bg-white/10 flex-1" />
-      {label ? (
-        <span className="text-label text-on-surface-muted shrink-0">
-          {label}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-function PackageCard({
-  item,
-}: {
-  item: {
-    name: string;
-    description: string;
-    price: string;
-    unit: string;
-    volume: string;
-    volumeLabel: string;
-    tag: string;
-    accent: string;
-  };
-}) {
-  return (
-    <div className="card-shell p-5 min-h-[228px] flex flex-col">
-      <div className="flex items-start justify-between gap-3">
-        <span
-          className={`px-2.5 py-1 rounded-full text-[10px] font-medium leading-none ${getTagStyles(
-            item.accent,
-          )}`}
-        >
-          {item.tag}
-        </span>
-
-        <div className="flex items-center gap-3 text-on-surface-variant shrink-0">
-          <button className="hover:text-on-surface transition-colors">
-            <Pencil size={14} />
-          </button>
-          <button className="hover:text-on-surface transition-colors">
-            <Trash2 size={14} />
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <p className="text-[1.1rem] leading-7 font-semibold">{item.name}</p>
-        <p className="text-sm text-on-surface-variant mt-1 leading-6">
-          {item.description}
-        </p>
-      </div>
-
-      <div className="mt-auto pt-7 flex items-end justify-between gap-4">
-        <div>
-          <p className="text-[2rem] leading-none font-semibold tracking-tight">
-            {item.price}
-          </p>
-          <p className="text-label text-on-surface-muted mt-2">{item.unit}</p>
-        </div>
-
-        <div className="text-right shrink-0">
-          <p
-            className={`text-[1.75rem] leading-none font-semibold ${getVolumeStyles(
-              item.accent,
-            )}`}
-          >
-            {item.volume}
-          </p>
-          <p className="text-label text-on-surface-muted mt-2">
-            {item.volumeLabel}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MobilePackageCard({
-  item,
-  icon,
-}: {
-  item: {
-    name: string;
-    description: string;
-    price: string;
-    unit: string;
-    volume: string;
-    volumeLabel: string;
-    tag: string;
-    accent: string;
-  };
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="card-shell p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p
-            className={`text-label ${
-              item.accent === "success"
-                ? "text-tertiary-light"
-                : "text-primary-light"
-            }`}
-          >
-            {item.tag}
-          </p>
-
-          <p className="text-[1.9rem] leading-[1.05] font-semibold mt-3 max-w-[230px]">
-            {item.name}
-          </p>
-        </div>
-
-        <div className="h-12 w-12 rounded-[var(--radius-md)] bg-surface-container-high flex items-center justify-center text-on-surface-variant shrink-0">
-          {icon}
-        </div>
-      </div>
-
-      <div className="mt-6 flex items-end justify-between gap-4">
-        <div>
-          <p
-            className={`text-[2.2rem] leading-none font-semibold tracking-tight ${
-              item.accent === "success" ? "text-tertiary-light" : ""
-            }`}
-          >
-            {item.price}
-          </p>
-          <p className="text-sm text-on-surface-variant mt-2">{item.unit}</p>
-        </div>
-
-        <div className="px-4 py-3 rounded-[var(--radius-md)] bg-surface-container-high text-right shrink-0 min-w-[110px]">
-          <p className="text-[1.1rem] leading-none font-semibold">
-            {item.volume} {item.volumeLabel}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+function matchesFilter(item: Package, filter: PackageFilter) {
+  if (filter === "active") return item.isActive;
+  if (filter === "archived") return !item.isActive;
+  return true;
 }
 
 export default function PackagesPage() {
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [search, setSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState<PackageFilter>("all");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function loadPackages() {
+    try {
+      setError("");
+      const data = await getPackages();
+      setPackages(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Błąd ładowania pakietów");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadPackages();
+  }, []);
+
+  const filteredPackages = useMemo(() => {
+    const query = normalize(search);
+
+    return packages.filter((item) => {
+      const name = normalize(item.name || "");
+      const description = normalize(item.description || "");
+
+      const matchesSearch =
+        !query || name.includes(query) || description.includes(query);
+
+      return matchesSearch && matchesFilter(item, activeFilter);
+    });
+  }, [packages, search, activeFilter]);
+
+  const handleCreatePackage = async (payload: CreatePackagePayload) => {
+    try {
+      setIsSubmitting(true);
+      setError("");
+      await createPackage(payload);
+      await loadPackages();
+      setIsModalOpen(false);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Nie udało się dodać pakietu",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeletePackage = async (id: number) => {
+    try {
+      setError("");
+      await deletePackage(id);
+      await loadPackages();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Nie udało się usunąć pakietu",
+      );
+    }
+  };
+
   return (
-    <div className="max-w-[1000px] mx-auto">
-      {/* Desktop */}
-      <div className="hidden md:block">
-        <div className="flex flex-col gap-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="max-w-[560px]">
-              <p className="text-label text-primary-light">
-                Define your studio offer
+    <>
+      <div className="max-w-[1000px] mx-auto">
+        <div className="hidden md:block">
+          <div className="flex flex-col gap-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="max-w-[560px]">
+                <p className="text-label text-primary-light">
+                  Zarządzanie pakietami
+                </p>
+                <h1 className="mt-2 text-[2.25rem] leading-[0.95] font-semibold font-display tracking-tight">
+                  Pakiety <span className="text-primary-light">Treningowe</span>
+                </h1>
+                <p className="mt-3 text-base text-on-surface-variant">
+                  Definiuj i optymalizuj ofertę treningową swojego studia.
+                </p>
+              </div>
+
+              <Button
+                variant="primary"
+                icon={<Plus size={16} />}
+                className="h-14"
+                onClick={() => setIsModalOpen(true)}
+              >
+                Dodaj Nowy Pakiet
+              </Button>
+            </div>
+
+            <PackageFilters
+              search={search}
+              activeFilter={activeFilter}
+              onSearchChange={setSearch}
+              onFilterChange={setActiveFilter}
+            />
+
+            <div className="flex items-center justify-between">
+              <p className="text-section-title">Lista Pakietów</p>
+              <p className="text-label text-on-surface-variant">
+                Wyświetlono {filteredPackages.length} pakietów
               </p>
-              <h1 className="mt-2 text-[2.25rem] leading-[0.95] mb-3 font-semibold font-display tracking-tight">
-                Pakiety <span className="text-primary-light">Treningowe</span>
-              </h1>
             </div>
 
-            <Button
-              variant="primary"
-              icon={<Plus size={16} />}
-              className="h-24"
-            >
-              Add New Package
-            </Button>
+            {error ? (
+              <div className="card-shell p-4 text-error-light">{error}</div>
+            ) : null}
+
+            {isLoading ? (
+              <div className="card-shell p-5 text-on-surface-variant">
+                Ładowanie pakietów...
+              </div>
+            ) : filteredPackages.length > 0 ? (
+              <div className="grid grid-cols-3 gap-4">
+                {filteredPackages.map((item) => (
+                  <PackageCard
+                    key={item.id}
+                    item={item}
+                    onDelete={handleDeletePackage}
+                  />
+                ))}
+
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="min-h-[260px] rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:border-primary/40 transition-colors flex flex-col items-center justify-center text-center p-6"
+                >
+                  <span className="h-16 w-16 rounded-full bg-surface-container flex items-center justify-center">
+                    <Plus size={28} />
+                  </span>
+                  <span className="mt-6 text-base font-semibold">
+                    Utwórz nową ofertę
+                  </span>
+                  <span className="mt-2 text-sm leading-6 max-w-[220px]">
+                    Zdefiniuj unikalny pakiet treningowy dla swoich klientów.
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <div className="card-shell p-8 text-center text-on-surface-variant">
+                Brak pakietów dla wybranych kryteriów.
+              </div>
+            )}
           </div>
+        </div>
 
-          <div className="flex flex-col gap-6">
-            <section>
-              <SectionHeader title="Personal" />
-              <div className="mt-4 grid grid-cols-3 gap-4">
-                {personalPackages.map((item) => (
-                  <PackageCard key={item.name} item={item} />
-                ))}
+        <div className="md:hidden px-1 pb-6">
+          <div className="flex flex-col gap-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-page-title">Pakiety</p>
+                <p className="mt-3 text-label text-primary-light">
+                  Zarządzaj ofertą treningową
+                </p>
               </div>
-            </section>
 
-            <section>
-              <SectionHeader title="Semi-personal" />
-              <div className="mt-4 grid grid-cols-3 gap-4">
-                {semiPackages.map((item) => (
-                  <PackageCard key={item.name} item={item} />
-                ))}
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="h-14 w-14 rounded-[var(--radius-lg)] bg-primary text-on-primary flex items-center justify-center shadow-soft"
+              >
+                <Plus size={24} />
+              </button>
+            </div>
 
-                <div className="opacity-0 pointer-events-none">
-                  <div className="card-shell p-5 min-h-[228px]" />
+            <PackageFilters
+              search={search}
+              activeFilter={activeFilter}
+              onSearchChange={setSearch}
+              onFilterChange={setActiveFilter}
+            />
+
+            <div className="flex items-center justify-between">
+              <p className="text-section-title">Lista Pakietów</p>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="text-label text-primary-light"
+              >
+                Dodaj nowy pakiet
+              </button>
+            </div>
+
+            {error ? (
+              <div className="card-shell p-4 text-error-light">{error}</div>
+            ) : null}
+
+            <div className="flex flex-col gap-4">
+              {isLoading ? (
+                <div className="card-shell p-5 text-on-surface-variant">
+                  Ładowanie pakietów...
                 </div>
-              </div>
-            </section>
-
-            <section>
-              <SectionHeader title="Consultations" />
-              <div className="mt-4 grid grid-cols-3 gap-4">
-                {consultationPackages.map((item) => (
-                  <PackageCard key={item.name} item={item} />
-                ))}
-
-                <div className="opacity-0 pointer-events-none">
-                  <div className="card-shell p-5 min-h-[228px]" />
+              ) : filteredPackages.length > 0 ? (
+                filteredPackages.map((item) => (
+                  <PackageCard
+                    key={item.id}
+                    item={item}
+                    onDelete={handleDeletePackage}
+                  />
+                ))
+              ) : (
+                <div className="card-shell p-8 text-center text-on-surface-variant">
+                  Brak pakietów.
                 </div>
-              </div>
-            </section>
+              )}
+
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="min-h-[180px] rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest text-on-surface-variant flex flex-col items-center justify-center text-center p-6"
+              >
+                <span className="h-14 w-14 rounded-full bg-surface-container flex items-center justify-center">
+                  <Plus size={24} />
+                </span>
+                <span className="mt-5 text-base font-semibold">
+                  Brakuje pakietu?
+                </span>
+                <span className="mt-2 text-sm leading-6 max-w-[260px]">
+                  Stwórz nową ofertę dopasowaną do potrzeb klientów.
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Mobile */}
-      <div className="md:hidden px-1 pb-6">
-        <div className="flex flex-col gap-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-page-title">Packages</p>
-            </div>
-
-            <div className="pt-2">
-              <p className="text-label text-primary-light">Atlas</p>
-            </div>
-          </div>
-
-          <button className="w-full bg-primary text-on-primary rounded-[var(--radius-lg)] px-5 py-5 font-semibold shadow-ambient flex items-center justify-between">
-            <span className="text-lg">Add New Package</span>
-            <span className="h-9 w-9 rounded-full bg-white/15 flex items-center justify-center">
-              <Plus size={20} />
-            </span>
-          </button>
-
-          <section>
-            <div className="flex items-center justify-between">
-              <p className="text-section-title">Personal Training</p>
-              <p className="text-label text-primary-light">Prime</p>
-            </div>
-
-            <div className="mt-4 flex flex-col gap-4">
-              {personalPackages.slice(0, 2).map((item) => (
-                <MobilePackageCard
-                  key={item.name}
-                  item={item}
-                  icon={<CalendarRange size={18} />}
-                />
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <div className="flex items-center justify-between">
-              <p className="text-section-title">Semi-personal</p>
-              <p className="text-label text-tertiary-light">Team</p>
-            </div>
-
-            <div className="mt-4 flex flex-col gap-4">
-              {semiPackages.map((item) => (
-                <MobilePackageCard
-                  key={item.name}
-                  item={item}
-                  icon={<Users size={18} />}
-                />
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <div className="flex items-center justify-between">
-              <p className="text-section-title">Consultations</p>
-              <p className="text-label text-on-surface-muted">Support</p>
-            </div>
-
-            <div className="mt-4 flex flex-col gap-4">
-              {consultationPackages.slice(0, 1).map((item) => (
-                <MobilePackageCard
-                  key={item.name}
-                  item={item}
-                  icon={<ClipboardList size={18} />}
-                />
-              ))}
-            </div>
-          </section>
-
-          <button className="fixed right-5 bottom-24 h-16 w-16 rounded-[20px] bg-primary text-white shadow-ambient flex items-center justify-center z-20">
-            <Plus size={28} />
-          </button>
-        </div>
-      </div>
-    </div>
+      <AddPackageModal
+        open={isModalOpen}
+        isSubmitting={isSubmitting}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleCreatePackage}
+      />
+    </>
   );
 }
