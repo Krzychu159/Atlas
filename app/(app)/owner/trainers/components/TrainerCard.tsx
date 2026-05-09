@@ -53,17 +53,9 @@ export default function TrainerCard({ trainer }: { trainer: Trainer }) {
             {fullName}
           </h3>
 
-          <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <span
-              className={`px-2 py-1 rounded-full text-[11px] font-medium leading-none ${getStatusStyles(
-                trainer.status,
-              )}`}
-            >
-              {trainer.status || "Aktywny"}
-            </span>
-
+          <div className="mt-2  ">
             {trainer.hourlyRate ? (
-              <span className="px-2 py-1 rounded-full text-[11px] font-medium leading-none bg-surface-container-high text-on-surface-variant">
+              <span className="px-2 py-1 rounded-full text-[8px] font-medium leading-none bg-surface-container-high text-secondary-light">
                 {trainer.hourlyRate} PLN/h
               </span>
             ) : null}
@@ -75,24 +67,17 @@ export default function TrainerCard({ trainer }: { trainer: Trainer }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 mt-4">
+      <div className="grid grid-cols-2 gap-3 mt-4">
         <div className="bg-surface-container-low rounded-[var(--radius-md)] px-3 py-3">
           <div className="flex items-center gap-1.5 text-on-surface-muted">
             <Dumbbell size={12} />
-            <p className="text-[11px] uppercase tracking-wide">Sesje</p>
+            <p className="text-[11px] uppercase tracking-wide">
+              Sesje (30 dni)
+            </p>
           </div>
           <p className="mt-3 text-[18px] font-semibold leading-none">
-            {trainer.sessionsCount ?? 0}
-          </p>
-        </div>
-
-        <div className="bg-surface-container-low rounded-[var(--radius-md)] px-3 py-3">
-          <div className="flex items-center gap-1.5 text-on-surface-muted">
-            <Star size={12} />
-            <p className="text-[11px] uppercase tracking-wide">Ocena</p>
-          </div>
-          <p className="mt-3 text-[18px] font-semibold leading-none text-tertiary-light">
-            {trainer.ratingAverage ? trainer.ratingAverage.toFixed(1) : "0.0"}
+            {trainer.sessionsCount ?? 0} &nbsp;
+            <span className="text-sm font-medium text-success">+37%</span>
           </p>
         </div>
 

@@ -66,14 +66,6 @@ export default function TrainersPage() {
     normalize(trainer.status || "").includes("active"),
   );
 
-  const averageRating =
-    trainers.length > 0
-      ? trainers.reduce(
-          (sum, trainer) => sum + (trainer.ratingAverage || 0),
-          0,
-        ) / trainers.length
-      : 0;
-
   const handleCreateTrainer = async (payload: CreateTrainerPayload) => {
     try {
       setIsSubmitting(true);
@@ -114,15 +106,6 @@ export default function TrainersPage() {
                   <p className="text-sm text-on-surface-variant">
                     Active Staff
                   </p>
-                </div>
-              </div>
-
-              <div className="bg-tertiary-container/70 rounded-[var(--radius-lg)] px-4 py-3 min-w-[150px]">
-                <div className="flex items-center gap-2">
-                  <p className="text-2xl font-semibold leading-none text-tertiary-light">
-                    {averageRating.toFixed(1)}
-                  </p>
-                  <p className="text-sm text-on-surface-variant">Rating Avg</p>
                 </div>
               </div>
 
@@ -177,9 +160,7 @@ export default function TrainersPage() {
 
       <AddTrainerModal
         open={isModalOpen}
-        isSubmitting={isSubmitting}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreateTrainer}
       />
     </>
   );

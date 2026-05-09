@@ -285,9 +285,7 @@ export default function ClientsPage() {
 
       <AddClientModal
         open={isModalOpen}
-        isSubmitting={isSubmitting}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreateClient}
       />
     </>
   );
