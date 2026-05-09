@@ -9,6 +9,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { Package } from "@/app/lib/owner/packages";
+import Link from "next/link";
 
 type PackageCardProps = {
   item: Package;
@@ -76,21 +77,11 @@ export default function PackageCard({ item, onDelete }: PackageCardProps) {
           >
             <Trash2 size={15} />
           </button>
-
-          <button
-            className="h-9 w-9 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant"
-            aria-label="Więcej"
-          >
-            <MoreVertical size={15} />
-          </button>
         </div>
       </div>
 
       <div className="mt-6">
         <p className="text-[1.25rem] leading-7 font-semibold">{item.name}</p>
-        <p className="mt-2 text-sm leading-6 text-on-surface-variant line-clamp-2">
-          {item.description || "Brak opisu pakietu"}
-        </p>
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3">
@@ -123,9 +114,12 @@ export default function PackageCard({ item, onDelete }: PackageCardProps) {
           </p>
         </div>
 
-        <button className="h-11 w-11 rounded-[var(--radius-md)] bg-surface-container-high flex items-center justify-center text-primary-light">
+        <Link
+          href={`/owner/packages/${item.id}`}
+          className="h-11 w-11 rounded-[var(--radius-md)] bg-surface-container-high flex items-center justify-center text-primary-light"
+        >
           <ChevronRight size={18} />
-        </button>
+        </Link>
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ import PackageCard from "./components/PackageCard";
 import PackageFilters, {
   type PackageFilter,
 } from "./components/PackageFilters";
+import { toast } from "sonner";
 
 function normalize(value: string) {
   return value.toLowerCase().trim();
@@ -81,17 +82,20 @@ export default function PackagesPage() {
     }
   };
 
-  const handleDeletePackage = async (id: number) => {
+  async function handleDeletePackage(id: number) {
     try {
-      setError("");
       await deletePackage(id);
-      await loadPackages();
+
+      setPackages((current) => current.filter((item) => item.id !== id));
+
+      toast.success("Pakiet został usunięty.");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Nie udało się usunąć pakietu",
-      );
+      const message =
+        err instanceof Error ? err.message : "Nie udało się usunąć pakietu.";
+
+      toast.error(message);
     }
-  };
+  }
 
   return (
     <>

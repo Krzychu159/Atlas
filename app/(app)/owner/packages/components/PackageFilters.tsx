@@ -35,11 +35,6 @@ export default function PackageFilters({
             className="w-full bg-transparent outline-none text-sm text-on-surface placeholder:text-on-surface-muted"
           />
         </div>
-
-        <button className="hidden md:flex h-14 px-5 rounded-[var(--radius-lg)] bg-surface-container text-on-surface-variant items-center gap-2">
-          <SlidersHorizontal size={15} />
-          Kategorie
-        </button>
       </div>
 
       <div className="flex items-center gap-3 overflow-x-auto pb-1">

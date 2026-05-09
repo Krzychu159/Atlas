@@ -97,7 +97,6 @@ export default function SettingsPage() {
                 <div className="relative">
                   <select className="w-full h-14 rounded-[var(--radius-lg)] bg-surface-container-low px-4 pr-12 outline-none text-base appearance-none">
                     <option>Polski (PL)</option>
-                    <option>English (EN)</option>
                   </select>
 
                   <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
@@ -254,7 +253,7 @@ export default function SettingsPage() {
                 <div>
                   <p className="text-base font-semibold">Status Subskrypcji</p>
                   <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-                    Twój plan Atlas Performance jest aktywny do 12.12.2024.
+                    Twój plan Atlas jest aktywny
                   </p>
                 </div>
               </div>

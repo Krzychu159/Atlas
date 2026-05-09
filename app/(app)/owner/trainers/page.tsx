@@ -130,10 +130,6 @@ export default function TrainersPage() {
                 className="w-full bg-transparent outline-none text-sm text-on-surface placeholder:text-on-surface-muted"
               />
             </div>
-
-            <Button variant="secondary" icon={<SlidersHorizontal size={14} />}>
-              Filters
-            </Button>
           </div>
 
           {error ? (
