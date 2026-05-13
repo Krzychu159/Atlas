@@ -32,10 +32,29 @@ export default function RootLayout({
       <body className="min-h-full bg-surface font-body text-on-surface">
         <Toaster
           position="top-right"
-          richColors
+          theme="dark"
           closeButton
+          visibleToasts={4}
+          gap={12}
+          offset={{ top: 18, right: 18 }}
+          mobileOffset={{ top: 76, right: 16, left: 16 }}
           toastOptions={{
-            className: "bg-surface-container-high text-on-surface border-none",
+            duration: 4200,
+            classNames: {
+              toast: "atlas-toast",
+              title: "atlas-toast-title",
+              description: "atlas-toast-description",
+              content: "atlas-toast-content",
+              icon: "atlas-toast-icon",
+              closeButton: "atlas-toast-close",
+              success: "atlas-toast-success",
+              error: "atlas-toast-error",
+              warning: "atlas-toast-warning",
+              info: "atlas-toast-info",
+              loading: "atlas-toast-loading",
+              actionButton: "atlas-toast-action",
+              cancelButton: "atlas-toast-cancel",
+            },
           }}
         />
 

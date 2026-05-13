@@ -4,8 +4,8 @@ export type ClientStatus = "active" | "suspended" | "new" | string;
 
 export type Client = {
   id: number;
-  trainerId: number;
-  activePackageId: number;
+  trainerId: number | null;
+  activePackageId: number | null;
   firstName: string;
   lastName: string;
   fullName: string;
@@ -17,6 +17,25 @@ export type Client = {
   progressPercent: number;
   billingStatus: string;
   status: ClientStatus;
+  subscriptionStatus?: string | null;
+  hasActivePackage?: boolean | null;
+  isPackageActive?: boolean | null;
+  activePackageName?: string | null;
+  currentPackageName?: string | null;
+  packageName?: string | null;
+  packageSessionsUsed?: number | null;
+  packageSessionsLimit?: number | null;
+  usedSessions?: number | null;
+  sessionsUsed?: number | null;
+  sessionsLimit?: number | null;
+  remainingSessions?: number | null;
+  balance?: number | null;
+  balanceAmount?: number | null;
+  accountBalance?: number | null;
+  currentBalance?: number | null;
+  billingBalance?: number | null;
+  currency?: string | null;
+  balanceCurrency?: string | null;
   nextSessionAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -24,6 +43,73 @@ export type Client = {
   trainerFullName: string;
   locationId: number;
   locationName: string;
+};
+
+export type SubscriptionCycle = {
+  clientPackageId: number;
+  packageId: number;
+  packageName: string | null;
+  isActive: boolean;
+  totalSessions: number;
+  usedSessions: number;
+  remainingSessions: number;
+  originalPrice: number;
+  balanceApplied: number;
+  amountToPay: number;
+  amountPaid: number;
+  amountDue: number;
+  currency: string | null;
+  expectedBillingType: string | null;
+  paymentStatus: string | null;
+  purchaseDate: string;
+  validUntil: string | null;
+  activatedAt: string | null;
+};
+
+export type SubscriptionNextPackage = {
+  packageId: number;
+  packageName: string | null;
+  sessionsLimit: number;
+  sessionsPerWeek: number;
+  price: number;
+  currency: string | null;
+  billingType: string | null;
+};
+
+export type ClientSubscription = {
+  clientId: number;
+  clientName: string | null;
+  status: string | null;
+  autoRenewEnabled: boolean;
+  cancelRenewalRequested: boolean;
+  renewalCancellationRequestedAt: string | null;
+  currentCycle: SubscriptionCycle | null;
+  nextPackage: SubscriptionNextPackage | null;
+  carryOverBalance: number;
+};
+
+export type SubscriptionUsageSession = {
+  sessionId: number;
+  date: string;
+  trainerName: string | null;
+  status: string | null;
+  plannedBillingType: string | null;
+  actualBillingType: string | null;
+  expectedUnitPrice: number;
+  actualUnitPrice: number;
+  balanceDifference: number;
+};
+
+export type SubscriptionUsage = {
+  clientId: number;
+  clientPackageId: number | null;
+  expectedBillingType: string | null;
+  totalSessions: number;
+  usedSessions: number;
+  remainingSessions: number;
+  adjustmentsTotal: number;
+  differentThanExpectedCount: number;
+  sessions: SubscriptionUsageSession[] | null;
 };
 
 export type CreateClientPayload = {
@@ -44,13 +130,54 @@ export type CreateClientPayload = {
   locationId: number;
 };
 
+export type UpdateClientPayload = {
+  trainerId?: number | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+  avatarUrl?: string | null;
+  goal?: string | null;
+  notes?: string | null;
+  progressPercent?: number;
+  billingStatus?: string | null;
+  status?: string | null;
+  nextSessionAt?: string | null;
+  locationId?: number;
+};
+
 export function getClients() {
   return backendFetch<Client[]>("Clients");
+}
+
+export function getClient(id: number) {
+  return backendFetch<Client>(`Clients/${id}`);
+}
+
+export function getClientsByTrainer(trainerId: number) {
+  return backendFetch<Client[]>(`Clients/filter?TrainerId=${trainerId}`);
+}
+
+export function getClientSubscription(id: number) {
+  return backendFetch<ClientSubscription>(`Clients/${id}/subscription`);
+}
+
+export function getClientSubscriptionUsage(id: number) {
+  return backendFetch<SubscriptionUsage>(
+    `Clients/${id}/subscription/current-cycle/usage`,
+  );
 }
 
 export function createClient(payload: CreateClientPayload) {
   return backendFetch<Client>("Clients", {
     method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateClient(id: number, payload: UpdateClientPayload) {
+  return backendFetch<Client>(`Clients/${id}`, {
+    method: "PATCH",
     body: JSON.stringify(payload),
   });
 }

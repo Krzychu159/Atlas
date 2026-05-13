@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Settings,
   Wallet,
+  ReceiptText,
 } from "lucide-react";
 
 export type AppRole = "owner" | "trainer" | "client";
@@ -17,22 +18,23 @@ export type NavItem = {
 
 export const navigationByRole: Record<AppRole, NavItem[]> = {
   owner: [
-    { label: "Dashboard", href: "/owner", icon: LayoutDashboard },
-    { label: "Trainers", href: "/owner/trainers", icon: UserPen },
-    { label: "Clients", href: "/owner/clients", icon: Users },
-    { label: "Schedule", href: "/owner/schedule", icon: CalendarDays },
-    { label: "Packages", href: "/owner/packages", icon: Wallet },
-    { label: "Settings", href: "/owner/settings", icon: Settings },
+    { label: "Panel", href: "/owner", icon: LayoutDashboard },
+    { label: "Trenerzy", href: "/owner/trainers", icon: UserPen },
+    { label: "Klienci", href: "/owner/clients", icon: Users },
+    { label: "Grafik", href: "/owner/schedule", icon: CalendarDays },
+    { label: "Pakiety", href: "/owner/packages", icon: Wallet },
+    { label: "Rozliczenia", href: "/owner/settlements", icon: ReceiptText },
+    { label: "Ustawienia", href: "/owner/settings", icon: Settings },
   ],
   trainer: [
-    { label: "Dashboard", href: "/trainer", icon: LayoutDashboard },
-    { label: "Clients", href: "/trainer/clients", icon: Users },
-    { label: "Settings", href: "/trainer/settings", icon: Settings },
+    { label: "Panel", href: "/trainer", icon: LayoutDashboard },
+    { label: "Klienci", href: "/trainer/clients", icon: Users },
+    { label: "Ustawienia", href: "/trainer/settings", icon: Settings },
   ],
   client: [
-    { label: "Dashboard", href: "/client", icon: LayoutDashboard },
-    { label: "Pay", href: "/client/payments", icon: Wallet },
-    { label: "Schedule", href: "/client/schedule", icon: CalendarDays },
-    { label: "Settings", href: "/client/settings", icon: Settings },
+    { label: "Panel", href: "/client", icon: LayoutDashboard },
+    { label: "Płatności", href: "/client/payments", icon: Wallet },
+    { label: "Grafik", href: "/client/schedule", icon: CalendarDays },
+    { label: "Ustawienia", href: "/client/settings", icon: Settings },
   ],
 };

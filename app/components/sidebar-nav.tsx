@@ -15,7 +15,10 @@ export function SidebarNav({ items, onNavigate }: SidebarNavProps) {
   return (
     <nav className="flex flex-col gap-2">
       {items.map((item) => {
-        const isDashboard = item.label === "Dashboard";
+        const isDashboard =
+          item.href === "/owner" ||
+          item.href === "/trainer" ||
+          item.href === "/client";
 
         const isActive = isDashboard
           ? pathname === item.href

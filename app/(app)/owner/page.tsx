@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, Dumbbell, Package, Plus, Users } from "lucide-react";
+import { toast } from "sonner";
 import {
   getOwnerDashboard,
   type OwnerDashboard,
@@ -17,16 +18,17 @@ import DashboardRevenueCard from "./components/DashboardRevenueCard";
 export default function DashboardPage() {
   const [dashboard, setDashboard] = useState<OwnerDashboard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     async function loadDashboard() {
       try {
-        setError("");
         const data = await getOwnerDashboard();
         setDashboard(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Błąd ładowania danych");
+        toast.error(
+          err instanceof Error ? err.message : "Błąd ładowania danych",
+          { id: "owner-dashboard-load-error" },
+        );
       } finally {
         setIsLoading(false);
       }
@@ -62,10 +64,6 @@ export default function DashboardPage() {
             <div className="card-shell p-5 text-on-surface-variant">
               Ładowanie danych operacyjnych...
             </div>
-          ) : null}
-
-          {error ? (
-            <div className="card-shell p-5 text-error-light">{error}</div>
           ) : null}
 
           {dashboard ? (
@@ -175,10 +173,6 @@ export default function DashboardPage() {
             <div className="card-shell p-5 text-on-surface-variant">
               Ładowanie danych...
             </div>
-          ) : null}
-
-          {error ? (
-            <div className="card-shell p-5 text-error-light">{error}</div>
           ) : null}
 
           {dashboard ? (

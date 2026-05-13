@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
 import {
   createPackage,
@@ -15,7 +16,6 @@ import PackageCard from "./components/PackageCard";
 import PackageFilters, {
   type PackageFilter,
 } from "./components/PackageFilters";
-import { toast } from "sonner";
 
 function normalize(value: string) {
   return value.toLowerCase().trim();
@@ -34,15 +34,16 @@ export default function PackagesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
 
   async function loadPackages() {
     try {
-      setError("");
       const data = await getPackages();
       setPackages(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Błąd ładowania pakietów");
+      toast.error(
+        err instanceof Error ? err.message : "Błąd ładowania pakietów",
+        { id: "owner-packages-load-error" },
+      );
     } finally {
       setIsLoading(false);
     }
@@ -69,12 +70,12 @@ export default function PackagesPage() {
   const handleCreatePackage = async (payload: CreatePackagePayload) => {
     try {
       setIsSubmitting(true);
-      setError("");
       await createPackage(payload);
       await loadPackages();
       setIsModalOpen(false);
+      toast.success("Pakiet został dodany.");
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error ? err.message : "Nie udało się dodać pakietu",
       );
     } finally {
@@ -138,10 +139,6 @@ export default function PackagesPage() {
                 Wyświetlono {filteredPackages.length} pakietów
               </p>
             </div>
-
-            {error ? (
-              <div className="card-shell p-4 text-error-light">{error}</div>
-            ) : null}
 
             {isLoading ? (
               <div className="card-shell p-5 text-on-surface-variant">
@@ -214,10 +211,6 @@ export default function PackagesPage() {
                 Dodaj nowy pakiet
               </button>
             </div>
-
-            {error ? (
-              <div className="card-shell p-4 text-error-light">{error}</div>
-            ) : null}
 
             <div className="flex flex-col gap-4">
               {isLoading ? (

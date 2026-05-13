@@ -284,6 +284,155 @@ body {
   }
 }
 
+@layer components {
+  .atlas-toast {
+    --atlas-toast-accent: var(--color-primary-light);
+    --atlas-toast-accent-bg: color-mix(
+      in srgb,
+      var(--atlas-toast-accent) 10%,
+      transparent
+    );
+
+    position: relative !important;
+    width: min(100%, 390px) !important;
+    min-height: 4.25rem !important;
+    overflow: hidden !important;
+    border: 0 !important;
+    border-radius: var(--radius-lg) !important;
+    outline: 1px solid
+      color-mix(in srgb, var(--color-secondary) 18%, transparent) !important;
+    background:
+      linear-gradient(135deg, var(--atlas-toast-accent-bg), transparent 56%),
+      color-mix(
+        in srgb,
+        var(--color-surface-bright) 72%,
+        transparent
+      ) !important;
+    color: var(--color-on-surface) !important;
+    box-shadow: var(--shadow-ambient) !important;
+    backdrop-filter: blur(20px) !important;
+    padding: 1rem 3rem 1rem 1rem !important;
+    font-family: var(--font-body) !important;
+  }
+
+  .atlas-toast::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0.25rem;
+    background: var(--atlas-toast-accent);
+  }
+
+  .atlas-toast-success {
+    --atlas-toast-accent: var(--color-tertiary-light);
+    --atlas-toast-accent-bg: color-mix(
+      in srgb,
+      var(--color-tertiary-container) 34%,
+      transparent
+    );
+  }
+
+  .atlas-toast-error {
+    --atlas-toast-accent: var(--color-error-light);
+    --atlas-toast-accent-bg: color-mix(
+      in srgb,
+      var(--color-error-container) 38%,
+      transparent
+    );
+  }
+
+  .atlas-toast-warning {
+    --atlas-toast-accent: var(--color-warning-light);
+    --atlas-toast-accent-bg: color-mix(
+      in srgb,
+      var(--color-warning-container) 34%,
+      transparent
+    );
+  }
+
+  .atlas-toast-info,
+  .atlas-toast-loading {
+    --atlas-toast-accent: var(--color-primary-light);
+    --atlas-toast-accent-bg: color-mix(
+      in srgb,
+      var(--color-primary-container) 34%,
+      transparent
+    );
+  }
+
+  .atlas-toast-title {
+    color: var(--color-on-surface) !important;
+    font-size: 0.92rem !important;
+    font-weight: 700 !important;
+    line-height: 1.35 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .atlas-toast-description {
+    color: var(--color-on-surface-variant) !important;
+    font-size: 0.8rem !important;
+    line-height: 1.45 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .atlas-toast-content {
+    gap: 0.2rem !important;
+  }
+
+  .atlas-toast-icon {
+    color: var(--atlas-toast-accent) !important;
+  }
+
+  .atlas-toast-close {
+    top: 50% !important;
+    left: auto !important;
+    right: 0.75rem !important;
+    transform: translateY(-50%) !important;
+    z-index: 2 !important;
+    height: 1.75rem !important;
+    width: 1.75rem !important;
+    border: 0 !important;
+    border-radius: var(--radius-default) !important;
+    background: color-mix(
+      in srgb,
+      var(--color-surface-container-lowest) 76%,
+      transparent
+    ) !important;
+    color: var(--color-on-surface-muted) !important;
+    box-shadow: none !important;
+  }
+
+  .atlas-toast-close:hover {
+    color: var(--color-on-surface) !important;
+    background: var(--color-surface-container) !important;
+  }
+
+  .atlas-toast-action,
+  .atlas-toast-cancel {
+    height: 2.25rem !important;
+    border: 0 !important;
+    border-radius: var(--radius-default) !important;
+    padding: 0 0.8rem !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .atlas-toast-action {
+    background: linear-gradient(
+      135deg,
+      var(--color-primary-container),
+      var(--color-primary)
+    ) !important;
+    color: var(--color-on-primary) !important;
+  }
+
+  .atlas-toast-cancel {
+    background: var(--color-surface-container-lowest) !important;
+    color: var(--color-on-surface-variant) !important;
+  }
+}
+
 /* =========================
    SCHEDULE CALENDAR
 ========================= */

@@ -1,8 +1,14 @@
-import { MoreVertical } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 import type { Client } from "@/app/lib/owner/clients";
+import {
+  formatClientBalance,
+  getClientName,
+  getClientPackageUsage,
+} from "./client-display";
 
 function getInitials(client: Client) {
-  const name = client.fullName || `${client.firstName} ${client.lastName}`;
+  const name = getClientName(client);
 
   return name
     .split(" ")
@@ -10,24 +16,6 @@ function getInitials(client: Client) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
-}
-
-function getBillingStyles(status: string) {
-  const normalized = status.toLowerCase();
-
-  if (normalized.includes("paid") || normalized.includes("opłac")) {
-    return "bg-tertiary-container text-tertiary-light";
-  }
-
-  if (
-    normalized.includes("overdue") ||
-    normalized.includes("zaleg") ||
-    normalized.includes("debt")
-  ) {
-    return "bg-error-container text-error-light";
-  }
-
-  return "bg-surface-container-high text-on-surface-variant";
 }
 
 function getStatusDot(client: Client) {
@@ -45,11 +33,11 @@ function getStatusDot(client: Client) {
 }
 
 export default function ClientListRow({ client }: { client: Client }) {
-  const fullName = client.fullName || `${client.firstName} ${client.lastName}`;
-  const progress = Math.max(0, Math.min(client.progressPercent || 0, 100));
+  const fullName = getClientName(client);
+  const packageUsage = getClientPackageUsage(client);
 
   return (
-    <div className="bg-surface-container rounded-[var(--radius-lg)] px-4 py-3.5 grid grid-cols-[64px_1.25fr_1fr_1.25fr_120px_28px] gap-4 items-center">
+    <div className="bg-surface-container rounded-[var(--radius-lg)] px-4 py-3.5 grid grid-cols-[64px_1.2fr_1fr_1.35fr_112px_44px] gap-4 items-center">
       <div className="relative h-14 w-14 rounded-[var(--radius-md)] bg-surface-container-low overflow-hidden flex items-center justify-center shrink-0">
         {client.avatarUrl ? (
           <img
@@ -73,7 +61,7 @@ export default function ClientListRow({ client }: { client: Client }) {
       <div className="min-w-0">
         <p className="text-base font-semibold truncate">{fullName}</p>
         <p className="text-label text-on-surface-variant mt-1 truncate">
-          Cel: {client.goal || "Nie określono"}
+          {client.email || "Brak adresu e-mail"}
         </p>
       </div>
 
@@ -85,31 +73,40 @@ export default function ClientListRow({ client }: { client: Client }) {
       </div>
 
       <div className="min-w-0">
-        <p className="text-label text-on-surface-variant">Postęp treningowy</p>
+        <p className="text-label text-on-surface-variant">
+          Wykorzystanie pakietu
+        </p>
         <div className="mt-1 flex items-center gap-3">
           <div className="h-1.5 flex-1 rounded-full bg-surface-container-lowest overflow-hidden">
             <div
               className="h-full rounded-full bg-primary-gradient"
-              style={{ width: `${progress}%` }}
+              style={{ width: `${packageUsage.percent}%` }}
             />
           </div>
           <p className="text-sm font-semibold text-primary-light shrink-0">
-            {progress}%
+            {packageUsage.label}
           </p>
         </div>
+        <p className="mt-1 text-[11px] text-on-surface-muted truncate">
+          {packageUsage.packageName}
+        </p>
       </div>
 
-      <span
-        className={`w-fit px-3 py-1.5 rounded-full text-[11px] font-semibold ${getBillingStyles(
-          client.billingStatus,
-        )}`}
-      >
-        {client.billingStatus || "Brak statusu"}
-      </span>
+      <div className="min-w-0">
+        <p className="text-label text-on-surface-variant">Balance</p>
+        <p className="mt-1 text-sm font-semibold text-tertiary-light truncate">
+          {formatClientBalance(client)}
+        </p>
+      </div>
 
-      <button className="text-on-surface-muted hover:text-on-surface transition-colors">
-        <MoreVertical size={18} />
-      </button>
+      <Link
+        href={`/owner/clients/${client.id}`}
+        prefetch={false}
+        aria-label={`Przejdź do profilu klienta ${fullName}`}
+        className="ml-auto flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container-low text-primary-light transition-colors hover:bg-surface-container-high hover:text-on-surface"
+      >
+        <ArrowRight size={18} />
+      </Link>
     </div>
   );
 }

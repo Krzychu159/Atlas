@@ -39,6 +39,19 @@ export type CreateTrainerPayload = {
   locationIds: number[];
 };
 
+export type UpdateTrainerPayload = {
+  firstName?: string | null;
+  lastName?: string | null;
+  bio?: string | null;
+  phone?: string | null;
+  avatarUrl?: string | null;
+  status?: string | null;
+  experienceYears?: number;
+  outlookCategoryName?: string | null;
+  outlookCategoryColor?: string | null;
+  locationIds?: number[] | null;
+};
+
 export function getTrainers() {
   return backendFetch<Trainer[]>("Trainers");
 }
@@ -50,6 +63,13 @@ export function getTrainer(id: number) {
 export function createTrainer(payload: CreateTrainerPayload) {
   return backendFetch<Trainer>("Trainers", {
     method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateTrainer(id: number, payload: UpdateTrainerPayload) {
+  return backendFetch<Trainer>(`Trainers/${id}`, {
+    method: "PATCH",
     body: JSON.stringify(payload),
   });
 }

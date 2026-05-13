@@ -6,19 +6,20 @@ export default function TrainerProfileDetails({
   trainer: Trainer;
 }) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_0.75fr] gap-4">
-      <div className="card-shell p-6">
-        <p className="text-section-title">Opis trenera</p>
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+      <section className="card-shell p-6">
+        <p className="text-label text-tertiary-light">Dane</p>
+        <p className="mt-3 text-section-title">Opis trenera</p>
 
-        <p className="mt-4 text-base leading-8 text-on-surface-variant">
+        <p className="mt-5 text-base leading-8 text-on-surface-variant">
           {trainer.bio || "Ten trener nie ma jeszcze uzupełnionego opisu."}
         </p>
-      </div>
+      </section>
 
-      <div className="card-shell p-6">
-        <p className="text-section-title">Informacje systemowe</p>
+      <section className="card-shell p-6">
+        <p className="text-section-title">Informacje</p>
 
-        <div className="mt-5 flex flex-col gap-4">
+        <div className="mt-5 flex flex-col gap-3">
           <InfoRow label="Status" value={trainer.status || "Brak"} />
           <InfoRow label="Rola" value={trainer.role || "Trener"} />
           <InfoRow
@@ -38,14 +39,14 @@ export default function TrainerProfileDetails({
             }
           />
         </div>
-      </div>
+      </section>
     </div>
   );
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-surface-container-low rounded-[var(--radius-lg)] px-4 py-3">
+    <div className="rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3">
       <p className="text-label text-on-surface-muted">{label}</p>
       <p className="mt-2 text-sm font-semibold text-on-surface">{value}</p>
     </div>

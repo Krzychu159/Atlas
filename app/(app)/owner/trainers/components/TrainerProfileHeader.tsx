@@ -1,7 +1,15 @@
 import Link from "next/link";
-import { CornerDownLeft, Mail, Phone, Pencil, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  Mail,
+  Phone,
+  Pencil,
+  ReceiptText,
+  ShieldCheck,
+  Star,
+} from "lucide-react";
+import type { TrainerRate } from "@/app/lib/owner/settlements";
 import type { Trainer } from "@/app/lib/owner/trainers";
-import { Button } from "@/app/components/ui/button";
 
 function getInitials(trainer: Trainer) {
   const name = trainer.fullName || `${trainer.firstName} ${trainer.lastName}`;
@@ -14,20 +22,43 @@ function getInitials(trainer: Trainer) {
     .toUpperCase();
 }
 
+function getRateLabel(trainer: Trainer, rates: TrainerRate[]) {
+  const activeRate = rates.find((rate) => rate.isActive) ?? rates[0];
+  const value = activeRate?.rate ?? trainer.hourlyRate ?? 0;
+
+  return `${value} zł / h`;
+}
+
 export default function TrainerProfileHeader({
   trainer,
+  rates,
+  onEdit,
 }: {
   trainer: Trainer;
+  rates: TrainerRate[];
+  onEdit: () => void;
 }) {
   const fullName =
     trainer.fullName || `${trainer.firstName} ${trainer.lastName}`;
+  const settlementsHref = `/owner/trainers/${trainer.id}/settlements`;
 
   return (
-    <div className="card-shell p-5 md:p-7">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-        <div className="flex flex-col sm:flex-row gap-5">
+    <section className="card-shell overflow-hidden p-5 md:p-8">
+      <div className="mb-7 flex items-center justify-between gap-4">
+        <Link
+          href="/owner/trainers"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-primary-light"
+        >
+          <ArrowLeft size={18} />
+          Lista trenerów
+        </Link>
+        <p className="text-label text-on-surface-muted">Profil trenera</p>
+      </div>
+
+      <div className="grid gap-7 lg:grid-cols-[190px_1fr_190px] lg:items-start">
+        <div className="flex justify-center lg:justify-start">
           <div className="relative shrink-0">
-            <div className="h-32 w-32 md:h-36 md:w-36 rounded-[28px] bg-surface-container-lowest overflow-hidden flex items-center justify-center">
+            <div className="flex h-40 w-40 items-center justify-center overflow-hidden rounded-[28px] bg-surface-container-lowest outline outline-4 outline-secondary">
               {trainer.avatarUrl ? (
                 <img
                   src={trainer.avatarUrl}
@@ -35,56 +66,100 @@ export default function TrainerProfileHeader({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <span className="text-[2rem] font-semibold text-primary-light">
+                <span className="text-[2.5rem] font-semibold text-primary-light">
                   {getInitials(trainer)}
                 </span>
               )}
             </div>
 
-            <div className="absolute -right-2 bottom-3 h-10 w-10 rounded-full bg-tertiary-light text-on-tertiary flex items-center justify-center shadow-soft">
+            <div className="absolute -right-2 bottom-4 flex h-11 w-11 items-center justify-center rounded-full bg-tertiary-light text-on-tertiary shadow-soft">
               <ShieldCheck size={18} />
             </div>
           </div>
+        </div>
 
-          <div className="min-w-0">
-            <p className="text-label text-primary-light">Trainer Management</p>
+        <div className="min-w-0">
+          <p className="text-label text-primary-light">
+            {trainer.role || "Personal performance coach"}
+          </p>
 
-            <h1 className="mt-3 text-[2.4rem] md:text-[3rem] leading-[0.95] font-semibold font-display tracking-tight">
-              {fullName}
-            </h1>
+          <h1 className="mt-3 font-display text-[2.7rem] font-semibold leading-[0.92] tracking-tight md:text-[4rem]">
+            {fullName}
+          </h1>
 
-            <p className="mt-3 text-label text-primary-light">
-              {trainer.role || "Trener personalny"}
-            </p>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <div className="inline-flex items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm text-on-surface">
-                <Mail size={16} className="text-primary-light" />
-                {trainer.email || "Brak e-maila"}
-              </div>
-
-              <div className="inline-flex items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm text-on-surface">
-                <Phone size={16} className="text-primary-light" />
-                {trainer.phone || "Brak telefonu"}
-              </div>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <div className="inline-flex items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm text-on-surface">
+              <Mail size={16} className="text-primary-light" />
+              {trainer.email || "Brak e-maila"}
             </div>
+
+            <div className="inline-flex items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm text-on-surface">
+              <Phone size={16} className="text-primary-light" />
+              {trainer.phone || "Brak telefonu"}
+            </div>
+          </div>
+
+          <div className="mt-7 grid grid-cols-2 gap-4 border-t border-secondary/30 pt-6 md:grid-cols-4">
+            <HeroStat label="Sesje" value={trainer.sessionsCount ?? 0} />
+            <HeroStat
+              label="Ocena"
+              value={
+                <span className="inline-flex items-center gap-1">
+                  {trainer.ratingAverage
+                    ? trainer.ratingAverage.toFixed(1)
+                    : "0.0"}
+                  <Star
+                    size={18}
+                    className="fill-tertiary-light text-tertiary-light"
+                  />
+                </span>
+              }
+            />
+            <HeroStat
+              label="Doświadczenie"
+              value={`${trainer.experienceYears ?? 0} lat`}
+            />
+            <HeroStat label="Stawka" value={getRateLabel(trainer, rates)} />
           </div>
         </div>
 
-        <div className="flex md:flex-col gap-3 md:min-w-[190px]">
-          <Button className="h-12 md:h-14 flex-1 rounded-[var(--radius-lg)] bg-primary text-on-primary font-semibold flex items-center justify-center gap-2">
+        <div className="flex gap-3 lg:flex-col">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="flex h-14 flex-1 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primary px-5 text-sm font-semibold text-on-primary shadow-soft transition hover:bg-primary-container"
+          >
             <Pencil size={16} />
-            Edytuj
-          </Button>
+            Edytuj profil
+          </button>
 
-          <Button className="h-12 md:h-14 flex-1 rounded-[var(--radius-lg)] bg-surface-container-low text-on-surface font-semibold flex items-center justify-center gap-2">
-            <Link href="/owner/trainers" className="flex items-center gap-2">
-              <CornerDownLeft size={16} />
-              Wróć
-            </Link>
-          </Button>
+          <Link
+            href={settlementsHref}
+            prefetch={false}
+            className="flex h-14 flex-1 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-on-surface transition hover:bg-surface-container-high"
+          >
+            <ReceiptText size={16} className="text-primary-light" />
+            Rozliczenia
+          </Link>
         </div>
       </div>
+    </section>
+  );
+}
+
+function HeroStat({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="text-label text-on-surface-muted">{label}</p>
+      <p className="mt-2 flex min-h-8 items-center text-2xl font-semibold leading-none text-on-surface">
+        {value}
+      </p>
     </div>
   );
 }

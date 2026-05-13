@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Pencil } from "lucide-react";
+import { toast } from "sonner";
 import {
   getPackage,
   getPackageClients,
@@ -57,14 +58,12 @@ export default function PackageDetailsPage({
   const [item, setItem] = useState<Package | null>(null);
   const [clients, setClients] = useState<PackageClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
   const [clientsSource, setClientsSource] = useState<"api" | "mock">("api");
 
   useEffect(() => {
     async function loadData() {
       try {
         setIsLoading(true);
-        setError("");
 
         const packageData = await getPackage(packageId);
         setItem(packageData);
@@ -83,8 +82,9 @@ export default function PackageDetailsPage({
           setClientsSource("mock");
         }
       } catch (err) {
-        setError(
+        toast.error(
           err instanceof Error ? err.message : "Nie udało się pobrać pakietu.",
+          { id: "owner-package-load-error" },
         );
       } finally {
         setIsLoading(false);
@@ -93,6 +93,11 @@ export default function PackageDetailsPage({
 
     if (Number.isFinite(packageId)) {
       loadData();
+    } else {
+      toast.error("Nieprawidłowe ID pakietu.", {
+        id: "owner-package-invalid-id",
+      });
+      setIsLoading(false);
     }
   }, [packageId]);
 
@@ -116,10 +121,6 @@ export default function PackageDetailsPage({
         <div className="mt-6 card-shell p-6 text-on-surface-variant">
           Ładowanie pakietu...
         </div>
-      ) : null}
-
-      {error ? (
-        <div className="mt-6 card-shell p-6 text-error-light">{error}</div>
       ) : null}
 
       {item ? (

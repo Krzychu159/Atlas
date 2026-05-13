@@ -1,64 +1,61 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, UserPlus } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Plus, UserPlus } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
-import {
-  createClient,
-  getClients,
-  type Client,
-  type CreateClientPayload,
-} from "@/app/lib/owner/clients";
+import { getClients, type Client } from "@/app/lib/owner/clients";
 import AddClientModal from "@/app/(app)/owner/clients/components/AddClientModal";
 import ClientFilters, {
-  type ClientFilter,
+  type ClientPackageFilter,
+  type ClientSort,
 } from "@/app/(app)/owner/clients/components/ClientFilters";
 import ClientListRow from "@/app/(app)/owner/clients/components/ClientListRow";
+import {
+  formatClientBalance,
+  getClientBalance,
+  getClientName,
+  getClientPackageUsage,
+  hasActiveClientPackage,
+} from "@/app/(app)/owner/clients/components/client-display";
 
 function normalize(value: string) {
   return value.toLowerCase().trim();
 }
 
-function matchesFilter(client: Client, filter: ClientFilter) {
-  const status = normalize(client.status || "");
-
-  if (filter === "active") {
-    return status === "active" || status === "aktywny";
-  }
-
-  if (filter === "suspended") {
-    return status === "suspended" || status === "zawieszony";
-  }
-
-  if (filter === "new") {
-    const createdAt = client.createdAt ? new Date(client.createdAt) : null;
-    if (!createdAt) return false;
-
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    return createdAt >= sevenDaysAgo;
-  }
-
+function matchesPackageFilter(client: Client, filter: ClientPackageFilter) {
+  if (filter === "active-package") return hasActiveClientPackage(client);
+  if (filter === "inactive-package") return !hasActiveClientPackage(client);
   return true;
+}
+
+function getTime(value?: string | null) {
+  if (!value) return 0;
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 }
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState("");
-  const [activeFilter, setActiveFilter] = useState<ClientFilter>("active");
+  const [packageFilter, setPackageFilter] =
+    useState<ClientPackageFilter>("all");
+  const [trainerFilter, setTrainerFilter] = useState("all");
+  const [sort, setSort] = useState<ClientSort>("newest");
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
 
   async function loadClients() {
     try {
-      setError("");
       const data = await getClients();
       setClients(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Błąd ładowania klientów");
+      toast.error(
+        err instanceof Error ? err.message : "Błąd ładowania klientów",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -68,45 +65,74 @@ export default function ClientsPage() {
     loadClients();
   }, []);
 
+  const trainerOptions = useMemo(() => {
+    const uniqueTrainers = new Set<string>();
+
+    clients.forEach((client) => {
+      if (client.trainerFullName) uniqueTrainers.add(client.trainerFullName);
+    });
+
+    return Array.from(uniqueTrainers).sort((first, second) =>
+      first.localeCompare(second, "pl"),
+    );
+  }, [clients]);
+
   const filteredClients = useMemo(() => {
     const query = normalize(search);
 
-    return clients.filter((client) => {
-      const fullName = normalize(
-        client.fullName || `${client.firstName} ${client.lastName}`,
-      );
+    const result = clients.filter((client) => {
+      const fullName = normalize(getClientName(client));
       const email = normalize(client.email || "");
-      const goal = normalize(client.goal || "");
+      const phoneNumber = normalize(client.phoneNumber || "");
+      const trainerName = client.trainerFullName || "";
 
       const matchesSearch =
         !query ||
         fullName.includes(query) ||
         email.includes(query) ||
-        goal.includes(query);
+        phoneNumber.includes(query);
+      const matchesTrainer =
+        trainerFilter === "all" || trainerName === trainerFilter;
 
-      return matchesSearch && matchesFilter(client, activeFilter);
-    });
-  }, [clients, search, activeFilter]);
-
-  const activeClientsCount = clients.filter((client) =>
-    matchesFilter(client, "active"),
-  ).length;
-
-  const handleCreateClient = async (payload: CreateClientPayload) => {
-    try {
-      setIsSubmitting(true);
-      setError("");
-      await createClient(payload);
-      await loadClients();
-      setIsModalOpen(false);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Nie udało się dodać klienta",
+      return (
+        matchesSearch &&
+        matchesTrainer &&
+        matchesPackageFilter(client, packageFilter)
       );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    });
+
+    return [...result].sort((first, second) => {
+      if (sort === "name") {
+        return getClientName(first).localeCompare(getClientName(second), "pl");
+      }
+
+      if (sort === "trainer") {
+        return (first.trainerFullName || "").localeCompare(
+          second.trainerFullName || "",
+          "pl",
+        );
+      }
+
+      if (sort === "balance-desc") {
+        return getClientBalance(second) - getClientBalance(first);
+      }
+
+      if (sort === "balance-asc") {
+        return getClientBalance(first) - getClientBalance(second);
+      }
+
+      if (sort === "package-usage") {
+        return (
+          getClientPackageUsage(second).percent -
+          getClientPackageUsage(first).percent
+        );
+      }
+
+      return getTime(second.createdAt) - getTime(first.createdAt);
+    });
+  }, [clients, search, trainerFilter, packageFilter, sort]);
+
+  const activeClientsCount = clients.filter(hasActiveClientPackage).length;
 
   return (
     <>
@@ -126,7 +152,7 @@ export default function ClientsPage() {
                 </div>
 
                 <p className="mt-3 text-base text-on-surface-variant">
-                  Zarządzaj swoją bazą sportowców i ich celami.
+                  Zarządzaj bazą klientów, trenerami i aktywnymi pakietami.
                 </p>
               </div>
 
@@ -142,14 +168,15 @@ export default function ClientsPage() {
 
             <ClientFilters
               search={search}
-              activeFilter={activeFilter}
+              packageFilter={packageFilter}
+              trainerFilter={trainerFilter}
+              sort={sort}
+              trainerOptions={trainerOptions}
               onSearchChange={setSearch}
-              onFilterChange={setActiveFilter}
+              onPackageFilterChange={setPackageFilter}
+              onTrainerFilterChange={setTrainerFilter}
+              onSortChange={setSort}
             />
-
-            {error ? (
-              <div className="card-shell p-4 text-error-light">{error}</div>
-            ) : null}
 
             <div className="flex flex-col gap-3">
               {isLoading ? (
@@ -181,7 +208,7 @@ export default function ClientsPage() {
                         Aktywni klienci: {activeClientsCount}
                       </p>
                       <p className="text-label text-on-surface-muted mt-1">
-                        Na podstawie backendu
+                        Z aktywnym pakietem
                       </p>
                     </div>
                   </div>
@@ -229,14 +256,15 @@ export default function ClientsPage() {
 
             <ClientFilters
               search={search}
-              activeFilter={activeFilter}
+              packageFilter={packageFilter}
+              trainerFilter={trainerFilter}
+              sort={sort}
+              trainerOptions={trainerOptions}
               onSearchChange={setSearch}
-              onFilterChange={setActiveFilter}
+              onPackageFilterChange={setPackageFilter}
+              onTrainerFilterChange={setTrainerFilter}
+              onSortChange={setSort}
             />
-
-            {error ? (
-              <div className="card-shell p-4 text-error-light">{error}</div>
-            ) : null}
 
             <div className="flex flex-col gap-4">
               {isLoading ? (
@@ -244,28 +272,69 @@ export default function ClientsPage() {
                   Ładowanie klientów...
                 </div>
               ) : filteredClients.length > 0 ? (
-                filteredClients.map((client) => (
-                  <div key={client.id} className="card-shell p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-lg font-semibold truncate">
-                          {client.fullName ||
-                            `${client.firstName} ${client.lastName}`}
-                        </p>
-                        <p className="mt-2 text-sm text-on-surface-variant truncate">
-                          {client.goal || "Brak celu"}
-                        </p>
-                        <p className="mt-4 text-label text-primary-light">
-                          Trener: {client.trainerFullName || "Nie przypisano"}
-                        </p>
+                filteredClients.map((client) => {
+                  const packageUsage = getClientPackageUsage(client);
+                  const fullName = getClientName(client);
+
+                  return (
+                    <div key={client.id} className="card-shell p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-lg font-semibold truncate">
+                            {fullName}
+                          </p>
+                          <p className="mt-2 text-sm text-on-surface-variant truncate">
+                            {client.email || "Brak adresu e-mail"}
+                          </p>
+                          <p className="mt-4 text-label text-primary-light">
+                            Trener:{" "}
+                            {client.trainerFullName || "Nie przypisano"}
+                          </p>
+                        </div>
+
+                        <Link
+                          href={`/owner/clients/${client.id}`}
+                          prefetch={false}
+                          aria-label={`Przejdź do profilu klienta ${fullName}`}
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container-high text-primary-light"
+                        >
+                          <ArrowRight size={18} />
+                        </Link>
                       </div>
 
-                      <span className="px-3 py-1 rounded-full bg-surface-container-high text-on-surface-variant text-[11px] font-semibold">
-                        {client.billingStatus || "Status"}
-                      </span>
+                      <div className="mt-5 grid grid-cols-[1fr_auto] items-end gap-4">
+                        <div className="min-w-0">
+                          <p className="text-label text-on-surface-variant">
+                            Wykorzystanie pakietu
+                          </p>
+                          <div className="mt-2 flex items-center gap-3">
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-container-lowest">
+                              <div
+                                className="h-full rounded-full bg-primary-gradient"
+                                style={{ width: `${packageUsage.percent}%` }}
+                              />
+                            </div>
+                            <p className="text-sm font-semibold text-primary-light">
+                              {packageUsage.label}
+                            </p>
+                          </div>
+                          <p className="mt-2 truncate text-xs text-on-surface-muted">
+                            {packageUsage.packageName}
+                          </p>
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-label text-on-surface-variant">
+                            Balance
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-tertiary-light">
+                            {formatClientBalance(client)}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="card-shell p-8 text-center text-on-surface-variant">
                   Brak klientów.

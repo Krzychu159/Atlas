@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ArrowRight, Mail, X } from "lucide-react";
+import { toast } from "sonner";
 import {
   cancelInvitation,
   createInvitation,
@@ -29,7 +30,6 @@ export default function AddTrainerModal({
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingInvitations, setIsLoadingInvitations] = useState(false);
-  const [error, setError] = useState("");
 
   async function loadInvitations() {
     try {
@@ -41,7 +41,7 @@ export default function AddTrainerModal({
 
       setInvitations(data.filter(isPendingInvitation));
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error ? err.message : "Nie udało się pobrać zaproszeń.",
       );
     } finally {
@@ -65,7 +65,6 @@ export default function AddTrainerModal({
   async function handleSubmit() {
     try {
       setIsSubmitting(true);
-      setError("");
 
       await createInvitation({
         email: form.email,
@@ -75,8 +74,9 @@ export default function AddTrainerModal({
 
       setForm(initialForm);
       await loadInvitations();
+      toast.success("Zaproszenie dla trenera zostało wysłane.");
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error
           ? err.message
           : "Nie udało się wysłać zaproszenia.",
@@ -88,15 +88,14 @@ export default function AddTrainerModal({
 
   async function handleCancel(id: number) {
     try {
-      setError("");
-
       await cancelInvitation(id);
 
       setInvitations((current) =>
         current.filter((invitation) => invitation.id !== id),
       );
+      toast.success("Zaproszenie zostało wycofane.");
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error
           ? err.message
           : "Nie udało się wycofać zaproszenia.",
@@ -106,11 +105,11 @@ export default function AddTrainerModal({
 
   async function handleResend(id: number) {
     try {
-      setError("");
       await resendInvitation(id);
       await loadInvitations();
+      toast.success("Zaproszenie zostało ponowione.");
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error
           ? err.message
           : "Nie udało się ponowić zaproszenia.",
@@ -161,12 +160,6 @@ export default function AddTrainerModal({
             />
           </div>
         </div>
-
-        {error ? (
-          <div className="mt-4 rounded-[var(--radius-lg)] bg-error-container/40 px-4 py-3 text-sm text-error-light">
-            {error}
-          </div>
-        ) : null}
 
         <button
           onClick={handleSubmit}

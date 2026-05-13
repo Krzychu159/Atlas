@@ -1,14 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, SlidersHorizontal, UserPlus } from "lucide-react";
+import { Search, UserPlus } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
-import {
-  createTrainer,
-  getTrainers,
-  type CreateTrainerPayload,
-  type Trainer,
-} from "@/app/lib/owner/trainers";
+import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
 import AddTrainerModal from "./components/AddTrainerModal";
 import TrainerCard from "./components/TrainerCard";
 
@@ -21,16 +17,16 @@ export default function TrainersPage() {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
 
   async function loadTrainers() {
     try {
-      setError("");
       const data = await getTrainers();
       setTrainers(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Błąd ładowania trenerów");
+      toast.error(
+        err instanceof Error ? err.message : "Błąd ładowania trenerów",
+        { id: "owner-trainers-load-error" },
+      );
     } finally {
       setIsLoading(false);
     }
@@ -65,22 +61,6 @@ export default function TrainersPage() {
   const activeTrainers = trainers.filter((trainer) =>
     normalize(trainer.status || "").includes("active"),
   );
-
-  const handleCreateTrainer = async (payload: CreateTrainerPayload) => {
-    try {
-      setIsSubmitting(true);
-      setError("");
-      await createTrainer(payload);
-      await loadTrainers();
-      setIsModalOpen(false);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Nie udało się dodać trenera",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <>
@@ -131,10 +111,6 @@ export default function TrainersPage() {
               />
             </div>
           </div>
-
-          {error ? (
-            <div className="card-shell p-4 text-error-light">{error}</div>
-          ) : null}
 
           {isLoading ? (
             <div className="card-shell p-5 text-on-surface-variant">

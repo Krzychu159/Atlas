@@ -35,7 +35,6 @@ export default function PackageEditCard({
   });
 
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     setForm({
@@ -58,7 +57,6 @@ export default function PackageEditCard({
   async function handleSave() {
     try {
       setIsSaving(true);
-      setError("");
 
       const payload: UpdatePackagePayload = {
         name: form.name,
@@ -78,7 +76,6 @@ export default function PackageEditCard({
       const message =
         err instanceof Error ? err.message : "Nie udało się zapisać zmian.";
 
-      setError(message);
       toast.error(message);
     } finally {
       setIsSaving(false);
@@ -166,12 +163,6 @@ export default function PackageEditCard({
         />
         <span className="text-sm text-on-surface-variant">Pakiet aktywny</span>
       </label>
-
-      {error ? (
-        <div className="mt-4 rounded-[var(--radius-lg)] bg-error-container/40 px-4 py-3 text-sm text-error-light">
-          {error}
-        </div>
-      ) : null}
 
       <button
         onClick={handleSave}
