@@ -1,6 +1,12 @@
-import { ChevronRight, Clock3, Dumbbell, Star } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, ChevronRight, Clock3, Dumbbell } from "lucide-react";
 import type { Trainer } from "@/app/lib/owner/trainers";
 import Link from "next/link";
+
+export type TrainerSessionTrend = {
+  current: number;
+  previous: number;
+  percent: number;
+};
 
 function getInitials(trainer: Trainer) {
   const name = trainer.fullName || `${trainer.firstName} ${trainer.lastName}`;
@@ -13,21 +19,13 @@ function getInitials(trainer: Trainer) {
     .toUpperCase();
 }
 
-function getStatusStyles(status: string) {
-  const normalized = status.toLowerCase();
-
-  if (normalized.includes("active") || normalized.includes("aktywn")) {
-    return "bg-tertiary-container text-tertiary-light";
-  }
-
-  if (normalized.includes("leave") || normalized.includes("urlop")) {
-    return "bg-surface-container-high text-on-surface-variant";
-  }
-
-  return "bg-surface-container-high text-on-surface-variant";
-}
-
-export default function TrainerCard({ trainer }: { trainer: Trainer }) {
+export default function TrainerCard({
+  trainer,
+  trend,
+}: {
+  trainer: Trainer;
+  trend?: TrainerSessionTrend;
+}) {
   const fullName =
     trainer.fullName || `${trainer.firstName} ${trainer.lastName}`;
 
@@ -75,10 +73,12 @@ export default function TrainerCard({ trainer }: { trainer: Trainer }) {
               Sesje (30 dni)
             </p>
           </div>
-          <p className="mt-3 text-[18px] font-semibold leading-none">
-            {trainer.sessionsCount ?? 0} &nbsp;
-            <span className="text-sm font-medium text-success">+37%</span>
-          </p>
+          <div className="mt-3 flex items-end justify-between gap-2">
+            <p className="text-[18px] font-semibold leading-none">
+              {trend?.current ?? trainer.sessionsCount ?? 0}
+            </p>
+            <TrendBadge trend={trend} />
+          </div>
         </div>
 
         <div className="bg-surface-container-low rounded-[var(--radius-md)] px-3 py-3">
@@ -100,5 +100,32 @@ export default function TrainerCard({ trainer }: { trainer: Trainer }) {
         <ChevronRight size={14} />
       </Link>
     </div>
+  );
+}
+
+function TrendBadge({ trend }: { trend?: TrainerSessionTrend }) {
+  if (!trend) {
+    return (
+      <span className="rounded-full bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface-muted">
+        --
+      </span>
+    );
+  }
+
+  const isPositive = trend.percent >= 0;
+
+  return (
+    <span
+      className={[
+        "inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold",
+        isPositive
+          ? "bg-tertiary-container text-tertiary-light"
+          : "bg-error-container text-error-light",
+      ].join(" ")}
+    >
+      {isPositive ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+      {isPositive ? "+" : ""}
+      {trend.percent}%
+    </span>
   );
 }

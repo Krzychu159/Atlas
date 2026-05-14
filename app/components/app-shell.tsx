@@ -132,7 +132,7 @@ export function AppShell({ children, role }: AppShellProps) {
           </header>
 
           <div className="hidden md:block">
-            <Header />
+            <Header role={role} />
           </div>
 
           <main className="min-w-0 bg-surface px-4 pb-6 pt-4 md:px-8 md:pb-8 md:pt-0">

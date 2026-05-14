@@ -5,7 +5,11 @@ import Link from "next/link";
 import { ArrowRight, Plus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
-import { getClients, type Client } from "@/app/lib/owner/clients";
+import {
+  getClients,
+  getClientSubscription,
+  type Client,
+} from "@/app/lib/owner/clients";
 import AddClientModal from "@/app/(app)/owner/clients/components/AddClientModal";
 import ClientFilters, {
   type ClientPackageFilter,
@@ -51,7 +55,33 @@ export default function ClientsPage() {
   async function loadClients() {
     try {
       const data = await getClients();
-      setClients(data);
+      const subscriptions = await Promise.allSettled(
+        data.map((client) => getClientSubscription(client.id)),
+      );
+
+      setClients(
+        data.map((client, index) => {
+          const subscription = subscriptions[index];
+
+          if (subscription.status !== "fulfilled") return client;
+
+          const cycle = subscription.value.currentCycle;
+
+          return {
+            ...client,
+            subscriptionStatus: subscription.value.status,
+            hasActivePackage: Boolean(cycle?.isActive),
+            currentPackageName: cycle?.packageName ?? client.currentPackageName,
+            packageSessionsLimit:
+              cycle?.totalSessions ?? client.packageSessionsLimit,
+            packageSessionsUsed:
+              cycle?.usedSessions ?? client.packageSessionsUsed,
+            remainingSessions: cycle?.remainingSessions ?? client.remainingSessions,
+            balance: subscription.value.carryOverBalance ?? client.balance,
+            currency: cycle?.currency ?? client.currency,
+          };
+        }),
+      );
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Błąd ładowania klientów",

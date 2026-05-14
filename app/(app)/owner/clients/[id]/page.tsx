@@ -83,7 +83,7 @@ export default function OwnerClientDetailsPage() {
   }, [params.id]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 pb-10">
+    <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-5 pb-10">
       {isLoading ? (
         <div className="card-shell p-6 text-on-surface-variant">
           Ładowanie klienta...
@@ -104,7 +104,11 @@ export default function OwnerClientDetailsPage() {
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_330px]">
             <ClientSessionsPanel sessions={sessions} />
-            <ClientNotesPanel client={client} subscription={subscription} />
+            <ClientNotesPanel
+              client={client}
+              subscription={subscription}
+              onClientChange={setClient}
+            />
           </div>
 
           <EditClientModal

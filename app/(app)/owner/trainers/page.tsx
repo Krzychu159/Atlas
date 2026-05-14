@@ -5,8 +5,11 @@ import { Search, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
+import { getTrainerSessions } from "@/app/lib/owner/sessions";
 import AddTrainerModal from "./components/AddTrainerModal";
-import TrainerCard from "./components/TrainerCard";
+import TrainerCard, {
+  type TrainerSessionTrend,
+} from "./components/TrainerCard";
 
 function normalize(value: string) {
   return value.toLowerCase().trim();
@@ -14,6 +17,9 @@ function normalize(value: string) {
 
 export default function TrainersPage() {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const [sessionTrends, setSessionTrends] = useState<
+    Record<number, TrainerSessionTrend>
+  >({});
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -22,6 +28,7 @@ export default function TrainersPage() {
     try {
       const data = await getTrainers();
       setTrainers(data);
+      loadSessionTrends(data);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Błąd ładowania trenerów",
@@ -32,8 +39,49 @@ export default function TrainersPage() {
     }
   }
 
+  async function loadSessionTrends(items: Trainer[]) {
+    const now = new Date();
+    const currentStart = new Date(now);
+    currentStart.setDate(currentStart.getDate() - 30);
+    const previousStart = new Date(now);
+    previousStart.setDate(previousStart.getDate() - 60);
+
+    const results = await Promise.allSettled(
+      items.map((trainer) => getTrainerSessions(trainer.id)),
+    );
+
+    const trends: Record<number, TrainerSessionTrend> = {};
+
+    items.forEach((trainer, index) => {
+      const result = results[index];
+
+      if (result.status !== "fulfilled") return;
+
+      const sessions = result.value;
+      const current = sessions.filter((session) => {
+        const time = new Date(session.startAt).getTime();
+        return time >= currentStart.getTime() && time <= now.getTime();
+      }).length;
+      const previous = sessions.filter((session) => {
+        const time = new Date(session.startAt).getTime();
+        return time >= previousStart.getTime() && time < currentStart.getTime();
+      }).length;
+      const percent =
+        previous > 0
+          ? Math.round(((current - previous) / previous) * 100)
+          : current > 0
+            ? 100
+            : 0;
+
+      trends[trainer.id] = { current, previous, percent };
+    });
+
+    setSessionTrends(trends);
+  }
+
   useEffect(() => {
     loadTrainers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filteredTrainers = useMemo(() => {
@@ -119,7 +167,11 @@ export default function TrainersPage() {
           ) : filteredTrainers.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {filteredTrainers.map((trainer) => (
-                <TrainerCard key={trainer.id} trainer={trainer} />
+                <TrainerCard
+                  key={trainer.id}
+                  trainer={trainer}
+                  trend={sessionTrends[trainer.id]}
+                />
               ))}
             </div>
           ) : (

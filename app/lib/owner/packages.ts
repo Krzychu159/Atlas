@@ -7,7 +7,12 @@ export type Package = {
   price: number;
   currency: string;
   sessionsLimit: number;
+  sessionsPerWeek?: number;
   durationDays: number;
+  billingType?: number;
+  participantsCount: number;
+  locationId?: number | null;
+  locationName?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -20,7 +25,11 @@ export type CreatePackagePayload = {
   price: number;
   currency: string;
   sessionsLimit: number;
+  sessionsPerWeek?: number;
   durationDays: number;
+  billingType?: number;
+  participantsCount?: number | null;
+  locationId?: number | null;
   isActive: boolean;
   createdBy: number;
 };

@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Star,
 } from "lucide-react";
+import { Button, ButtonLink } from "@/app/components/ui/button";
 import type { TrainerRate } from "@/app/lib/owner/settlements";
 import type { Trainer } from "@/app/lib/owner/trainers";
 
@@ -123,37 +124,34 @@ export default function TrainerProfileHeader({
           </div>
         </div>
 
-        <div className="flex gap-3 lg:flex-col">
-          <button
+        <div className="flex gap-3  lg:flex-col">
+          <Button
             type="button"
             onClick={onEdit}
-            className="flex h-14 flex-1 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primary px-5 text-sm font-semibold text-on-primary shadow-soft transition hover:bg-primary-container"
+            size="lg"
+            icon={<Pencil size={16} />}
+            className="flex-1 p-4"
           >
-            <Pencil size={16} />
             Edytuj profil
-          </button>
+          </Button>
 
-          <Link
+          <ButtonLink
+            type="button"
             href={settlementsHref}
-            prefetch={false}
-            className="flex h-14 flex-1 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-on-surface transition hover:bg-surface-container-high"
+            variant="secondary"
+            size="lg"
+            icon={<ReceiptText size={16} />}
+            className="flex-1 p-4 "
           >
-            <ReceiptText size={16} className="text-primary-light" />
             Rozliczenia
-          </Link>
+          </ButtonLink>
         </div>
       </div>
     </section>
   );
 }
 
-function HeroStat({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
+function HeroStat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <p className="text-label text-on-surface-muted">{label}</p>

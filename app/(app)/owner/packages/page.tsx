@@ -14,26 +14,51 @@ import {
 import AddPackageModal from "./components/AddPackageModal";
 import PackageCard from "./components/PackageCard";
 import PackageFilters, {
-  type PackageFilter,
+  type DurationFilter,
+  type PackageSort,
+  type ParticipantsFilter,
+  type SessionsFilter,
 } from "./components/PackageFilters";
 
 function normalize(value: string) {
   return value.toLowerCase().trim();
 }
 
-function matchesFilter(item: Package, filter: PackageFilter) {
-  if (filter === "active") return item.isActive;
-  if (filter === "archived") return !item.isActive;
+function matchesParticipants(item: Package, filter: ParticipantsFilter) {
+  const count = item.participantsCount || 1;
+
+  if (filter === "solo") return count <= 1;
+  if (filter === "duo") return count === 2;
+  if (filter === "group") return count > 2;
+  return true;
+}
+
+function matchesSessions(item: Package, filter: SessionsFilter) {
+  if (filter === "short") return item.sessionsLimit <= 4;
+  if (filter === "medium") return item.sessionsLimit >= 5 && item.sessionsLimit <= 10;
+  if (filter === "long") return item.sessionsLimit > 10;
+  return true;
+}
+
+function matchesDuration(item: Package, filter: DurationFilter) {
+  if (filter === "monthly") return item.durationDays <= 31;
+  if (filter === "quarterly") return item.durationDays > 31 && item.durationDays <= 90;
+  if (filter === "long") return item.durationDays > 90;
   return true;
 }
 
 export default function PackagesPage() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [search, setSearch] = useState("");
-  const [activeFilter, setActiveFilter] = useState<PackageFilter>("all");
+  const [participantsFilter, setParticipantsFilter] =
+    useState<ParticipantsFilter>("all");
+  const [sessionsFilter, setSessionsFilter] = useState<SessionsFilter>("all");
+  const [durationFilter, setDurationFilter] = useState<DurationFilter>("all");
+  const [sort, setSort] = useState<PackageSort>("newest");
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [packageToDelete, setPackageToDelete] = useState<Package | null>(null);
 
   async function loadPackages() {
     try {
@@ -56,16 +81,33 @@ export default function PackagesPage() {
   const filteredPackages = useMemo(() => {
     const query = normalize(search);
 
-    return packages.filter((item) => {
+    const result = packages.filter((item) => {
       const name = normalize(item.name || "");
       const description = normalize(item.description || "");
 
       const matchesSearch =
         !query || name.includes(query) || description.includes(query);
 
-      return matchesSearch && matchesFilter(item, activeFilter);
+      return (
+        matchesSearch &&
+        matchesParticipants(item, participantsFilter) &&
+        matchesSessions(item, sessionsFilter) &&
+        matchesDuration(item, durationFilter)
+      );
     });
-  }, [packages, search, activeFilter]);
+
+    return [...result].sort((first, second) => {
+      if (sort === "price-asc") return first.price - second.price;
+      if (sort === "price-desc") return second.price - first.price;
+      if (sort === "sessions-desc") return second.sessionsLimit - first.sessionsLimit;
+      if (sort === "duration-desc") return second.durationDays - first.durationDays;
+      if (sort === "participants-asc") {
+        return (first.participantsCount || 1) - (second.participantsCount || 1);
+      }
+
+      return new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime();
+    });
+  }, [packages, search, participantsFilter, sessionsFilter, durationFilter, sort]);
 
   const handleCreatePackage = async (payload: CreatePackagePayload) => {
     try {
@@ -88,6 +130,7 @@ export default function PackagesPage() {
       await deletePackage(id);
 
       setPackages((current) => current.filter((item) => item.id !== id));
+      setPackageToDelete(null);
 
       toast.success("Pakiet został usunięty.");
     } catch (err) {
@@ -128,9 +171,15 @@ export default function PackagesPage() {
 
             <PackageFilters
               search={search}
-              activeFilter={activeFilter}
+              participantsFilter={participantsFilter}
+              sessionsFilter={sessionsFilter}
+              durationFilter={durationFilter}
+              sort={sort}
               onSearchChange={setSearch}
-              onFilterChange={setActiveFilter}
+              onParticipantsFilterChange={setParticipantsFilter}
+              onSessionsFilterChange={setSessionsFilter}
+              onDurationFilterChange={setDurationFilter}
+              onSortChange={setSort}
             />
 
             <div className="flex items-center justify-between">
@@ -150,7 +199,7 @@ export default function PackagesPage() {
                   <PackageCard
                     key={item.id}
                     item={item}
-                    onDelete={handleDeletePackage}
+                    onDeleteRequest={setPackageToDelete}
                   />
                 ))}
 
@@ -197,9 +246,15 @@ export default function PackagesPage() {
 
             <PackageFilters
               search={search}
-              activeFilter={activeFilter}
+              participantsFilter={participantsFilter}
+              sessionsFilter={sessionsFilter}
+              durationFilter={durationFilter}
+              sort={sort}
               onSearchChange={setSearch}
-              onFilterChange={setActiveFilter}
+              onParticipantsFilterChange={setParticipantsFilter}
+              onSessionsFilterChange={setSessionsFilter}
+              onDurationFilterChange={setDurationFilter}
+              onSortChange={setSort}
             />
 
             <div className="flex items-center justify-between">
@@ -222,7 +277,7 @@ export default function PackagesPage() {
                   <PackageCard
                     key={item.id}
                     item={item}
-                    onDelete={handleDeletePackage}
+                    onDeleteRequest={setPackageToDelete}
                   />
                 ))
               ) : (
@@ -256,6 +311,35 @@ export default function PackagesPage() {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreatePackage}
       />
+
+      {packageToDelete ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-[420px] rounded-[var(--radius-xl)] bg-surface-container p-6 shadow-ambient">
+            <p className="font-display text-2xl font-semibold">Usunąć pakiet?</p>
+            <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+              Tej akcji nie da się szybko cofnąć. Pakiet:{" "}
+              <span className="font-semibold text-on-surface">
+                {packageToDelete.name}
+              </span>
+              .
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => setPackageToDelete(null)}
+              >
+                Anuluj
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => handleDeletePackage(packageToDelete.id)}
+              >
+                Usuń pakiet
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

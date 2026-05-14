@@ -2,56 +2,139 @@
 
 import { Search, SlidersHorizontal } from "lucide-react";
 
-export type PackageFilter = "all" | "active" | "archived";
+export type ParticipantsFilter = "all" | "solo" | "duo" | "group";
+export type SessionsFilter = "all" | "short" | "medium" | "long";
+export type DurationFilter = "all" | "monthly" | "quarterly" | "long";
+export type PackageSort =
+  | "newest"
+  | "price-asc"
+  | "price-desc"
+  | "sessions-desc"
+  | "duration-desc"
+  | "participants-asc";
 
 type PackageFiltersProps = {
   search: string;
-  activeFilter: PackageFilter;
+  participantsFilter: ParticipantsFilter;
+  sessionsFilter: SessionsFilter;
+  durationFilter: DurationFilter;
+  sort: PackageSort;
   onSearchChange: (value: string) => void;
-  onFilterChange: (value: PackageFilter) => void;
+  onParticipantsFilterChange: (value: ParticipantsFilter) => void;
+  onSessionsFilterChange: (value: SessionsFilter) => void;
+  onDurationFilterChange: (value: DurationFilter) => void;
+  onSortChange: (value: PackageSort) => void;
 };
-
-const filters: { label: string; value: PackageFilter }[] = [
-  { label: "Wszystkie", value: "all" },
-  { label: "Aktywne", value: "active" },
-  { label: "Archiwalne", value: "archived" },
-];
 
 export default function PackageFilters({
   search,
-  activeFilter,
+  participantsFilter,
+  sessionsFilter,
+  durationFilter,
+  sort,
   onSearchChange,
-  onFilterChange,
+  onParticipantsFilterChange,
+  onSessionsFilterChange,
+  onDurationFilterChange,
+  onSortChange,
 }: PackageFiltersProps) {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-4">
-        <div className="card-shell p-3 flex items-center gap-3 flex-1">
-          <Search size={18} className="text-on-surface-variant shrink-0" />
+    <div className="card-shell p-4">
+      <div className="grid gap-3 lg:grid-cols-[1fr_190px_190px_190px_190px]">
+        <label className="flex h-12 items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4">
+          <Search size={18} className="shrink-0 text-on-surface-muted" />
           <input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Szukaj pakietu..."
-            className="w-full bg-transparent outline-none text-sm text-on-surface placeholder:text-on-surface-muted"
+            className="w-full bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
           />
-        </div>
-      </div>
+        </label>
 
-      <div className="flex items-center gap-3 overflow-x-auto pb-1">
-        {filters.map((filter) => (
-          <button
-            key={filter.value}
-            onClick={() => onFilterChange(filter.value)}
-            className={`h-11 px-5 rounded-full text-label whitespace-nowrap transition-colors ${
-              activeFilter === filter.value
-                ? "bg-primary-light text-primary-container"
-                : "bg-surface-container text-on-surface-variant"
-            }`}
-          >
-            {filter.label}
-          </button>
-        ))}
+        <Select
+          icon={<SlidersHorizontal size={16} />}
+          label="Uczestnicy"
+          value={participantsFilter}
+          onChange={(value) =>
+            onParticipantsFilterChange(value as ParticipantsFilter)
+          }
+          options={[
+            ["all", "Dowolnie"],
+            ["solo", "1 osoba"],
+            ["duo", "2 osoby"],
+            ["group", "Grupowe"],
+          ]}
+        />
+        <Select
+          label="Sesje"
+          value={sessionsFilter}
+          onChange={(value) => onSessionsFilterChange(value as SessionsFilter)}
+          options={[
+            ["all", "Dowolnie"],
+            ["short", "1-4"],
+            ["medium", "5-10"],
+            ["long", "11+"],
+          ]}
+        />
+        <Select
+          label="Czas"
+          value={durationFilter}
+          onChange={(value) => onDurationFilterChange(value as DurationFilter)}
+          options={[
+            ["all", "Dowolnie"],
+            ["monthly", "do 31 dni"],
+            ["quarterly", "32-90 dni"],
+            ["long", "90+ dni"],
+          ]}
+        />
+        <Select
+          label="Sortuj"
+          value={sort}
+          onChange={(value) => onSortChange(value as PackageSort)}
+          options={[
+            ["newest", "Najnowsze"],
+            ["price-asc", "Cena rosnąco"],
+            ["price-desc", "Cena malejąco"],
+            ["sessions-desc", "Najwięcej sesji"],
+            ["duration-desc", "Najdłuższe"],
+            ["participants-asc", "Uczestnicy"],
+          ]}
+        />
       </div>
     </div>
+  );
+}
+
+function Select({
+  label,
+  value,
+  options,
+  onChange,
+  icon,
+}: {
+  label: string;
+  value: string;
+  options: Array<[string, string]>;
+  onChange: (value: string) => void;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <label className="rounded-[var(--radius-lg)] bg-surface-container-lowest px-3 py-2">
+      <span className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
+        {icon}
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 w-full bg-transparent text-sm font-semibold text-on-surface outline-none"
+      >
+        {options.map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue}>
+            {optionLabel}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

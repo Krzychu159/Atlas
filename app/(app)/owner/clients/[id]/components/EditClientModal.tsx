@@ -17,27 +17,6 @@ type EditClientModalProps = {
   onSaved: (client: Client) => void;
 };
 
-function toDateTimeLocal(value?: string | null) {
-  if (!value) return "";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return "";
-
-  const offsetMs = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
-}
-
-function fromDateTimeLocal(value: string) {
-  if (!value) return null;
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return null;
-
-  return date.toISOString();
-}
-
 export default function EditClientModal({
   open,
   client,
@@ -49,15 +28,10 @@ export default function EditClientModal({
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
   const [trainerId, setTrainerId] = useState("");
-  const [status, setStatus] = useState("");
   const [billingStatus, setBillingStatus] = useState("");
   const [progressPercent, setProgressPercent] = useState("0");
-  const [locationId, setLocationId] = useState("");
-  const [nextSessionAt, setNextSessionAt] = useState("");
   const [goal, setGoal] = useState("");
-  const [notes, setNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -75,15 +49,10 @@ export default function EditClientModal({
     setLastName(client.lastName || "");
     setEmail(client.email || "");
     setPhoneNumber(client.phoneNumber || "");
-    setAvatarUrl(client.avatarUrl || "");
     setTrainerId(client.trainerId ? String(client.trainerId) : "");
-    setStatus(client.status || "active");
     setBillingStatus(client.billingStatus || "");
     setProgressPercent(String(client.progressPercent ?? 0));
-    setLocationId(client.locationId ? String(client.locationId) : "");
-    setNextSessionAt(toDateTimeLocal(client.nextSessionAt));
     setGoal(client.goal || "");
-    setNotes(client.notes || "");
   }, [client, open]);
 
   if (!open || !client) return null;
@@ -99,14 +68,9 @@ export default function EditClientModal({
       lastName: lastName.trim() || null,
       email: email.trim() || null,
       phoneNumber: phoneNumber.trim() || null,
-      avatarUrl: avatarUrl.trim() || null,
       goal: goal.trim() || null,
-      notes: notes.trim() || null,
       progressPercent: Number(progressPercent) || 0,
       billingStatus: billingStatus.trim() || null,
-      status: status.trim() || null,
-      nextSessionAt: fromDateTimeLocal(nextSessionAt),
-      locationId: Number(locationId) || client.locationId || 0,
     };
 
     try {
@@ -177,7 +141,12 @@ export default function EditClientModal({
               ))}
             </select>
           </label>
-          <Field label="Status" value={status} onChange={setStatus} />
+          <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3">
+            <p className="text-label text-on-surface-muted">Lokalizacja</p>
+            <p className="mt-2 text-sm font-semibold text-on-surface">
+              {client.locationName || "Brak lokalizacji"}
+            </p>
+          </div>
           <Field
             label="Status rozliczeń"
             value={billingStatus}
@@ -189,34 +158,10 @@ export default function EditClientModal({
             onChange={setProgressPercent}
             type="number"
           />
-          <Field
-            label="ID lokalizacji"
-            value={locationId}
-            onChange={setLocationId}
-            type="number"
-          />
-          <Field
-            label="Następna sesja"
-            value={nextSessionAt}
-            onChange={setNextSessionAt}
-            type="datetime-local"
-          />
-          <Field
-            label="URL avatara"
-            value={avatarUrl}
-            onChange={setAvatarUrl}
-            className="md:col-span-2"
-          />
           <TextArea
             label="Cel"
             value={goal}
             onChange={setGoal}
-            className="md:col-span-2"
-          />
-          <TextArea
-            label="Notatki"
-            value={notes}
-            onChange={setNotes}
             className="md:col-span-2"
           />
         </div>

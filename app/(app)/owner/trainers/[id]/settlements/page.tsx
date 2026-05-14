@@ -184,7 +184,7 @@ export default function TrainerSettlementPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-5 pb-10">
+    <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-5 pb-10">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Link
