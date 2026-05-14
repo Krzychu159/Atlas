@@ -47,6 +47,12 @@ async function handler(req: NextRequest, context: RouteContext) {
 
   const text = await response.text();
 
+  if ([204, 205, 304].includes(response.status)) {
+    return new NextResponse(null, {
+      status: response.status,
+    });
+  }
+
   return new NextResponse(text, {
     status: response.status,
     headers: {
