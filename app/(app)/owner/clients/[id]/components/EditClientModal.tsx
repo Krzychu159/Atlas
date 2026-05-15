@@ -4,7 +4,9 @@ import { type FormEvent, useEffect, useState } from "react";
 import { MapPin, X } from "lucide-react";
 import { toast } from "sonner";
 import { CustomSelect } from "@/app/components/ui/custom-select";
+import AvatarFilePicker from "../../../components/AvatarFilePicker";
 import {
+  getClient,
   updateClient,
   type Client,
   type UpdateClientPayload,
@@ -31,6 +33,7 @@ export default function EditClientModal({
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [trainerId, setTrainerId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [goal, setGoal] = useState("");
@@ -57,6 +60,7 @@ export default function EditClientModal({
     setLastName(client.lastName || "");
     setEmail(client.email || "");
     setPhoneNumber(client.phoneNumber || "");
+    setAvatarUrl(client.avatarUrl || "");
     setTrainerId(client.trainerId ? String(client.trainerId) : "");
     setLocationId(resolveClientLocationId(client, locations));
     setGoal(client.goal || "");
@@ -84,6 +88,7 @@ export default function EditClientModal({
       lastName: lastName.trim() || null,
       email: email.trim() || null,
       phoneNumber: phoneNumber.trim() || null,
+      avatarUrl: avatarUrl.trim() || null,
       goal: goal.trim() || null,
       locationId: resolvedLocationId,
       progressPercent: client.progressPercent ?? 0,
@@ -94,8 +99,17 @@ export default function EditClientModal({
 
     try {
       setIsSaving(true);
-      const updatedClient = await updateClient(client.id, payload);
-      onSaved(updatedClient);
+      await updateClient(client.id, payload);
+      const confirmedClient = await getClient(client.id);
+      const failedFields = getClientUpdateFailedFields(confirmedClient, payload);
+
+      if (failedFields.length) {
+        throw new Error(
+          `Backend zwrócił sukces, ale nie zapisał pól: ${failedFields.join(", ")}.`,
+        );
+      }
+
+      onSaved(confirmedClient);
       toast.success("Dane klienta zostały zaktualizowane.", {
         id: "owner-client-edit-success",
       });
@@ -130,6 +144,7 @@ export default function EditClientModal({
           label: client.locationName || "Brak lokalizacji",
         },
       ];
+  const avatarFallback = `${firstName[0] || ""}${lastName[0] || ""}` || "K";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8">
@@ -162,6 +177,13 @@ export default function EditClientModal({
             label="Telefon"
             value={phoneNumber}
             onChange={setPhoneNumber}
+          />
+          <AvatarFilePicker
+            label="Zdjęcie klienta"
+            value={avatarUrl}
+            onChange={setAvatarUrl}
+            fallbackText={avatarFallback}
+            className="md:col-span-2"
           />
 
           <div>
@@ -236,6 +258,45 @@ function resolveClientLocationId(client: Client, locations: Location[]) {
   );
 
   return matchedLocation ? String(matchedLocation.id) : "";
+}
+
+function normalizeText(value?: string | null) {
+  return (value || "").trim();
+}
+
+function isSameOptionalText(
+  actual?: string | null,
+  expected?: string | null,
+) {
+  return normalizeText(actual) === normalizeText(expected);
+}
+
+function getClientUpdateFailedFields(
+  client: Client,
+  payload: UpdateClientPayload,
+) {
+  const failedFields: string[] = [];
+
+  if (client.trainerId !== payload.trainerId) failedFields.push("trener");
+  if (client.locationId !== payload.locationId) failedFields.push("lokalizacja");
+  if (!isSameOptionalText(client.firstName, payload.firstName)) {
+    failedFields.push("imię");
+  }
+  if (!isSameOptionalText(client.lastName, payload.lastName)) {
+    failedFields.push("nazwisko");
+  }
+  if (!isSameOptionalText(client.email, payload.email)) {
+    failedFields.push("e-mail");
+  }
+  if (!isSameOptionalText(client.phoneNumber, payload.phoneNumber)) {
+    failedFields.push("telefon");
+  }
+  if (!isSameOptionalText(client.avatarUrl, payload.avatarUrl)) {
+    failedFields.push("zdjęcie");
+  }
+  if (!isSameOptionalText(client.goal, payload.goal)) failedFields.push("cel");
+
+  return failedFields;
 }
 
 function Field({

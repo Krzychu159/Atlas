@@ -71,6 +71,8 @@ async function handler(req: NextRequest, context: RouteContext) {
       status: response.status,
     });
 
+    nextResponse.headers.set("Cache-Control", "no-store");
+
     if (response.status === 401) {
       expireAuthCookies(nextResponse);
     }
@@ -83,6 +85,7 @@ async function handler(req: NextRequest, context: RouteContext) {
     headers: {
       "Content-Type":
         response.headers.get("content-type") || "application/json",
+      "Cache-Control": "no-store",
     },
   });
 

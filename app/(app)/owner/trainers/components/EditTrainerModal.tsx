@@ -1,8 +1,11 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronDown, MapPin, X } from "lucide-react";
 import { toast } from "sonner";
+import AvatarFilePicker from "../../components/AvatarFilePicker";
+import { CustomSelect } from "@/app/components/ui/custom-select";
+import { getLocations, type Location } from "@/app/lib/owner/locations";
 import {
   updateTrainerRates,
   type TrainerRate,
@@ -21,17 +24,32 @@ type EditTrainerModalProps = {
   onSaved: (trainer: Trainer, rates: TrainerRate[]) => void;
 };
 
-function toLocationInput(values?: number[] | null) {
-  return values?.length ? values.join(", ") : "";
+const trainerStatusOptions = [
+  { value: "Active", label: "Aktywny" },
+  { value: "Inactive", label: "Nieaktywny" },
+  { value: "Paused", label: "Wstrzymany" },
+];
+
+function toLocationValues(values?: number[] | null) {
+  return values?.map((value) => String(value)) ?? [];
 }
 
-function parseLocationIds(value: string) {
-  const ids = value
-    .split(",")
-    .map((part) => Number(part.trim()))
-    .filter((part) => Number.isInteger(part) && part > 0);
+function parseLocationIds(values: string[]) {
+  const ids = values
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0);
 
   return ids.length ? ids : null;
+}
+
+function normalizeTrainerStatus(value?: string | null) {
+  const normalized = (value || "").trim().toLowerCase();
+
+  if (normalized === "active") return "Active";
+  if (normalized === "inactive") return "Inactive";
+  if (normalized === "paused") return "Paused";
+
+  return value || "Active";
 }
 
 export default function EditTrainerModal({
@@ -45,6 +63,7 @@ export default function EditTrainerModal({
     () => rates.find((rate) => rate.isActive) ?? rates[0],
     [rates],
   );
+  const [locations, setLocations] = useState<Location[]>([]);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -52,9 +71,17 @@ export default function EditTrainerModal({
   const [bio, setBio] = useState("");
   const [status, setStatus] = useState("");
   const [experienceYears, setExperienceYears] = useState("0");
-  const [locationIds, setLocationIds] = useState("");
+  const [locationIds, setLocationIds] = useState<string[]>([]);
   const [hourlyRate, setHourlyRate] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+
+    getLocations()
+      .then(setLocations)
+      .catch(() => setLocations([]));
+  }, [open]);
 
   useEffect(() => {
     if (!trainer || !open) return;
@@ -64,9 +91,9 @@ export default function EditTrainerModal({
     setPhone(trainer.phone || "");
     setAvatarUrl(trainer.avatarUrl || "");
     setBio(trainer.bio || "");
-    setStatus(trainer.status || "active");
+    setStatus(normalizeTrainerStatus(trainer.status));
     setExperienceYears(String(trainer.experienceYears ?? 0));
-    setLocationIds(toLocationInput(trainer.locationIds));
+    setLocationIds(toLocationValues(trainer.locationIds));
     setHourlyRate(String(activeRate?.rate ?? trainer.hourlyRate ?? 0));
   }, [activeRate, open, trainer]);
 
@@ -83,7 +110,7 @@ export default function EditTrainerModal({
       phone: phone.trim() || null,
       avatarUrl: avatarUrl.trim() || null,
       bio: bio.trim() || null,
-      status: status.trim() || null,
+      status: status || null,
       experienceYears: Number(experienceYears) || 0,
       locationIds: parseLocationIds(locationIds),
     };
@@ -114,6 +141,14 @@ export default function EditTrainerModal({
     }
   }
 
+  const statusOptions = trainerStatusOptions.some(
+    (option) => option.value === status,
+  )
+    ? trainerStatusOptions
+    : [{ value: status, label: status }, ...trainerStatusOptions];
+  const avatarFallback =
+    `${firstName[0] || ""}${lastName[0] || ""}` || trainer.fullName || "T";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8">
       <form
@@ -141,12 +176,15 @@ export default function EditTrainerModal({
           <Field label="Imię" value={firstName} onChange={setFirstName} />
           <Field label="Nazwisko" value={lastName} onChange={setLastName} />
           <Field label="Telefon" value={phone} onChange={setPhone} />
-          <Field
-            label="Status"
-            value={status}
-            onChange={setStatus}
-            placeholder="active"
-          />
+          <div>
+            <span className="text-label text-on-surface-muted">Status</span>
+            <CustomSelect
+              value={status}
+              onChange={setStatus}
+              className="mt-2"
+              options={statusOptions}
+            />
+          </div>
           <Field
             label="Doświadczenie"
             value={experienceYears}
@@ -159,17 +197,19 @@ export default function EditTrainerModal({
             onChange={setHourlyRate}
             type="number"
           />
-          <Field
-            label="URL avatara"
+          <AvatarFilePicker
+            label="Zdjęcie trenera"
             value={avatarUrl}
             onChange={setAvatarUrl}
+            fallbackText={avatarFallback}
             className="md:col-span-2"
           />
-          <Field
-            label="ID lokalizacji"
-            value={locationIds}
+          <LocationMultiSelect
+            label="Lokalizacje"
+            values={locationIds}
+            locations={locations}
+            fallbackNames={trainer.locationNames}
             onChange={setLocationIds}
-            placeholder="np. 1, 2"
             className="md:col-span-2"
           />
           <TextArea
@@ -199,6 +239,137 @@ export default function EditTrainerModal({
       </form>
     </div>
   );
+}
+
+function LocationMultiSelect({
+  label,
+  values,
+  locations,
+  fallbackNames,
+  onChange,
+  className,
+}: {
+  label: string;
+  values: string[];
+  locations: Location[];
+  fallbackNames?: string[] | null;
+  onChange: (values: string[]) => void;
+  className?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const baseOptions = locations.map((location) => ({
+    value: String(location.id),
+    label: formatLocationLabel(location),
+  }));
+  const missingOptions = values
+    .filter((value) => !baseOptions.some((option) => option.value === value))
+    .map((value, index) => ({
+      value,
+      label: fallbackNames?.[index] || `Lokalizacja ${value}`,
+    }));
+  const options = [...baseOptions, ...missingOptions];
+  const selectedLabels = values
+    .map((value) => options.find((option) => option.value === value)?.label)
+    .filter(Boolean) as string[];
+  const displayValue = selectedLabels.length
+    ? selectedLabels.length > 2
+      ? `${selectedLabels.slice(0, 2).join(", ")} +${selectedLabels.length - 2}`
+      : selectedLabels.join(", ")
+    : "Wybierz lokalizacje";
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
+
+  function toggleValue(value: string) {
+    onChange(
+      values.includes(value)
+        ? values.filter((item) => item !== value)
+        : [...values, value],
+    );
+  }
+
+  return (
+    <div ref={rootRef} className={["relative", className].filter(Boolean).join(" ")}>
+      <span className="text-label text-on-surface-muted">{label}</span>
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        className={[
+          "mt-2 flex h-12 w-full items-center gap-3 rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest px-3 text-left transition",
+          "hover:border-white/10 hover:bg-surface-container-low focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_24%,transparent)]",
+          isOpen ? "border-primary-light/40 bg-surface-container-low" : "",
+        ].join(" ")}
+      >
+        <MapPin size={16} className="shrink-0 text-on-surface-muted" />
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-on-surface">
+          {displayValue}
+        </span>
+        <ChevronDown
+          size={16}
+          className={[
+            "shrink-0 text-on-surface-muted transition-transform",
+            isOpen ? "rotate-180" : "",
+          ].join(" ")}
+        />
+      </button>
+
+      {isOpen ? (
+        <div className="absolute left-0 top-[calc(100%+0.5rem)] z-40 max-h-72 w-full overflow-y-auto rounded-[var(--radius-lg)] border border-white/10 bg-surface-container p-1.5 shadow-ambient">
+          {options.length ? (
+            options.map((option) => {
+              const active = values.includes(option.value);
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => toggleValue(option.value)}
+                  className={[
+                    "flex min-h-10 w-full items-center gap-2 rounded-[var(--radius-md)] px-3 text-left text-sm transition",
+                    active
+                      ? "bg-surface-container-high text-on-surface"
+                      : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface",
+                  ].join(" ")}
+                >
+                  <span
+                    className={[
+                      "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border",
+                      active
+                        ? "border-primary-light bg-primary text-on-primary"
+                        : "border-white/15 bg-surface-container-lowest",
+                    ].join(" ")}
+                  >
+                    {active ? <Check size={13} /> : null}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-semibold">
+                    {option.label}
+                  </span>
+                </button>
+              );
+            })
+          ) : (
+            <p className="px-3 py-2 text-sm text-on-surface-muted">
+              Brak lokalizacji do wyboru.
+            </p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function formatLocationLabel(location: Location) {
+  return location.name || location.city || `Lokalizacja ${location.id}`;
 }
 
 function Field({

@@ -5,6 +5,7 @@ export async function backendFetch<T>(
   options?: RequestInit,
 ): Promise<T> {
   const response = await fetch(`/api/backend/${path}`, {
+    cache: "no-store",
     ...options,
     headers: {
       "Content-Type": "application/json",
