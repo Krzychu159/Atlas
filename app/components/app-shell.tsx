@@ -131,7 +131,7 @@ export function AppShell({ children, role }: AppShellProps) {
             <CircleUserRound width={32} height={32} />
           </header>
 
-          <div className="hidden md:block">
+          <div className="hidden px-4 md:block md:px-8">
             <Header role={role} />
           </div>
 

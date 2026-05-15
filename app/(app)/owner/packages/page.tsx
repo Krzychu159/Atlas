@@ -62,6 +62,7 @@ export default function PackagesPage() {
 
   async function loadPackages() {
     try {
+      setIsLoading(true);
       const data = await getPackages();
       setPackages(data);
     } catch (err) {
@@ -143,7 +144,7 @@ export default function PackagesPage() {
 
   return (
     <>
-      <div className="max-w-[1000px] mx-auto">
+      <div className="max-w-[1400px] mx-auto">
         <div className="hidden md:block">
           <div className="flex flex-col gap-5">
             <div className="flex items-start justify-between gap-4">
@@ -194,7 +195,7 @@ export default function PackagesPage() {
                 Ładowanie pakietów...
               </div>
             ) : filteredPackages.length > 0 ? (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4 xl:grid-cols-3 2xl:grid-cols-4">
                 {filteredPackages.map((item) => (
                   <PackageCard
                     key={item.id}

@@ -52,7 +52,7 @@ const mobileTransactions = [
 
 export default function PaymentsPage() {
   return (
-    <div className="max-w-[1000px] mx-auto">
+    <div className="max-w-[1400px] mx-auto">
       {/* Desktop */}
       <div className="hidden md:block">
         <div className="flex flex-col gap-6">

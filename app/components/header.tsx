@@ -14,9 +14,9 @@ import {
 } from "lucide-react";
 import NotificationsPanel from "@/app/(app)/owner/components/NotificationsPanel";
 import type { AppRole } from "@/app/components/navigation";
+import { CustomSelect } from "@/app/components/ui/custom-select";
 import { getCurrentUser, type CurrentUser } from "@/app/lib/auth/current-user";
 import { getClients, type Client } from "@/app/lib/owner/clients";
-import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
 
 type HeaderProps = {
@@ -30,6 +30,12 @@ type SearchResult = {
   subtitle: string;
   href: string;
 };
+
+const locationOptions = [
+  { value: "all", label: "Wszystkie lokalizacje" },
+  { value: "klaj", label: "Kłaj" },
+  { value: "niepolomice", label: "Niepołomice" },
+];
 
 function normalize(value: string) {
   return value.toLowerCase().trim();
@@ -60,22 +66,11 @@ function getRoleLabel(role: string) {
   }
 }
 
-function getLocationLabel(location: Location) {
-  return location.name || location.city || `Lokalizacja ${location.id}`;
-}
-
-function getStoredLocation() {
-  if (typeof window === "undefined") return "all";
-
-  return window.localStorage.getItem("atlas-owner-location-id") || "all";
-}
-
 export function Header({ role }: HeaderProps) {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState("all");
   const [user, setUser] = useState<CurrentUser | null>(null);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState(getStoredLocation);
   const [query, setQuery] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
@@ -85,13 +80,7 @@ export function Header({ role }: HeaderProps) {
     getCurrentUser()
       .then(setUser)
       .catch(() => setUser(null));
-
-    if (role === "owner") {
-      getLocations()
-        .then((items) => setLocations(items.filter((item) => item.isActive)))
-        .catch(() => setLocations([]));
-    }
-  }, [role]);
+  }, []);
 
   async function ensureDirectories() {
     if (directoriesLoaded || role !== "owner") return;
@@ -149,18 +138,6 @@ export function Header({ role }: HeaderProps) {
     return [...clientResults, ...trainerResults].slice(0, 6);
   }, [clients, query, role, trainers]);
 
-  function handleLocationChange(value: string) {
-    setSelectedLocation(value);
-
-    if (value === "all") {
-      window.localStorage.removeItem("atlas-owner-location-id");
-    } else {
-      window.localStorage.setItem("atlas-owner-location-id", value);
-    }
-
-    window.location.reload();
-  }
-
   const displayUser = user ?? {
     id: "",
     fullName: "Użytkownik",
@@ -171,83 +148,72 @@ export function Header({ role }: HeaderProps) {
 
   return (
     <>
-      <header className="mx-auto mb-10 mt-4 grid max-w-[1000px] grid-cols-[1fr_auto] items-center gap-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="relative hidden min-w-0 flex-1 md:block">
-            <Search
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-muted"
-              size={17}
-            />
-            <input
-              type="text"
-              value={query}
-              onFocus={ensureDirectories}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                ensureDirectories();
-              }}
-              placeholder="Szukaj klientów i trenerów..."
-              className="h-14 w-full rounded-full bg-surface-container-lowest pl-12 pr-5 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
-            />
+      <header className="mx-auto mb-8 mt-4 flex w-full max-w-[1400px] items-center justify-between gap-4">
+        <div className="relative hidden min-w-[280px] max-w-[640px] flex-1 md:block">
+          <Search
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-muted"
+            size={17}
+          />
+          <input
+            type="text"
+            value={query}
+            onFocus={ensureDirectories}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              ensureDirectories();
+            }}
+            placeholder="Szukaj klientów i trenerów..."
+            className="h-12 w-full rounded-full bg-surface-container-lowest pl-12 pr-5 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
+          />
 
-            {query ? (
-              <div className="absolute left-0 top-[calc(100%+0.75rem)] z-40 w-full overflow-hidden rounded-[var(--radius-lg)] bg-surface-container shadow-ambient">
-                {searchResults.length > 0 ? (
-                  searchResults.map((result) => (
-                    <Link
-                      key={`${result.type}-${result.id}`}
-                      href={result.href}
-                      prefetch={false}
-                      onClick={() => setQuery("")}
-                      className="flex items-center gap-3 px-4 py-3 transition hover:bg-surface-container-high"
-                    >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-lowest text-primary-light">
-                        {result.type === "client" ? (
-                          <UserRound size={17} />
-                        ) : (
-                          <Building2 size={17} />
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-on-surface">
-                          {result.title}
-                        </p>
-                        <p className="truncate text-xs text-on-surface-muted">
-                          {result.subtitle}
-                        </p>
-                      </div>
-                    </Link>
-                  ))
-                ) : (
-                  <div className="px-4 py-5 text-sm text-on-surface-variant">
-                    Brak wyników.
-                  </div>
-                )}
-              </div>
-            ) : null}
-          </div>
-
-          {role === "owner" ? (
-            <label className="hidden h-14 items-center gap-2 rounded-full bg-surface-container-lowest px-4 text-sm text-on-surface md:flex">
-              <MapPin size={17} className="text-primary-light" />
-              <select
-                value={selectedLocation}
-                onChange={(event) => handleLocationChange(event.target.value)}
-                className="max-w-[170px] bg-transparent text-sm font-semibold outline-none"
-                aria-label="Wybierz lokalizację"
-              >
-                <option value="all">Wszystkie lokalizacje</option>
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {getLocationLabel(location)}
-                  </option>
-                ))}
-              </select>
-            </label>
+          {query ? (
+            <div className="absolute left-0 top-[calc(100%+0.75rem)] z-40 w-full overflow-hidden rounded-[var(--radius-lg)] bg-surface-container shadow-ambient">
+              {searchResults.length > 0 ? (
+                searchResults.map((result) => (
+                  <Link
+                    key={`${result.type}-${result.id}`}
+                    href={result.href}
+                    prefetch={false}
+                    onClick={() => setQuery("")}
+                    className="flex items-center gap-3 px-4 py-3 transition hover:bg-surface-container-high"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-lowest text-primary-light">
+                      {result.type === "client" ? (
+                        <UserRound size={17} />
+                      ) : (
+                        <Building2 size={17} />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-on-surface">
+                        {result.title}
+                      </p>
+                      <p className="truncate text-xs text-on-surface-muted">
+                        {result.subtitle}
+                      </p>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="px-4 py-5 text-sm text-on-surface-variant">
+                  Brak wyników.
+                </div>
+              )}
+            </div>
           ) : null}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          {role === "owner" ? (
+            <CustomSelect
+              value={selectedLocation}
+              options={locationOptions}
+              onChange={setSelectedLocation}
+              icon={<MapPin size={16} />}
+              className="hidden w-[240px] shrink-0 xl:block"
+            />
+          ) : null}
+
           <Link
             href="/owner/notifications"
             className="relative text-on-surface-variant hover:text-on-surface md:hidden"
@@ -258,7 +224,7 @@ export function Header({ role }: HeaderProps) {
 
           <button
             onClick={() => setIsNotificationsOpen(true)}
-            className="relative hidden h-11 w-11 items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant transition hover:bg-surface-container hover:text-on-surface md:flex"
+            className="relative hidden h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant transition hover:bg-surface-container hover:text-on-surface md:flex"
             aria-label="Otwórz powiadomienia"
           >
             <Bell width={18} height={18} />
@@ -269,9 +235,9 @@ export function Header({ role }: HeaderProps) {
             <button
               type="button"
               onClick={() => setIsProfileOpen((value) => !value)}
-              className="flex h-14 items-center gap-3 rounded-full bg-surface-container-lowest py-2 pl-3 pr-4 transition hover:bg-surface-container"
+              className="flex h-12 items-center gap-3 rounded-full bg-surface-container-lowest py-1.5 pl-2 pr-4 transition hover:bg-surface-container"
             >
-              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-surface-container text-primary-light">
+              <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-surface-container text-primary-light">
                 {displayUser.avatarUrl ? (
                   <img
                     src={displayUser.avatarUrl}

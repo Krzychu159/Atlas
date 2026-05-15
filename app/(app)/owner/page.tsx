@@ -42,7 +42,7 @@ export default function DashboardPage() {
   const recentClients: RecentClient[] = dashboard?.recentClients ?? [];
 
   return (
-    <div className="max-w-[1000px] mx-auto">
+    <div className="max-w-[1400px] mx-auto">
       {/* Desktop */}
       <div className="hidden md:block">
         <div className="flex flex-col gap-5">

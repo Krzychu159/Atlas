@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronDown, Search } from "lucide-react";
+import { Search } from "lucide-react";
+import { CustomSelect } from "@/app/components/ui/custom-select";
 
 export type ClientPackageFilter = "all" | "active-package" | "inactive-package";
 export type ClientSort =
@@ -33,22 +34,10 @@ const sortOptions: { label: string; value: ClientSort }[] = [
   { label: "Najnowsi", value: "newest" },
   { label: "Alfabetycznie", value: "name" },
   { label: "Po trenerze", value: "trainer" },
-  { label: "Balance malejąco", value: "balance-desc" },
-  { label: "Balance rosnąco", value: "balance-asc" },
+  { label: "Saldo malejąco", value: "balance-desc" },
+  { label: "Saldo rosnąco", value: "balance-asc" },
   { label: "Wykorzystanie pakietu", value: "package-usage" },
 ];
-
-const selectClassName =
-  "h-12 w-full appearance-none rounded-[var(--radius-lg)] bg-surface-container-low px-4 pr-10 text-sm text-on-surface outline-none transition-colors hover:bg-surface-container focus:bg-surface-container";
-
-function SelectChevron() {
-  return (
-    <ChevronDown
-      size={16}
-      className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-muted"
-    />
-  );
-}
 
 export default function ClientFilters({
   search,
@@ -61,6 +50,11 @@ export default function ClientFilters({
   onTrainerFilterChange,
   onSortChange,
 }: ClientFiltersProps) {
+  const trainerSelectOptions = [
+    { value: "all", label: "Wszyscy trenerzy" },
+    ...trainerOptions.map((trainer) => ({ value: trainer, label: trainer })),
+  ];
+
   return (
     <div className="card-shell p-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -74,21 +68,12 @@ export default function ClientFilters({
           />
         </div>
 
-        <div className="relative w-full shrink-0 lg:w-[250px]">
-          <select
-            value={trainerFilter}
-            onChange={(event) => onTrainerFilterChange(event.target.value)}
-            className={selectClassName}
-          >
-            <option value="all">Wszyscy trenerzy</option>
-            {trainerOptions.map((trainer) => (
-              <option key={trainer} value={trainer}>
-                {trainer}
-              </option>
-            ))}
-          </select>
-          <SelectChevron />
-        </div>
+        <CustomSelect
+          value={trainerFilter}
+          options={trainerSelectOptions}
+          onChange={onTrainerFilterChange}
+          className="w-full shrink-0 lg:w-[250px]"
+        />
       </div>
 
       <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -109,20 +94,12 @@ export default function ClientFilters({
           ))}
         </div>
 
-        <div className="relative w-full shrink-0 lg:w-[250px]">
-          <select
-            value={sort}
-            onChange={(event) => onSortChange(event.target.value as ClientSort)}
-            className={selectClassName}
-          >
-            {sortOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <SelectChevron />
-        </div>
+        <CustomSelect
+          value={sort}
+          options={sortOptions}
+          onChange={(value) => onSortChange(value as ClientSort)}
+          className="w-full shrink-0 lg:w-[250px]"
+        />
       </div>
     </div>
   );

@@ -1,8 +1,9 @@
 import { User, Settings2, Pencil, ChevronDown, Bolt, Lock } from "lucide-react";
+import OutlookIntegrationCard from "./components/OutlookIntegrationCard";
 
 export default function SettingsPage() {
   return (
-    <div className="max-w-[1000px] mx-auto">
+    <div className="max-w-[1400px] mx-auto">
       {/* Desktop */}
       <div className="hidden md:block">
         <div className="flex flex-col gap-6">
@@ -125,6 +126,8 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+
+          <OutlookIntegrationCard />
 
           <div className="flex items-center justify-end gap-8 pt-1">
             <button className="text-base text-on-surface-variant hover:text-on-surface transition-colors">
@@ -259,6 +262,8 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+
+          <OutlookIntegrationCard />
 
           <div className="flex flex-col gap-3">
             <button className="h-13 rounded-[var(--radius-lg)] bg-surface-container-low text-on-surface font-medium py-3.5">

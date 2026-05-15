@@ -13,7 +13,6 @@ import { getTrainer, type Trainer } from "@/app/lib/owner/trainers";
 import EditTrainerModal from "../components/EditTrainerModal";
 import TrainerProfileClients from "../components/TrainerProfileClients";
 import TrainerProfileHeader from "../components/TrainerProfileHeader";
-import TrainerProfileRates from "../components/TrainerProfileRates";
 import TrainerSchedulePanel from "../components/TrainerSchedulePanel";
 
 export default function TrainerPage() {
@@ -71,7 +70,7 @@ export default function TrainerPage() {
   }, [params.id]);
 
   return (
-    <div className="mx-auto w-full max-w-[1000px] pb-10">
+    <div className="mx-auto w-full max-w-[1400px] pb-10">
       {isLoading ? (
         <div className="card-shell p-6 text-on-surface-variant">
           Ładowanie profilu trenera...

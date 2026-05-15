@@ -65,7 +65,7 @@ function Section({
 
 export default function NotificationsPage() {
   return (
-    <div className="max-w-[1000px] mx-auto">
+    <div className="max-w-[1400px] mx-auto">
       <div className=" px-1 pb-28">
         <div className="pt-2">
           <p className="text-page-title">Powiadomienia</p>

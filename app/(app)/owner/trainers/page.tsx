@@ -26,6 +26,7 @@ export default function TrainersPage() {
 
   async function loadTrainers() {
     try {
+      setIsLoading(true);
       const data = await getTrainers();
       setTrainers(data);
       loadSessionTrends(data);
@@ -112,7 +113,7 @@ export default function TrainersPage() {
 
   return (
     <>
-      <div className="max-w-[1000px] mx-auto">
+      <div className="max-w-[1400px] mx-auto">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div className="max-w-[560px]">
@@ -165,7 +166,7 @@ export default function TrainersPage() {
               Ładowanie trenerów...
             </div>
           ) : filteredTrainers.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {filteredTrainers.map((trainer) => (
                 <TrainerCard
                   key={trainer.id}

@@ -135,7 +135,7 @@ function MobileMiniStat({
 
 export default function DashboardPage() {
   return (
-    <div className="max-w-[1000px] mx-auto">
+    <div className="max-w-[1400px] mx-auto">
       {/* Desktop */}
       <div className="hidden md:block">
         <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-5">

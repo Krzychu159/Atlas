@@ -40,7 +40,42 @@ export type OwnerSession = {
   createdAt: string;
   updatedAt: string;
   createdBy: number | null;
+  locationParticipantsCount?: number;
+  locationLimit?: number;
+  isLocationLimitExceeded?: boolean;
+  outlookCategories?: string[] | null;
+  primaryOutlookCategory?: string | null;
 };
+
+type SessionFilterParams = {
+  trainerId?: number;
+  clientId?: number;
+  locationId?: number;
+  status?: string;
+  from?: string;
+  to?: string;
+};
+
+function buildSessionFilterQuery(params: SessionFilterParams = {}) {
+  const searchParams = new URLSearchParams();
+
+  if (params.trainerId) searchParams.set("TrainerId", String(params.trainerId));
+  if (params.clientId) searchParams.set("ClientId", String(params.clientId));
+  if (params.locationId) searchParams.set("LocationId", String(params.locationId));
+  if (params.status) searchParams.set("Status", params.status);
+  if (params.from) searchParams.set("From", params.from);
+  if (params.to) searchParams.set("To", params.to);
+
+  const query = searchParams.toString();
+
+  return query ? `?${query}` : "";
+}
+
+export function getOwnerSessions(params?: SessionFilterParams) {
+  return backendFetch<OwnerSession[]>(
+    `sessions/filter${buildSessionFilterQuery(params)}`,
+  );
+}
 
 export function getClientSessions(clientId: number) {
   return backendFetch<OwnerSession[]>(`Sessions/filter?ClientId=${clientId}`);

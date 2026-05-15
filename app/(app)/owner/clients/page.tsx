@@ -48,12 +48,13 @@ export default function ClientsPage() {
   const [packageFilter, setPackageFilter] =
     useState<ClientPackageFilter>("all");
   const [trainerFilter, setTrainerFilter] = useState("all");
-  const [sort, setSort] = useState<ClientSort>("newest");
+  const [sort, setSort] = useState<ClientSort>("package-usage");
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   async function loadClients() {
     try {
+      setIsLoading(true);
       const data = await getClients();
       const subscriptions = await Promise.allSettled(
         data.map((client) => getClientSubscription(client.id)),
@@ -76,7 +77,8 @@ export default function ClientsPage() {
               cycle?.totalSessions ?? client.packageSessionsLimit,
             packageSessionsUsed:
               cycle?.usedSessions ?? client.packageSessionsUsed,
-            remainingSessions: cycle?.remainingSessions ?? client.remainingSessions,
+            remainingSessions:
+              cycle?.remainingSessions ?? client.remainingSessions,
             balance: subscription.value.carryOverBalance ?? client.balance,
             currency: cycle?.currency ?? client.currency,
           };
@@ -166,7 +168,7 @@ export default function ClientsPage() {
 
   return (
     <>
-      <div className="max-w-[1000px] mx-auto">
+      <div className="max-w-[1400px] mx-auto">
         {/* Desktop */}
         <div className="hidden md:block">
           <div className="flex flex-col gap-5">
@@ -317,8 +319,7 @@ export default function ClientsPage() {
                             {client.email || "Brak adresu e-mail"}
                           </p>
                           <p className="mt-4 text-label text-primary-light">
-                            Trener:{" "}
-                            {client.trainerFullName || "Nie przypisano"}
+                            Trener: {client.trainerFullName || "Nie przypisano"}
                           </p>
                         </div>
 

@@ -2,7 +2,7 @@ export async function backendFetch<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(`/api/backend/${withOwnerLocation(path)}`, {
+  const response = await fetch(`/api/backend/${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -36,51 +36,4 @@ export async function backendFetch<T>(
   }
 
   return data as T;
-}
-
-function withOwnerLocation(path: string) {
-  const selectedLocationId = getSelectedOwnerLocationId();
-
-  if (!selectedLocationId || !shouldAttachOwnerLocation(path)) return path;
-
-  const [rawPath, rawQuery = ""] = path.split("?");
-  const searchParams = new URLSearchParams(rawQuery);
-
-  if (searchParams.has("locationId") || searchParams.has("LocationId")) {
-    return path;
-  }
-
-  searchParams.set("locationId", selectedLocationId);
-
-  return `${rawPath}?${searchParams.toString()}`;
-}
-
-function getSelectedOwnerLocationId() {
-  if (typeof window === "undefined") return null;
-
-  try {
-    const value = window.localStorage.getItem("atlas-owner-location-id");
-
-    return value && value !== "all" ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-function shouldAttachOwnerLocation(path: string) {
-  const [rawPath] = path.split("?");
-  const normalized = rawPath.toLowerCase();
-
-  return [
-    "dashboard",
-    "clients",
-    "trainers",
-    "sessions",
-    "billing",
-    "payments",
-    "packages",
-    "reports",
-    "alerts",
-    "invitations",
-  ].some((prefix) => normalized.startsWith(prefix));
 }

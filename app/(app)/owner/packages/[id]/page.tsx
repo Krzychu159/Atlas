@@ -102,7 +102,7 @@ export default function PackageDetailsPage({
   }, [packageId]);
 
   return (
-    <div className="max-w-[1000px] mx-auto pb-10">
+    <div className="max-w-[1400px] mx-auto pb-10">
       <div className="flex items-center justify-between gap-4">
         <Link
           href="/owner/packages"

@@ -1,6 +1,7 @@
 "use client";
 
 import { Search, SlidersHorizontal } from "lucide-react";
+import { CustomSelect } from "@/app/components/ui/custom-select";
 
 export type ParticipantsFilter = "all" | "solo" | "duo" | "group";
 export type SessionsFilter = "all" | "short" | "medium" | "long";
@@ -51,7 +52,7 @@ export default function PackageFilters({
           />
         </label>
 
-        <Select
+        <CustomSelect
           icon={<SlidersHorizontal size={16} />}
           label="Uczestnicy"
           value={participantsFilter}
@@ -59,82 +60,48 @@ export default function PackageFilters({
             onParticipantsFilterChange(value as ParticipantsFilter)
           }
           options={[
-            ["all", "Dowolnie"],
-            ["solo", "1 osoba"],
-            ["duo", "2 osoby"],
-            ["group", "Grupowe"],
+            { value: "all", label: "Dowolnie" },
+            { value: "solo", label: "1 osoba" },
+            { value: "duo", label: "2 osoby" },
+            { value: "group", label: "Grupowe" },
           ]}
         />
-        <Select
+        <CustomSelect
           label="Sesje"
           value={sessionsFilter}
           onChange={(value) => onSessionsFilterChange(value as SessionsFilter)}
           options={[
-            ["all", "Dowolnie"],
-            ["short", "1-4"],
-            ["medium", "5-10"],
-            ["long", "11+"],
+            { value: "all", label: "Dowolnie" },
+            { value: "short", label: "1-4" },
+            { value: "medium", label: "5-10" },
+            { value: "long", label: "11+" },
           ]}
         />
-        <Select
+        <CustomSelect
           label="Czas"
           value={durationFilter}
           onChange={(value) => onDurationFilterChange(value as DurationFilter)}
           options={[
-            ["all", "Dowolnie"],
-            ["monthly", "do 31 dni"],
-            ["quarterly", "32-90 dni"],
-            ["long", "90+ dni"],
+            { value: "all", label: "Dowolnie" },
+            { value: "monthly", label: "do 31 dni" },
+            { value: "quarterly", label: "32-90 dni" },
+            { value: "long", label: "90+ dni" },
           ]}
         />
-        <Select
+        <CustomSelect
           label="Sortuj"
           value={sort}
           onChange={(value) => onSortChange(value as PackageSort)}
           options={[
-            ["newest", "Najnowsze"],
-            ["price-asc", "Cena rosnąco"],
-            ["price-desc", "Cena malejąco"],
-            ["sessions-desc", "Najwięcej sesji"],
-            ["duration-desc", "Najdłuższe"],
-            ["participants-asc", "Uczestnicy"],
+            { value: "newest", label: "Najnowsze" },
+            { value: "price-asc", label: "Cena rosnąco" },
+            { value: "price-desc", label: "Cena malejąco" },
+            { value: "sessions-desc", label: "Najwięcej sesji" },
+            { value: "duration-desc", label: "Najdłuższe" },
+            { value: "participants-asc", label: "Uczestnicy" },
           ]}
         />
       </div>
     </div>
-  );
-}
-
-function Select({
-  label,
-  value,
-  options,
-  onChange,
-  icon,
-}: {
-  label: string;
-  value: string;
-  options: Array<[string, string]>;
-  onChange: (value: string) => void;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <label className="rounded-[var(--radius-lg)] bg-surface-container-lowest px-3 py-2">
-      <span className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
-        {icon}
-        {label}
-      </span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full bg-transparent text-sm font-semibold text-on-surface outline-none"
-      >
-        {options.map(([optionValue, optionLabel]) => (
-          <option key={optionValue} value={optionValue}>
-            {optionLabel}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }

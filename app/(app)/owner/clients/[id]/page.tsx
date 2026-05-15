@@ -83,7 +83,7 @@ export default function OwnerClientDetailsPage() {
   }, [params.id]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-5 pb-10">
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
       {isLoading ? (
         <div className="card-shell p-6 text-on-surface-variant">
           Ładowanie klienta...
