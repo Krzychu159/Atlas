@@ -56,6 +56,26 @@ type SessionFilterParams = {
   to?: string;
 };
 
+export type SessionParticipantPayload = {
+  clientId: number;
+  countsAgainstPackage: boolean;
+  sessionsCharged: number;
+  note?: string | null;
+};
+
+export type SessionPayload = {
+  title?: string | null;
+  note?: string | null;
+  startAt: string;
+  endAt: string;
+  trainerId: number;
+  locationId: number;
+  status?: string | null;
+  plannedSessionType?: string | null;
+  outlookCategories?: string[] | null;
+  participants?: SessionParticipantPayload[] | null;
+};
+
 function buildSessionFilterQuery(params: SessionFilterParams = {}) {
   const searchParams = new URLSearchParams();
 
@@ -75,6 +95,20 @@ export function getOwnerSessions(params?: SessionFilterParams) {
   return backendFetch<OwnerSession[]>(
     `sessions/filter${buildSessionFilterQuery(params)}`,
   );
+}
+
+export function createSession(payload: SessionPayload) {
+  return backendFetch<OwnerSession>("sessions", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateSession(id: number, payload: SessionPayload) {
+  return backendFetch<OwnerSession>(`sessions/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function getClientSessions(clientId: number) {

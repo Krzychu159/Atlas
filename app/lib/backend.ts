@@ -27,13 +27,46 @@ export async function backendFetch<T>(
   }
 
   if (!response.ok) {
-    const message =
-      typeof data === "object" && data !== null && "message" in data
-        ? String((data as { message?: string }).message)
-        : "Backend request failed";
+    const message = getBackendErrorMessage(data);
 
     throw new Error(message);
   }
 
   return data as T;
+}
+
+function getBackendErrorMessage(data: unknown) {
+  if (typeof data !== "object" || data === null) {
+    return "Backend request failed";
+  }
+
+  if ("message" in data && data.message) {
+    return String(data.message);
+  }
+
+  if ("detail" in data && data.detail) {
+    return String(data.detail);
+  }
+
+  if ("title" in data && data.title) {
+    const title = String(data.title);
+
+    if ("errors" in data && typeof data.errors === "object" && data.errors) {
+      const errors = Object.entries(data.errors as Record<string, unknown>)
+        .flatMap(([field, messages]) => {
+          if (Array.isArray(messages)) {
+            return messages.map((message) => `${field}: ${String(message)}`);
+          }
+
+          return [`${field}: ${String(messages)}`];
+        })
+        .join(" ");
+
+      return errors ? `${title}: ${errors}` : title;
+    }
+
+    return title;
+  }
+
+  return "Backend request failed";
 }

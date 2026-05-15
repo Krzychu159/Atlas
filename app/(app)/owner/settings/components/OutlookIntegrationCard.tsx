@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarSync, CheckCircle2, ExternalLink, Loader2, Unplug } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
@@ -28,6 +28,8 @@ export default function OutlookIntegrationCard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const authWindowRef = useRef<Window | null>(null);
+  const pollingRef = useRef<number | null>(null);
 
   async function loadStatus() {
     try {
@@ -50,6 +52,59 @@ export default function OutlookIntegrationCard() {
     loadStatus();
   }, []);
 
+  function stopConnectPolling() {
+    if (pollingRef.current) {
+      window.clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+
+    setIsConnecting(false);
+  }
+
+  function closeAuthWindow() {
+    try {
+      authWindowRef.current?.close();
+    } catch {
+      // The OAuth callback is cross-origin, but opener-owned windows can usually be closed.
+    } finally {
+      authWindowRef.current = null;
+    }
+  }
+
+  function startConnectPolling(authWindow: Window) {
+    let attempts = 0;
+    authWindowRef.current = authWindow;
+
+    if (pollingRef.current) {
+      window.clearInterval(pollingRef.current);
+    }
+
+    pollingRef.current = window.setInterval(async () => {
+      attempts += 1;
+
+      try {
+        const data = await getOutlookStatus();
+        setStatus(data);
+
+        if (data.isConnected) {
+          closeAuthWindow();
+          stopConnectPolling();
+          toast.success("Konto Microsoft zostało połączone.", {
+            id: "outlook-connected",
+          });
+          return;
+        }
+      } catch {
+        // Retry on the next tick. The regular status check handles visible errors.
+      }
+
+      if (authWindow.closed || attempts >= 60) {
+        stopConnectPolling();
+        await loadStatus();
+      }
+    }, 1500);
+  }
+
   async function handleConnect() {
     try {
       setIsConnecting(true);
@@ -59,7 +114,23 @@ export default function OutlookIntegrationCard() {
         throw new Error("Backend nie zwrócił adresu połączenia Microsoft.");
       }
 
-      window.location.href = data.url;
+      const authWindow = window.open(
+        data.url,
+        "atlas-outlook-connect",
+        "width=720,height=760,menubar=no,toolbar=no,location=yes,status=no",
+      );
+
+      if (!authWindow) {
+        throw new Error(
+          "Nie udało się otworzyć okna Microsoft. Odblokuj wyskakujące okna dla StudioCRM i spróbuj ponownie.",
+        );
+      }
+
+      startConnectPolling(authWindow);
+      toast.info(
+        "Autoryzacja Microsoft otworzyła się w nowym oknie. Zamkniemy je automatycznie po połączeniu.",
+        { id: "outlook-connect-started" },
+      );
     } catch (err) {
       toast.error(
         err instanceof Error
@@ -67,9 +138,27 @@ export default function OutlookIntegrationCard() {
           : "Nie udało się rozpocząć łączenia z Microsoft.",
         { id: "outlook-connect-error" },
       );
-      setIsConnecting(false);
+      stopConnectPolling();
     }
   }
+
+  useEffect(() => {
+    function handleFocus() {
+      loadStatus();
+    }
+
+    window.addEventListener("focus", handleFocus);
+
+    return () => window.removeEventListener("focus", handleFocus);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        window.clearInterval(pollingRef.current);
+      }
+    };
+  }, []);
 
   async function handleDisconnect() {
     try {
