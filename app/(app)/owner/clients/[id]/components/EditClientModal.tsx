@@ -1,13 +1,15 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { MapPin, X } from "lucide-react";
 import { toast } from "sonner";
+import { CustomSelect } from "@/app/components/ui/custom-select";
 import {
   updateClient,
   type Client,
   type UpdateClientPayload,
 } from "@/app/lib/owner/clients";
+import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
 
 type EditClientModalProps = {
@@ -24,22 +26,28 @@ export default function EditClientModal({
   onSaved,
 }: EditClientModalProps) {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [trainerId, setTrainerId] = useState("");
-  const [billingStatus, setBillingStatus] = useState("");
-  const [progressPercent, setProgressPercent] = useState("0");
+  const [locationId, setLocationId] = useState("");
   const [goal, setGoal] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
 
-    getTrainers()
-      .then(setTrainers)
-      .catch(() => setTrainers([]));
+    Promise.all([getTrainers(), getLocations()])
+      .then(([trainersData, locationsData]) => {
+        setTrainers(trainersData);
+        setLocations(locationsData);
+      })
+      .catch(() => {
+        setTrainers([]);
+        setLocations([]);
+      });
   }, [open]);
 
   useEffect(() => {
@@ -50,10 +58,9 @@ export default function EditClientModal({
     setEmail(client.email || "");
     setPhoneNumber(client.phoneNumber || "");
     setTrainerId(client.trainerId ? String(client.trainerId) : "");
-    setBillingStatus(client.billingStatus || "");
-    setProgressPercent(String(client.progressPercent ?? 0));
+    setLocationId(resolveClientLocationId(client, locations));
     setGoal(client.goal || "");
-  }, [client, open]);
+  }, [client, locations, open]);
 
   if (!open || !client) return null;
 
@@ -62,6 +69,15 @@ export default function EditClientModal({
 
     if (!client) return;
 
+    const resolvedLocationId = Number(locationId);
+
+    if (!resolvedLocationId) {
+      toast.error("Wybierz lokalizację klienta.", {
+        id: "owner-client-location-required",
+      });
+      return;
+    }
+
     const payload: UpdateClientPayload = {
       trainerId: trainerId ? Number(trainerId) : null,
       firstName: firstName.trim() || null,
@@ -69,8 +85,11 @@ export default function EditClientModal({
       email: email.trim() || null,
       phoneNumber: phoneNumber.trim() || null,
       goal: goal.trim() || null,
-      progressPercent: Number(progressPercent) || 0,
-      billingStatus: billingStatus.trim() || null,
+      locationId: resolvedLocationId,
+      progressPercent: client.progressPercent ?? 0,
+      billingStatus: client.billingStatus || null,
+      status: client.status || null,
+      nextSessionAt: client.nextSessionAt || null,
     };
 
     try {
@@ -92,6 +111,25 @@ export default function EditClientModal({
       setIsSaving(false);
     }
   }
+
+  const trainerOptions = [
+    { value: "", label: "Brak przypisania" },
+    ...trainers.map((trainer) => ({
+      value: String(trainer.id),
+      label: trainer.fullName || `${trainer.firstName} ${trainer.lastName}`,
+    })),
+  ];
+  const locationOptions = locations.length
+    ? locations.map((location) => ({
+        value: String(location.id),
+        label: formatLocationLabel(location),
+      }))
+    : [
+        {
+          value: locationId,
+          label: client.locationName || "Brak lokalizacji",
+        },
+      ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8">
@@ -125,39 +163,30 @@ export default function EditClientModal({
             value={phoneNumber}
             onChange={setPhoneNumber}
           />
-          <label>
+
+          <div>
             <span className="text-label text-on-surface-muted">Trener</span>
-            <select
+            <CustomSelect
               value={trainerId}
-              onChange={(event) => setTrainerId(event.target.value)}
-              className="mt-2 h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm text-on-surface outline-none"
-            >
-              <option value="">Brak przypisania</option>
-              {trainers.map((trainer) => (
-                <option key={trainer.id} value={trainer.id}>
-                  {trainer.fullName ||
-                    `${trainer.firstName} ${trainer.lastName}`}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3">
-            <p className="text-label text-on-surface-muted">Lokalizacja</p>
-            <p className="mt-2 text-sm font-semibold text-on-surface">
-              {client.locationName || "Brak lokalizacji"}
-            </p>
+              onChange={setTrainerId}
+              className="mt-2"
+              options={trainerOptions}
+            />
           </div>
-          <Field
-            label="Status rozliczeń"
-            value={billingStatus}
-            onChange={setBillingStatus}
-          />
-          <Field
-            label="Postęp"
-            value={progressPercent}
-            onChange={setProgressPercent}
-            type="number"
-          />
+
+          <div>
+            <span className="text-label text-on-surface-muted">
+              Lokalizacja
+            </span>
+            <CustomSelect
+              value={locationId}
+              onChange={setLocationId}
+              icon={<MapPin size={16} />}
+              className="mt-2"
+              options={locationOptions}
+            />
+          </div>
+
           <TextArea
             label="Cel"
             value={goal}
@@ -185,6 +214,28 @@ export default function EditClientModal({
       </form>
     </div>
   );
+}
+
+function formatLocationLabel(location: Location) {
+  return location.name || location.city || `Lokalizacja ${location.id}`;
+}
+
+function normalizeLocationName(value?: string | null) {
+  return (value || "").trim().toLowerCase();
+}
+
+function resolveClientLocationId(client: Client, locations: Location[]) {
+  if (client.locationId) return String(client.locationId);
+
+  const clientLocationName = normalizeLocationName(client.locationName);
+  const matchedLocation = locations.find((location) =>
+    [location.name, location.city]
+      .map(normalizeLocationName)
+      .filter(Boolean)
+      .includes(clientLocationName),
+  );
+
+  return matchedLocation ? String(matchedLocation.id) : "";
 }
 
 function Field({

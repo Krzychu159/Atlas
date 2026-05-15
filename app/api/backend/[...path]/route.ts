@@ -2,6 +2,14 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_API_URL;
+const authCookieNames = [
+  "accessToken",
+  "refreshToken",
+  "role",
+  "userId",
+  "refresh_token",
+  "user_role",
+];
 
 type RouteContext = {
   params: Promise<{
@@ -19,6 +27,17 @@ async function handler(req: NextRequest, context: RouteContext) {
 
   const cookieStore = await cookies();
   const token = cookieStore.get("accessToken")?.value;
+
+  if (!token) {
+    const response = NextResponse.json(
+      { message: "Session expired" },
+      { status: 401 },
+    );
+
+    expireAuthCookies(response);
+
+    return response;
+  }
 
   const { path } = await context.params;
   const backendPath = path.join("/");
@@ -48,17 +67,43 @@ async function handler(req: NextRequest, context: RouteContext) {
   const text = await response.text();
 
   if ([204, 205, 304].includes(response.status)) {
-    return new NextResponse(null, {
+    const nextResponse = new NextResponse(null, {
       status: response.status,
     });
+
+    if (response.status === 401) {
+      expireAuthCookies(nextResponse);
+    }
+
+    return nextResponse;
   }
 
-  return new NextResponse(text, {
+  const nextResponse = new NextResponse(text, {
     status: response.status,
     headers: {
       "Content-Type":
         response.headers.get("content-type") || "application/json",
     },
+  });
+
+  if (response.status === 401) {
+    expireAuthCookies(nextResponse);
+  }
+
+  return nextResponse;
+}
+
+function expireAuthCookies(response: NextResponse) {
+  const expiredCookie = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    expires: new Date(0),
+    path: "/",
+  };
+
+  authCookieNames.forEach((name) => {
+    response.cookies.set(name, "", expiredCookie);
   });
 }
 

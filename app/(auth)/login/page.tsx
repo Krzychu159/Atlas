@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AtSign, Lock, ArrowRight, Eye, EyeOff, Dumbbell } from "lucide-react";
 
@@ -15,6 +15,29 @@ function getRedirectPath(role?: string) {
     default:
       return "/login";
   }
+}
+
+function getSafeRedirectPath(value: string | null) {
+  if (!value) return null;
+  if (!value.startsWith("/") || value.startsWith("//")) return null;
+  if (value.startsWith("/login") || value.startsWith("/logout")) return null;
+  if (
+    !["/owner", "/trainer", "/client"].some(
+      (prefix) => value === prefix || value.startsWith(`${prefix}/`),
+    )
+  ) {
+    return null;
+  }
+
+  return value;
+}
+
+function getLoginNotice(reason: string | null) {
+  if (reason === "session-expired") {
+    return "Twoja sesja wygasła. Zaloguj się ponownie, żeby kontynuować pracę.";
+  }
+
+  return "";
 }
 
 function LoginLoadingOverlay() {
@@ -67,6 +90,12 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setNotice(getLoginNotice(params.get("reason")));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -95,8 +124,11 @@ export default function LoginPage() {
         throw new Error(data?.message || "Logowanie nie powiodło się.");
       }
 
+      const params = new URLSearchParams(window.location.search);
       const role = data?.user?.role;
-      router.replace(getRedirectPath(role));
+      const nextPath = getSafeRedirectPath(params.get("next"));
+
+      router.replace(nextPath || getRedirectPath(role));
       router.refresh();
     } catch (err) {
       setError(
@@ -211,6 +243,12 @@ export default function LoginPage() {
                       <p className="mt-4 text-[1.05rem] leading-8 text-on-surface-variant">
                         Wprowadź swoje dane, aby uzyskać dostęp.
                       </p>
+
+                      {notice ? (
+                        <div className="mt-6 rounded-[var(--radius-lg)] border border-warning/20 bg-warning-container/20 px-4 py-3 text-sm leading-6 text-warning-light">
+                          {notice}
+                        </div>
+                      ) : null}
 
                       <form className="mt-12 space-y-7" onSubmit={handleSubmit}>
                         <div>
@@ -377,6 +415,12 @@ export default function LoginPage() {
               <p className="mt-5 text-[1.05rem] uppercase leading-8 tracking-[0.03em] text-on-surface-muted">
                 Zaloguj się do swojego centrum dowodzenia
               </p>
+
+              {notice ? (
+                <div className="mt-6 rounded-[var(--radius-lg)] border border-warning/20 bg-warning-container/20 px-4 py-3 text-sm leading-6 text-warning-light">
+                  {notice}
+                </div>
+              ) : null}
             </div>
 
             <form className="mt-12 space-y-7" onSubmit={handleSubmit}>

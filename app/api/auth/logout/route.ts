@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 
 export async function POST() {
   const res = NextResponse.json({ ok: true, message: "Logged out" });
+  const authCookieNames = [
+    "accessToken",
+    "refreshToken",
+    "role",
+    "userId",
+    "refresh_token",
+    "user_role",
+  ];
 
   const expiredCookie = {
     httpOnly: true,
@@ -11,10 +19,9 @@ export async function POST() {
     path: "/",
   };
 
-  res.cookies.set("accessToken", "", expiredCookie);
-  res.cookies.set("refreshToken", "", expiredCookie);
-  res.cookies.set("role", "", expiredCookie);
-  res.cookies.set("userId", "", expiredCookie);
+  authCookieNames.forEach((name) => {
+    res.cookies.set(name, "", expiredCookie);
+  });
 
   return res;
 }

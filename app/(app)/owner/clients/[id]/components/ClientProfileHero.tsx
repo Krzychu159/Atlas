@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { ArrowLeft, Mail, Pencil, Phone, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Mail,
+  Pencil,
+  Phone,
+  ShieldCheck,
+} from "lucide-react";
 import type { Client } from "@/app/lib/owner/clients";
 import { getClientName } from "../../components/client-display";
 
@@ -12,6 +19,25 @@ function getInitials(client: Client) {
     .toUpperCase();
 }
 
+function getClientAgeInMonths(createdAt?: string | null) {
+  if (!createdAt) return 0;
+
+  const createdDate = new Date(createdAt);
+
+  if (Number.isNaN(createdDate.getTime())) return 0;
+
+  const now = new Date();
+  const years = now.getFullYear() - createdDate.getFullYear();
+  const months = now.getMonth() - createdDate.getMonth();
+  const totalMonths = years * 12 + months;
+
+  return Math.max(0, totalMonths);
+}
+
+function getMilestoneProgress(months: number) {
+  return Math.min(100, Math.round((months / 12) * 100));
+}
+
 export default function ClientProfileHero({
   client,
   onEdit,
@@ -20,6 +46,8 @@ export default function ClientProfileHero({
   onEdit: () => void;
 }) {
   const fullName = getClientName(client);
+  const membershipMonths = getClientAgeInMonths(client.createdAt);
+  const milestoneProgress = getMilestoneProgress(membershipMonths);
 
   return (
     <section className="card-shell overflow-hidden p-5 md:p-8">
@@ -79,18 +107,14 @@ export default function ClientProfileHero({
           </div>
 
           <div className="mt-7 grid grid-cols-2 gap-4 border-t border-secondary/30 pt-6 md:grid-cols-3">
+            <HeroStat label="Trener" value={client.trainerFullName || "Brak"} />
             <HeroStat
-              label="Trener"
-              value={client.trainerFullName || "Brak"}
+              label="Lokalizacja"
+              value={client.locationName || "Brak"}
             />
-            <HeroStat label="Lokalizacja" value={client.locationName || "Brak"} />
-            <HeroStat
-              label="Utworzono"
-              value={
-                client.createdAt
-                  ? new Date(client.createdAt).toLocaleDateString("pl-PL")
-                  : "Brak"
-              }
+            <ClientMilestones
+              months={membershipMonths}
+              progress={milestoneProgress}
             />
           </div>
         </div>
@@ -108,13 +132,64 @@ export default function ClientProfileHero({
   );
 }
 
-function HeroStat({
-  label,
-  value,
+function ClientMilestones({
+  months,
+  progress,
 }: {
-  label: string;
-  value: React.ReactNode;
+  months: number;
+  progress: number;
 }) {
+  const milestones = [3, 6, 12];
+
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <CalendarDays size={14} className="text-primary-light" />
+          <p className="text-label text-on-surface-muted">Nagrody</p>
+        </div>
+        <p className="shrink-0 text-xs font-semibold text-on-surface">
+          {months} mies.
+        </p>
+      </div>
+
+      <div className="relative mt-3">
+        <div className="h-1.5 overflow-hidden rounded-full bg-surface-container-low">
+          <div
+            className="h-full rounded-full bg-primary-gradient transition-[width]"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 grid -translate-y-1/2 grid-cols-3">
+          {milestones.map((milestone) => (
+            <div key={milestone} className="flex justify-center">
+              <span
+                className={[
+                  "h-3 w-[2px] rounded-full",
+                  months >= milestone ? "bg-primary-light" : "bg-white/20",
+                ].join(" ")}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-2 grid grid-cols-3 text-center text-[9px] font-semibold uppercase tracking-wider text-on-surface-muted">
+        {milestones.map((milestone) => (
+          <span
+            key={milestone}
+            className={months >= milestone ? "text-primary-light" : ""}
+          >
+            {milestone} mies.
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HeroStat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <p className="text-label text-on-surface-muted">{label}</p>

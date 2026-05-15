@@ -10,6 +10,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Search,
   UserRound,
   WalletCards,
   X,
@@ -109,6 +110,14 @@ function toDateInputValue(date: Date) {
   const day = `${date.getDate()}`.padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function formatDateControlLabel(date: Date) {
+  return date.toLocaleDateString("pl-PL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 function toDateTimeLocalValue(date: Date) {
@@ -385,6 +394,71 @@ function getClientDisplayName(client: Client) {
   const composedName = `${client.firstName || ""} ${client.lastName || ""}`.trim();
 
   return fullName || composedName || `Klient #${client.id}`;
+}
+
+function getClientShortName(client: Client) {
+  const fullName = getClientDisplayName(client);
+  const parts = fullName.split(/\s+/).filter(Boolean);
+  const firstName = parts[0] || fullName;
+  const lastName = parts.length > 1 ? parts[parts.length - 1] : "";
+
+  return lastName
+    ? `${firstName} ${lastName.charAt(0).toUpperCase()}`
+    : firstName;
+}
+
+function getSuggestedSessionTitle(clientIds: string[], clients: Client[]) {
+  const clientsById = new Map(
+    clients.map((client) => [String(client.id), client]),
+  );
+
+  return clientIds
+    .map((clientId) => clientsById.get(clientId))
+    .filter((client): client is Client => Boolean(client))
+    .map(getClientShortName)
+    .join(" + ");
+}
+
+function normalizeSearch(value: string) {
+  return value.toLowerCase().trim();
+}
+
+function isActiveClientForSession(client: Client) {
+  const status = normalizeSearch(
+    client.subscriptionStatus || client.status || "",
+  );
+
+  if (
+    status.includes("inactive") ||
+    status.includes("suspended") ||
+    status.includes("cancel") ||
+    status.includes("paused") ||
+    status.includes("archived")
+  ) {
+    return false;
+  }
+
+  if (client.hasActivePackage === false || client.isPackageActive === false) {
+    return false;
+  }
+
+  return true;
+}
+
+function matchesClientSearch(client: Client, query: string) {
+  if (!query) return true;
+
+  const haystack = [
+    getClientDisplayName(client),
+    client.email,
+    client.phoneNumber,
+    client.trainerFullName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(query);
 }
 
 export default function SchedulePage() {
@@ -687,19 +761,33 @@ function DateNavigator({
         <ChevronLeft size={18} />
       </button>
 
-      <div className="flex h-10 min-w-[220px] items-center justify-center gap-2 rounded-[10px] bg-surface-container-low px-3 text-sm font-semibold text-on-surface">
-        <CalendarDays size={16} className="text-primary-light" />
+      <div
+        className={[
+          "flex h-10 items-center justify-center rounded-[10px] bg-surface-container-low text-sm font-semibold text-on-surface",
+          view === "day" ? "min-w-[170px]" : "min-w-[220px] gap-2 px-3",
+        ].join(" ")}
+      >
         {view === "day" ? (
-          <input
-            type="date"
-            value={toDateInputValue(anchorDate)}
-            onChange={(event) =>
-              onDateChange(new Date(`${event.target.value}T12:00:00`))
-            }
-            className="h-8 min-h-0 w-[150px] border-0 bg-transparent px-2 py-0 text-sm font-semibold shadow-none"
-          />
+          <label className="relative flex h-full w-full cursor-pointer items-center justify-center gap-2 px-3">
+            <CalendarDays size={16} className="text-primary-light" />
+            <span className="min-w-[92px] text-center tabular-nums">
+              {formatDateControlLabel(anchorDate)}
+            </span>
+            <input
+              type="date"
+              aria-label="Wybierz dzień"
+              value={toDateInputValue(anchorDate)}
+              onChange={(event) =>
+                onDateChange(new Date(`${event.target.value}T12:00:00`))
+              }
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
+          </label>
         ) : (
-          <span className="whitespace-nowrap">{periodLabel}</span>
+          <>
+            <CalendarDays size={16} className="text-primary-light" />
+            <span className="whitespace-nowrap">{periodLabel}</span>
+          </>
         )}
       </div>
 
@@ -987,6 +1075,10 @@ function SessionEditorModal({
   const [values, setValues] = useState<SessionFormValues>(() =>
     getDefaultFormValues({ session, date: anchorDate, trainers, locations }),
   );
+  const [clientSearch, setClientSearch] = useState("");
+  const [isTitleEdited, setIsTitleEdited] = useState(() =>
+    Boolean(session?.title),
+  );
 
   if (!open) return null;
 
@@ -1000,7 +1092,13 @@ function SessionEditorModal({
   }));
   const selectedClientIds = new Set(values.participantIds);
   const selectedTrainerId = Number(values.trainerId);
-  const orderedClients = [...clients].sort((first, second) => {
+  const clientQuery = normalizeSearch(clientSearch);
+  const activeClients = clients.filter(
+    (client) =>
+      selectedClientIds.has(String(client.id)) ||
+      isActiveClientForSession(client),
+  );
+  const orderedClients = [...activeClients].sort((first, second) => {
     const firstSelected = selectedClientIds.has(String(first.id));
     const secondSelected = selectedClientIds.has(String(second.id));
 
@@ -1018,6 +1116,11 @@ function SessionEditorModal({
       "pl",
     );
   });
+  const visibleClients = orderedClients.filter(
+    (client) =>
+      selectedClientIds.has(String(client.id)) ||
+      matchesClientSearch(client, clientQuery),
+  );
 
   function updateValue(
     key: Exclude<keyof SessionFormValues, "participantIds">,
@@ -1026,13 +1129,24 @@ function SessionEditorModal({
     setValues((current) => ({ ...current, [key]: value }));
   }
 
+  function updateTitle(value: string) {
+    setIsTitleEdited(true);
+    updateValue("title", value);
+  }
+
   function toggleParticipant(clientId: string) {
-    setValues((current) => ({
-      ...current,
-      participantIds: current.participantIds.includes(clientId)
+    setValues((current) => {
+      const participantIds = current.participantIds.includes(clientId)
         ? current.participantIds.filter((id) => id !== clientId)
-        : [...current.participantIds, clientId],
-    }));
+        : [...current.participantIds, clientId];
+      const suggestedTitle = getSuggestedSessionTitle(participantIds, clients);
+
+      return {
+        ...current,
+        participantIds,
+        title: !session && !isTitleEdited ? suggestedTitle : current.title,
+      };
+    });
   }
 
   return (
@@ -1103,8 +1217,12 @@ function SessionEditorModal({
           <Field label="Tytuł" className="md:col-span-2">
             <input
               value={values.title}
-              onChange={(event) => updateValue("title", event.target.value)}
-              placeholder="Np. Trening personalny"
+              onChange={(event) => updateTitle(event.target.value)}
+              placeholder={
+                values.participantIds.length
+                  ? getSuggestedSessionTitle(values.participantIds, clients)
+                  : "Np. Anna N + Dominik S"
+              }
               className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
             />
           </Field>
@@ -1152,51 +1270,76 @@ function SessionEditorModal({
           </Field>
 
           <Field label="Klienci sesji" className="md:col-span-2">
-            {orderedClients.length ? (
-              <div className="grid max-h-[220px] gap-2 overflow-y-auto rounded-[var(--radius-lg)] bg-surface-container-low p-2 md:grid-cols-2">
-                {orderedClients.map((client) => {
-                  const clientId = String(client.id);
-                  const selected = selectedClientIds.has(clientId);
+            <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-2">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-md)] bg-surface-container px-3">
+                  <Search size={16} className="shrink-0 text-primary-light" />
+                  <input
+                    value={clientSearch}
+                    onChange={(event) => setClientSearch(event.target.value)}
+                    placeholder="Szukaj klienta..."
+                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-on-surface-muted"
+                  />
+                </div>
+                <span className="shrink-0 rounded-full bg-surface-container px-3 py-2 text-xs font-semibold text-on-surface-variant">
+                  {values.participantIds.length}/{activeClients.length}
+                </span>
+              </div>
 
-                  return (
-                    <button
-                      key={client.id}
-                      type="button"
-                      onClick={() => toggleParticipant(clientId)}
-                      className={[
-                        "flex min-w-0 items-center justify-between gap-3 rounded-[var(--radius-md)] border px-3 py-2 text-left transition",
-                        selected
-                          ? "border-primary/60 bg-primary/10 text-on-surface"
-                          : "border-transparent bg-surface-container text-on-surface-variant hover:border-white/10 hover:text-on-surface",
-                      ].join(" ")}
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold">
-                          {getClientDisplayName(client)}
-                        </span>
-                        <span className="mt-0.5 block truncate text-xs text-on-surface-muted">
-                          {client.email || client.phoneNumber || "Brak kontaktu"}
-                        </span>
-                      </span>
-                      <span
-                        className={[
-                          "shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider",
-                          selected
-                            ? "bg-primary text-on-primary"
-                            : "bg-surface-container-low text-on-surface-muted",
-                        ].join(" ")}
-                      >
-                        {selected ? "Wybrany" : "Dodaj"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3 text-sm text-on-surface-muted">
-                Brak klientów do przypisania.
-              </div>
-            )}
+              {activeClients.length ? (
+                visibleClients.length ? (
+                  <div className="mt-2 grid max-h-[260px] gap-2 overflow-y-auto md:grid-cols-2">
+                    {visibleClients.map((client) => {
+                      const clientId = String(client.id);
+                      const selected = selectedClientIds.has(clientId);
+
+                      return (
+                        <button
+                          key={client.id}
+                          type="button"
+                          onClick={() => toggleParticipant(clientId)}
+                          className={[
+                            "flex min-w-0 items-center justify-between gap-3 rounded-[var(--radius-md)] border px-3 py-2 text-left transition",
+                            selected
+                              ? "border-primary/60 bg-primary/10 text-on-surface"
+                              : "border-transparent bg-surface-container text-on-surface-variant hover:border-white/10 hover:text-on-surface",
+                          ].join(" ")}
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold">
+                              {getClientDisplayName(client)}
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs text-on-surface-muted">
+                              {client.email ||
+                                client.phoneNumber ||
+                                "Brak kontaktu"}
+                            </span>
+                          </span>
+                          <span
+                            className={[
+                              "shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider",
+                              selected
+                                ? "bg-primary text-on-primary"
+                                : "bg-surface-container-low text-on-surface-muted",
+                            ].join(" ")}
+                          >
+                            {selected ? "Wybrany" : "Dodaj"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="mt-2 rounded-[var(--radius-md)] bg-surface-container px-4 py-3 text-sm text-on-surface-muted">
+                    Brak wyników.
+                  </div>
+                )
+              ) : (
+                <div className="mt-2 rounded-[var(--radius-md)] bg-surface-container px-4 py-3 text-sm text-on-surface-muted">
+                  Brak aktywnych klientów do przypisania.
+                </div>
+              )}
+            </div>
           </Field>
 
           <Field label="Status">

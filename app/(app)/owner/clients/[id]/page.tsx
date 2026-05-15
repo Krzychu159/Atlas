@@ -106,7 +106,6 @@ export default function OwnerClientDetailsPage() {
             <ClientSessionsPanel sessions={sessions} />
             <ClientNotesPanel
               client={client}
-              subscription={subscription}
               onClientChange={setClient}
             />
           </div>

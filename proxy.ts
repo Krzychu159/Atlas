@@ -1,71 +1,48 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
-function getHomeByRole(role?: string) {
-  switch (role) {
-    case "owner":
-      return "/owner";
-    case "trainer":
-      return "/trainer";
-    case "client":
-      return "/client";
-    default:
-      return "/login";
-  }
+const protectedPrefixes = ["/owner", "/trainer", "/client"];
+
+function isProtectedPath(pathname: string) {
+  return protectedPrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
 }
 
-export function proxy(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+function continueWithCurrentPath(request: NextRequest) {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(
+    "x-atlas-current-path",
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+  );
 
-  const token = req.cookies.get("accessToken")?.value;
-  const role = req.cookies.get("role")?.value;
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
+}
 
-  const isAuthPage =
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/register") ||
-    pathname.startsWith("/forgot-password");
+export function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
 
-  const isOwnerRoute = pathname.startsWith("/owner");
-  const isTrainerRoute = pathname.startsWith("/trainer");
-  const isClientRoute = pathname.startsWith("/client");
-
-  if (pathname === "/") {
-    return NextResponse.redirect(new URL(getHomeByRole(role), req.url));
-  }
-
-  if (isAuthPage) {
-    if (token && role) {
-      return NextResponse.redirect(new URL(getHomeByRole(role), req.url));
-    }
+  if (!isProtectedPath(pathname)) {
     return NextResponse.next();
   }
 
-  if (!token || !role) {
-    return NextResponse.redirect(new URL("/login", req.url));
+  const accessToken = request.cookies.get("accessToken")?.value;
+  const role = request.cookies.get("role")?.value;
+  const userId = request.cookies.get("userId")?.value;
+
+  if (accessToken && role && userId) {
+    return continueWithCurrentPath(request);
   }
 
-  if (isOwnerRoute && role !== "owner") {
-    return NextResponse.redirect(new URL(getHomeByRole(role), req.url));
-  }
+  const loginUrl = new URL("/login", request.url);
+  loginUrl.searchParams.set("next", `${pathname}${search}`);
 
-  if (isTrainerRoute && role !== "trainer") {
-    return NextResponse.redirect(new URL(getHomeByRole(role), req.url));
-  }
-
-  if (isClientRoute && role !== "client") {
-    return NextResponse.redirect(new URL(getHomeByRole(role), req.url));
-  }
-
-  return NextResponse.next();
+  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {
-  matcher: [
-    "/",
-    "/login",
-    "/register",
-    "/forgot-password",
-    "/owner/:path*",
-    "/trainer/:path*",
-    "/client/:path*",
-  ],
+  matcher: ["/owner/:path*", "/trainer/:path*", "/client/:path*"],
 };

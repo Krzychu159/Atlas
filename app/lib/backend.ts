@@ -1,3 +1,5 @@
+let authRedirectStarted = false;
+
 export async function backendFetch<T>(
   path: string,
   options?: RequestInit,
@@ -12,6 +14,12 @@ export async function backendFetch<T>(
   });
 
   const text = await response.text();
+
+  if (response.status === 401) {
+    handleUnauthorizedSession();
+
+    throw new Error("Sesja wygasła. Zaloguj się ponownie.");
+  }
 
   let data: unknown = null;
 
@@ -33,6 +41,26 @@ export async function backendFetch<T>(
   }
 
   return data as T;
+}
+
+function handleUnauthorizedSession() {
+  if (typeof window === "undefined" || authRedirectStarted) {
+    return;
+  }
+
+  authRedirectStarted = true;
+
+  const nextPath = `${window.location.pathname}${window.location.search}`;
+  const loginPath = `/login?reason=session-expired&next=${encodeURIComponent(
+    nextPath,
+  )}`;
+
+  fetch("/api/auth/logout", {
+    method: "POST",
+    cache: "no-store",
+  }).finally(() => {
+    window.location.assign(loginPath);
+  });
 }
 
 function getBackendErrorMessage(data: unknown) {
