@@ -18,7 +18,7 @@ import ClientNotesPanel from "./components/ClientNotesPanel";
 import ClientProfileHero from "./components/ClientProfileHero";
 import ClientSessionsPanel from "./components/ClientSessionsPanel";
 import EditClientModal from "./components/EditClientModal";
-import { showOwnerError, showOwnerInfo } from "../../components/owner-toast";
+import { showOwnerError } from "../../components/owner-toast";
 
 export default function OwnerClientDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -99,23 +99,39 @@ export default function OwnerClientDetailsPage() {
   async function handleOpenTrainingPlan() {
     if (!client) return;
 
-    let plan = trainingPlan;
-    let url = getTrainingPlanUrl(plan);
+    const cachedUrl = getTrainingPlanUrl(trainingPlan);
 
-    if (!url) {
-      try {
-        plan = await getClientTrainingPlan(client.id);
-        setTrainingPlan(plan);
-        url = getTrainingPlanUrl(plan);
-      } catch {
-        url = "";
-      }
+    if (cachedUrl) {
+      window.open(cachedUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    const pendingTab = window.open("", "_blank");
+
+    if (pendingTab) {
+      pendingTab.opener = null;
+    }
+
+    let url = "";
+
+    try {
+      const plan = await getClientTrainingPlan(client.id);
+      setTrainingPlan(plan);
+      url = getTrainingPlanUrl(plan);
+    } catch {
+      url = "";
     }
 
     if (!url) {
-      showOwnerInfo("Nie dodano jeszcze linku do plików klienta.", {
+      pendingTab?.close();
+      showOwnerError(new Error("Najpierw dodaj link do folderu klienta."), "", {
         id: "owner-client-files-missing",
       });
+      return;
+    }
+
+    if (pendingTab) {
+      pendingTab.location.href = url;
       return;
     }
 
