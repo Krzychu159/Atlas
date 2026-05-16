@@ -1,4 +1,4 @@
-import { backendFetch } from "../backend";
+import { backendGet } from "../backend";
 
 export type CurrentUser = {
   id: string;
@@ -21,7 +21,7 @@ type AuthMeResponse = Partial<CurrentUser> & {
 
 export async function getCurrentUser() {
   try {
-    const backendUser = await backendFetch<AuthMeResponse>("Auth/me");
+    const backendUser = await backendGet<AuthMeResponse>("Auth/me");
     return normalizeUser(backendUser);
   } catch {
     const response = await fetch("/api/auth/me", { cache: "no-store" });

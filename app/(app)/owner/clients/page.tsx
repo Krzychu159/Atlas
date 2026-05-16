@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Plus, UserPlus } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
 import {
   getClients,
@@ -23,6 +22,7 @@ import {
   getClientPackageUsage,
   hasActiveClientPackage,
 } from "@/app/(app)/owner/clients/components/client-display";
+import { showOwnerError } from "@/app/(app)/owner/components/owner-toast";
 
 function normalize(value: string) {
   return value.toLowerCase().trim();
@@ -85,9 +85,9 @@ export default function ClientsPage() {
         }),
       );
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Błąd ładowania klientów",
-      );
+      showOwnerError(err, "Błąd ładowania klientów", {
+        id: "owner-clients-load-error",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -194,7 +194,7 @@ export default function ClientsPage() {
                 className="h-16"
                 onClick={() => setIsModalOpen(true)}
               >
-                Dodaj Klienta
+                Dodaj klienta
               </Button>
             </div>
 

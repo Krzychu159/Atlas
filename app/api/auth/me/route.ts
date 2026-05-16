@@ -9,17 +9,23 @@ export async function GET() {
   const userId = cookieStore.get("userId")?.value;
 
   if (!accessToken || !role || !userId) {
-    return NextResponse.json(
+    const response = NextResponse.json(
       { authenticated: false, user: null },
       { status: 401 },
     );
+    response.headers.set("Cache-Control", "no-store");
+
+    return response;
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     authenticated: true,
     user: {
       userId,
       role,
     },
   });
+  response.headers.set("Cache-Control", "no-store");
+
+  return response;
 }

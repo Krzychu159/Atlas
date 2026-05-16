@@ -1,4 +1,4 @@
-import { backendFetch } from "../backend";
+import { backendGet } from "../backend";
 
 export type OwnerSession = {
   id?: string | number;
@@ -37,5 +37,5 @@ export type OwnerDashboard = {
 };
 
 export function getOwnerDashboard() {
-  return backendFetch<OwnerDashboard>("Dashboard/owner");
+  return backendGet<OwnerDashboard>("Dashboard/owner");
 }

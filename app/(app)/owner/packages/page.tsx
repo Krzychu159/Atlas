@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
 import {
   createPackage,
@@ -19,6 +18,7 @@ import PackageFilters, {
   type ParticipantsFilter,
   type SessionsFilter,
 } from "./components/PackageFilters";
+import { showOwnerError, showOwnerSuccess } from "../components/owner-toast";
 
 function normalize(value: string) {
   return value.toLowerCase().trim();
@@ -66,10 +66,9 @@ export default function PackagesPage() {
       const data = await getPackages();
       setPackages(data);
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Błąd ładowania pakietów",
-        { id: "owner-packages-load-error" },
-      );
+      showOwnerError(err, "Błąd ładowania pakietów", {
+        id: "owner-packages-load-error",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -116,11 +115,13 @@ export default function PackagesPage() {
       await createPackage(payload);
       await loadPackages();
       setIsModalOpen(false);
-      toast.success("Pakiet został dodany.");
+      showOwnerSuccess("Pakiet został dodany.", {
+        id: "owner-package-create-success",
+      });
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Nie udało się dodać pakietu",
-      );
+      showOwnerError(err, "Nie udało się dodać pakietu", {
+        id: "owner-package-create-error",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -133,12 +134,13 @@ export default function PackagesPage() {
       setPackages((current) => current.filter((item) => item.id !== id));
       setPackageToDelete(null);
 
-      toast.success("Pakiet został usunięty.");
+      showOwnerSuccess("Pakiet został usunięty.", {
+        id: "owner-package-delete-success",
+      });
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Nie udało się usunąć pakietu.";
-
-      toast.error(message);
+      showOwnerError(err, "Nie udało się usunąć pakietu.", {
+        id: "owner-package-delete-error",
+      });
     }
   }
 
@@ -166,7 +168,7 @@ export default function PackagesPage() {
                 className="h-14"
                 onClick={() => setIsModalOpen(true)}
               >
-                Dodaj Nowy Pakiet
+                Dodaj nowy pakiet
               </Button>
             </div>
 

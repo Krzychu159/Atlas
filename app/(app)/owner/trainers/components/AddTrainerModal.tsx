@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { ArrowRight, Mail, X } from "lucide-react";
-import { toast } from "sonner";
 import {
   cancelInvitation,
   createInvitation,
@@ -12,6 +11,7 @@ import {
   type Invitation,
 } from "@/app/lib/owner/invitations";
 import InvitationsList from "../../components/InvitationsList";
+import { showOwnerError, showOwnerSuccess } from "../../components/owner-toast";
 
 type AddTrainerModalProps = {
   open: boolean;
@@ -41,9 +41,9 @@ export default function AddTrainerModal({
 
       setInvitations(data.filter(isPendingInvitation));
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Nie udało się pobrać zaproszeń.",
-      );
+      showOwnerError(err, "Nie udało się pobrać zaproszeń.", {
+        id: "owner-trainer-invitations-load-error",
+      });
     } finally {
       setIsLoadingInvitations(false);
     }
@@ -74,13 +74,13 @@ export default function AddTrainerModal({
 
       setForm(initialForm);
       await loadInvitations();
-      toast.success("Zaproszenie dla trenera zostało wysłane.");
+      showOwnerSuccess("Zaproszenie dla trenera zostało wysłane.", {
+        id: "owner-trainer-invitation-create-success",
+      });
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Nie udało się wysłać zaproszenia.",
-      );
+      showOwnerError(err, "Nie udało się wysłać zaproszenia.", {
+        id: "owner-trainer-invitation-create-error",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -93,13 +93,13 @@ export default function AddTrainerModal({
       setInvitations((current) =>
         current.filter((invitation) => invitation.id !== id),
       );
-      toast.success("Zaproszenie zostało wycofane.");
+      showOwnerSuccess("Zaproszenie zostało wycofane.", {
+        id: "owner-trainer-invitation-cancel-success",
+      });
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Nie udało się wycofać zaproszenia.",
-      );
+      showOwnerError(err, "Nie udało się wycofać zaproszenia.", {
+        id: "owner-trainer-invitation-cancel-error",
+      });
     }
   }
 
@@ -107,13 +107,13 @@ export default function AddTrainerModal({
     try {
       await resendInvitation(id);
       await loadInvitations();
-      toast.success("Zaproszenie zostało ponowione.");
+      showOwnerSuccess("Zaproszenie zostało ponowione.", {
+        id: "owner-trainer-invitation-resend-success",
+      });
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Nie udało się ponowić zaproszenia.",
-      );
+      showOwnerError(err, "Nie udało się ponowić zaproszenia.", {
+        id: "owner-trainer-invitation-resend-error",
+      });
     }
   }
 
@@ -136,7 +136,7 @@ export default function AddTrainerModal({
         <div className="pr-12">
           <p className="text-label text-primary-light">Zaproszenie</p>
           <h2 className="mt-2 text-[2rem] leading-none font-semibold tracking-tight">
-            Dodaj Trenera
+            Dodaj trenera
           </h2>
           <p className="mt-4 text-base leading-7 text-on-surface-variant">
             Wpisz adres e-mail trenera. Wyślemy zaproszenie do utworzenia konta

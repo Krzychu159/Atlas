@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { PackagePlus, X } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import {
+  OwnerTextArea,
+  OwnerTextField,
+} from "../../components/OwnerFormControls";
 import type { CreatePackagePayload } from "@/app/lib/owner/packages";
 
 type AddPackageModalProps = {
@@ -101,67 +105,65 @@ export default function AddPackageModal({
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Field
+          <OwnerTextField
             label="Nazwa pakietu"
             value={form.name}
             onChange={(value) => updateField("name", value)}
             placeholder="np. 12 treningów 1:1"
           />
-          <Field
+          <OwnerTextField
             label="Cena"
             value={form.price}
             onChange={(value) => updateField("price", value)}
             type="number"
             placeholder="1200"
           />
-          <Field
+          <OwnerTextField
             label="Limit sesji"
             value={form.sessionsLimit}
             onChange={(value) => updateField("sessionsLimit", value)}
             type="number"
             placeholder="12"
           />
-          <Field
+          <OwnerTextField
             label="Czas trwania"
             value={form.durationDays}
             onChange={(value) => updateField("durationDays", value)}
             type="number"
             placeholder="45"
           />
-          <Field
+          <OwnerTextField
             label="Uczestnicy"
             value={form.participantsCount}
             onChange={(value) => updateField("participantsCount", value)}
             type="number"
             placeholder="1"
           />
-          <Field
+          <OwnerTextField
             label="Sesje / tydzień"
             value={form.sessionsPerWeek}
             onChange={(value) => updateField("sessionsPerWeek", value)}
             type="number"
           />
-          <Field
+          <OwnerTextField
             label="Waluta"
             value={form.currency}
             onChange={(value) => updateField("currency", value)}
           />
-          <Field
-            label="Billing type"
+          <OwnerTextField
+            label="Typ rozliczenia"
             value={form.billingType}
             onChange={(value) => updateField("billingType", value)}
             type="number"
           />
-          <label className="md:col-span-2">
-            <span className="text-label text-on-surface-variant">Opis</span>
-            <textarea
-              value={form.description}
-              onChange={(event) => updateField("description", event.target.value)}
-              placeholder="Krótki opis oferty..."
-              rows={2}
-              className="mt-2 w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm outline-none placeholder:text-on-surface-muted"
-            />
-          </label>
+          <OwnerTextArea
+            label="Opis"
+            value={form.description}
+            onChange={(value) => updateField("description", value)}
+            placeholder="Krótki opis oferty..."
+            rows={2}
+            className="md:col-span-2"
+          />
         </div>
 
         <div className="mt-5 flex items-center justify-between gap-4">
@@ -193,32 +195,5 @@ export default function AddPackageModal({
         </div>
       </div>
     </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  placeholder?: string;
-}) {
-  return (
-    <label>
-      <span className="text-label text-on-surface-variant">{label}</span>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        type={type}
-        placeholder={placeholder}
-        className="mt-2 h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm outline-none placeholder:text-on-surface-muted"
-      />
-    </label>
   );
 }

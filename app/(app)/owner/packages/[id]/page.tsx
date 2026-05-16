@@ -3,7 +3,6 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Pencil } from "lucide-react";
-import { toast } from "sonner";
 import {
   getPackage,
   getPackageClients,
@@ -13,6 +12,7 @@ import {
 import PackageDetailsHero from "./components/PackageDetailsHero";
 import PackageEditCard from "./components/PackageEditCard";
 import PackageClientsList from "./components/PackageClientsList";
+import { showOwnerError } from "../../components/owner-toast";
 
 const mockPackageClients: PackageClient[] = [
   {
@@ -82,10 +82,9 @@ export default function PackageDetailsPage({
           setClientsSource("mock");
         }
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Nie udało się pobrać pakietu.",
-          { id: "owner-package-load-error" },
-        );
+        showOwnerError(err, "Nie udało się pobrać pakietu.", {
+          id: "owner-package-load-error",
+        });
       } finally {
         setIsLoading(false);
       }
@@ -94,7 +93,7 @@ export default function PackageDetailsPage({
     if (Number.isFinite(packageId)) {
       loadData();
     } else {
-      toast.error("Nieprawidłowe ID pakietu.", {
+      showOwnerError(new Error("Nieprawidłowe ID pakietu."), "", {
         id: "owner-package-invalid-id",
       });
       setIsLoading(false);
@@ -109,7 +108,7 @@ export default function PackageDetailsPage({
           className="inline-flex items-center gap-3 text-on-surface hover:text-primary-light"
         >
           <ArrowLeft size={20} className="text-primary-light" />
-          <span className="text-lg font-semibold">Package Details</span>
+          <span className="text-lg font-semibold">Szczegóły pakietu</span>
         </Link>
 
         <button className="h-10 w-10 rounded-full bg-surface-container-low flex items-center justify-center text-primary-light">

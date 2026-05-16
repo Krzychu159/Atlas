@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CalendarSync, CheckCircle2, ExternalLink, Loader2, Unplug } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
 import {
   disconnectOutlook,
@@ -10,6 +9,11 @@ import {
   getOutlookStatus,
   type OutlookStatus,
 } from "@/app/lib/owner/outlook";
+import {
+  showOwnerError,
+  showOwnerInfo,
+  showOwnerSuccess,
+} from "../../components/owner-toast";
 
 function formatConnectedDate(value: string | null) {
   if (!value) return "Brak daty połączenia";
@@ -37,12 +41,9 @@ export default function OutlookIntegrationCard() {
       const data = await getOutlookStatus();
       setStatus(data);
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Nie udało się sprawdzić połączenia Outlook.",
-        { id: "outlook-status-error" },
-      );
+      showOwnerError(err, "Nie udało się sprawdzić połączenia Outlook.", {
+        id: "outlook-status-error",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +90,7 @@ export default function OutlookIntegrationCard() {
         if (data.isConnected) {
           closeAuthWindow();
           stopConnectPolling();
-          toast.success("Konto Microsoft zostało połączone.", {
+          showOwnerSuccess("Konto Microsoft zostało połączone.", {
             id: "outlook-connected",
           });
           return;
@@ -127,17 +128,14 @@ export default function OutlookIntegrationCard() {
       }
 
       startConnectPolling(authWindow);
-      toast.info(
+      showOwnerInfo(
         "Autoryzacja Microsoft otworzyła się w nowym oknie. Zamkniemy je automatycznie po połączeniu.",
         { id: "outlook-connect-started" },
       );
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Nie udało się rozpocząć łączenia z Microsoft.",
-        { id: "outlook-connect-error" },
-      );
+      showOwnerError(err, "Nie udało się rozpocząć łączenia z Microsoft.", {
+        id: "outlook-connect-error",
+      });
       stopConnectPolling();
     }
   }
@@ -165,14 +163,13 @@ export default function OutlookIntegrationCard() {
       setIsDisconnecting(true);
       await disconnectOutlook();
       await loadStatus();
-      toast.success("Konto Microsoft zostało odłączone.", {
+      showOwnerSuccess("Konto Microsoft zostało odłączone.", {
         id: "outlook-disconnected",
       });
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Nie udało się odłączyć Outlook.",
-        { id: "outlook-disconnect-error" },
-      );
+      showOwnerError(err, "Nie udało się odłączyć Outlook.", {
+        id: "outlook-disconnect-error",
+      });
     } finally {
       setIsDisconnecting(false);
     }

@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { expireAuthCookies } from "@/app/lib/server/auth-cookies";
 
 export const runtime = "nodejs";
 
@@ -18,7 +19,13 @@ export async function POST(request: Request) {
   const token = cookieStore.get("accessToken")?.value;
 
   if (!token) {
-    return NextResponse.json({ message: "Session expired" }, { status: 401 });
+    const response = NextResponse.json(
+      { message: "Sesja wygasła." },
+      { status: 401 },
+    );
+    expireAuthCookies(response);
+
+    return response;
   }
 
   const formData = await request.formData();
@@ -26,7 +33,7 @@ export async function POST(request: Request) {
 
   if (!(file instanceof File)) {
     return NextResponse.json(
-      { message: "Missing avatar file." },
+      { message: "Brakuje pliku zdjęcia." },
       { status: 400 },
     );
   }
@@ -35,14 +42,14 @@ export async function POST(request: Request) {
 
   if (!extension) {
     return NextResponse.json(
-      { message: "Unsupported image format." },
+      { message: "Nieobsługiwany format zdjęcia." },
       { status: 400 },
     );
   }
 
   if (file.size > maxAvatarSize) {
     return NextResponse.json(
-      { message: "Avatar file is too large." },
+      { message: "Plik zdjęcia jest za duży." },
       { status: 400 },
     );
   }

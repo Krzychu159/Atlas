@@ -1,47 +1,175 @@
+type ApiQueryValue = string | number | boolean | null | undefined;
+type ApiQuery = Record<string, ApiQueryValue | ApiQueryValue[]>;
+
+type BackendFetchOptions = Omit<RequestInit, "body"> & {
+  body?: BodyInit | null;
+  json?: unknown;
+  query?: ApiQuery;
+  skipUnauthorizedRedirect?: boolean;
+};
+
+type ApiErrorOptions = {
+  status: number;
+  payload?: unknown;
+  path?: string;
+};
+
 let authRedirectStarted = false;
+
+export class ApiError extends Error {
+  status: number;
+  payload?: unknown;
+  path?: string;
+
+  constructor(message: string, options: ApiErrorOptions) {
+    super(message);
+    this.name = "ApiError";
+    this.status = options.status;
+    this.payload = options.payload;
+    this.path = options.path;
+  }
+
+  get isUnauthorized() {
+    return this.status === 401;
+  }
+}
 
 export async function backendFetch<T>(
   path: string,
-  options?: RequestInit,
+  options: BackendFetchOptions = {},
 ): Promise<T> {
-  const response = await fetch(`/api/backend/${path}`, {
-    cache: "no-store",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      ...(options?.headers || {}),
-    },
-  });
+  const { json, query, skipUnauthorizedRedirect, ...fetchOptions } = options;
+  const body = json !== undefined ? JSON.stringify(json) : fetchOptions.body;
+  const headers = new Headers(fetchOptions.headers);
 
-  const text = await response.text();
-
-  if (response.status === 401) {
-    handleUnauthorizedSession();
-
-    throw new Error("Sesja wygasła. Zaloguj się ponownie.");
+  if (!headers.has("Accept")) {
+    headers.set("Accept", "application/json");
   }
 
-  let data: unknown = null;
+  if (json !== undefined && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    throw new Error(
-      `Backend returned non-JSON response. Status: ${response.status}. Body: ${text.slice(
-        0,
-        120,
-      )}`,
-    );
+  const response = await fetch(buildBackendUrl(path, query), {
+    cache: "no-store",
+    ...fetchOptions,
+    body,
+    headers,
+  });
+  const payload = await readResponsePayload(response);
+
+  if (response.status === 401) {
+    if (!skipUnauthorizedRedirect) {
+      handleUnauthorizedSession();
+    }
+
+    throw new ApiError("Sesja wygasła. Zaloguj się ponownie.", {
+      status: response.status,
+      payload,
+      path,
+    });
   }
 
   if (!response.ok) {
-    const message = getBackendErrorMessage(data);
-
-    throw new Error(message);
+    throw new ApiError(getBackendErrorMessage(payload), {
+      status: response.status,
+      payload,
+      path,
+    });
   }
 
-  return data as T;
+  return payload as T;
+}
+
+export function backendGet<T>(path: string, query?: ApiQuery) {
+  return backendFetch<T>(path, { method: "GET", query });
+}
+
+export function backendPost<T>(path: string, json?: unknown, query?: ApiQuery) {
+  return backendFetch<T>(path, { method: "POST", json, query });
+}
+
+export function backendPut<T>(path: string, json?: unknown, query?: ApiQuery) {
+  return backendFetch<T>(path, { method: "PUT", json, query });
+}
+
+export function backendPatch<T>(path: string, json?: unknown, query?: ApiQuery) {
+  return backendFetch<T>(path, { method: "PATCH", json, query });
+}
+
+export function backendDelete<T>(path: string, query?: ApiQuery) {
+  return backendFetch<T>(path, { method: "DELETE", query });
+}
+
+export function getErrorMessage(
+  error: unknown,
+  fallback = "Wystąpił nieoczekiwany błąd.",
+) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+function buildBackendUrl(path: string, query?: ApiQuery) {
+  const [rawPath, rawSearch = ""] = path.replace(/^\/+/, "").split("?");
+  const searchParams = new URLSearchParams(rawSearch);
+
+  if (query) {
+    Object.entries(query).forEach(([key, value]) => {
+      appendQueryValue(searchParams, key, value);
+    });
+  }
+
+  const search = searchParams.toString();
+
+  return `/api/backend/${rawPath}${search ? `?${search}` : ""}`;
+}
+
+function appendQueryValue(
+  searchParams: URLSearchParams,
+  key: string,
+  value: ApiQueryValue | ApiQueryValue[],
+) {
+  if (Array.isArray(value)) {
+    value.forEach((item) => appendQueryValue(searchParams, key, item));
+    return;
+  }
+
+  if (value === null || value === undefined || value === "") {
+    return;
+  }
+
+  searchParams.set(key, String(value));
+}
+
+async function readResponsePayload(response: Response) {
+  if ([204, 205, 304].includes(response.status)) {
+    return null;
+  }
+
+  const text = await response.text();
+
+  if (!text) return null;
+
+  const contentType = response.headers.get("content-type") || "";
+
+  if (!contentType.includes("application/json")) {
+    return text;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new ApiError(
+      `Backend zwrócił niepoprawną odpowiedź JSON. Status: ${response.status}.`,
+      {
+        status: response.status,
+        payload: text.slice(0, 500),
+      },
+    );
+  }
 }
 
 function handleUnauthorizedSession() {
@@ -65,8 +193,12 @@ function handleUnauthorizedSession() {
 }
 
 function getBackendErrorMessage(data: unknown) {
+  if (typeof data === "string" && data.trim()) {
+    return data;
+  }
+
   if (typeof data !== "object" || data === null) {
-    return "Backend request failed";
+    return "Nie udało się wykonać operacji.";
   }
 
   if ("message" in data && data.message) {
@@ -97,5 +229,5 @@ function getBackendErrorMessage(data: unknown) {
     return title;
   }
 
-  return "Backend request failed";
+  return "Nie udało się wykonać operacji.";
 }

@@ -1,12 +1,6 @@
-import { ArrowDownRight, ArrowUpRight, ChevronRight, Clock3, Dumbbell } from "lucide-react";
-import type { Trainer } from "@/app/lib/owner/trainers";
 import Link from "next/link";
-
-export type TrainerSessionTrend = {
-  current: number;
-  previous: number;
-  percent: number;
-};
+import { ChevronRight, Clock3, Dumbbell } from "lucide-react";
+import type { Trainer } from "@/app/lib/owner/trainers";
 
 function getInitials(trainer: Trainer) {
   const name = trainer.fullName || `${trainer.firstName} ${trainer.lastName}`;
@@ -19,20 +13,14 @@ function getInitials(trainer: Trainer) {
     .toUpperCase();
 }
 
-export default function TrainerCard({
-  trainer,
-  trend,
-}: {
-  trainer: Trainer;
-  trend?: TrainerSessionTrend;
-}) {
+export default function TrainerCard({ trainer }: { trainer: Trainer }) {
   const fullName =
     trainer.fullName || `${trainer.firstName} ${trainer.lastName}`;
 
   return (
-    <div className="bg-surface-container rounded-[var(--radius-lg)] p-5">
+    <div className="rounded-[var(--radius-lg)] bg-surface-container p-5">
       <div className="flex items-start gap-4">
-        <div className="h-14 w-14 rounded-[var(--radius-md)] bg-surface-container-low flex items-center justify-center overflow-hidden shrink-0">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-md)] bg-surface-container-low">
           {trainer.avatarUrl ? (
             <img
               src={trainer.avatarUrl}
@@ -40,48 +28,43 @@ export default function TrainerCard({
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="h-9 w-9 rounded-[var(--radius-md)] bg-surface-container-high flex items-center justify-center text-xs font-semibold text-primary-light">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-high text-xs font-semibold text-primary-light">
               {getInitials(trainer)}
             </div>
           )}
         </div>
 
         <div className="min-w-0 flex-1">
-          <h3 className="text-[17px] leading-6 font-semibold truncate">
+          <h3 className="truncate text-[17px] font-semibold leading-6">
             {fullName}
           </h3>
 
-          <div className="mt-2  ">
+          <div className="mt-2">
             {trainer.hourlyRate ? (
-              <span className="px-2 py-1 rounded-full text-[8px] font-medium leading-none bg-surface-container-high text-secondary-light">
+              <span className="rounded-full bg-surface-container-high px-2 py-1 text-[8px] font-medium leading-none text-secondary-light">
                 {trainer.hourlyRate} PLN/h
               </span>
             ) : null}
           </div>
 
-          <p className="mt-2 text-on-surface-variant text-sm leading-5 line-clamp-2">
+          <p className="mt-2 line-clamp-2 text-sm leading-5 text-on-surface-variant">
             {trainer.bio || trainer.role || "Trener personalny"}
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mt-4">
-        <div className="bg-surface-container-low rounded-[var(--radius-md)] px-3 py-3">
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="rounded-[var(--radius-md)] bg-surface-container-low px-3 py-3">
           <div className="flex items-center gap-1.5 text-on-surface-muted">
             <Dumbbell size={12} />
-            <p className="text-[11px] uppercase tracking-wide">
-              Sesje (30 dni)
-            </p>
+            <p className="text-[11px] uppercase tracking-wide">Sesje</p>
           </div>
-          <div className="mt-3 flex items-end justify-between gap-2">
-            <p className="text-[18px] font-semibold leading-none">
-              {trend?.current ?? trainer.sessionsCount ?? 0}
-            </p>
-            <TrendBadge trend={trend} />
-          </div>
+          <p className="mt-3 text-[18px] font-semibold leading-none">
+            {trainer.sessionsCount ?? 0}
+          </p>
         </div>
 
-        <div className="bg-surface-container-low rounded-[var(--radius-md)] px-3 py-3">
+        <div className="rounded-[var(--radius-md)] bg-surface-container-low px-3 py-3">
           <div className="flex items-center gap-1.5 text-on-surface-muted">
             <Clock3 size={12} />
             <p className="text-[11px] uppercase tracking-wide">Dośw.</p>
@@ -94,38 +77,11 @@ export default function TrainerCard({
 
       <Link
         href={`/owner/trainers/${trainer.id}`}
-        className="w-full mt-3 rounded-[var(--radius-md)] bg-surface-container-low hover:bg-surface-container-high transition-colors px-4 py-3 flex items-center justify-center gap-2 text-sm font-medium"
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-surface-container-low px-4 py-3 text-sm font-medium transition-colors hover:bg-surface-container-high"
       >
         Zobacz profil
         <ChevronRight size={14} />
       </Link>
     </div>
-  );
-}
-
-function TrendBadge({ trend }: { trend?: TrainerSessionTrend }) {
-  if (!trend) {
-    return (
-      <span className="rounded-full bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface-muted">
-        --
-      </span>
-    );
-  }
-
-  const isPositive = trend.percent >= 0;
-
-  return (
-    <span
-      className={[
-        "inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold",
-        isPositive
-          ? "bg-tertiary-container text-tertiary-light"
-          : "bg-error-container text-error-light",
-      ].join(" ")}
-    >
-      {isPositive ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
-      {isPositive ? "+" : ""}
-      {trend.percent}%
-    </span>
   );
 }

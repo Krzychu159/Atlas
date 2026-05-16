@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { toast } from "sonner";
 import { getClientsByTrainer, type Client } from "@/app/lib/owner/clients";
 import { getTrainerRates, type TrainerRate } from "@/app/lib/owner/settlements";
 import {
@@ -14,6 +13,7 @@ import EditTrainerModal from "../components/EditTrainerModal";
 import TrainerProfileClients from "../components/TrainerProfileClients";
 import TrainerProfileHeader from "../components/TrainerProfileHeader";
 import TrainerSchedulePanel from "../components/TrainerSchedulePanel";
+import { showOwnerError } from "../../components/owner-toast";
 
 export default function TrainerPage() {
   const params = useParams<{ id: string }>();
@@ -30,7 +30,7 @@ export default function TrainerPage() {
         const trainerId = Number(params.id);
 
         if (!trainerId) {
-          toast.error("Nieprawidłowe ID trenera.", {
+          showOwnerError(new Error("Nieprawidłowe ID trenera."), "", {
             id: "owner-trainer-invalid-id",
           });
           return;
@@ -57,10 +57,9 @@ export default function TrainerPage() {
           sessionsResult.status === "fulfilled" ? sessionsResult.value : [],
         );
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Nie udało się pobrać trenera.",
-          { id: "owner-trainer-load-error" },
-        );
+        showOwnerError(err, "Nie udało się pobrać trenera.", {
+          id: "owner-trainer-load-error",
+        });
       } finally {
         setIsLoading(false);
       }

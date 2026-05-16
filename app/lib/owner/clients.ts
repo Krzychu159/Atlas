@@ -1,4 +1,4 @@
-import { backendFetch } from "../backend";
+import { backendGet, backendPatch, backendPost } from "../backend";
 
 export type ClientStatus = "active" | "suspended" | "new" | string;
 
@@ -147,37 +147,31 @@ export type UpdateClientPayload = {
 };
 
 export function getClients() {
-  return backendFetch<Client[]>("Clients");
+  return backendGet<Client[]>("Clients");
 }
 
 export function getClient(id: number) {
-  return backendFetch<Client>(`Clients/${id}`);
+  return backendGet<Client>(`Clients/${id}`);
 }
 
 export function getClientsByTrainer(trainerId: number) {
-  return backendFetch<Client[]>(`Clients/filter?TrainerId=${trainerId}`);
+  return backendGet<Client[]>("Clients/filter", { TrainerId: trainerId });
 }
 
 export function getClientSubscription(id: number) {
-  return backendFetch<ClientSubscription>(`Clients/${id}/subscription`);
+  return backendGet<ClientSubscription>(`Clients/${id}/subscription`);
 }
 
 export function getClientSubscriptionUsage(id: number) {
-  return backendFetch<SubscriptionUsage>(
+  return backendGet<SubscriptionUsage>(
     `Clients/${id}/subscription/current-cycle/usage`,
   );
 }
 
 export function createClient(payload: CreateClientPayload) {
-  return backendFetch<Client>("Clients", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return backendPost<Client>("Clients", payload);
 }
 
 export function updateClient(id: number, payload: UpdateClientPayload) {
-  return backendFetch<Client>(`Clients/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  });
+  return backendPatch<Client>(`Clients/${id}`, payload);
 }

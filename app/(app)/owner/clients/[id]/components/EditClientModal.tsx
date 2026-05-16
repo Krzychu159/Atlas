@@ -2,9 +2,16 @@
 
 import { type FormEvent, useEffect, useState } from "react";
 import { MapPin, X } from "lucide-react";
-import { toast } from "sonner";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import AvatarFilePicker from "../../../components/AvatarFilePicker";
+import {
+  OwnerTextArea,
+  OwnerTextField,
+} from "../../../components/OwnerFormControls";
+import {
+  showOwnerError,
+  showOwnerSuccess,
+} from "../../../components/owner-toast";
 import {
   getClient,
   updateClient,
@@ -76,7 +83,7 @@ export default function EditClientModal({
     const resolvedLocationId = Number(locationId);
 
     if (!resolvedLocationId) {
-      toast.error("Wybierz lokalizację klienta.", {
+      showOwnerError(new Error("Wybierz lokalizację klienta."), "", {
         id: "owner-client-location-required",
       });
       return;
@@ -110,17 +117,14 @@ export default function EditClientModal({
       }
 
       onSaved(confirmedClient);
-      toast.success("Dane klienta zostały zaktualizowane.", {
+      showOwnerSuccess("Dane klienta zostały zaktualizowane.", {
         id: "owner-client-edit-success",
       });
       onClose();
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Nie udało się zaktualizować klienta.",
-        { id: "owner-client-edit-error" },
-      );
+      showOwnerError(err, "Nie udało się zaktualizować klienta.", {
+        id: "owner-client-edit-error",
+      });
     } finally {
       setIsSaving(false);
     }
@@ -170,10 +174,18 @@ export default function EditClientModal({
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Field label="Imię" value={firstName} onChange={setFirstName} />
-          <Field label="Nazwisko" value={lastName} onChange={setLastName} />
-          <Field label="E-mail" value={email} onChange={setEmail} />
-          <Field
+          <OwnerTextField
+            label="Imię"
+            value={firstName}
+            onChange={setFirstName}
+          />
+          <OwnerTextField
+            label="Nazwisko"
+            value={lastName}
+            onChange={setLastName}
+          />
+          <OwnerTextField label="E-mail" value={email} onChange={setEmail} />
+          <OwnerTextField
             label="Telefon"
             value={phoneNumber}
             onChange={setPhoneNumber}
@@ -209,7 +221,7 @@ export default function EditClientModal({
             />
           </div>
 
-          <TextArea
+          <OwnerTextArea
             label="Cel"
             value={goal}
             onChange={setGoal}
@@ -297,54 +309,4 @@ function getClientUpdateFailedFields(
   if (!isSameOptionalText(client.goal, payload.goal)) failedFields.push("cel");
 
   return failedFields;
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  className,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  className?: string;
-}) {
-  return (
-    <label className={className}>
-      <span className="text-label text-on-surface-muted">{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
-      />
-    </label>
-  );
-}
-
-function TextArea({
-  label,
-  value,
-  onChange,
-  className,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  className?: string;
-}) {
-  return (
-    <label className={className}>
-      <span className="text-label text-on-surface-muted">{label}</span>
-      <textarea
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        rows={4}
-        className="mt-2 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
-      />
-    </label>
-  );
 }

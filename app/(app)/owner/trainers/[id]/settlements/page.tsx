@@ -12,7 +12,6 @@ import {
   ReceiptText,
   Wallet,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
 import {
   getTrainerRates,
@@ -23,6 +22,10 @@ import {
   type TrainerSettlementItem,
 } from "@/app/lib/owner/settlements";
 import { getTrainer, type Trainer } from "@/app/lib/owner/trainers";
+import {
+  showOwnerError,
+  showOwnerSuccess,
+} from "../../../components/owner-toast";
 
 function getCurrentMonthValue() {
   const now = new Date();
@@ -106,7 +109,7 @@ export default function TrainerSettlementPage() {
       const { year, month } = parseMonth(monthValue);
 
       if (!trainerId || !year || !month) {
-        toast.error("Nieprawidłowe dane rozliczenia.", {
+        showOwnerError(new Error("Nieprawidłowe dane rozliczenia."), "", {
           id: "owner-trainer-settlement-invalid",
         });
         setIsLoading(false);
@@ -134,12 +137,9 @@ export default function TrainerSettlementPage() {
             : null,
         );
       } catch (err) {
-        toast.error(
-          err instanceof Error
-            ? err.message
-            : "Nie udało się pobrać rozliczenia trenera.",
-          { id: "owner-trainer-settlement-load-error" },
-        );
+        showOwnerError(err, "Nie udało się pobrać rozliczenia trenera.", {
+          id: "owner-trainer-settlement-load-error",
+        });
       } finally {
         setIsLoading(false);
       }
@@ -168,14 +168,13 @@ export default function TrainerSettlementPage() {
         settlement.month,
       );
       setSettlement(data);
-      toast.success("Rozliczenie oznaczone jako wypłacone.", {
+      showOwnerSuccess("Rozliczenie oznaczone jako wypłacone.", {
         id: "owner-trainer-settlement-paid",
       });
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Nie udało się oznaczyć rozliczenia jako wypłacone.",
+      showOwnerError(
+        err,
+        "Nie udało się oznaczyć rozliczenia jako wypłacone.",
         { id: "owner-trainer-settlement-paid-error" },
       );
     } finally {

@@ -1,4 +1,9 @@
-import { backendFetch } from "../backend";
+import {
+  backendDelete,
+  backendGet,
+  backendPost,
+  backendPut,
+} from "../backend";
 
 export type Package = {
   id: number;
@@ -56,41 +61,31 @@ export type PackageClient = {
 };
 
 export function getPackages() {
-  return backendFetch<Package[]>("Packages");
+  return backendGet<Package[]>("Packages");
 }
 
 export function getPackage(id: number) {
-  return backendFetch<Package>(`Packages/${id}`);
+  return backendGet<Package>(`Packages/${id}`);
 }
 
 export function createPackage(payload: CreatePackagePayload) {
-  return backendFetch<Package>("Packages", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return backendPost<Package>("Packages", payload);
 }
 
 export function updatePackage(id: number, payload: UpdatePackagePayload) {
-  return backendFetch<Package>(`Packages/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
+  return backendPut<Package>(`Packages/${id}`, payload);
 }
 
 export function deletePackage(id: number) {
-  return backendFetch<void>(`Packages/${id}`, {
-    method: "DELETE",
-  });
+  return backendDelete<void>(`Packages/${id}`);
 }
 
 export function restorePackage(id: number) {
-  return backendFetch<void>(`Packages/${id}/restore`, {
-    method: "POST",
-  });
+  return backendPost<void>(`Packages/${id}/restore`);
 }
 
 export function getDeletedPackages() {
-  return backendFetch<Package[]>("Packages/deleted");
+  return backendGet<Package[]>("Packages/deleted");
 }
 
 /**
@@ -100,5 +95,5 @@ export function getDeletedPackages() {
  * Na razie backend tego nie ma, więc page.tsx używa mocka po catch.
  */
 export function getPackageClients(id: number) {
-  return backendFetch<PackageClient[]>(`Packages/${id}/clients`);
+  return backendGet<PackageClient[]>(`Packages/${id}/clients`);
 }

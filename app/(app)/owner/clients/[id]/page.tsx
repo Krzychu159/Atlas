@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { toast } from "sonner";
 import {
   getClient,
   getClientSubscription,
@@ -17,6 +16,7 @@ import ClientNotesPanel from "./components/ClientNotesPanel";
 import ClientProfileHero from "./components/ClientProfileHero";
 import ClientSessionsPanel from "./components/ClientSessionsPanel";
 import EditClientModal from "./components/EditClientModal";
+import { showOwnerError } from "../../components/owner-toast";
 
 export default function OwnerClientDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -34,7 +34,7 @@ export default function OwnerClientDetailsPage() {
       const clientId = Number(params.id);
 
       if (!clientId) {
-        toast.error("Nieprawidłowe ID klienta.", {
+        showOwnerError(new Error("Nieprawidłowe ID klienta."), "", {
           id: "owner-client-invalid-id",
         });
         setIsLoading(false);
@@ -70,10 +70,9 @@ export default function OwnerClientDetailsPage() {
           setSessions(sessionsResult.value);
         }
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Nie udało się pobrać klienta.",
-          { id: "owner-client-load-error" },
-        );
+        showOwnerError(err, "Nie udało się pobrać klienta.", {
+          id: "owner-client-load-error",
+        });
       } finally {
         setIsLoading(false);
       }

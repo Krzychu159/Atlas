@@ -35,7 +35,7 @@ const yesterdayNotifications: NotificationItemData[] = [
     type: "system",
     title: "Aktualizacja systemu",
     description:
-      "Wprowadziliśmy nowe widżety do Twojego Dashboardu. Sprawdź teraz.",
+      "Wprowadziliśmy nowe widżety do panelu. Sprawdź teraz.",
     time: "2 dni temu",
   },
 ];

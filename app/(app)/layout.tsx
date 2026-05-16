@@ -2,32 +2,10 @@ import type { ReactNode } from "react";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/app/components/app-shell";
-import type { AppRole } from "@/app/components/navigation";
-
-const BACKEND_URL = process.env.BACKEND_API_URL;
-const validRoles = ["owner", "trainer", "client"] as const;
-
-async function isTokenAcceptedByBackend(accessToken: string) {
-  if (!BACKEND_URL) return true;
-
-  try {
-    const response = await fetch(`${BACKEND_URL}/api/Auth/me`, {
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      cache: "no-store",
-    });
-
-    if (response.status === 401 || response.status === 403) {
-      return false;
-    }
-
-    return true;
-  } catch {
-    return true;
-  }
-}
+import {
+  isBackendSessionValid,
+  isValidAppRole,
+} from "@/app/lib/server/session";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const cookieStore = await cookies();
@@ -42,17 +20,15 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     redirect(currentPath ? `/login?next=${encodeURIComponent(currentPath)}` : "/login");
   }
 
-  const role = rawRole as AppRole;
-
-  if (!validRoles.includes(role)) {
+  if (!isValidAppRole(rawRole)) {
     redirect("/login");
   }
 
-  const sessionValid = await isTokenAcceptedByBackend(accessToken);
+  const sessionValid = await isBackendSessionValid(accessToken);
 
   if (!sessionValid) {
     redirect(`/logout?reason=session-expired${nextQuery}`);
   }
 
-  return <AppShell role={role}>{children}</AppShell>;
+  return <AppShell role={rawRole}>{children}</AppShell>;
 }

@@ -1,4 +1,4 @@
-import { backendFetch } from "../backend";
+import { backendGet, backendPost, backendPut } from "../backend";
 import { getTrainers, type Trainer } from "./trainers";
 
 export type TrainerRate = {
@@ -57,17 +57,14 @@ function emptySettlement(
 }
 
 export function getTrainerRates(trainerId: number) {
-  return backendFetch<TrainerRate[]>(`Trainers/${trainerId}/rates`);
+  return backendGet<TrainerRate[]>(`Trainers/${trainerId}/rates`);
 }
 
 export function updateTrainerRates(
   trainerId: number,
   payload: { hourlyRate: number | null },
 ) {
-  return backendFetch<TrainerRate[]>(`Trainers/${trainerId}/rates`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
+  return backendPut<TrainerRate[]>(`Trainers/${trainerId}/rates`, payload);
 }
 
 export function getTrainerSettlement(
@@ -75,8 +72,9 @@ export function getTrainerSettlement(
   year: number,
   month: number,
 ) {
-  return backendFetch<TrainerMonthlySettlement>(
-    `Trainers/${trainerId}/settlement?year=${year}&month=${month}`,
+  return backendGet<TrainerMonthlySettlement>(
+    `Trainers/${trainerId}/settlement`,
+    { year, month },
   );
 }
 
@@ -85,9 +83,10 @@ export function markTrainerSettlementAsPaid(
   year: number,
   month: number,
 ) {
-  return backendFetch<TrainerMonthlySettlement>(
-    `Trainers/${trainerId}/settlement/mark-as-paid?year=${year}&month=${month}`,
-    { method: "POST" },
+  return backendPost<TrainerMonthlySettlement>(
+    `Trainers/${trainerId}/settlement/mark-as-paid`,
+    undefined,
+    { year, month },
   );
 }
 

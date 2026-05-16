@@ -160,7 +160,7 @@ async function uploadAvatar(file: File) {
   } | null;
 
   if (!response.ok || !data?.url) {
-    throw new Error(data?.message || "Avatar upload failed.");
+    throw new Error(data?.message || "Nie udało się wgrać zdjęcia.");
   }
 
   return data.url;

@@ -1,4 +1,4 @@
-import { backendFetch } from "../backend";
+import { backendGet } from "../backend";
 
 export type Location = {
   id: number;
@@ -10,5 +10,5 @@ export type Location = {
 };
 
 export function getLocations() {
-  return backendFetch<Location[]>("Locations");
+  return backendGet<Location[]>("Locations");
 }

@@ -1,15 +1,8 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { expireAuthCookies } from "@/app/lib/server/auth-cookies";
 
 const BACKEND_URL = process.env.BACKEND_API_URL;
-const authCookieNames = [
-  "accessToken",
-  "refreshToken",
-  "role",
-  "userId",
-  "refresh_token",
-  "user_role",
-];
 
 type RouteContext = {
   params: Promise<{
@@ -19,20 +12,14 @@ type RouteContext = {
 
 async function handler(req: NextRequest, context: RouteContext) {
   if (!BACKEND_URL) {
-    return NextResponse.json(
-      { message: "Missing BACKEND_API_URL" },
-      { status: 500 },
-    );
+    return jsonError("Brakuje konfiguracji BACKEND_API_URL.", 500);
   }
 
   const cookieStore = await cookies();
   const token = cookieStore.get("accessToken")?.value;
 
   if (!token) {
-    const response = NextResponse.json(
-      { message: "Session expired" },
-      { status: 401 },
-    );
+    const response = jsonError("Sesja wygasła.", 401);
 
     expireAuthCookies(response);
 
@@ -53,16 +40,22 @@ async function handler(req: NextRequest, context: RouteContext) {
       ? undefined
       : await req.text();
 
-  const response = await fetch(url.toString(), {
-    method: req.method,
-    headers: {
-      Accept: "application/json",
-      ...(body ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body,
-    cache: "no-store",
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(url.toString(), {
+      method: req.method,
+      headers: {
+        Accept: "application/json",
+        ...(body ? { "Content-Type": "application/json" } : {}),
+        Authorization: `Bearer ${token}`,
+      },
+      body,
+      cache: "no-store",
+    });
+  } catch {
+    return jsonError("Nie udało się połączyć z backendem.", 502);
+  }
 
   const text = await response.text();
 
@@ -96,18 +89,11 @@ async function handler(req: NextRequest, context: RouteContext) {
   return nextResponse;
 }
 
-function expireAuthCookies(response: NextResponse) {
-  const expiredCookie = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
-    expires: new Date(0),
-    path: "/",
-  };
+function jsonError(message: string, status: number) {
+  const response = NextResponse.json({ message }, { status });
+  response.headers.set("Cache-Control", "no-store");
 
-  authCookieNames.forEach((name) => {
-    response.cookies.set(name, "", expiredCookie);
-  });
+  return response;
 }
 
 export {

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { ArrowRight, Mail, X } from "lucide-react";
-import { toast } from "sonner";
 import {
   cancelInvitation,
   createInvitation,
@@ -12,6 +11,7 @@ import {
   type Invitation,
 } from "@/app/lib/owner/invitations";
 import InvitationsList from "../../components/InvitationsList";
+import { showOwnerError, showOwnerSuccess } from "../../components/owner-toast";
 
 type AddClientModalProps = {
   open: boolean;
@@ -38,9 +38,9 @@ export default function AddClientModal({ open, onClose }: AddClientModalProps) {
 
       setInvitations(data.filter(isPendingInvitation));
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Nie udało się pobrać zaproszeń.",
-      );
+      showOwnerError(err, "Nie udało się pobrać zaproszeń.", {
+        id: "owner-client-invitations-load-error",
+      });
     } finally {
       setIsLoadingInvitations(false);
     }
@@ -71,13 +71,13 @@ export default function AddClientModal({ open, onClose }: AddClientModalProps) {
 
       setForm(initialForm);
       await loadInvitations();
-      toast.success("Zaproszenie dla klienta zostało wysłane.");
+      showOwnerSuccess("Zaproszenie dla klienta zostało wysłane.", {
+        id: "owner-client-invitation-create-success",
+      });
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Nie udało się wysłać zaproszenia.",
-      );
+      showOwnerError(err, "Nie udało się wysłać zaproszenia.", {
+        id: "owner-client-invitation-create-error",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -90,13 +90,13 @@ export default function AddClientModal({ open, onClose }: AddClientModalProps) {
       setInvitations((current) =>
         current.filter((invitation) => invitation.id !== id),
       );
-      toast.success("Zaproszenie zostało wycofane.");
+      showOwnerSuccess("Zaproszenie zostało wycofane.", {
+        id: "owner-client-invitation-cancel-success",
+      });
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Nie udało się wycofać zaproszenia.",
-      );
+      showOwnerError(err, "Nie udało się wycofać zaproszenia.", {
+        id: "owner-client-invitation-cancel-error",
+      });
     }
   }
 
@@ -104,13 +104,13 @@ export default function AddClientModal({ open, onClose }: AddClientModalProps) {
     try {
       await resendInvitation(id);
       await loadInvitations();
-      toast.success("Zaproszenie zostało ponowione.");
+      showOwnerSuccess("Zaproszenie zostało ponowione.", {
+        id: "owner-client-invitation-resend-success",
+      });
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Nie udało się ponowić zaproszenia.",
-      );
+      showOwnerError(err, "Nie udało się ponowić zaproszenia.", {
+        id: "owner-client-invitation-resend-error",
+      });
     }
   }
 
@@ -133,7 +133,7 @@ export default function AddClientModal({ open, onClose }: AddClientModalProps) {
         <div className="pr-12">
           <p className="text-label text-primary-light">Zaproszenie</p>
           <h2 className="mt-2 text-[2rem] leading-none font-semibold tracking-tight">
-            Dodaj Klienta
+            Dodaj klienta
           </h2>
           <p className="mt-4 text-base leading-7 text-on-surface-variant">
             Wpisz adres e-mail klienta. Wyślemy zaproszenie do utworzenia konta

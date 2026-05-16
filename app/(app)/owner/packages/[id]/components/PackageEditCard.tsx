@@ -7,7 +7,10 @@ import {
   type Package,
   type UpdatePackagePayload,
 } from "@/app/lib/owner/packages";
-import { toast } from "sonner";
+import {
+  showOwnerError,
+  showOwnerSuccess,
+} from "../../../components/owner-toast";
 
 type FormState = {
   name: string;
@@ -71,12 +74,13 @@ export default function PackageEditCard({
       const updated = await updatePackage(item.id, payload);
       onUpdated(updated);
 
-      toast.success("Pakiet został zaktualizowany.");
+      showOwnerSuccess("Pakiet został zaktualizowany.", {
+        id: "owner-package-update-success",
+      });
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Nie udało się zapisać zmian.";
-
-      toast.error(message);
+      showOwnerError(err, "Nie udało się zapisać zmian.", {
+        id: "owner-package-update-error",
+      });
     } finally {
       setIsSaving(false);
     }

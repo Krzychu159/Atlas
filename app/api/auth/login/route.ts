@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAuthCookieOptions } from "@/app/lib/server/auth-cookies";
 
 export async function POST(req: Request) {
   try {
@@ -7,7 +8,7 @@ export async function POST(req: Request) {
 
     if (!backendUrl) {
       return NextResponse.json(
-        { message: "Missing BACKEND_API_URL in .env.local" },
+        { message: "Brakuje konfiguracji BACKEND_API_URL." },
         { status: 500 },
       );
     }
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { message: data?.message || "Login failed" },
+        { message: data?.message || "Nie udało się zalogować." },
         { status: response.status },
       );
     }
@@ -43,13 +44,9 @@ export async function POST(req: Request) {
         role,
       },
     });
+    res.headers.set("Cache-Control", "no-store");
 
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
-      path: "/",
-    };
+    const cookieOptions = getAuthCookieOptions();
 
     res.cookies.set("accessToken", data.token, cookieOptions);
     res.cookies.set("refreshToken", data.refreshToken, cookieOptions);
@@ -61,7 +58,7 @@ export async function POST(req: Request) {
     console.error("AUTH_LOGIN_ROUTE_ERROR", error);
 
     return NextResponse.json(
-      { message: "Internal server error in /api/auth/login" },
+      { message: "Nie udało się obsłużyć logowania." },
       { status: 500 },
     );
   }

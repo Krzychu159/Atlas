@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CalendarDays, Clock3, Dumbbell } from "lucide-react";
 import type { OwnerSession } from "@/app/lib/owner/sessions";
+import { getOwnerSessionPackageName } from "../../components/session-display";
 
 function formatDay(value: string) {
   const date = new Date(value);
@@ -87,6 +88,9 @@ export default function TrainerSchedulePanel({
                 <p className="mt-1 truncate text-sm text-on-surface-variant">
                   {session.clientsDisplayName || "Brak klienta"} ·{" "}
                   {session.locationName || "Brak lokalizacji"}
+                </p>
+                <p className="mt-1 truncate text-xs font-semibold text-tertiary-light">
+                  {getOwnerSessionPackageName(session)}
                 </p>
               </div>
 

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, Dumbbell, Package, Plus, Users } from "lucide-react";
-import { toast } from "sonner";
 import {
   getOwnerDashboard,
   type OwnerDashboard,
@@ -14,6 +13,7 @@ import DashboardStatCard from "./components/DashboardStatCard";
 import DashboardSessionsSection from "./components/DashboardSessionsSection";
 import DashboardClientRow from "./components/DashboardClientRow";
 import DashboardRevenueCard from "./components/DashboardRevenueCard";
+import { showOwnerError } from "./components/owner-toast";
 
 export default function DashboardPage() {
   const [dashboard, setDashboard] = useState<OwnerDashboard | null>(null);
@@ -25,10 +25,9 @@ export default function DashboardPage() {
         const data = await getOwnerDashboard();
         setDashboard(data);
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Błąd ładowania danych",
-          { id: "owner-dashboard-load-error" },
-        );
+        showOwnerError(err, "Błąd ładowania danych", {
+          id: "owner-dashboard-load-error",
+        });
       } finally {
         setIsLoading(false);
       }
@@ -48,7 +47,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-label text-primary-light">Overview</p>
+              <p className="text-label text-primary-light">Przegląd</p>
               <h1 className="mt-2 text-[2.25rem] leading-[0.95] font-semibold font-display tracking-tight">
                 Status <span className="text-primary-light">Operacyjny</span>
               </h1>

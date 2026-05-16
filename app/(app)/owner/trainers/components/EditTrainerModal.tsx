@@ -2,8 +2,15 @@
 
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, MapPin, X } from "lucide-react";
-import { toast } from "sonner";
 import AvatarFilePicker from "../../components/AvatarFilePicker";
+import {
+  OwnerTextArea,
+  OwnerTextField,
+} from "../../components/OwnerFormControls";
+import {
+  showOwnerError,
+  showOwnerSuccess,
+} from "../../components/owner-toast";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
 import {
@@ -125,17 +132,14 @@ export default function EditTrainerModal({
       ]);
 
       onSaved(updatedTrainer, updatedRates);
-      toast.success("Dane trenera zostały zaktualizowane.", {
+      showOwnerSuccess("Dane trenera zostały zaktualizowane.", {
         id: "owner-trainer-edit-success",
       });
       onClose();
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Nie udało się zaktualizować trenera.",
-        { id: "owner-trainer-edit-error" },
-      );
+      showOwnerError(err, "Nie udało się zaktualizować trenera.", {
+        id: "owner-trainer-edit-error",
+      });
     } finally {
       setIsSaving(false);
     }
@@ -173,9 +177,17 @@ export default function EditTrainerModal({
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Field label="Imię" value={firstName} onChange={setFirstName} />
-          <Field label="Nazwisko" value={lastName} onChange={setLastName} />
-          <Field label="Telefon" value={phone} onChange={setPhone} />
+          <OwnerTextField
+            label="Imię"
+            value={firstName}
+            onChange={setFirstName}
+          />
+          <OwnerTextField
+            label="Nazwisko"
+            value={lastName}
+            onChange={setLastName}
+          />
+          <OwnerTextField label="Telefon" value={phone} onChange={setPhone} />
           <div>
             <span className="text-label text-on-surface-muted">Status</span>
             <CustomSelect
@@ -185,13 +197,13 @@ export default function EditTrainerModal({
               options={statusOptions}
             />
           </div>
-          <Field
+          <OwnerTextField
             label="Doświadczenie"
             value={experienceYears}
             onChange={setExperienceYears}
             type="number"
           />
-          <Field
+          <OwnerTextField
             label="Stawka godzinowa"
             value={hourlyRate}
             onChange={setHourlyRate}
@@ -212,7 +224,7 @@ export default function EditTrainerModal({
             onChange={setLocationIds}
             className="md:col-span-2"
           />
-          <TextArea
+          <OwnerTextArea
             label="Opis"
             value={bio}
             onChange={setBio}
@@ -370,57 +382,4 @@ function LocationMultiSelect({
 
 function formatLocationLabel(location: Location) {
   return location.name || location.city || `Lokalizacja ${location.id}`;
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  placeholder,
-  className,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  placeholder?: string;
-  className?: string;
-}) {
-  return (
-    <label className={className}>
-      <span className="text-label text-on-surface-muted">{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="mt-2 h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
-      />
-    </label>
-  );
-}
-
-function TextArea({
-  label,
-  value,
-  onChange,
-  className,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  className?: string;
-}) {
-  return (
-    <label className={className}>
-      <span className="text-label text-on-surface-muted">{label}</span>
-      <textarea
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        rows={4}
-        className="mt-2 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
-      />
-    </label>
-  );
 }

@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
 import { updateClient, type Client } from "@/app/lib/owner/clients";
+import {
+  showOwnerError,
+  showOwnerSuccess,
+} from "../../../components/owner-toast";
 
 export default function ClientNotesPanel({
   client,
@@ -24,11 +27,13 @@ export default function ClientNotesPanel({
       setIsSaving(true);
       const updatedClient = await updateClient(client.id, { notes });
       onClientChange(updatedClient);
-      toast.success("Notatki klienta zostały zapisane.");
+      showOwnerSuccess("Notatki klienta zostały zapisane.", {
+        id: "owner-client-notes-success",
+      });
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Nie udało się zapisać notatek.",
-      );
+      showOwnerError(err, "Nie udało się zapisać notatek.", {
+        id: "owner-client-notes-error",
+      });
     } finally {
       setIsSaving(false);
     }

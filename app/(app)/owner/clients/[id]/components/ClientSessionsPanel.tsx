@@ -1,6 +1,7 @@
 import { CalendarDays, Dumbbell } from "lucide-react";
 import type { OwnerSession } from "@/app/lib/owner/sessions";
 import { formatDateTime } from "@/app/lib/formatters/date";
+import { getOwnerSessionPackageName } from "../../../components/session-display";
 
 function getStatusStyles(status?: string | null) {
   const normalized = status?.toLowerCase() || "";
@@ -56,6 +57,9 @@ export default function ClientSessionsPanel({
                     </p>
                     <p className="mt-2 text-label text-on-surface-muted">
                       {session.trainerFullName || "Brak trenera"}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-tertiary-light">
+                      {getOwnerSessionPackageName(session)}
                     </p>
                   </div>
                 </div>

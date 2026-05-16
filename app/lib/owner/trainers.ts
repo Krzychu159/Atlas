@@ -1,4 +1,4 @@
-import { backendFetch } from "../backend";
+import { backendGet, backendPatch, backendPost } from "../backend";
 
 export type Trainer = {
   id: number;
@@ -53,23 +53,17 @@ export type UpdateTrainerPayload = {
 };
 
 export function getTrainers() {
-  return backendFetch<Trainer[]>("Trainers");
+  return backendGet<Trainer[]>("Trainers");
 }
 
 export function getTrainer(id: number) {
-  return backendFetch<Trainer>(`Trainers/${id}`);
+  return backendGet<Trainer>(`Trainers/${id}`);
 }
 
 export function createTrainer(payload: CreateTrainerPayload) {
-  return backendFetch<Trainer>("Trainers", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return backendPost<Trainer>("Trainers", payload);
 }
 
 export function updateTrainer(id: number, payload: UpdateTrainerPayload) {
-  return backendFetch<Trainer>(`Trainers/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  });
+  return backendPatch<Trainer>(`Trainers/${id}`, payload);
 }

@@ -1,4 +1,4 @@
-import { backendFetch } from "../backend";
+import { backendGet, backendPost, backendPut } from "../backend";
 
 export type OwnerSessionParticipant = {
   id: number;
@@ -76,45 +76,31 @@ export type SessionPayload = {
   participants?: SessionParticipantPayload[] | null;
 };
 
-function buildSessionFilterQuery(params: SessionFilterParams = {}) {
-  const searchParams = new URLSearchParams();
-
-  if (params.trainerId) searchParams.set("TrainerId", String(params.trainerId));
-  if (params.clientId) searchParams.set("ClientId", String(params.clientId));
-  if (params.locationId) searchParams.set("LocationId", String(params.locationId));
-  if (params.status) searchParams.set("Status", params.status);
-  if (params.from) searchParams.set("From", params.from);
-  if (params.to) searchParams.set("To", params.to);
-
-  const query = searchParams.toString();
-
-  return query ? `?${query}` : "";
-}
-
 export function getOwnerSessions(params?: SessionFilterParams) {
-  return backendFetch<OwnerSession[]>(
-    `sessions/filter${buildSessionFilterQuery(params)}`,
-  );
+  return backendGet<OwnerSession[]>("sessions/filter", {
+    TrainerId: params?.trainerId,
+    ClientId: params?.clientId,
+    LocationId: params?.locationId,
+    Status: params?.status,
+    From: params?.from,
+    To: params?.to,
+  });
 }
 
 export function createSession(payload: SessionPayload) {
-  return backendFetch<OwnerSession>("sessions", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return backendPost<OwnerSession>("sessions", payload);
 }
 
 export function updateSession(id: number, payload: SessionPayload) {
-  return backendFetch<OwnerSession>(`sessions/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
+  return backendPut<OwnerSession>(`sessions/${id}`, payload);
 }
 
 export function getClientSessions(clientId: number) {
-  return backendFetch<OwnerSession[]>(`Sessions/filter?ClientId=${clientId}`);
+  return backendGet<OwnerSession[]>("Sessions/filter", { ClientId: clientId });
 }
 
 export function getTrainerSessions(trainerId: number) {
-  return backendFetch<OwnerSession[]>(`Sessions/filter?TrainerId=${trainerId}`);
+  return backendGet<OwnerSession[]>("Sessions/filter", {
+    TrainerId: trainerId,
+  });
 }

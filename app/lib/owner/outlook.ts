@@ -1,4 +1,4 @@
-import { backendFetch } from "../backend";
+import { backendGet, backendPost } from "../backend";
 
 export type OutlookStatus = {
   isConnected: boolean;
@@ -12,15 +12,13 @@ export type OutlookConnectUrl = {
 };
 
 export function getOutlookStatus() {
-  return backendFetch<OutlookStatus>("outlook/status");
+  return backendGet<OutlookStatus>("outlook/status");
 }
 
 export function getOutlookConnectUrl() {
-  return backendFetch<OutlookConnectUrl>("outlook/connect-url");
+  return backendGet<OutlookConnectUrl>("outlook/connect-url");
 }
 
 export function disconnectOutlook() {
-  return backendFetch<unknown>("outlook/disconnect", {
-    method: "POST",
-  });
+  return backendPost<unknown>("outlook/disconnect");
 }
