@@ -96,6 +96,32 @@ export default function OwnerClientDetailsPage() {
     loadClientDetails();
   }, [params.id]);
 
+  async function handleOpenTrainingPlan() {
+    if (!client) return;
+
+    let plan = trainingPlan;
+    let url = getTrainingPlanUrl(plan);
+
+    if (!url) {
+      try {
+        plan = await getClientTrainingPlan(client.id);
+        setTrainingPlan(plan);
+        url = getTrainingPlanUrl(plan);
+      } catch {
+        url = "";
+      }
+    }
+
+    if (!url) {
+      showOwnerInfo("Nie dodano jeszcze linku do plików klienta.", {
+        id: "owner-client-files-missing",
+      });
+      return;
+    }
+
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
       {isLoading ? (
@@ -109,7 +135,7 @@ export default function OwnerClientDetailsPage() {
           <ClientProfileHero
             client={client}
             onEdit={() => setIsEditOpen(true)}
-            onFiles={() => openTrainingPlan(trainingPlan)}
+            onFiles={handleOpenTrainingPlan}
           />
           <ClientMetricCards
             client={client}
@@ -138,15 +164,6 @@ export default function OwnerClientDetailsPage() {
   );
 }
 
-function openTrainingPlan(plan: ClientTrainingPlan | null) {
-  const url = plan?.url || plan?.googleDriveFolderUrl;
-
-  if (!url) {
-    showOwnerInfo("Nie dodano jeszcze linku do plików klienta.", {
-      id: "owner-client-files-missing",
-    });
-    return;
-  }
-
-  window.open(url, "_blank", "noopener,noreferrer");
+function getTrainingPlanUrl(plan: ClientTrainingPlan | null) {
+  return plan?.url || plan?.googleDriveFolderUrl || "";
 }

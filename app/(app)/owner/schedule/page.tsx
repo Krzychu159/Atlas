@@ -52,6 +52,7 @@ export default function SchedulePage() {
   const [selectedSession, setSelectedSession] = useState<OwnerSession | null>(
     null,
   );
+  const [createSessionDate, setCreateSessionDate] = useState(() => new Date());
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [isStatusLoading, setIsStatusLoading] = useState(true);
   const [isSessionsLoading, setIsSessionsLoading] = useState(false);
@@ -159,8 +160,9 @@ export default function SchedulePage() {
     );
   }
 
-  function openCreateModal() {
+  function openCreateModal(date = anchorDate) {
     setSelectedSession(null);
+    setCreateSessionDate(date);
     setIsSessionModalOpen(true);
   }
 
@@ -240,7 +242,7 @@ export default function SchedulePage() {
                 </Button>
                 <Button
                   icon={<Plus size={16} />}
-                  onClick={openCreateModal}
+                  onClick={() => openCreateModal()}
                   disabled={isResourcesLoading}
                 >
                   Dodaj sesję
@@ -273,6 +275,7 @@ export default function SchedulePage() {
             sessions={visibleSessions}
             isLoading={isSessionsLoading}
             onSelectSession={openEditModal}
+            onCreateSession={openCreateModal}
           />
         ) : (
           <DaySchedule
@@ -280,6 +283,7 @@ export default function SchedulePage() {
             sessions={visibleSessions}
             isLoading={isSessionsLoading}
             onSelectSession={openEditModal}
+            onCreateSession={openCreateModal}
           />
         )}
       </div>
@@ -289,12 +293,12 @@ export default function SchedulePage() {
           isSessionModalOpen
             ? selectedSession
               ? `session-${selectedSession.id}`
-              : `new-${toDateInputValue(anchorDate)}`
+              : `new-${toDateInputValue(createSessionDate)}`
             : "closed"
         }
         open={isSessionModalOpen}
         session={selectedSession}
-        anchorDate={anchorDate}
+        anchorDate={selectedSession ? anchorDate : createSessionDate}
         trainers={trainers}
         locations={locations}
         clients={clients}

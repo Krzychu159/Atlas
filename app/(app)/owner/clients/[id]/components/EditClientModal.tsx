@@ -52,7 +52,6 @@ export default function EditClientModal({
   const [trainingPlan, setTrainingPlan] = useState<ClientTrainingPlan | null>(
     null,
   );
-  const [trainingPlanFileName, setTrainingPlanFileName] = useState("");
   const [trainingPlanUrl, setTrainingPlanUrl] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -89,12 +88,10 @@ export default function EditClientModal({
     getClientTrainingPlan(client.id)
       .then((plan) => {
         setTrainingPlan(plan);
-        setTrainingPlanFileName(plan.fileName || "");
         setTrainingPlanUrl(plan.url || plan.googleDriveFolderUrl || "");
       })
       .catch(() => {
         setTrainingPlan(null);
-        setTrainingPlanFileName("");
         setTrainingPlanUrl("");
       });
   }, [client, open]);
@@ -130,30 +127,15 @@ export default function EditClientModal({
       nextSessionAt: client.nextSessionAt || null,
     };
     const cleanTrainingPlanUrl = trainingPlanUrl.trim();
-    const cleanTrainingPlanFileName =
-      trainingPlanFileName.trim() || "Plan treningowy";
     const originalTrainingPlanUrl = normalizeText(
       trainingPlan?.url || trainingPlan?.googleDriveFolderUrl,
     );
-    const originalTrainingPlanFileName = normalizeText(trainingPlan?.fileName);
-    const hasTrainingPlanInput = Boolean(
-      cleanTrainingPlanUrl || trainingPlanFileName.trim(),
-    );
     const shouldSaveTrainingPlan =
-      hasTrainingPlanInput &&
-      (cleanTrainingPlanUrl !== originalTrainingPlanUrl ||
-        cleanTrainingPlanFileName !== originalTrainingPlanFileName);
+      cleanTrainingPlanUrl !== originalTrainingPlanUrl;
 
     if (cleanTrainingPlanUrl && !isValidUrl(cleanTrainingPlanUrl)) {
       showOwnerError(new Error("Wklej poprawny link do pliku klienta."), "", {
         id: "owner-client-training-plan-url-invalid",
-      });
-      return;
-    }
-
-    if (trainingPlanFileName.trim() && !cleanTrainingPlanUrl) {
-      showOwnerError(new Error("Dodaj link do pliku klienta."), "", {
-        id: "owner-client-training-plan-url-required",
       });
       return;
     }
@@ -176,14 +158,20 @@ export default function EditClientModal({
           googleDriveFolderId:
             driveMeta.folderId || trainingPlan?.googleDriveFolderId || "",
           fileId: driveMeta.fileId || trainingPlan?.fileId || "",
-          fileName: cleanTrainingPlanUrl ? cleanTrainingPlanFileName : "",
+          fileName: cleanTrainingPlanUrl ? "Folder klienta" : "",
           url: cleanTrainingPlanUrl,
         });
+        const normalizedPlan = {
+          ...savedPlan,
+          fileName: savedPlan.fileName || "Folder klienta",
+          url: savedPlan.url || cleanTrainingPlanUrl,
+        };
 
-        setTrainingPlan(savedPlan);
-        setTrainingPlanFileName(savedPlan.fileName || cleanTrainingPlanFileName);
-        setTrainingPlanUrl(savedPlan.url || savedPlan.googleDriveFolderUrl || "");
-        onTrainingPlanSaved?.(savedPlan);
+        setTrainingPlan(normalizedPlan);
+        setTrainingPlanUrl(
+          normalizedPlan.url || normalizedPlan.googleDriveFolderUrl || "",
+        );
+        onTrainingPlanSaved?.(normalizedPlan);
       }
 
       onSaved(confirmedClient);
@@ -295,36 +283,24 @@ export default function EditClientModal({
             label="Cel"
             value={goal}
             onChange={setGoal}
+            rows={2}
             className="md:col-span-2"
           />
 
-          <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 md:col-span-2">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
+          <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-3 md:col-span-2">
+            <div className="mb-3 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
                 <Link2 size={18} />
               </div>
-              <div>
-                <p className="font-semibold text-on-surface">Pliki</p>
-                <p className="text-sm text-on-surface-variant">
-                  Link otwierany z przycisku na karcie klienta.
-                </p>
-              </div>
+              <p className="font-semibold text-on-surface">Pliki</p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-[0.8fr_1.2fr]">
-              <OwnerTextField
-                label="Nazwa pliku"
-                value={trainingPlanFileName}
-                onChange={setTrainingPlanFileName}
-                placeholder="Plan treningowy"
-              />
-              <OwnerTextField
-                label="Link do pliku"
-                value={trainingPlanUrl}
-                onChange={setTrainingPlanUrl}
-                placeholder="https://drive.google.com/..."
-              />
-            </div>
+            <OwnerTextField
+              label="Link do folderu"
+              value={trainingPlanUrl}
+              onChange={setTrainingPlanUrl}
+              placeholder="https://drive.google.com/drive/folders/..."
+            />
           </div>
         </div>
 

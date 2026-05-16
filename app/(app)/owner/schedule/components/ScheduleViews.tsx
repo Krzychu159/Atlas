@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, UserRound, WalletCards } from "lucide-react";
+import { MapPin, Plus, UserRound } from "lucide-react";
 import type { OwnerSession } from "@/app/lib/owner/sessions";
 import {
   dayNames,
@@ -12,11 +12,10 @@ import {
 } from "../date-utils";
 import {
   getParticipantsLabel,
-  getSessionPackageName,
   getSessionTitle,
   getToneClasses,
 } from "../session-utils";
-import { EmptyDay, LoadingState } from "./ScheduleStates";
+import { LoadingState } from "./ScheduleStates";
 import SessionMetaChip from "./SessionMetaChip";
 
 export function WeekSchedule({
@@ -24,11 +23,13 @@ export function WeekSchedule({
   sessions,
   isLoading,
   onSelectSession,
+  onCreateSession,
 }: {
   days: Date[];
   sessions: OwnerSession[];
   isLoading: boolean;
   onSelectSession: (session: OwnerSession) => void;
+  onCreateSession: (date: Date) => void;
 }) {
   return (
     <section className="card-shell overflow-hidden p-4">
@@ -62,16 +63,25 @@ export function WeekSchedule({
 
                 <div className="mt-3 flex flex-col gap-2">
                   {daySessions.length > 0 ? (
-                    daySessions.map((session) => (
-                      <SessionCard
-                        key={session.id}
-                        session={session}
+                    <>
+                      {daySessions.map((session) => (
+                        <SessionCard
+                          key={session.id}
+                          session={session}
+                          compact
+                          onSelect={onSelectSession}
+                        />
+                      ))}
+                      <AddSessionCard
                         compact
-                        onSelect={onSelectSession}
+                        onClick={() => onCreateSession(day)}
                       />
-                    ))
+                    </>
                   ) : (
-                    <EmptyDay />
+                    <AddSessionCard
+                      compact
+                      onClick={() => onCreateSession(day)}
+                    />
                   )}
                 </div>
               </div>
@@ -88,11 +98,13 @@ export function DaySchedule({
   sessions,
   isLoading,
   onSelectSession,
+  onCreateSession,
 }: {
   date: Date;
   sessions: OwnerSession[];
   isLoading: boolean;
   onSelectSession: (session: OwnerSession) => void;
+  onCreateSession: (date: Date) => void;
 }) {
   const daySessions = sessions.filter((session) =>
     isSameDay(new Date(session.startAt), date),
@@ -116,17 +128,18 @@ export function DaySchedule({
         {isLoading ? (
           <LoadingState />
         ) : daySessions.length > 0 ? (
-          daySessions.map((session) => (
-            <SessionCard
-              key={session.id}
-              session={session}
-              onSelect={onSelectSession}
-            />
-          ))
+          <>
+            {daySessions.map((session) => (
+              <SessionCard
+                key={session.id}
+                session={session}
+                onSelect={onSelectSession}
+              />
+            ))}
+            <AddSessionCard onClick={() => onCreateSession(date)} />
+          </>
         ) : (
-          <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-8 text-center text-on-surface-variant xl:col-span-2">
-            Brak sesji w tym dniu.
-          </div>
+          <AddSessionCard onClick={() => onCreateSession(date)} />
         )}
       </div>
     </section>
@@ -174,7 +187,7 @@ function SessionCard({
       <div
         className={[
           "mt-3 grid gap-2",
-          compact ? "grid-cols-1" : "sm:grid-cols-3",
+          compact ? "grid-cols-1" : "sm:grid-cols-2",
         ].join(" ")}
       >
         <SessionMetaChip
@@ -189,12 +202,6 @@ function SessionCard({
           value={session.locationName || "Brak"}
           tone="neutral"
         />
-        <SessionMetaChip
-          icon={<WalletCards size={14} />}
-          label="Pakiet"
-          value={getSessionPackageName(session)}
-          tone="success"
-        />
       </div>
 
       {!compact && session.clientsDisplayName ? (
@@ -202,6 +209,30 @@ function SessionCard({
           {session.clientsDisplayName}
         </p>
       ) : null}
+    </button>
+  );
+}
+
+function AddSessionCard({
+  compact,
+  onClick,
+}: {
+  compact?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "flex w-full items-center justify-center gap-3 rounded-[var(--radius-lg)] border border-dashed border-primary-light/35 bg-surface-container-lowest/35 text-sm font-semibold text-primary-light transition hover:border-primary-light hover:bg-primary/10",
+        compact ? "min-h-20 px-3 py-4" : "min-h-28 px-4 py-5",
+      ].join(" ")}
+    >
+      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15">
+        <Plus size={18} />
+      </span>
+      Dodaj sesję
     </button>
   );
 }
