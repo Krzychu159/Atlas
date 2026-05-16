@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
-import { MapPin, X } from "lucide-react";
+import { Link2, MapPin, X } from "lucide-react";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import AvatarFilePicker from "../../../components/AvatarFilePicker";
 import {
@@ -14,8 +14,11 @@ import {
 } from "../../../components/owner-toast";
 import {
   getClient,
+  getClientTrainingPlan,
   updateClient,
+  updateClientTrainingPlan,
   type Client,
+  type ClientTrainingPlan,
   type UpdateClientPayload,
 } from "@/app/lib/owner/clients";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
@@ -26,6 +29,7 @@ type EditClientModalProps = {
   client: Client | null;
   onClose: () => void;
   onSaved: (client: Client) => void;
+  onTrainingPlanSaved?: (plan: ClientTrainingPlan) => void;
 };
 
 export default function EditClientModal({
@@ -33,6 +37,7 @@ export default function EditClientModal({
   client,
   onClose,
   onSaved,
+  onTrainingPlanSaved,
 }: EditClientModalProps) {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -44,6 +49,11 @@ export default function EditClientModal({
   const [trainerId, setTrainerId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [goal, setGoal] = useState("");
+  const [trainingPlan, setTrainingPlan] = useState<ClientTrainingPlan | null>(
+    null,
+  );
+  const [trainingPlanFileName, setTrainingPlanFileName] = useState("");
+  const [trainingPlanUrl, setTrainingPlanUrl] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -72,6 +82,22 @@ export default function EditClientModal({
     setLocationId(resolveClientLocationId(client, locations));
     setGoal(client.goal || "");
   }, [client, locations, open]);
+
+  useEffect(() => {
+    if (!client || !open) return;
+
+    getClientTrainingPlan(client.id)
+      .then((plan) => {
+        setTrainingPlan(plan);
+        setTrainingPlanFileName(plan.fileName || "");
+        setTrainingPlanUrl(plan.url || plan.googleDriveFolderUrl || "");
+      })
+      .catch(() => {
+        setTrainingPlan(null);
+        setTrainingPlanFileName("");
+        setTrainingPlanUrl("");
+      });
+  }, [client, open]);
 
   if (!open || !client) return null;
 
@@ -103,6 +129,34 @@ export default function EditClientModal({
       status: client.status || null,
       nextSessionAt: client.nextSessionAt || null,
     };
+    const cleanTrainingPlanUrl = trainingPlanUrl.trim();
+    const cleanTrainingPlanFileName =
+      trainingPlanFileName.trim() || "Plan treningowy";
+    const originalTrainingPlanUrl = normalizeText(
+      trainingPlan?.url || trainingPlan?.googleDriveFolderUrl,
+    );
+    const originalTrainingPlanFileName = normalizeText(trainingPlan?.fileName);
+    const hasTrainingPlanInput = Boolean(
+      cleanTrainingPlanUrl || trainingPlanFileName.trim(),
+    );
+    const shouldSaveTrainingPlan =
+      hasTrainingPlanInput &&
+      (cleanTrainingPlanUrl !== originalTrainingPlanUrl ||
+        cleanTrainingPlanFileName !== originalTrainingPlanFileName);
+
+    if (cleanTrainingPlanUrl && !isValidUrl(cleanTrainingPlanUrl)) {
+      showOwnerError(new Error("Wklej poprawny link do pliku klienta."), "", {
+        id: "owner-client-training-plan-url-invalid",
+      });
+      return;
+    }
+
+    if (trainingPlanFileName.trim() && !cleanTrainingPlanUrl) {
+      showOwnerError(new Error("Dodaj link do pliku klienta."), "", {
+        id: "owner-client-training-plan-url-required",
+      });
+      return;
+    }
 
     try {
       setIsSaving(true);
@@ -114,6 +168,22 @@ export default function EditClientModal({
         throw new Error(
           `Backend zwrócił sukces, ale nie zapisał pól: ${failedFields.join(", ")}.`,
         );
+      }
+
+      if (shouldSaveTrainingPlan) {
+        const driveMeta = parseGoogleDriveLink(cleanTrainingPlanUrl);
+        const savedPlan = await updateClientTrainingPlan(client.id, {
+          googleDriveFolderId:
+            driveMeta.folderId || trainingPlan?.googleDriveFolderId || "",
+          fileId: driveMeta.fileId || trainingPlan?.fileId || "",
+          fileName: cleanTrainingPlanUrl ? cleanTrainingPlanFileName : "",
+          url: cleanTrainingPlanUrl,
+        });
+
+        setTrainingPlan(savedPlan);
+        setTrainingPlanFileName(savedPlan.fileName || cleanTrainingPlanFileName);
+        setTrainingPlanUrl(savedPlan.url || savedPlan.googleDriveFolderUrl || "");
+        onTrainingPlanSaved?.(savedPlan);
       }
 
       onSaved(confirmedClient);
@@ -227,6 +297,35 @@ export default function EditClientModal({
             onChange={setGoal}
             className="md:col-span-2"
           />
+
+          <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 md:col-span-2">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
+                <Link2 size={18} />
+              </div>
+              <div>
+                <p className="font-semibold text-on-surface">Pliki</p>
+                <p className="text-sm text-on-surface-variant">
+                  Link otwierany z przycisku na karcie klienta.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-[0.8fr_1.2fr]">
+              <OwnerTextField
+                label="Nazwa pliku"
+                value={trainingPlanFileName}
+                onChange={setTrainingPlanFileName}
+                placeholder="Plan treningowy"
+              />
+              <OwnerTextField
+                label="Link do pliku"
+                value={trainingPlanUrl}
+                onChange={setTrainingPlanUrl}
+                placeholder="https://drive.google.com/..."
+              />
+            </div>
+          </div>
         </div>
 
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -281,6 +380,40 @@ function isSameOptionalText(
   expected?: string | null,
 ) {
   return normalizeText(actual) === normalizeText(expected);
+}
+
+function parseGoogleDriveLink(value: string) {
+  const parsedUrl = parseUrl(value);
+
+  if (!parsedUrl) {
+    return { fileId: "", folderId: "" };
+  }
+
+  const folderMatch = parsedUrl.pathname.match(/\/folders\/([^/?]+)/);
+  const fileMatch =
+    parsedUrl.pathname.match(/\/d\/([^/?]+)/) ||
+    parsedUrl.pathname.match(/\/file\/d\/([^/?]+)/);
+
+  return {
+    fileId: parsedUrl.searchParams.get("id") || fileMatch?.[1] || "",
+    folderId: folderMatch?.[1] || "",
+  };
+}
+
+function parseUrl(value: string) {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
+function isValidUrl(value: string) {
+  const parsedUrl = parseUrl(value);
+
+  return Boolean(
+    parsedUrl?.protocol === "http:" || parsedUrl?.protocol === "https:",
+  );
 }
 
 function getClientUpdateFailedFields(

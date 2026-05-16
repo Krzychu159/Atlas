@@ -1,4 +1,4 @@
-import { backendGet, backendPatch, backendPost } from "../backend";
+import { backendGet, backendPatch, backendPost, backendPut } from "../backend";
 
 export type ClientStatus = "active" | "suspended" | "new" | string;
 
@@ -112,6 +112,22 @@ export type SubscriptionUsage = {
   sessions: SubscriptionUsageSession[] | null;
 };
 
+export type ClientTrainingPlan = {
+  clientId: number;
+  googleDriveFolderId: string | null;
+  googleDriveFolderUrl: string | null;
+  fileId: string | null;
+  fileName: string | null;
+  url: string | null;
+};
+
+export type UpdateClientTrainingPlanPayload = {
+  googleDriveFolderId: string;
+  fileId: string;
+  fileName: string;
+  url: string;
+};
+
 export type CreateClientPayload = {
   trainerId: number;
   activePackageId: number;
@@ -168,10 +184,21 @@ export function getClientSubscriptionUsage(id: number) {
   );
 }
 
+export function getClientTrainingPlan(id: number) {
+  return backendGet<ClientTrainingPlan>(`clients/${id}/training-plan`);
+}
+
 export function createClient(payload: CreateClientPayload) {
   return backendPost<Client>("Clients", payload);
 }
 
 export function updateClient(id: number, payload: UpdateClientPayload) {
   return backendPatch<Client>(`Clients/${id}`, payload);
+}
+
+export function updateClientTrainingPlan(
+  id: number,
+  payload: UpdateClientTrainingPlanPayload,
+) {
+  return backendPut<ClientTrainingPlan>(`clients/${id}/training-plan`, payload);
 }

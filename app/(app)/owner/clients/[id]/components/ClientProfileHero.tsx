@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   CalendarDays,
+  Files,
   Mail,
   Pencil,
   Phone,
@@ -41,9 +42,11 @@ function getMilestoneProgress(months: number) {
 export default function ClientProfileHero({
   client,
   onEdit,
+  onFiles,
 }: {
   client: Client;
   onEdit: () => void;
+  onFiles: () => void;
 }) {
   const fullName = getClientName(client);
   const membershipMonths = getClientAgeInMonths(client.createdAt);
@@ -119,14 +122,24 @@ export default function ClientProfileHero({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onEdit}
-          className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primary px-5 text-sm font-semibold text-on-primary shadow-soft transition hover:bg-primary-container"
-        >
-          <Pencil size={16} />
-          Edytuj dane
-        </button>
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primary px-5 text-sm font-semibold text-on-primary shadow-soft transition hover:bg-primary-container"
+          >
+            <Pencil size={16} />
+            Edytuj dane
+          </button>
+          <button
+            type="button"
+            onClick={onFiles}
+            className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-primary-light transition hover:bg-surface-container-high"
+          >
+            <Files size={16} />
+            Pliki
+          </button>
+        </div>
       </div>
     </section>
   );

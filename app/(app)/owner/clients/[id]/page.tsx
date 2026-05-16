@@ -6,8 +6,10 @@ import {
   getClient,
   getClientSubscription,
   getClientSubscriptionUsage,
+  getClientTrainingPlan,
   type Client,
   type ClientSubscription,
+  type ClientTrainingPlan,
   type SubscriptionUsage,
 } from "@/app/lib/owner/clients";
 import { getClientSessions, type OwnerSession } from "@/app/lib/owner/sessions";
@@ -16,7 +18,7 @@ import ClientNotesPanel from "./components/ClientNotesPanel";
 import ClientProfileHero from "./components/ClientProfileHero";
 import ClientSessionsPanel from "./components/ClientSessionsPanel";
 import EditClientModal from "./components/EditClientModal";
-import { showOwnerError } from "../../components/owner-toast";
+import { showOwnerError, showOwnerInfo } from "../../components/owner-toast";
 
 export default function OwnerClientDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -25,6 +27,9 @@ export default function OwnerClientDetailsPage() {
     null,
   );
   const [usage, setUsage] = useState<SubscriptionUsage | null>(null);
+  const [trainingPlan, setTrainingPlan] = useState<ClientTrainingPlan | null>(
+    null,
+  );
   const [sessions, setSessions] = useState<OwnerSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -44,13 +49,19 @@ export default function OwnerClientDetailsPage() {
       try {
         setIsLoading(true);
 
-        const [clientResult, subscriptionResult, usageResult, sessionsResult] =
-          await Promise.allSettled([
-            getClient(clientId),
-            getClientSubscription(clientId),
-            getClientSubscriptionUsage(clientId),
-            getClientSessions(clientId),
-          ]);
+        const [
+          clientResult,
+          subscriptionResult,
+          usageResult,
+          sessionsResult,
+          trainingPlanResult,
+        ] = await Promise.allSettled([
+          getClient(clientId),
+          getClientSubscription(clientId),
+          getClientSubscriptionUsage(clientId),
+          getClientSessions(clientId),
+          getClientTrainingPlan(clientId),
+        ]);
 
         if (clientResult.status !== "fulfilled") {
           throw clientResult.reason;
@@ -68,6 +79,10 @@ export default function OwnerClientDetailsPage() {
 
         if (sessionsResult.status === "fulfilled") {
           setSessions(sessionsResult.value);
+        }
+
+        if (trainingPlanResult.status === "fulfilled") {
+          setTrainingPlan(trainingPlanResult.value);
         }
       } catch (err) {
         showOwnerError(err, "Nie udało się pobrać klienta.", {
@@ -94,6 +109,7 @@ export default function OwnerClientDetailsPage() {
           <ClientProfileHero
             client={client}
             onEdit={() => setIsEditOpen(true)}
+            onFiles={() => openTrainingPlan(trainingPlan)}
           />
           <ClientMetricCards
             client={client}
@@ -114,9 +130,23 @@ export default function OwnerClientDetailsPage() {
             client={client}
             onClose={() => setIsEditOpen(false)}
             onSaved={setClient}
+            onTrainingPlanSaved={setTrainingPlan}
           />
         </>
       ) : null}
     </div>
   );
+}
+
+function openTrainingPlan(plan: ClientTrainingPlan | null) {
+  const url = plan?.url || plan?.googleDriveFolderUrl;
+
+  if (!url) {
+    showOwnerInfo("Nie dodano jeszcze linku do plików klienta.", {
+      id: "owner-client-files-missing",
+    });
+    return;
+  }
+
+  window.open(url, "_blank", "noopener,noreferrer");
 }

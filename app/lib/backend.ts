@@ -155,13 +155,17 @@ async function readResponsePayload(response: Response) {
 
   const contentType = response.headers.get("content-type") || "";
 
-  if (!contentType.includes("application/json")) {
+  if (!contentType.includes("application/json") && !looksLikeJson(text)) {
     return text;
   }
 
   try {
     return JSON.parse(text);
   } catch {
+    if (!contentType.includes("application/json")) {
+      return text;
+    }
+
     throw new ApiError(
       `Backend zwrócił niepoprawną odpowiedź JSON. Status: ${response.status}.`,
       {
@@ -170,6 +174,15 @@ async function readResponsePayload(response: Response) {
       },
     );
   }
+}
+
+function looksLikeJson(text: string) {
+  const trimmed = text.trim();
+
+  return (
+    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+    (trimmed.startsWith("[") && trimmed.endsWith("]"))
+  );
 }
 
 function handleUnauthorizedSession() {
