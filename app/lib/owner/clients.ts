@@ -178,6 +178,20 @@ export function getClientSubscription(id: number) {
   return backendGet<ClientSubscription>(`Clients/${id}/subscription`);
 }
 
+export function setClientNextPackage(id: number, packageId: number) {
+  return backendPut<ClientSubscription>(`Clients/${id}/subscription/next-package`, {
+    packageId,
+  });
+}
+
+export function cancelClientSubscription(id: number) {
+  return backendPost<ClientSubscription>(`Clients/${id}/subscription/cancel`);
+}
+
+export function resumeClientSubscription(id: number) {
+  return backendPost<ClientSubscription>(`Clients/${id}/subscription/resume`);
+}
+
 export function getClientSubscriptionUsage(id: number) {
   return backendGet<SubscriptionUsage>(
     `Clients/${id}/subscription/current-cycle/usage`,

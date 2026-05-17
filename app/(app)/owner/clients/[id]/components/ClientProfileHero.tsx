@@ -6,6 +6,7 @@ import {
   Mail,
   Pencil,
   Phone,
+  ReceiptText,
   ShieldCheck,
 } from "lucide-react";
 import type { Client } from "@/app/lib/owner/clients";
@@ -139,6 +140,13 @@ export default function ClientProfileHero({
             <Files size={16} />
             Pliki
           </button>
+          <Link
+            href={`/owner/clients/${client.id}/payments`}
+            className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-primary-light transition hover:bg-surface-container-high"
+          >
+            <ReceiptText size={16} />
+            Płatności
+          </Link>
         </div>
       </div>
     </section>

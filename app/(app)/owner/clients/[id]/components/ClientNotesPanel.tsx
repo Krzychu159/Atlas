@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { updateClient, type Client } from "@/app/lib/owner/clients";
 import {
@@ -15,22 +15,43 @@ export default function ClientNotesPanel({
   client: Client;
   onClientChange: (client: Client) => void;
 }) {
-  const [notes, setNotes] = useState(client.notes || "");
+  const [draft, setDraft] = useState({
+    clientId: client.id,
+    notes: client.notes || "",
+  });
   const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    setNotes(client.notes || "");
-  }, [client.notes]);
+  const notes = draft.clientId === client.id ? draft.notes : client.notes || "";
 
   async function handleSaveNotes() {
+    console.log("handleSaveNotes start", {
+      clientId: client.id,
+      notes,
+    });
+
     try {
       setIsSaving(true);
-      const updatedClient = await updateClient(client.id, { notes });
+      const updatedClient = await updateClient(client.id, {
+        trainerId: client.trainerId ?? 0,
+        firstName: client.firstName,
+        lastName: client.lastName,
+        email: client.email,
+        phoneNumber: client.phoneNumber || "",
+        avatarUrl: client.avatarUrl || "",
+        goal: client.goal || "",
+        notes,
+        progressPercent: client.progressPercent ?? 0,
+        billingStatus: client.billingStatus || "",
+        status: client.status || "active",
+        nextSessionAt: client.nextSessionAt || null,
+        locationId: client.locationId ?? 0,
+      });
       onClientChange(updatedClient);
       showOwnerSuccess("Notatki klienta zostały zapisane.", {
         id: "owner-client-notes-success",
       });
+      console.log("Updated client:", updatedClient);
     } catch (err) {
+      console.error("handleSaveNotes error", err);
       showOwnerError(err, "Nie udało się zapisać notatek.", {
         id: "owner-client-notes-error",
       });
@@ -55,7 +76,9 @@ export default function ClientNotesPanel({
 
       <textarea
         value={notes}
-        onChange={(event) => setNotes(event.target.value)}
+        onChange={(event) =>
+          setDraft({ clientId: client.id, notes: event.target.value })
+        }
         rows={6}
         placeholder="Dodaj notatkę o kliencie..."
         className="mt-5 w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 text-sm leading-7 text-on-surface-variant outline-none placeholder:text-on-surface-muted"

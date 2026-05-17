@@ -6,6 +6,7 @@ import {
   Settings,
   Wallet,
   ReceiptText,
+  CreditCard,
 } from "lucide-react";
 
 export type AppRole = "owner" | "trainer" | "client";
@@ -23,6 +24,7 @@ export const navigationByRole: Record<AppRole, NavItem[]> = {
     { label: "Klienci", href: "/owner/clients", icon: Users },
     { label: "Grafik", href: "/owner/schedule", icon: CalendarDays },
     { label: "Pakiety", href: "/owner/packages", icon: Wallet },
+    { label: "Płatności", href: "/owner/payments", icon: CreditCard },
     { label: "Rozliczenia", href: "/owner/settlements", icon: ReceiptText },
     { label: "Ustawienia", href: "/owner/settings", icon: Settings },
   ],
