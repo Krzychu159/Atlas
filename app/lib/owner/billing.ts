@@ -4,6 +4,13 @@ export type PaymentMethod = 1 | 2 | 3 | 4;
 export type ClientPaymentStatus = 1 | 2 | 3 | 4;
 export type ClientPaymentSource = 1 | 2 | 3;
 
+export const paymentMethodOptions = [
+  { value: "1", label: "Blik" },
+  { value: "2", label: "Przelew" },
+  { value: "3", label: "Gotówka" },
+  { value: "4", label: "Bramka płatności" },
+];
+
 export type ClientPayment = {
   id: number;
   clientId: number;
@@ -118,4 +125,38 @@ export function activateClientPackage(clientId: number, clientPackageId: number)
   return backendPost<void>(
     `client-packages/clients/${clientId}/packages/${clientPackageId}/activate`,
   );
+}
+
+export function isPendingPayment(payment: ClientPayment) {
+  return payment.status === 1 && !payment.confirmedAt && !payment.rejectedAt;
+}
+
+export function isConfirmedPayment(payment: ClientPayment) {
+  return payment.status === 2 || Boolean(payment.confirmedAt);
+}
+
+export function isRejectedPayment(payment: ClientPayment) {
+  return payment.status === 3 || Boolean(payment.rejectedAt);
+}
+
+export function getPaymentMethodLabel(method?: number | null) {
+  const labels: Record<number, string> = {
+    1: "Blik",
+    2: "Przelew",
+    3: "Gotówka",
+    4: "Bramka płatności",
+  };
+
+  return method ? labels[method] || `Metoda ${method}` : "Brak metody";
+}
+
+export function getPaymentStatusLabel(status?: number | null) {
+  const labels: Record<number, string> = {
+    1: "Oczekuje",
+    2: "Opłacone",
+    3: "Odrzucone",
+    4: "Anulowane",
+  };
+
+  return status ? labels[status] || `Status ${status}` : "Brak statusu";
 }

@@ -4,16 +4,22 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
+  Clock3,
   ExternalLink,
-  FileCheck2,
   ReceiptText,
   RefreshCw,
-  WalletCards,
+  UsersRound,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import { OwnerTextArea } from "../components/OwnerFormControls";
 import {
   confirmClientPayment,
+  getPaymentMethodLabel,
+  getPaymentStatusLabel,
   getPendingPayments,
+  isPendingPayment,
+  rejectClientPayment,
   type ClientPayment,
 } from "@/app/lib/owner/billing";
 import {
@@ -21,17 +27,16 @@ import {
   showOwnerSuccess,
 } from "../components/owner-toast";
 
-const fiscalStorageKey = "atlas-owner-fiscal-printed-payments";
-
 export default function OwnerPaymentsPage() {
   const [payments, setPayments] = useState<ClientPayment[]>([]);
-  const [printedIds, setPrintedIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
+  const [paymentToReject, setPaymentToReject] =
+    useState<ClientPayment | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setPrintedIds(readPrintedIds());
       void loadPayments();
     }, 0);
 
@@ -62,15 +67,15 @@ export default function OwnerPaymentsPage() {
 
     try {
       setProcessingId(payment.id);
-      const confirmed = await confirmClientPayment(payment.id);
+      await confirmClientPayment(payment.id);
       setPayments((current) =>
-        current.map((item) => (item.id === payment.id ? confirmed : item)),
+        current.filter((item) => item.id !== payment.id),
       );
-      showOwnerSuccess("Wpłata została oznaczona jako opłacona.", {
+      showOwnerSuccess("Wpłata została potwierdzona.", {
         id: `owner-payment-confirmed-${payment.id}`,
       });
     } catch (err) {
-      showOwnerError(err, "Nie udało się oznaczyć wpłaty jako opłaconej.", {
+      showOwnerError(err, "Nie udało się potwierdzić wpłaty.", {
         id: `owner-payment-confirm-error-${payment.id}`,
       });
     } finally {
@@ -78,18 +83,39 @@ export default function OwnerPaymentsPage() {
     }
   }
 
-  function handleToggleFiscal(paymentId: number) {
-    setPrintedIds((current) => {
-      const next = current.includes(paymentId)
-        ? current.filter((id) => id !== paymentId)
-        : [...current, paymentId];
+  async function handleRejectPayment() {
+    if (!paymentToReject) return;
 
-      writePrintedIds(next);
-      return next;
-    });
+    const reason = rejectReason.trim();
+
+    if (!reason) {
+      showOwnerError(new Error("Podaj powód odrzucenia wpłaty."), "", {
+        id: "owner-payment-reject-reason-required",
+      });
+      return;
+    }
+
+    try {
+      setProcessingId(paymentToReject.id);
+      await rejectClientPayment(paymentToReject.id, reason);
+      setPayments((current) =>
+        current.filter((item) => item.id !== paymentToReject.id),
+      );
+      setPaymentToReject(null);
+      setRejectReason("");
+      showOwnerSuccess("Wpłata została odrzucona.", {
+        id: `owner-payment-rejected-${paymentToReject.id}`,
+      });
+    } catch (err) {
+      showOwnerError(err, "Nie udało się odrzucić wpłaty.", {
+        id: `owner-payment-reject-error-${paymentToReject.id}`,
+      });
+    } finally {
+      setProcessingId(null);
+    }
   }
 
-  const summary = useMemo(() => getPaymentsSummary(payments), [payments]);
+  const summary = useMemo(() => getPendingPaymentsSummary(payments), [payments]);
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
@@ -99,9 +125,10 @@ export default function OwnerPaymentsPage() {
           <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
             Płatności
           </h1>
-          <p className="mt-3 max-w-[680px] text-sm leading-6 text-on-surface-variant">
-            Wpłaty klientów oczekujące na potwierdzenie oraz kontrola
-            wystawienia paragonu.
+          <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
+            Kolejka wpłat zgłoszonych przez klientów. Wpłaty dodane ręcznie
+            przez staff są potwierdzane przez backend od razu i trafiają do
+            historii konkretnego klienta.
           </p>
         </div>
 
@@ -122,28 +149,29 @@ export default function OwnerPaymentsPage() {
 
       <section className="grid gap-3 md:grid-cols-3">
         <PaymentStat
-          label="Oczekujące"
+          label="Do potwierdzenia"
           value={String(summary.count)}
-          icon={<WalletCards size={18} />}
+          icon={<Clock3 size={18} />}
         />
         <PaymentStat
-          label="Do potwierdzenia"
+          label="Kwota zgłoszeń"
           value={formatMoney(summary.amount, summary.currency)}
           icon={<ReceiptText size={18} />}
         />
         <PaymentStat
-          label="Paragony"
-          value={`${printedIds.length}/${payments.length}`}
-          icon={<FileCheck2 size={18} />}
+          label="Klienci"
+          value={String(summary.clientsCount)}
+          icon={<UsersRound size={18} />}
         />
       </section>
 
       <section className="card-shell p-4 md:p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <p className="text-section-title">Lista wpłat</p>
+            <p className="text-section-title">Zgłoszenia klientów</p>
             <p className="mt-2 text-sm text-on-surface-variant">
-              Backend udostępnia aktualnie listę wpłat oczekujących.
+              Potwierdzenie księguje zgłoszoną wpłatę. Odrzucenie wymaga
+              krótkiego powodu, który zostaje wysłany do backendu.
             </p>
           </div>
           <p className="text-label text-on-surface-muted">
@@ -158,13 +186,15 @@ export default function OwnerPaymentsPage() {
         ) : payments.length > 0 ? (
           <div className="flex flex-col gap-3">
             {payments.map((payment) => (
-              <PaymentRow
+              <PendingPaymentRow
                 key={payment.id}
                 payment={payment}
-                fiscalPrinted={printedIds.includes(payment.id)}
                 processing={processingId === payment.id}
                 onConfirm={() => handleConfirm(payment)}
-                onToggleFiscal={() => handleToggleFiscal(payment.id)}
+                onReject={() => {
+                  setPaymentToReject(payment);
+                  setRejectReason("");
+                }}
               />
             ))}
           </div>
@@ -174,6 +204,20 @@ export default function OwnerPaymentsPage() {
           </div>
         )}
       </section>
+
+      {paymentToReject ? (
+        <RejectPaymentModal
+          payment={paymentToReject}
+          reason={rejectReason}
+          processing={processingId === paymentToReject.id}
+          onReasonChange={setRejectReason}
+          onClose={() => {
+            setPaymentToReject(null);
+            setRejectReason("");
+          }}
+          onConfirm={handleRejectPayment}
+        />
+      ) : null}
     </div>
   );
 }
@@ -200,29 +244,33 @@ function PaymentStat({
   );
 }
 
-function PaymentRow({
+function PendingPaymentRow({
   payment,
-  fiscalPrinted,
   processing,
   onConfirm,
-  onToggleFiscal,
+  onReject,
 }: {
   payment: ClientPayment;
-  fiscalPrinted: boolean;
   processing: boolean;
   onConfirm: () => void;
-  onToggleFiscal: () => void;
+  onReject: () => void;
 }) {
   return (
     <article className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.8fr_0.8fr_auto] lg:items-center">
+      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr_0.8fr_auto] xl:items-center">
         <div className="min-w-0">
           <p className="truncate text-base font-semibold text-on-surface">
             {payment.clientName || `Klient #${payment.clientId}`}
           </p>
           <p className="mt-1 text-sm text-on-surface-variant">
-            {payment.packageName || "Wpłata bez przypisanego pakietu"}
+            {payment.packageName || "Pakiet nierozpoznany"} ·{" "}
+            {formatDate(payment.paymentDate)}
           </p>
+          {payment.note ? (
+            <p className="mt-2 line-clamp-2 text-xs text-on-surface-muted">
+              {payment.note}
+            </p>
+          ) : null}
         </div>
 
         <div>
@@ -233,38 +281,100 @@ function PaymentRow({
         </div>
 
         <div>
-          <p className="text-label text-on-surface-muted">Status</p>
+          <p className="text-label text-on-surface-muted">Zgłoszenie</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <StatusPill label={getPaymentStatusLabel(payment.status)} />
-            <StatusPill
-              label={fiscalPrinted ? "Paragon wystawiony" : "Brak paragonu"}
-              muted={!fiscalPrinted}
-            />
+            <StatusPill label={getPaymentMethodLabel(payment.method)} muted />
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 lg:justify-end">
-          <Button
-            size="sm"
-            variant="secondary"
-            icon={<FileCheck2 size={15} />}
-            onClick={onToggleFiscal}
-            disabled={fiscalPrinted}
-          >
-            {fiscalPrinted ? "Paragon wystawiony" : "Wystaw paragon"}
-          </Button>
+        <div className="flex flex-wrap gap-2 xl:justify-end">
           <Button
             size="sm"
             icon={<CheckCircle2 size={15} />}
             onClick={onConfirm}
-            disabled={processing || isConfirmed(payment)}
+            disabled={processing || !isPendingPayment(payment)}
           >
-            {isConfirmed(payment) ? "Opłacone" : "Oznacz opłacone"}
+            Potwierdź
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            icon={<XCircle size={15} />}
+            onClick={onReject}
+            disabled={processing || !isPendingPayment(payment)}
+          >
+            Odrzuć
           </Button>
           <ButtonLinkLike href={`/owner/clients/${payment.clientId}/payments`} />
         </div>
       </div>
     </article>
+  );
+}
+
+function RejectPaymentModal({
+  payment,
+  reason,
+  processing,
+  onReasonChange,
+  onClose,
+  onConfirm,
+}: {
+  payment: ClientPayment;
+  reason: string;
+  processing: boolean;
+  onReasonChange: (value: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-[560px] rounded-[var(--radius-xl)] border border-white/8 bg-surface-container p-5 shadow-ambient">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-label text-primary-light">Odrzucenie wpłaty</p>
+            <h2 className="mt-2 text-2xl font-semibold text-on-surface">
+              {payment.clientName || `Klient #${payment.clientId}`}
+            </h2>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              {formatMoney(payment.amount, payment.currency)} ·{" "}
+              {payment.packageName || "Pakiet nierozpoznany"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-on-surface-muted transition hover:text-on-surface"
+          >
+            <XCircle size={18} />
+          </button>
+        </div>
+
+        <OwnerTextArea
+          label="Powód odrzucenia"
+          value={reason}
+          onChange={onReasonChange}
+          rows={4}
+          className="mt-5"
+          placeholder="Np. nie znaleziono przelewu na koncie."
+        />
+
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="secondary" onClick={onClose} disabled={processing}>
+            Anuluj
+          </Button>
+          <Button
+            variant="danger"
+            icon={<XCircle size={16} />}
+            onClick={onConfirm}
+            disabled={processing}
+          >
+            Odrzuć wpłatę
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -295,34 +405,22 @@ function StatusPill({ label, muted }: { label: string; muted?: boolean }) {
   );
 }
 
-function getPaymentsSummary(payments: ClientPayment[]) {
+function getPendingPaymentsSummary(payments: ClientPayment[]) {
+  const clientIds = new Set<number>();
+
   return payments.reduce(
-    (summary, payment) => ({
-      count: summary.count + (isConfirmed(payment) ? 0 : 1),
-      amount: summary.amount + (isConfirmed(payment) ? 0 : payment.amount),
-      currency: payment.currency || summary.currency,
-    }),
-    { count: 0, amount: 0, currency: "PLN" },
+    (summary, payment) => {
+      clientIds.add(payment.clientId);
+
+      return {
+        count: summary.count + 1,
+        amount: summary.amount + payment.amount,
+        currency: payment.currency || summary.currency,
+        clientsCount: clientIds.size,
+      };
+    },
+    { count: 0, amount: 0, currency: "PLN", clientsCount: 0 },
   );
-}
-
-function isPendingPayment(payment: ClientPayment) {
-  return payment.status === 1 && !payment.confirmedAt && !payment.rejectedAt;
-}
-
-function isConfirmed(payment: ClientPayment) {
-  return payment.status === 2 || Boolean(payment.confirmedAt);
-}
-
-function getPaymentStatusLabel(status: number) {
-  const labels: Record<number, string> = {
-    1: "Oczekuje",
-    2: "Opłacone",
-    3: "Odrzucone",
-    4: "Anulowane",
-  };
-
-  return labels[status] || `Status ${status}`;
 }
 
 function formatMoney(amount: number, currency?: string | null) {
@@ -332,19 +430,12 @@ function formatMoney(amount: number, currency?: string | null) {
   })} ${currency || "PLN"}`;
 }
 
-function readPrintedIds() {
-  try {
-    const raw = window.localStorage.getItem(fiscalStorageKey);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+function formatDate(value?: string | null) {
+  if (!value) return "Brak daty";
 
-    return Array.isArray(parsed)
-      ? parsed.filter((value): value is number => typeof value === "number")
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function writePrintedIds(ids: number[]) {
-  window.localStorage.setItem(fiscalStorageKey, JSON.stringify(ids));
+  return new Intl.DateTimeFormat("pl-PL", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
 }
