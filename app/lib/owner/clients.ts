@@ -198,6 +198,12 @@ export function getClientSubscriptionUsage(id: number) {
   );
 }
 
+export function getClientCurrentCycle(id: number) {
+  return backendGet<SubscriptionCycle>(
+    `clients/${id}/subscription/current-cycle`,
+  );
+}
+
 export function getClientTrainingPlan(id: number) {
   return backendGet<ClientTrainingPlan>(`clients/${id}/training-plan`);
 }

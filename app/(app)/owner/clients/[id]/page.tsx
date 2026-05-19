@@ -13,6 +13,7 @@ import {
   type SubscriptionUsage,
 } from "@/app/lib/owner/clients";
 import { getClientSessions, type OwnerSession } from "@/app/lib/owner/sessions";
+import { getClientPayments, type ClientPayment } from "@/app/lib/owner/billing";
 import ClientMetricCards from "./components/ClientMetricCards";
 import ClientNotesPanel from "./components/ClientNotesPanel";
 import ClientProfileHero from "./components/ClientProfileHero";
@@ -31,6 +32,7 @@ export default function OwnerClientDetailsPage() {
     null,
   );
   const [sessions, setSessions] = useState<OwnerSession[]>([]);
+  const [payments, setPayments] = useState<ClientPayment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
@@ -55,12 +57,14 @@ export default function OwnerClientDetailsPage() {
           usageResult,
           sessionsResult,
           trainingPlanResult,
+          paymentsResult,
         ] = await Promise.allSettled([
           getClient(clientId),
           getClientSubscription(clientId),
           getClientSubscriptionUsage(clientId),
           getClientSessions(clientId),
           getClientTrainingPlan(clientId),
+          getClientPayments(clientId, { page: 1, pageSize: 3 }),
         ]);
 
         if (clientResult.status !== "fulfilled") {
@@ -83,6 +87,10 @@ export default function OwnerClientDetailsPage() {
 
         if (trainingPlanResult.status === "fulfilled") {
           setTrainingPlan(trainingPlanResult.value);
+        }
+
+        if (paymentsResult.status === "fulfilled") {
+          setPayments(paymentsResult.value.items || []);
         }
       } catch (err) {
         showOwnerError(err, "Nie udało się pobrać klienta.", {
@@ -163,6 +171,7 @@ export default function OwnerClientDetailsPage() {
             <ClientSessionsPanel sessions={sessions} />
             <ClientNotesPanel
               client={client}
+              payments={payments}
               onClientChange={setClient}
             />
           </div>

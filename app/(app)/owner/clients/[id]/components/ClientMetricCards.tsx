@@ -5,7 +5,6 @@ import type {
   SubscriptionUsage,
 } from "@/app/lib/owner/clients";
 import {
-  formatClientBalance,
   getClientPackageUsage,
 } from "../../components/client-display";
 
@@ -71,19 +70,16 @@ export default function ClientMetricCards({
       usage?.usedSessions ?? cycle?.usedSessions ?? client.packageSessionsUsed,
   });
   const currency = cycle?.currency || client.currency || "PLN";
-  const balance =
-    subscription?.carryOverBalance !== undefined
-      ? formatMoney(subscription.carryOverBalance, currency)
-      : formatClientBalance(client);
+  const amountDue = formatMoney(cycle?.amountDue ?? 0, currency);
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
       <MetricCard
-        label="Saldo"
-        value={balance}
-        note="Saldo klienta / carry-over"
+        label="Do zapłaty"
+        value={amountDue}
+        note={cycle?.packageName || "Aktualny cykl"}
         icon={<CreditCard size={22} />}
-        highlight
+        highlight={(cycle?.amountDue ?? 0) > 0}
       />
       <MetricCard
         label="Aktywny pakiet"

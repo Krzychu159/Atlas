@@ -4,15 +4,21 @@ import { useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { updateClient, type Client } from "@/app/lib/owner/clients";
 import {
+  getPaymentStatusLabel,
+  type ClientPayment,
+} from "@/app/lib/owner/billing";
+import {
   showOwnerError,
   showOwnerSuccess,
 } from "../../../components/owner-toast";
 
 export default function ClientNotesPanel({
   client,
+  payments,
   onClientChange,
 }: {
   client: Client;
+  payments: ClientPayment[];
   onClientChange: (client: Client) => void;
 }) {
   const [draft, setDraft] = useState({
@@ -79,62 +85,72 @@ export default function ClientNotesPanel({
         onChange={(event) =>
           setDraft({ clientId: client.id, notes: event.target.value })
         }
-        rows={6}
+        rows={4}
         placeholder="Dodaj notatkę o kliencie..."
         className="mt-5 w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 text-sm leading-7 text-on-surface-variant outline-none placeholder:text-on-surface-muted"
       />
 
-      <PaymentHistoryMock />
+      <PaymentHistory payments={payments} />
     </aside>
   );
 }
 
-const mockPayments = [
-  {
-    title: "Pakiet 8 treningów 1:1",
-    date: "12 maj 2026",
-    amount: "+350 zł",
-  },
-  {
-    title: "Doładowanie salda",
-    date: "28 kwi 2026",
-    amount: "+120 zł",
-  },
-];
-
-function PaymentHistoryMock() {
+function PaymentHistory({ payments }: { payments: ClientPayment[] }) {
   return (
     <section className="mt-5 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-section-title">Historia wpłat</p>
+          <p className="text-section-title">Ostatnie wpłaty</p>
           <p className="mt-1 text-xs text-on-surface-muted">
-            Miejsce pod dane z rozliczeń klienta.
+            Trzy najnowsze operacje płatnicze klienta.
           </p>
         </div>
-        <span className="rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary-light">
-          Mock
-        </span>
       </div>
 
       <div className="mt-4 flex flex-col gap-2">
-        {mockPayments.map((payment) => (
-          <div
-            key={`${payment.title}-${payment.date}`}
-            className="rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-3"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <p className="min-w-0 truncate text-sm font-semibold text-on-surface">
-                {payment.title}
-              </p>
-              <p className="shrink-0 text-sm font-semibold text-tertiary-light">
-                {payment.amount}
-              </p>
+        {payments.length > 0 ? (
+          payments.slice(0, 3).map((payment) => (
+            <div
+              key={payment.id}
+              className="rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-3"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="min-w-0 truncate text-sm font-semibold text-on-surface">
+                  {payment.packageName || "Wpłata klienta"}
+                </p>
+                <p className="shrink-0 text-sm font-semibold text-tertiary-light">
+                  {formatMoney(payment.amount, payment.currency)}
+                </p>
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-3 text-xs text-on-surface-muted">
+                <span>{formatDate(payment.paymentDate)}</span>
+                <span>{getPaymentStatusLabel(payment.status)}</span>
+              </div>
             </div>
-            <p className="mt-1 text-xs text-on-surface-muted">{payment.date}</p>
+          ))
+        ) : (
+          <div className="rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-4 text-center text-sm text-on-surface-variant">
+            Brak wpłat do wyświetlenia.
           </div>
-        ))}
+        )}
       </div>
     </section>
   );
+}
+
+function formatMoney(amount: number, currency?: string | null) {
+  return `${amount.toLocaleString("pl-PL", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ${currency || "PLN"}`;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Brak daty";
+
+  return new Intl.DateTimeFormat("pl-PL", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
 }

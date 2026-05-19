@@ -25,7 +25,7 @@ export default function ClientSessionsPanel({
       (first, second) =>
         new Date(second.startAt).getTime() - new Date(first.startAt).getTime(),
     )
-    .slice(0, 6);
+    .slice(0, 3);
 
   return (
     <section className="card-shell p-5 md:p-6">
