@@ -45,20 +45,25 @@ export default function ClientProfileHero({
   client,
   onEdit,
   onFiles,
+  backHref = "/owner/clients",
+  paymentsHref,
 }: {
   client: Client;
   onEdit: () => void;
   onFiles: () => void;
+  backHref?: string;
+  paymentsHref?: string;
 }) {
   const fullName = getClientName(client);
   const membershipMonths = getClientAgeInMonths(client.createdAt);
   const milestoneProgress = getMilestoneProgress(membershipMonths);
+  const resolvedPaymentsHref = paymentsHref || `/owner/clients/${client.id}/payments`;
 
   return (
     <section className="card-shell overflow-hidden p-5 md:p-8">
       <div className="mb-7 flex items-center justify-between gap-4">
         <Link
-          href="/owner/clients"
+          href={backHref}
           className="inline-flex items-center gap-2 text-sm font-semibold text-primary-light"
         >
           <ArrowLeft size={18} />
@@ -142,7 +147,7 @@ export default function ClientProfileHero({
             Pliki
           </button>
           <Link
-            href={`/owner/clients/${client.id}/payments`}
+            href={resolvedPaymentsHref}
             className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-primary-light transition hover:bg-surface-container-high"
           >
             <ReceiptText size={16} />

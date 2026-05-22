@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
@@ -42,8 +43,17 @@ import {
   showOwnerError,
   showOwnerSuccess,
 } from "../components/owner-toast";
+import { isForbiddenError } from "@/app/lib/backend";
+import {
+  confirmTrainerPortalPayment,
+  getTrainerPortalPendingPayments,
+  rejectTrainerPortalPayment,
+} from "@/app/lib/trainer/portal";
 
 export default function OwnerPaymentsPage() {
+  const pathname = usePathname();
+  const basePath = pathname.startsWith("/trainer") ? "/trainer" : "/owner";
+  const eyebrow = basePath === "/trainer" ? "Panel trenera" : "Panel ownera";
   const [payments, setPayments] = useState<ClientPayment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
@@ -98,8 +108,15 @@ export default function OwnerPaymentsPage() {
   async function loadPayments() {
     try {
       setIsLoading(true);
-      const data = await getOwnerPayments(buildBackendPaymentQuery());
-      setPayments(data.items || []);
+      try {
+        const data = await getOwnerPayments(buildBackendPaymentQuery());
+        setPayments(data.items || []);
+      } catch (err) {
+        if (basePath !== "/trainer" || !isForbiddenError(err)) throw err;
+
+        const pendingPayments = await getTrainerPortalPendingPayments();
+        setPayments(pendingPayments);
+      }
     } catch (err) {
       showOwnerError(err, "Nie udało się pobrać płatności.", {
         id: "owner-payments-load-error",
@@ -119,7 +136,12 @@ export default function OwnerPaymentsPage() {
 
     try {
       setProcessingId(payment.id);
-      await confirmClientPayment(payment.id);
+      try {
+        await confirmClientPayment(payment.id);
+      } catch (err) {
+        if (basePath !== "/trainer" || !isForbiddenError(err)) throw err;
+        await confirmTrainerPortalPayment(payment.id);
+      }
       showOwnerSuccess("Wpłata została potwierdzona.", {
         id: `owner-payment-confirmed-${payment.id}`,
       });
@@ -147,7 +169,12 @@ export default function OwnerPaymentsPage() {
 
     try {
       setProcessingId(paymentToReject.id);
-      await rejectClientPayment(paymentToReject.id, reason);
+      try {
+        await rejectClientPayment(paymentToReject.id, reason);
+      } catch (err) {
+        if (basePath !== "/trainer" || !isForbiddenError(err)) throw err;
+        await rejectTrainerPortalPayment(paymentToReject.id, reason);
+      }
       setPaymentToReject(null);
       setRejectReason("");
       showOwnerSuccess("Wpłata została odrzucona.", {
@@ -287,7 +314,7 @@ export default function OwnerPaymentsPage() {
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-label text-primary-light">Panel ownera</p>
+          <p className="text-label text-primary-light">{eyebrow}</p>
           <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
             Płatności
           </h1>
@@ -425,6 +452,7 @@ export default function OwnerPaymentsPage() {
                   setPaymentToReverse(payment);
                   setReversalReason("");
                 }}
+                basePath={basePath}
               />
             ))}
           </div>
@@ -528,6 +556,7 @@ function PaymentRow({
   onIssueReceipt,
   onCancelReceipt,
   onReverse,
+  basePath,
 }: {
   payment: ClientPayment;
   processing: boolean;
@@ -536,6 +565,7 @@ function PaymentRow({
   onIssueReceipt: () => void;
   onCancelReceipt: () => void;
   onReverse: () => void;
+  basePath: string;
 }) {
   const pending = isPendingPayment(payment);
   const confirmed = isConfirmedPayment(payment);
@@ -640,7 +670,7 @@ function PaymentRow({
               </Button>
             </>
           ) : null}
-          <ButtonLinkLike href={`/owner/clients/${payment.clientId}/payments`} />
+          <ButtonLinkLike href={`${basePath}/clients/${payment.clientId}/payments`} />
         </div>
       </div>
     </article>

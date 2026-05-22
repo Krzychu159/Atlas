@@ -32,7 +32,13 @@ function getStatusDot(client: Client) {
   return "bg-primary-light";
 }
 
-export default function ClientListRow({ client }: { client: Client }) {
+export default function ClientListRow({
+  client,
+  detailsHref,
+}: {
+  client: Client;
+  detailsHref?: string;
+}) {
   const fullName = getClientName(client);
   const packageUsage = getClientPackageUsage(client);
 
@@ -100,7 +106,7 @@ export default function ClientListRow({ client }: { client: Client }) {
       </div>
 
       <Link
-        href={`/owner/clients/${client.id}`}
+        href={detailsHref || `/owner/clients/${client.id}`}
         prefetch={false}
         aria-label={`Przejdź do profilu klienta ${fullName}`}
         className="ml-auto flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container-low text-primary-light transition-colors hover:bg-surface-container-high hover:text-on-surface"

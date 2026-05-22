@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 
-export function OutlookRequiredState() {
+export function OutlookRequiredState({
+  settingsHref = "/owner/settings",
+}: {
+  settingsHref?: string;
+}) {
   return (
     <div className="flex min-h-[420px] items-center justify-center rounded-[var(--radius-xl)] bg-surface-container p-6 text-center shadow-soft">
       <div className="max-w-[520px]">
@@ -16,7 +20,7 @@ export function OutlookRequiredState() {
           w ustawieniach, potem wróć tutaj, żeby zobaczyć sesje.
         </p>
         <Link
-          href="/owner/settings"
+          href={settingsHref}
           className="mt-6 inline-flex h-12 items-center justify-center rounded-[var(--radius-lg)] bg-primary px-5 text-sm font-semibold text-on-primary shadow-soft transition hover:bg-primary-container"
         >
           Przejdź do ustawień

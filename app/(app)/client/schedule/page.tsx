@@ -1,650 +1,681 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import {
-  Bell,
   CalendarDays,
-  Check,
   ChevronLeft,
   ChevronRight,
-  MessageCircle,
-  Plus,
-  X,
+  Clock3,
+  Dumbbell,
+  MapPin,
+  UserRound,
 } from "lucide-react";
+import { Button } from "@/app/components/ui/button";
+import { showAppError } from "@/app/components/ui/app-toast";
+import { formatSessionTime } from "@/app/lib/formatters/date";
+import {
+  getClientPortalSchedule,
+  getClientPortalSubscriptionUsage,
+  type ClientPortalSession,
+  type SubscriptionUsage,
+} from "@/app/lib/client/portal";
 
-const calendarDays = [
-  { day: "28", label: "Pon", muted: true },
-  { day: "29", label: "Wt", muted: true },
-  { day: "30", label: "Śr", muted: true },
-  { day: "31", label: "Czw", muted: true },
-  { day: "1", label: "Pt" },
-  { day: "2", label: "Sob" },
-  { day: "3", label: "Ndz" },
-  { day: "4", label: "Pon" },
-  { day: "5", label: "Wt", selected: true },
-  { day: "6", label: "Śr" },
-  { day: "7", label: "Czw" },
-  { day: "8", label: "Pt" },
-  { day: "9", label: "Sob" },
-  { day: "10", label: "Ndz" },
-];
+export default function ClientSchedulePage() {
+  const [sessions, setSessions] = useState<ClientPortalSession[]>([]);
+  const [usage, setUsage] = useState<SubscriptionUsage | null>(null);
+  const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
+  const [selectedDateKey, setSelectedDateKey] = useState(() =>
+    toDateKey(new Date()),
+  );
+  const [loadedAt, setLoadedAt] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
-const sessionHistory = [
-  {
-    date: "31 Październik",
-    time: "18:00 - 19:15",
-    type: "Body Pump Express",
-    trainer: "Anna Nowak",
-    intensity: 3,
-    status: "Obecny",
-  },
-  {
-    date: "29 Październik",
-    time: "10:00 - 11:30",
-    type: "Strength Session",
-    trainer: "Marek Kowalski",
-    intensity: 4,
-    status: "Obecny",
-  },
-];
+  async function loadPlan() {
+    try {
+      setIsLoading(true);
+      const [scheduleData, usageData] = await Promise.allSettled([
+        getClientPortalSchedule(),
+        getClientPortalSubscriptionUsage(),
+      ]);
 
-export default function SchedulePage() {
+      if (scheduleData.status === "fulfilled") {
+        setSessions(scheduleData.value || []);
+      } else {
+        throw scheduleData.reason;
+      }
+
+      if (usageData.status === "fulfilled") {
+        setUsage(usageData.value);
+      }
+
+      setLoadedAt(Date.now());
+    } catch (err) {
+      showAppError(err, "Nie udało się pobrać planu treningów.", {
+        id: "client-schedule-load-error",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadPlan();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const weekDays = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, index) =>
+        addDays(weekStart, index),
+      ),
+    [weekStart],
+  );
+  const weekEnd = addDays(weekStart, 7);
+  const weekSessions = useMemo(
+    () =>
+      sessions
+        .filter((session) => {
+          const time = getTime(session.startAt);
+          return time >= weekStart.getTime() && time < weekEnd.getTime();
+        })
+        .sort(sortSessions),
+    [sessions, weekEnd, weekStart],
+  );
+  const sessionsByDay = useMemo(() => {
+    const map = new Map<string, ClientPortalSession[]>();
+
+    weekDays.forEach((day) => map.set(toDateKey(day), []));
+    weekSessions.forEach((session) => {
+      const key = toDateKey(new Date(session.startAt));
+      map.get(key)?.push(session);
+    });
+
+    return map;
+  }, [weekDays, weekSessions]);
+  const nextSession = useMemo(
+    () =>
+      [...sessions]
+        .filter((session) => getTime(session.startAt) >= loadedAt)
+        .sort(sortSessions)[0] || null,
+    [loadedAt, sessions],
+  );
+  const usageProgress = usage?.totalSessions
+    ? Math.round((usage.usedSessions / usage.totalSessions) * 100)
+    : 0;
+  const selectedDay =
+    weekDays.find((day) => toDateKey(day) === selectedDateKey) || weekDays[0];
+  const selectedDaySessions =
+    sessionsByDay.get(toDateKey(selectedDay)) || [];
+
   return (
-    <div className="max-w-[1400px] mx-auto">
-      {/* Desktop */}
-      <div className="hidden md:block">
-        <div className="flex flex-col gap-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="max-w-[560px]">
-              <p className="text-label text-primary-light">Harmonogram</p>
-              <h1 className="mt-2 text-[2.25rem] leading-[0.95] font-semibold font-display tracking-tight">
-                Twoje <span className="text-primary-light">Treningi</span>
-              </h1>
-            </div>
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
+      <MobileSchedule
+        weekDays={weekDays}
+        weekStart={weekStart}
+        selectedDateKey={selectedDateKey}
+        selectedDay={selectedDay}
+        selectedDaySessions={selectedDaySessions}
+        nextSession={nextSession}
+        usage={usage}
+        usageProgress={usageProgress}
+        isLoading={isLoading}
+        onSelectDate={setSelectedDateKey}
+        onPreviousWeek={() => {
+          const nextWeek = addDays(weekStart, -7);
+          setWeekStart(nextWeek);
+          setSelectedDateKey(toDateKey(nextWeek));
+        }}
+        onNextWeek={() => {
+          const nextWeek = addDays(weekStart, 7);
+          setWeekStart(nextWeek);
+          setSelectedDateKey(toDateKey(nextWeek));
+        }}
+        onRefresh={loadPlan}
+      />
 
-            <div className="text-right shrink-0">
-              <p className="text-base text-on-surface-variant">
-                Pozostałe sesje
-              </p>
-              <div className="mt-2 flex items-center justify-end gap-4">
-                <p className="text-[2rem] leading-none font-semibold">
-                  12 / 20
-                </p>
-                <div className="h-14 w-14 rounded-full bg-surface-container flex items-center justify-center text-primary-light">
-                  <CalendarDays size={22} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-[1fr_360px] gap-4 items-start">
-            <div className="card-shell p-5 min-h-[985px]">
-              <div className="flex items-center justify-between gap-4">
-                <p className="text-[1.2rem] font-semibold">Listopad 2024</p>
-
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <button className="h-12 w-12 rounded-[16px] bg-surface-container-low flex items-center justify-center text-on-surface">
-                      <ChevronLeft size={18} />
-                    </button>
-                    <button className="h-12 w-12 rounded-[16px] bg-surface-container-low flex items-center justify-center text-on-surface">
-                      <ChevronRight size={18} />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low p-1">
-                    <button className="px-5 py-2.5 rounded-[10px] bg-surface-container-high text-on-surface-variant text-sm font-medium">
-                      Miesiąc
-                    </button>
-                    <button className="px-5 py-2.5 rounded-[10px] bg-primary text-on-primary text-sm font-medium">
-                      Tydzień
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 overflow-hidden rounded-[24px] bg-surface-container-low">
-                <div className="grid grid-cols-7 border-b border-white/5">
-                  {["Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Ndz"].map(
-                    (item) => (
-                      <div
-                        key={item}
-                        className="h-14 flex items-center justify-center text-label text-on-surface-variant"
-                      >
-                        {item}
-                      </div>
-                    ),
-                  )}
-                </div>
-
-                <div className="grid grid-cols-7 auto-rows-[190px]">
-                  {calendarDays.map((item) => (
-                    <div
-                      key={`${item.label}-${item.day}`}
-                      className={`relative border-r border-b border-white/5 p-4 ${
-                        item.selected ? "bg-primary/8" : ""
-                      }`}
-                    >
-                      <p
-                        className={`text-[1.8rem] leading-none font-semibold ${
-                          item.muted
-                            ? "text-on-surface-muted/60"
-                            : "text-on-surface"
-                        }`}
-                      >
-                        {item.day}
-                      </p>
-
-                      {item.day === "1" && (
-                        <div className="mt-4 rounded-[18px] bg-primary-light/20 border-l-[3px] border-primary-light p-3">
-                          <p className="text-sm text-primary-light font-medium">
-                            08:00
-                          </p>
-                          <p className="mt-2 text-[1rem] leading-5 font-semibold">
-                            Strength Training
-                          </p>
-                        </div>
-                      )}
-
-                      {item.day === "4" && (
-                        <div className="mt-4 rounded-[18px] bg-tertiary-container/40 border-l-[3px] border-tertiary-light p-3">
-                          <p className="text-sm text-tertiary-light font-medium">
-                            17:30
-                          </p>
-                          <p className="mt-2 text-[1rem] leading-5 font-semibold">
-                            Mobility Flow
-                          </p>
-                        </div>
-                      )}
-
-                      {item.day === "5" && (
-                        <div className="space-y-3 mt-4">
-                          <div className="rounded-[18px] bg-primary p-3 shadow-soft">
-                            <p className="text-sm text-white/85 font-medium">
-                              10:00
-                            </p>
-                            <p className="mt-2 text-[1rem] leading-5 font-semibold text-white">
-                              Personal Training
-                            </p>
-                          </div>
-
-                          <div className="rounded-[18px] bg-surface-container-high p-3">
-                            <p className="text-sm text-on-surface-muted font-medium">
-                              19:00
-                            </p>
-                            <p className="mt-2 text-[1rem] leading-5 font-semibold text-on-surface-variant">
-                              Yoga
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {item.day === "7" && (
-                        <div className="mt-4 rounded-[18px] bg-primary-light/20 border-l-[3px] border-primary-light p-3">
-                          <p className="text-sm text-primary-light font-medium">
-                            08:00
-                          </p>
-                          <p className="mt-2 text-[1rem] leading-5 font-semibold">
-                            Conditioning
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <div className="card-shell p-6">
-                <p className="text-label text-on-surface-variant">
-                  Najbliższa sesja
-                </p>
-
-                <div className="mt-5 flex items-center gap-4">
-                  <div className="h-16 w-16 rounded-[18px] overflow-hidden bg-surface-container-low shrink-0">
-                    <img
-                      src="https://images.unsplash.com/photo-1567013127542-490d757e6349?q=80&w=800&auto=format&fit=crop"
-                      alt="Trener"
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-
-                  <div>
-                    <p className="text-[1.85rem] leading-none font-semibold">
-                      Personal Training
-                    </p>
-                    <p className="mt-2 text-base text-on-surface-variant">
-                      Trener: Marek Kowalski
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-6 rounded-[20px] bg-surface-container-lowest px-4 py-4 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <CalendarDays size={17} className="text-primary-light" />
-                    <p className="text-[1rem] font-medium">Wtorek, 10:00</p>
-                  </div>
-
-                  <span className="px-4 py-2 rounded-full bg-tertiary-container text-tertiary-light text-sm font-semibold">
-                    Potwierdzone
-                  </span>
-                </div>
-
-                <button className="mt-5 w-full h-14 rounded-[var(--radius-lg)] bg-primary text-on-primary font-semibold shadow-soft">
-                  Oznacz obecność
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="card-shell p-5 min-h-[156px] flex flex-col justify-between">
-                  <Check size={22} className="text-primary-light" />
-                  <div>
-                    <p className="text-[3rem] leading-none font-semibold">
-                      94%
-                    </p>
-                    <p className="mt-3 text-label text-on-surface-variant">
-                      Obecność
-                    </p>
-                  </div>
-                </div>
-
-                <div className="card-shell p-5 min-h-[156px] flex flex-col justify-between">
-                  <Plus size={22} className="text-tertiary-light" />
-                  <div>
-                    <p className="text-[3rem] leading-none font-semibold">8</p>
-                    <p className="mt-3 text-label text-on-surface-variant">
-                      Sesje / mc
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="card-shell p-6">
-                <p className="text-section-title">Twoi trenerzy</p>
-
-                <div className="mt-5 flex flex-col gap-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className="h-14 w-14 rounded-full p-[2px] bg-primary-gradient shrink-0">
-                        <div className="h-full w-full rounded-full overflow-hidden bg-surface-container-low">
-                          <img
-                            src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=800&auto=format&fit=crop"
-                            alt="Marek Kowalski"
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="min-w-0">
-                        <p className="text-[1.25rem] font-semibold truncate">
-                          Marek Kowalski
-                        </p>
-                        <p className="mt-1 text-label text-on-surface-variant">
-                          Strength & Conditioning
-                        </p>
-                      </div>
-                    </div>
-
-                    <button className="h-11 w-11 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant shrink-0">
-                      <MessageCircle size={18} />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4 opacity-70">
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className="h-14 w-14 rounded-full overflow-hidden bg-surface-container-low shrink-0">
-                        <img
-                          src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=800&auto=format&fit=crop"
-                          alt="Anna Nowak"
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-
-                      <div className="min-w-0">
-                        <p className="text-[1.25rem] font-semibold truncate">
-                          Anna Nowak
-                        </p>
-                        <p className="mt-1 text-label text-on-surface-variant">
-                          Yoga & Mobility
-                        </p>
-                      </div>
-                    </div>
-
-                    <button className="h-11 w-11 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant shrink-0">
-                      <MessageCircle size={18} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-[26px] border border-white/8 bg-surface-container-lowest p-6">
-                <p className="text-label text-on-surface-variant">
-                  Postęp celu
-                </p>
-                <div className="mt-4 flex items-end justify-between gap-4">
-                  <p className="text-[1.7rem] leading-[1.2] font-semibold max-w-[220px]">
-                    Redukcja Tkanki Tłuszczowej
-                  </p>
-                  <p className="text-[2.1rem] leading-none font-semibold text-tertiary-light">
-                    72%
-                  </p>
-                </div>
-
-                <div className="mt-6 h-3 rounded-full bg-surface-container-low overflow-hidden">
-                  <div className="h-full w-[72%] rounded-full bg-[linear-gradient(90deg,#00a84f,#4ae176)]" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card-shell overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-5 bg-surface-container-low">
-              <p className="text-section-title">Historia Sesji</p>
-              <button className="text-label text-primary-light">
-                Zobacz wszystkie
-              </button>
-            </div>
-
-            <div className="grid grid-cols-[1.4fr_1.8fr_1.3fr_1.2fr_130px] px-6 py-5 text-label text-on-surface-variant border-b border-white/5">
-              <p>Data</p>
-              <p>Rodzaj treningu</p>
-              <p>Trener</p>
-              <p>Intensywność</p>
-              <p>Status</p>
-            </div>
-
-            {sessionHistory.map((item, index) => (
-              <div
-                key={item.date}
-                className={`grid grid-cols-[1.4fr_1.8fr_1.3fr_1.2fr_130px] px-6 py-7 items-center ${
-                  index !== sessionHistory.length - 1
-                    ? "border-b border-white/5"
-                    : ""
-                }`}
-              >
-                <div>
-                  <p className="text-[1.25rem] font-semibold">{item.date}</p>
-                  <p className="mt-2 text-sm text-on-surface-variant">
-                    {item.time}
-                  </p>
-                </div>
-
-                <p className="text-[1.2rem] font-medium">{item.type}</p>
-                <p className="text-[1.1rem]">{item.trainer}</p>
-
-                <div className="flex items-end gap-2 h-8">
-                  {[1, 2, 3, 4, 5].map((bar) => (
-                    <span
-                      key={bar}
-                      className={`w-2 rounded-full ${
-                        bar <= item.intensity
-                          ? "bg-tertiary-light h-7"
-                          : "bg-white/12 h-5"
-                      }`}
-                    />
-                  ))}
-                </div>
-
-                <div>
-                  <span className="px-4 py-2 rounded-full bg-tertiary-container text-tertiary-light text-sm font-semibold">
-                    {item.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="hidden flex-col gap-5 md:flex">
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-label text-primary-light">Plan</p>
+          <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
+            Tygodniowy plan treningów
+          </h1>
+          <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
+            Prosty widok Twoich sesji z godziną, trenerem i lokalizacją.
+          </p>
         </div>
-      </div>
 
-      {/* Mobile */}
-      <div className="md:hidden px-1 pb-6">
-        <div className="flex flex-col gap-5">
-          <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container p-1">
+          <button
+            type="button"
+            onClick={() => setWeekStart((current) => addDays(current, -7))}
+            className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-lowest text-on-surface-variant transition hover:text-on-surface"
+            aria-label="Poprzedni tydzień"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <div className="min-w-[230px] rounded-[var(--radius-md)] bg-surface-container-lowest px-4 py-3 text-center">
+            <p className="text-sm font-semibold">
+              {formatWeekRange(weekStart, addDays(weekStart, 6))}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setWeekStart((current) => addDays(current, 7))}
+            className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-lowest text-on-surface-variant transition hover:text-on-surface"
+            aria-label="Następny tydzień"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-3">
+        <PlanMetric
+          icon={<CalendarDays size={20} />}
+          label="Sesje w tygodniu"
+          value={String(weekSessions.length)}
+          note="Zaplanowane w wybranym tygodniu"
+          loading={isLoading}
+        />
+        <PlanMetric
+          icon={<Dumbbell size={20} />}
+          label="Wykorzystanie cyklu"
+          value={
+            usage
+              ? `${usage.usedSessions}/${usage.totalSessions}`
+              : "Brak danych"
+          }
+          note={`${usageProgress}% aktualnego cyklu`}
+          loading={isLoading}
+        />
+        <PlanMetric
+          icon={<Clock3 size={20} />}
+          label="Najbliższy trening"
+          value={nextSession ? formatShortDateTime(nextSession.startAt) : "Brak"}
+          note={nextSession?.title || "Najbliższa sesja pojawi się po zaplanowaniu"}
+          loading={isLoading}
+        />
+      </section>
+
+      <section className="card-shell p-4 md:p-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+          {weekDays.map((day) => {
+            const daySessions = sessionsByDay.get(toDateKey(day)) || [];
+
+            return (
+              <DayColumn
+                key={toDateKey(day)}
+                day={day}
+                sessions={daySessions}
+                isToday={toDateKey(day) === toDateKey(new Date())}
+              />
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1fr_0.72fr]">
+        <div className="card-shell p-5 md:p-6">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-label text-primary-light">Twój harmonogram</p>
-              <h1 className="mt-2 text-page-title">Treningi</h1>
+              <p className="text-label text-on-surface-muted">Najbliższe</p>
+              <h2 className="mt-3 font-display text-[1.85rem] font-semibold leading-none">
+                Kolejne sesje
+              </h2>
             </div>
-
-            <div className="flex items-center gap-4 shrink-0">
-              <Bell size={20} className="text-on-surface-variant" />
-              <div className="h-12 w-12 rounded-full overflow-hidden bg-surface-container-low">
-                <img
-                  src="https://images.unsplash.com/photo-1567013127542-490d757e6349?q=80&w=800&auto=format&fit=crop"
-                  alt="Profil użytkownika"
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            </div>
+            <Button type="button" variant="secondary" size="sm" onClick={loadPlan}>
+              Odśwież
+            </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <button className="h-14 rounded-[var(--radius-lg)] bg-surface-container text-on-surface font-semibold flex items-center justify-center gap-3">
-              <CalendarDays size={18} />
-              Miesiąc
-            </button>
-
-            <button className="h-14 rounded-[var(--radius-lg)] bg-primary text-on-primary font-semibold flex items-center justify-center gap-3">
-              <Plus size={18} />
-              Umów sesję
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1">
-            {[
-              { day: "Pon", num: "12" },
-              { day: "Wt", num: "13", active: true },
-              { day: "Śr", num: "14" },
-              { day: "Czw", num: "15" },
-              { day: "Pt", num: "16" },
-              { day: "Sob", num: "17", muted: true },
-              { day: "Ndz", num: "18", muted: true },
-            ].map((item) => (
-              <button
-                key={item.num}
-                className={`relative min-w-[54px] h-[82px] rounded-[22px] flex flex-col items-center justify-center ${
-                  item.active
-                    ? "bg-primary/20 border border-primary/30"
-                    : "bg-surface-container"
-                }`}
-              >
-                <span
-                  className={`text-label ${
-                    item.muted ? "text-on-surface-muted/60" : "text-on-surface"
-                  }`}
-                >
-                  {item.day}
-                </span>
-                <span
-                  className={`mt-2 text-[2rem] leading-none font-semibold ${
-                    item.active ? "text-white" : "text-on-surface"
-                  }`}
-                >
-                  {item.num}
-                </span>
-
-                {item.active ? (
-                  <span className="absolute bottom-[-6px] h-3 w-3 rounded-full bg-primary-light" />
-                ) : null}
-              </button>
-            ))}
-          </div>
-
-          <div>
-            <div className="flex items-center gap-4">
-              <p className="text-section-title">Dzisiejsze sesje</p>
-              <div className="h-px flex-1 bg-white/8" />
-            </div>
-
-            <div className="mt-4 flex flex-col gap-4">
-              <div className="card-shell overflow-hidden">
-                <div className="h-[210px] overflow-hidden bg-surface-container-low">
-                  <img
-                    src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop"
-                    alt="Trening personalny"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <span className="px-3 py-1 rounded-full bg-tertiary-container text-tertiary-light text-label">
-                        Potwierdzony
-                      </span>
-
-                      <p className="mt-5 text-[2.2rem] leading-[1.05] font-semibold">
-                        Trening
-                        <br />
-                        Personalny
-                      </p>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <p className="text-label text-on-surface-variant">
-                        Siłowy / Hipertrofia
-                      </p>
-                      <p className="mt-3 text-[3rem] leading-none font-semibold text-primary-light">
-                        08:30
-                      </p>
-                      <p className="mt-2 text-label text-on-surface-variant">
-                        60 minut
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-12 w-12 rounded-full bg-primary/15 flex items-center justify-center text-primary-light shrink-0">
-                        <img
-                          src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=800&auto=format&fit=crop"
-                          alt="Marek Kowalski"
-                          className="h-full w-full object-cover rounded-full"
-                        />
-                      </div>
-
-                      <div className="min-w-0">
-                        <p className="text-base font-semibold truncate">
-                          Marek Kowalski
-                        </p>
-                        <p className="text-sm text-on-surface-variant truncate">
-                          Senior Coach
-                        </p>
-                      </div>
-                    </div>
-
-                    <button className="text-label text-primary-light shrink-0">
-                      Szczegóły →
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="card-shell p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-3 text-on-surface-variant">
-                      <p className="text-[1.4rem] font-semibold leading-none">
-                        17:00
-                      </p>
-                      <span className="text-label">•</span>
-                      <span className="text-label">Mobility & Stretch</span>
-                    </div>
-
-                    <p className="mt-6 text-[2rem] leading-[1.05] font-semibold">
-                      Sesja Regeneracyjna
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-6 flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant">
-                    <MessageCircle size={14} />
-                  </div>
-                  <p className="text-base text-on-surface-variant">
-                    Anna Nowak
-                  </p>
-                </div>
-
-                <div className="mt-8 flex items-center justify-center gap-4">
-                  <button className="h-14 w-14 rounded-[18px] bg-surface-container-low flex items-center justify-center text-on-surface">
-                    <Check size={20} />
-                  </button>
-                  <button className="h-14 w-14 rounded-[18px] bg-surface-container-low flex items-center justify-center text-on-surface">
-                    <X size={20} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card-shell p-5">
-            <p className="text-label text-on-surface-variant">
-              Statystyki tygodnia
-            </p>
-
-            <div className="mt-5 flex items-end justify-between gap-4">
-              <div>
-                <p className="text-[2.2rem] leading-none font-semibold">
-                  3 / 5
-                </p>
-                <p className="mt-3 text-label text-on-surface-variant">
-                  Treningi ukończone
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 h-3 rounded-full bg-surface-container-low overflow-hidden">
-              <div className="h-full w-[60%] rounded-full bg-[linear-gradient(90deg,#00a84f,#4ae176)]" />
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-4">
-              <div className="bg-surface-container-lowest rounded-[22px] p-5">
-                <p className="text-label text-on-surface-variant">Kalorie</p>
-                <p className="mt-4 text-[2rem] leading-none font-semibold">
-                  1,840
-                </p>
-              </div>
-
-              <div className="bg-surface-container-lowest rounded-[22px] p-5">
-                <p className="text-label text-on-surface-variant">Czas</p>
-                <p className="mt-4 text-[2rem] leading-none font-semibold">
-                  210m
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="card-shell p-5">
-            <div className="flex items-start gap-4">
-              <div className="h-12 w-12 rounded-full bg-surface-container-low flex items-center justify-center text-primary-light shrink-0">
-                <MessageCircle size={18} />
-              </div>
-
-              <div>
-                <p className="text-base font-semibold">Wiadomość od trenera</p>
-                <p className="mt-1 text-sm text-on-surface-variant">
-                  Marek Kowalski • 2h temu
-                </p>
-              </div>
-            </div>
-
-            <p className="mt-6 text-[1.05rem] leading-8 text-on-surface-variant italic">
-              “Hej! Na dzisiejszym treningu skupimy się na martwym ciągu.
-              Przygotuj się na większe obciążenie. Pamiętaj o porządnym
-              śniadaniu!”
-            </p>
-          </div>
-
-          <div className="rounded-[28px] overflow-hidden bg-surface-container-low">
-            <div className="h-[180px] bg-[linear-gradient(135deg,#163f52,#305f74)] relative">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(183,196,255,0.1),transparent_55%)]" />
-              <div className="absolute left-5 bottom-5">
-                <p className="text-label text-primary-light">
-                  Lokalizacja studia
-                </p>
-              </div>
-            </div>
+          <div className="mt-5 flex flex-col gap-3">
+            {isLoading ? (
+              <PlanSkeleton />
+            ) : sessions.length ? (
+              sessions
+                .filter((session) => getTime(session.startAt) >= loadedAt)
+                .sort(sortSessions)
+                .slice(0, 6)
+                .map((session) => (
+                  <SessionListRow key={session.id} session={session} />
+                ))
+            ) : (
+              <EmptyState text="Nie masz jeszcze zaplanowanych sesji." />
+            )}
           </div>
         </div>
+
+        <div className="card-shell p-5 md:p-6">
+          <p className="text-label text-on-surface-muted">Pakiet</p>
+          <h2 className="mt-3 font-display text-[1.85rem] font-semibold leading-none">
+            Licznik wejść
+          </h2>
+
+          <div className="mt-6 h-3 overflow-hidden rounded-full bg-surface-container-lowest">
+            <div
+              className="h-full rounded-full bg-primary-gradient"
+              style={{ width: `${Math.max(0, Math.min(usageProgress, 100))}%` }}
+            />
+          </div>
+
+          <div className="mt-5 grid grid-cols-3 gap-3">
+            <UsageTile label="Użyte" value={usage?.usedSessions ?? 0} />
+            <UsageTile label="Zostało" value={usage?.remainingSessions ?? 0} />
+            <UsageTile label="Razem" value={usage?.totalSessions ?? 0} />
+          </div>
+
+          <p className="mt-5 text-sm leading-6 text-on-surface-variant">
+            Licznik pochodzi z aktualnego cyklu subskrypcji. Sesje anulowane nie
+            powinny zwiększać wykorzystania pakietu.
+          </p>
+        </div>
+      </section>
       </div>
     </div>
   );
+}
+
+function MobileSchedule({
+  weekDays,
+  weekStart,
+  selectedDateKey,
+  selectedDay,
+  selectedDaySessions,
+  nextSession,
+  usage,
+  usageProgress,
+  isLoading,
+  onSelectDate,
+  onPreviousWeek,
+  onNextWeek,
+  onRefresh,
+}: {
+  weekDays: Date[];
+  weekStart: Date;
+  selectedDateKey: string;
+  selectedDay: Date;
+  selectedDaySessions: ClientPortalSession[];
+  nextSession: ClientPortalSession | null;
+  usage: SubscriptionUsage | null;
+  usageProgress: number;
+  isLoading: boolean;
+  onSelectDate: (value: string) => void;
+  onPreviousWeek: () => void;
+  onNextWeek: () => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4 md:hidden">
+      <section>
+        <p className="text-label text-primary-light">Plan</p>
+        <h1 className="mt-2 font-display text-[2.15rem] font-semibold leading-[0.95]">
+          Treningi w tygodniu
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+          Wybierz dzień i sprawdź zaplanowane sesje.
+        </p>
+      </section>
+
+      <section className="card-shell p-3">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={onPreviousWeek}
+            className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-lowest text-on-surface-variant"
+            aria-label="Poprzedni tydzień"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <p className="text-sm font-semibold">
+            {formatWeekRange(weekStart, addDays(weekStart, 6))}
+          </p>
+          <button
+            type="button"
+            onClick={onNextWeek}
+            className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-lowest text-on-surface-variant"
+            aria-label="Następny tydzień"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {weekDays.map((day) => {
+            const key = toDateKey(day);
+            const selected = key === selectedDateKey;
+
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onSelectDate(key)}
+                className={[
+                  "flex min-w-[58px] flex-col items-center rounded-[var(--radius-lg)] px-3 py-3 transition",
+                  selected
+                    ? "bg-primary text-on-primary"
+                    : "bg-surface-container-lowest text-on-surface-variant",
+                ].join(" ")}
+              >
+                <span className="text-[10px] font-semibold uppercase tracking-wider">
+                  {new Intl.DateTimeFormat("pl-PL", { weekday: "short" }).format(day)}
+                </span>
+                <span className="mt-2 text-[1.45rem] font-semibold leading-none">
+                  {new Intl.DateTimeFormat("pl-PL", { day: "2-digit" }).format(day)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="grid grid-cols-2 gap-3">
+        <MobilePlanMetric
+          label="Najbliższy"
+          value={nextSession ? formatSessionTime(nextSession.startAt) : "Brak"}
+          note={nextSession?.title || "sesji"}
+        />
+        <MobilePlanMetric
+          label="Pakiet"
+          value={usage ? `${usage.usedSessions}/${usage.totalSessions}` : "-"}
+          note={`${usageProgress}% cyklu`}
+        />
+      </section>
+
+      <section className="card-shell p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-label text-on-surface-muted">
+              {new Intl.DateTimeFormat("pl-PL", {
+                weekday: "long",
+                day: "2-digit",
+                month: "short",
+              }).format(selectedDay)}
+            </p>
+            <h2 className="mt-2 font-display text-[1.6rem] font-semibold leading-none">
+              Sesje dnia
+            </h2>
+          </div>
+          <Button type="button" variant="secondary" size="sm" onClick={onRefresh}>
+            Odśwież
+          </Button>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-3">
+          {isLoading ? (
+            <PlanSkeleton />
+          ) : selectedDaySessions.length ? (
+            selectedDaySessions.map((session) => (
+              <SessionListRow key={session.id} session={session} />
+            ))
+          ) : (
+            <EmptyState text="W tym dniu nie masz treningów." />
+          )}
+        </div>
+      </section>
+
+      <section className="card-shell p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-label text-on-surface-muted">Licznik wejść</p>
+            <p className="mt-2 text-[1.55rem] font-semibold">
+              {usage?.remainingSessions ?? 0} zostało
+            </p>
+          </div>
+          <div className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
+            <Dumbbell size={22} />
+          </div>
+        </div>
+        <div className="mt-5 h-3 overflow-hidden rounded-full bg-surface-container-lowest">
+          <div
+            className="h-full rounded-full bg-primary-gradient"
+            style={{ width: `${Math.max(0, Math.min(usageProgress, 100))}%` }}
+          />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function MobilePlanMetric({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <div className="card-shell min-h-[118px] p-4">
+      <p className="text-label text-on-surface-muted">{label}</p>
+      <p className="mt-4 text-[1.55rem] font-semibold leading-none text-primary-light">
+        {value}
+      </p>
+      <p className="mt-2 line-clamp-1 text-sm text-on-surface-variant">{note}</p>
+    </div>
+  );
+}
+
+function DayColumn({
+  day,
+  sessions,
+  isToday,
+}: {
+  day: Date;
+  sessions: ClientPortalSession[];
+  isToday: boolean;
+}) {
+  return (
+    <div
+      className={[
+        "min-h-[260px] rounded-[var(--radius-lg)] bg-surface-container-lowest p-3",
+        isToday ? "outline outline-1 outline-primary-light/35" : "",
+      ].join(" ")}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-label text-on-surface-muted">
+            {new Intl.DateTimeFormat("pl-PL", { weekday: "short" }).format(day)}
+          </p>
+          <p className="mt-1 text-[1.55rem] font-semibold leading-none">
+            {new Intl.DateTimeFormat("pl-PL", { day: "2-digit" }).format(day)}
+          </p>
+        </div>
+        {isToday ? (
+          <span className="rounded-full bg-primary/20 px-2.5 py-1 text-xs font-semibold text-primary-light">
+            Dziś
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3">
+        {sessions.length ? (
+          sessions.map((session) => (
+            <div
+              key={session.id}
+              className="rounded-[var(--radius-md)] bg-surface-container p-3"
+            >
+              <p className="text-sm font-semibold text-primary-light">
+                {formatSessionTime(session.startAt)} - {formatSessionTime(session.endAt)}
+              </p>
+              <p className="mt-2 line-clamp-2 text-sm font-semibold">
+                {session.title || "Trening"}
+              </p>
+              <p className="mt-2 truncate text-xs text-on-surface-variant">
+                {session.trainerFullName || "Trener"}
+              </p>
+            </div>
+          ))
+        ) : (
+          <div className="rounded-[var(--radius-md)] border border-dashed border-white/10 p-4 text-xs leading-5 text-on-surface-muted">
+            Brak treningów
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PlanMetric({
+  icon,
+  label,
+  value,
+  note,
+  loading,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  note: string;
+  loading: boolean;
+}) {
+  return (
+    <div className="card-shell p-5">
+      <div className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
+        {icon}
+      </div>
+      <p className="mt-5 text-label text-on-surface-muted">{label}</p>
+      {loading ? (
+        <div className="mt-3 h-7 animate-pulse rounded bg-surface-container-lowest" />
+      ) : (
+        <p className="mt-3 text-[1.5rem] font-semibold leading-tight">{value}</p>
+      )}
+      <p className="mt-3 text-sm leading-6 text-on-surface-variant">{note}</p>
+    </div>
+  );
+}
+
+function SessionListRow({ session }: { session: ClientPortalSession }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 md:flex-row md:items-center md:justify-between">
+      <div className="min-w-0">
+        <p className="truncate text-base font-semibold">
+          {session.title || "Trening"}
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2 text-sm text-on-surface-variant">
+          <span className="inline-flex items-center gap-1.5">
+            <Clock3 size={14} className="text-primary-light" />
+            {formatShortDateTime(session.startAt)}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <MapPin size={14} className="text-primary-light" />
+            {session.locationName || "Brak lokalizacji"}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <UserRound size={14} className="text-primary-light" />
+            {session.trainerFullName || "Trener"}
+          </span>
+        </div>
+      </div>
+      <span className="w-fit rounded-full bg-surface-container-low px-3 py-1 text-xs font-semibold text-primary-light">
+        {getSessionStatusLabel(session.status)}
+      </span>
+    </div>
+  );
+}
+
+function UsageTile({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4">
+      <p className="text-label text-on-surface-muted">{label}</p>
+      <p className="mt-2 text-[1.55rem] font-semibold leading-none">{value}</p>
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest p-5 text-sm text-on-surface-variant">
+      {text}
+    </div>
+  );
+}
+
+function PlanSkeleton() {
+  return (
+    <>
+      {[1, 2, 3].map((item) => (
+        <div
+          key={item}
+          className="h-20 animate-pulse rounded-[var(--radius-lg)] bg-surface-container-lowest"
+        />
+      ))}
+    </>
+  );
+}
+
+function getWeekStart(date: Date) {
+  const result = new Date(date);
+  const day = result.getDay() || 7;
+  result.setDate(result.getDate() - day + 1);
+  result.setHours(0, 0, 0, 0);
+
+  return result;
+}
+
+function addDays(date: Date, days: number) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+
+  return result;
+}
+
+function toDateKey(date: Date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function formatWeekRange(start: Date, end: Date) {
+  const formatter = new Intl.DateTimeFormat("pl-PL", {
+    day: "2-digit",
+    month: "short",
+  });
+
+  return `${formatter.format(start)} - ${formatter.format(end)}`;
+}
+
+function formatShortDateTime(value?: string | null) {
+  if (!value) return "Brak terminu";
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("pl-PL", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function sortSessions(first: ClientPortalSession, second: ClientPortalSession) {
+  return getTime(first.startAt) - getTime(second.startAt);
+}
+
+function getTime(value?: string | null) {
+  if (!value) return 0;
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function getSessionStatusLabel(status?: string | null) {
+  const normalized = status?.toLowerCase() || "";
+
+  if (normalized.includes("completed") || normalized.includes("done")) {
+    return "Zrealizowany";
+  }
+  if (normalized.includes("cancel")) return "Anulowany";
+  if (normalized.includes("confirm")) return "Potwierdzony";
+  if (normalized.includes("planned")) return "Zaplanowany";
+
+  return status || "Zaplanowany";
 }

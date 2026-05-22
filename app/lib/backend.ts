@@ -70,6 +70,14 @@ export async function backendFetch<T>(
     });
   }
 
+  if (response.status === 403) {
+    throw new ApiError("Nie masz uprawnień do tej operacji.", {
+      status: response.status,
+      payload,
+      path,
+    });
+  }
+
   if (!response.ok) {
     throw new ApiError(getBackendErrorMessage(payload), {
       status: response.status,
@@ -110,6 +118,10 @@ export function getErrorMessage(
   }
 
   return fallback;
+}
+
+export function isForbiddenError(error: unknown) {
+  return error instanceof ApiError && error.status === 403;
 }
 
 function buildBackendUrl(path: string, query?: ApiQuery) {

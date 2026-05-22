@@ -58,13 +58,28 @@ import {
   showOwnerError,
   showOwnerSuccess,
 } from "@/app/(app)/owner/components/owner-toast";
+import {
+  cancelTrainerPortalClientSubscription,
+  confirmTrainerPortalPayment,
+  createTrainerPortalClientPayment,
+  getTrainerPortalClient,
+  getTrainerPortalClientBilling,
+  getTrainerPortalClientSubscription,
+  getTrainerPortalClientSubscriptionUsage,
+  getTrainerPortalMe,
+  resumeTrainerPortalClientSubscription,
+  setTrainerPortalClientNextPackage,
+} from "@/app/lib/trainer/portal";
+import { trainerPortalClientToClient } from "@/app/lib/trainer/portal-mappers";
 
 type ClientPaymentsPageClientProps = {
   clientIdParam: string;
+  basePath?: "/owner" | "/trainer";
 };
 
 export default function ClientPaymentsPageClient({
   clientIdParam,
+  basePath = "/owner",
 }: ClientPaymentsPageClientProps) {
   const [clientId, setClientId] = useState<number | null>(null);
   const [client, setClient] = useState<Client | null>(null);
@@ -120,6 +135,11 @@ export default function ClientPaymentsPageClient({
 
     try {
       setIsLoading(true);
+      if (basePath === "/trainer") {
+        await loadTrainerClientPayments(id);
+        return;
+      }
+
       const [
         clientData,
         billingData,
@@ -170,12 +190,61 @@ export default function ClientPaymentsPageClient({
     }
   }
 
+  async function loadTrainerClientPayments(id: number) {
+    const [
+      meData,
+      clientData,
+      billingData,
+      subscriptionData,
+      usageData,
+      packagesData,
+    ] =
+      await Promise.all([
+        getTrainerPortalMe().catch(() => null),
+        getTrainerPortalClient(id),
+        getTrainerPortalClientBilling(id),
+        getTrainerPortalClientSubscription(id),
+        getTrainerPortalClientSubscriptionUsage(id).catch(() => null),
+        getPackages().catch(() => []),
+      ]);
+    const activeClientPackageId = billingData.activeClientPackageId
+      ? String(billingData.activeClientPackageId)
+      : "";
+    const activePackageData =
+      billingData.packages?.find(
+        (item) => item.clientPackageId === billingData.activeClientPackageId,
+      ) || null;
+
+    setClient(trainerPortalClientToClient(clientData, meData));
+    setBilling(billingData);
+    setSubscription(subscriptionData);
+    setUsage(usageData);
+    setClientPayments((billingData.payments || []).slice(0, 3));
+    setHasMorePayments((billingData.payments?.length || 0) > 3);
+    setActivePackage(activePackageData);
+    setCurrentCycle(subscriptionData.currentCycle || null);
+    setPackages(packagesData.filter((item) => item.isActive));
+    setPaymentAmount(String(Math.max(billingData.activePackageAmountDue, 0)));
+    setPaymentPackageId(activeClientPackageId);
+    setNextPackageId(
+      subscriptionData.nextPackage?.packageId
+        ? String(subscriptionData.nextPackage.packageId)
+        : "",
+    );
+  }
+
   async function handleSetNextPackage() {
     if (!clientId || !nextPackageId) return;
 
     try {
       setIsSaving(true);
-      const data = await setClientNextPackage(clientId, Number(nextPackageId));
+      const data =
+        basePath === "/trainer"
+          ? await setTrainerPortalClientNextPackage(
+              clientId,
+              Number(nextPackageId),
+            )
+          : await setClientNextPackage(clientId, Number(nextPackageId));
       setSubscription(data);
       showOwnerSuccess("Pakiet od następnego cyklu został ustawiony.", {
         id: "owner-client-next-package-set",
@@ -201,7 +270,10 @@ export default function ClientPaymentsPageClient({
 
     try {
       setIsSaving(true);
-      const data = await cancelClientSubscription(clientId);
+      const data =
+        basePath === "/trainer"
+          ? await cancelTrainerPortalClientSubscription(clientId)
+          : await cancelClientSubscription(clientId);
       setSubscription({
         ...data,
         autoRenewEnabled: false,
@@ -231,7 +303,10 @@ export default function ClientPaymentsPageClient({
 
     try {
       setIsSaving(true);
-      const data = await resumeClientSubscription(clientId);
+      const data =
+        basePath === "/trainer"
+          ? await resumeTrainerPortalClientSubscription(clientId)
+          : await resumeClientSubscription(clientId);
       setSubscription({
         ...data,
         autoRenewEnabled: true,
@@ -280,14 +355,18 @@ export default function ClientPaymentsPageClient({
 
     try {
       setIsSaving(true);
-      const createdPayment = await createClientPayment({
+      const paymentPayload = {
         clientId,
         clientPackageId: Number(paymentPackageId),
         amount,
         method: Number(paymentMethod) as PaymentMethod,
         paymentDate: new Date().toISOString(),
         note: paymentNote.trim() || "Wpłata dodana w panelu.",
-      });
+      };
+      const createdPayment =
+        basePath === "/trainer"
+          ? await createTrainerPortalClientPayment(clientId, paymentPayload)
+          : await createClientPayment(paymentPayload);
 
       showOwnerSuccess(getCreatedPaymentMessage(createdPayment), {
         id: "owner-client-payment-created",
@@ -315,7 +394,11 @@ export default function ClientPaymentsPageClient({
 
     try {
       setProcessingPaymentId(payment.id);
-      await confirmClientPayment(payment.id);
+      if (basePath === "/trainer") {
+        await confirmTrainerPortalPayment(payment.id);
+      } else {
+        await confirmClientPayment(payment.id);
+      }
       showOwnerSuccess("Wpłata została potwierdzona.", {
         id: `owner-client-payment-confirmed-${payment.id}`,
       });
@@ -470,15 +553,15 @@ export default function ClientPaymentsPageClient({
   const lastPayment = payments[0] || null;
   const visiblePayments = payments.slice(0, 3);
   const allClientPaymentsHref = clientId
-    ? `/owner/payments?clientId=${clientId}`
-    : "/owner/payments";
+    ? `${basePath}/payments?clientId=${clientId}`
+    : `${basePath}/payments`;
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Link
-            href={clientId ? `/owner/clients/${clientId}` : "/owner/clients"}
+            href={clientId ? `${basePath}/clients/${clientId}` : `${basePath}/clients`}
             className="inline-flex items-center gap-2 text-sm font-semibold text-primary-light"
           >
             <ArrowLeft size={18} />

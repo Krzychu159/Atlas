@@ -1,278 +1,489 @@
-import { User, Settings2, Pencil, ChevronDown, Bolt, Lock } from "lucide-react";
+"use client";
 
-export default function SettingsPage() {
+import {
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { Lock, Mail, MapPin, Phone, User } from "lucide-react";
+import AvatarFilePicker from "@/app/components/ui/avatar-file-picker";
+import { Button } from "@/app/components/ui/button";
+import { showAppError, showAppSuccess } from "@/app/components/ui/app-toast";
+import {
+  getClientPortalMe,
+  requestClientPortalEmailChange,
+  updateClientPortalMe,
+  type ClientPortalMe,
+} from "@/app/lib/client/portal";
+
+type ProfileForm = {
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  avatarUrl: string;
+};
+
+export default function ClientSettingsPage() {
+  const [me, setMe] = useState<ClientPortalMe | null>(null);
+  const [form, setForm] = useState<ProfileForm>(() => toProfileForm(null));
+  const [requestedEmail, setRequestedEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRequestingEmail, setIsRequestingEmail] = useState(false);
+
+  const initials = useMemo(
+    () => getInitials(form.firstName, form.lastName, me?.fullName),
+    [form.firstName, form.lastName, me?.fullName],
+  );
+
+  async function loadProfile() {
+    try {
+      setIsLoading(true);
+      const data = await getClientPortalMe();
+      setMe(data);
+      setForm(toProfileForm(data));
+      setRequestedEmail("");
+    } catch (err) {
+      showAppError(err, "Nie udało się pobrać profilu klienta.", {
+        id: "client-profile-load-error",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadProfile();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  async function handleSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    try {
+      setIsSaving(true);
+      const updated = await updateClientPortalMe({
+        firstName: form.firstName.trim() || null,
+        lastName: form.lastName.trim() || null,
+        phoneNumber: form.phoneNumber.trim() || null,
+        avatarUrl: form.avatarUrl || null,
+      });
+
+      setMe(updated);
+      setForm(toProfileForm(updated));
+      showAppSuccess("Profil został zapisany.", {
+        id: "client-profile-save-success",
+      });
+    } catch (err) {
+      showAppError(err, "Nie udało się zapisać profilu.", {
+        id: "client-profile-save-error",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleEmailRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const email = requestedEmail.trim();
+
+    if (!email) {
+      showAppError(
+        new Error("Wpisz nowy adres e-mail."),
+        "Wpisz nowy adres e-mail.",
+        { id: "client-email-empty" },
+      );
+      return;
+    }
+
+    try {
+      setIsRequestingEmail(true);
+      await requestClientPortalEmailChange({ requestedEmail: email });
+      setRequestedEmail("");
+      showAppSuccess("Prośba o zmianę e-maila została wysłana.", {
+        id: "client-email-request-success",
+      });
+    } catch (err) {
+      showAppError(err, "Nie udało się wysłać prośby o zmianę e-maila.", {
+        id: "client-email-request-error",
+      });
+    } finally {
+      setIsRequestingEmail(false);
+    }
+  }
+
   return (
-    <div className="max-w-[1400px] mx-auto">
-      {/* Desktop */}
-      <div className="hidden md:block">
-        <div className="flex flex-col gap-6">
-          <div className="max-w-[560px]">
-            <p className="text-label text-primary-light">
-              Zarządzaj ustawieniami systemu
-            </p>
-            <h1 className="mt-2 text-[2.25rem] leading-[0.95] mb-3 font-semibold font-display tracking-tight">
-              Ustawienia <span className="text-primary-light">ATLAS</span>
-            </h1>
-          </div>
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 pb-10">
+      <MobileSettings
+        me={me}
+        form={form}
+        initials={initials}
+        requestedEmail={requestedEmail}
+        isLoading={isLoading}
+        isSaving={isSaving}
+        isRequestingEmail={isRequestingEmail}
+        onFormChange={setForm}
+        onRequestedEmailChange={setRequestedEmail}
+        onSave={handleSave}
+        onEmailRequest={handleEmailRequest}
+      />
 
-          <div className="card-shell p-6 md:p-8">
-            <div className="grid grid-cols-[180px_1fr] gap-8 items-start">
-              <div className="flex flex-col items-center text-center">
-                <div className="relative">
-                  <div className="h-36 w-36 rounded-[24px] overflow-hidden bg-surface-container-low shadow-soft">
-                    <img
-                      src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=800&auto=format&fit=crop"
-                      alt="Zdjęcie profilowe"
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
+      <div className="hidden flex-col gap-6 md:flex">
+      <section>
+        <p className="text-label text-primary-light">Ustawienia</p>
+        <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
+          Profil klienta
+        </h1>
+        <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
+          Dane kontaktowe widoczne dla studia i trenera.
+        </p>
+      </section>
 
-                  <button className="absolute -right-2 bottom-0 h-11 w-11 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-soft">
-                    <Pencil size={16} />
-                  </button>
-                </div>
-
-                <button className="mt-4 text-label text-on-surface-variant hover:text-on-surface transition-colors">
-                  Zmień zdjęcie
-                </button>
-              </div>
-
-              <div>
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-surface-container-low flex items-center justify-center text-primary-light">
-                    <User size={18} />
-                  </div>
-                  <p className="text-section-title">Ustawienia Profilu</p>
-                </div>
-
-                <div className="mt-6 grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block mb-2 text-label text-on-surface-variant">
-                      Imię
-                    </label>
-                    <input
-                      defaultValue="Marek"
-                      className="w-full h-14 rounded-[var(--radius-lg)] bg-surface-container-low px-4 outline-none text-base"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block mb-2 text-label text-on-surface-variant">
-                      Nazwisko
-                    </label>
-                    <input
-                      defaultValue="Kowalski"
-                      className="w-full h-14 rounded-[var(--radius-lg)] bg-surface-container-low px-4 outline-none text-base"
-                    />
-                  </div>
-
-                  <div className="col-span-2">
-                    <label className="block mb-2 text-label text-on-surface-variant">
-                      Pseudonim
-                    </label>
-                    <input
-                      defaultValue="marek_coach"
-                      className="w-full h-14 rounded-[var(--radius-lg)] bg-surface-container-low px-4 outline-none text-base"
-                    />
-                  </div>
-                </div>
-              </div>
+      <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <form onSubmit={handleSave} className="card-shell p-5 md:p-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary-light">
+              <User size={18} />
+            </div>
+            <div>
+              <p className="text-label text-on-surface-muted">Profil</p>
+              <h2 className="font-display text-[1.65rem] font-semibold leading-none">
+                Dane osobowe
+              </h2>
             </div>
           </div>
 
-          <div className="card-shell p-6 md:p-8">
+          <div className="mt-6">
+            <AvatarFilePicker
+              value={form.avatarUrl}
+              fallbackText={initials}
+              onChange={(value) =>
+                setForm((current) => ({ ...current, avatarUrl: value }))
+              }
+            />
+          </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <TextField
+              label="Imię"
+              value={form.firstName}
+              onChange={(value) =>
+                setForm((current) => ({ ...current, firstName: value }))
+              }
+              disabled={isLoading}
+            />
+            <TextField
+              label="Nazwisko"
+              value={form.lastName}
+              onChange={(value) =>
+                setForm((current) => ({ ...current, lastName: value }))
+              }
+              disabled={isLoading}
+            />
+            <TextField
+              label="Telefon"
+              value={form.phoneNumber}
+              onChange={(value) =>
+                setForm((current) => ({ ...current, phoneNumber: value }))
+              }
+              disabled={isLoading}
+              className="sm:col-span-2"
+            />
+          </div>
+
+          <div className="mt-6 flex justify-end">
+            <Button
+              type="submit"
+              disabled={isSaving || isLoading}
+              icon={<Lock size={16} />}
+            >
+              {isSaving ? "Zapisywanie..." : "Zapisz zmiany"}
+            </Button>
+          </div>
+        </form>
+
+        <div className="flex flex-col gap-4">
+          <div className="card-shell p-5 md:p-6">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-surface-container-low flex items-center justify-center text-primary-light">
-                <Settings2 size={18} />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary-light">
+                <Mail size={18} />
               </div>
-              <p className="text-section-title">Ustawienia Systemowe</p>
-            </div>
-
-            <div className="mt-6 grid grid-cols-[1fr_360px] gap-6 items-start">
               <div>
-                <label className="block mb-2 text-label text-on-surface-variant">
-                  Język systemu
-                </label>
-
-                <div className="relative">
-                  <select className="w-full h-14 rounded-[var(--radius-lg)] bg-surface-container-low px-4 pr-12 outline-none text-base appearance-none">
-                    <option>Polski (PL)</option>
-                    <option>English (EN)</option>
-                  </select>
-
-                  <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
-                    <ChevronDown size={18} />
-                  </div>
-                </div>
-
-                <p className="mt-3 text-sm italic text-on-surface-muted">
-                  Wybierz główny język interfejsu aplikacji.
-                </p>
-              </div>
-
-              <div className="bg-surface-container-low rounded-[var(--radius-xl)] p-5">
-                <div className="flex items-start gap-4">
-                  <div className="h-12 w-12 rounded-full bg-tertiary-container flex items-center justify-center text-tertiary-light shrink-0">
-                    <Bolt size={20} />
-                  </div>
-
-                  <div>
-                    <p className="text-lg font-semibold">Status Subskrypcji</p>
-                    <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-                      Twój plan Atlas Performance jest aktywny do 12.12.2036
-                    </p>
-                  </div>
-                </div>
+                <p className="text-label text-on-surface-muted">Konto</p>
+                <h2 className="font-display text-[1.65rem] font-semibold leading-none">
+                  E-mail
+                </h2>
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center justify-end gap-8 pt-1">
-            <button className="text-base text-on-surface-variant hover:text-on-surface transition-colors">
-              Anuluj
-            </button>
-
-            <button className="h-14 px-8 rounded-[var(--radius-lg)] bg-primary text-on-primary font-semibold shadow-ambient flex items-center gap-3">
-              <Lock size={16} />
-              Zapisz zmiany
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile */}
-      <div className="md:hidden px-1 pb-6">
-        <div className="flex flex-col gap-5">
-          <div>
-            <p className="text-label text-primary-light">
-              Zarządzaj ustawieniami systemu
-            </p>
-            <h1 className="mt-2 text-page-title">
-              Ustawienia <span className="text-primary-light">ATLAS</span>
-            </h1>
-          </div>
-
-          <div className="card-shell p-5">
-            <div className="flex flex-col items-center text-center">
-              <div className="relative">
-                <div className="h-28 w-28 rounded-[22px] overflow-hidden bg-surface-container-low shadow-soft">
-                  <img
-                    src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=800&auto=format&fit=crop"
-                    alt="Zdjęcie profilowe"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-
-                <button className="absolute -right-2 bottom-0 h-10 w-10 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-soft">
-                  <Pencil size={15} />
-                </button>
-              </div>
-
-              <button className="mt-4 text-label text-on-surface-variant">
-                Zmień zdjęcie
-              </button>
-            </div>
-
-            <div className="mt-6">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-surface-container-low flex items-center justify-center text-primary-light">
-                  <User size={18} />
-                </div>
-                <p className="text-section-title">Profil</p>
-              </div>
-
-              <div className="mt-5 flex flex-col gap-4">
-                <div>
-                  <label className="block mb-2 text-label text-on-surface-variant">
-                    Imię
-                  </label>
-                  <input
-                    defaultValue="Marek"
-                    className="w-full h-14 rounded-[var(--radius-lg)] bg-surface-container-low px-4 outline-none text-base"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-label text-on-surface-variant">
-                    Nazwisko
-                  </label>
-                  <input
-                    defaultValue="Kowalski"
-                    className="w-full h-14 rounded-[var(--radius-lg)] bg-surface-container-low px-4 outline-none text-base"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-label text-on-surface-variant">
-                    Pseudonim
-                  </label>
-                  <input
-                    defaultValue="marek_coach"
-                    className="w-full h-14 rounded-[var(--radius-lg)] bg-surface-container-low px-4 outline-none text-base"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card-shell p-5">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-surface-container-low flex items-center justify-center text-primary-light">
-                <Settings2 size={18} />
-              </div>
-              <p className="text-section-title">System</p>
-            </div>
-
-            <div className="mt-5">
-              <label className="block mb-2 text-label text-on-surface-variant">
-                Język systemu
-              </label>
-
-              <div className="relative">
-                <select className="w-full h-14 rounded-[var(--radius-lg)] bg-surface-container-low px-4 pr-12 outline-none text-base appearance-none">
-                  <option>Polski (PL)</option>
-                  <option>English (EN)</option>
-                  <option>Deutsch (DE)</option>
-                </select>
-
-                <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
-                  <ChevronDown size={18} />
-                </div>
-              </div>
-
-              <p className="mt-3 text-sm italic text-on-surface-muted">
-                Wybierz główny język interfejsu aplikacji.
+            <div className="mt-5 rounded-[var(--radius-lg)] bg-surface-container-lowest p-4">
+              <p className="text-label text-on-surface-muted">Aktualny adres</p>
+              <p className="mt-2 text-base font-semibold">
+                {me?.email || "Brak e-maila"}
               </p>
             </div>
 
-            <div className="mt-5 bg-surface-container-low rounded-[var(--radius-xl)] p-5">
-              <div className="flex items-start gap-4">
-                <div className="h-11 w-11 rounded-full bg-tertiary-container flex items-center justify-center text-tertiary-light shrink-0">
-                  <Bolt size={18} />
-                </div>
+            <form onSubmit={handleEmailRequest} className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <input
+                value={requestedEmail}
+                onChange={(event) => setRequestedEmail(event.target.value)}
+                type="email"
+                placeholder="Nowy adres e-mail"
+                className="h-12 min-w-0 flex-1 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
+              />
+              <Button
+                type="submit"
+                variant="secondary"
+                disabled={isRequestingEmail}
+              >
+                {isRequestingEmail ? "Wysyłanie..." : "Poproś o zmianę"}
+              </Button>
+            </form>
 
-                <div>
-                  <p className="text-base font-semibold">Status Subskrypcji</p>
-                  <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-                    Twój plan Atlas Performance jest aktywny do 12.12.2024.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <p className="mt-3 text-sm leading-6 text-on-surface-muted">
+              Zmiana e-maila wymaga potwierdzenia w studiu, dlatego wysyłasz
+              prośbę zamiast edytować adres bezpośrednio.
+            </p>
           </div>
 
-          <div className="flex flex-col gap-3">
-            <button className="h-13 rounded-[var(--radius-lg)] bg-surface-container-low text-on-surface font-medium py-3.5">
-              Anuluj
-            </button>
-
-            <button className="h-14 rounded-[var(--radius-lg)] bg-primary text-on-primary font-semibold shadow-ambient flex items-center justify-center gap-3">
-              <Lock size={16} />
-              Zapisz zmiany
-            </button>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <InfoCard
+              icon={<MapPin size={18} />}
+              label="Lokalizacja"
+              value={me?.locationName || "Brak lokalizacji"}
+            />
+            <InfoCard
+              icon={<Phone size={18} />}
+              label="Trener"
+              value={me?.trainerFullName || "Nie przypisano"}
+            />
           </div>
         </div>
+      </section>
       </div>
     </div>
   );
+}
+
+function MobileSettings({
+  me,
+  form,
+  initials,
+  requestedEmail,
+  isLoading,
+  isSaving,
+  isRequestingEmail,
+  onFormChange,
+  onRequestedEmailChange,
+  onSave,
+  onEmailRequest,
+}: {
+  me: ClientPortalMe | null;
+  form: ProfileForm;
+  initials: string;
+  requestedEmail: string;
+  isLoading: boolean;
+  isSaving: boolean;
+  isRequestingEmail: boolean;
+  onFormChange: Dispatch<SetStateAction<ProfileForm>>;
+  onRequestedEmailChange: (value: string) => void;
+  onSave: (event: FormEvent<HTMLFormElement>) => void;
+  onEmailRequest: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4 md:hidden">
+      <section>
+        <p className="text-label text-primary-light">Ustawienia</p>
+        <h1 className="mt-2 font-display text-[2.15rem] font-semibold leading-[0.95]">
+          Profil klienta
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+          Najważniejsze dane kontaktowe dla studia.
+        </p>
+      </section>
+
+      <form onSubmit={onSave} className="card-shell p-5">
+        <AvatarFilePicker
+          value={form.avatarUrl}
+          fallbackText={initials}
+          onChange={(value) =>
+            onFormChange((current) => ({ ...current, avatarUrl: value }))
+          }
+        />
+
+        <div className="mt-5 flex flex-col gap-4">
+          <TextField
+            label="Imię"
+            value={form.firstName}
+            onChange={(value) =>
+              onFormChange((current) => ({ ...current, firstName: value }))
+            }
+            disabled={isLoading}
+          />
+          <TextField
+            label="Nazwisko"
+            value={form.lastName}
+            onChange={(value) =>
+              onFormChange((current) => ({ ...current, lastName: value }))
+            }
+            disabled={isLoading}
+          />
+          <TextField
+            label="Telefon"
+            value={form.phoneNumber}
+            onChange={(value) =>
+              onFormChange((current) => ({ ...current, phoneNumber: value }))
+            }
+            disabled={isLoading}
+          />
+        </div>
+
+        <Button
+          type="submit"
+          disabled={isSaving || isLoading}
+          icon={<Lock size={16} />}
+          className="mt-5 w-full"
+        >
+          {isSaving ? "Zapisywanie..." : "Zapisz profil"}
+        </Button>
+      </form>
+
+      <section className="grid grid-cols-2 gap-3">
+        <InfoCard
+          icon={<MapPin size={18} />}
+          label="Lokalizacja"
+          value={me?.locationName || "Brak lokalizacji"}
+        />
+        <InfoCard
+          icon={<Phone size={18} />}
+          label="Trener"
+          value={me?.trainerFullName || "Nie przypisano"}
+        />
+      </section>
+
+      <form onSubmit={onEmailRequest} className="card-shell p-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary-light">
+            <Mail size={18} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-label text-on-surface-muted">E-mail</p>
+            <p className="truncate text-sm font-semibold">
+              {me?.email || "Brak e-maila"}
+            </p>
+          </div>
+        </div>
+
+        <input
+          value={requestedEmail}
+          onChange={(event) => onRequestedEmailChange(event.target.value)}
+          type="email"
+          placeholder="Nowy adres e-mail"
+          className="mt-5 h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
+        />
+
+        <Button
+          type="submit"
+          variant="secondary"
+          disabled={isRequestingEmail}
+          className="mt-3 w-full"
+        >
+          {isRequestingEmail ? "Wysyłanie..." : "Poproś o zmianę e-maila"}
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+function TextField({
+  label,
+  value,
+  onChange,
+  disabled,
+  className,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <label className={className}>
+      <span className="text-label text-on-surface-muted">{label}</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}
+        className="mt-2 h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm text-on-surface outline-none placeholder:text-on-surface-muted disabled:opacity-60"
+      />
+    </label>
+  );
+}
+
+function InfoCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="card-shell p-5">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary-light">
+        {icon}
+      </div>
+      <p className="mt-4 text-label text-on-surface-muted">{label}</p>
+      <p className="mt-2 text-base font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function toProfileForm(me: ClientPortalMe | null): ProfileForm {
+  const names = splitFullName(me);
+
+  return {
+    firstName: names.firstName,
+    lastName: names.lastName,
+    phoneNumber: me?.phoneNumber || "",
+    avatarUrl: me?.avatarUrl || "",
+  };
+}
+
+function splitFullName(me: ClientPortalMe | null) {
+  if (me?.firstName || me?.lastName) {
+    return {
+      firstName: me.firstName || "",
+      lastName: me.lastName || "",
+    };
+  }
+
+  const parts = (me?.fullName || "").trim().split(" ").filter(Boolean);
+  const firstName = parts.shift() || "";
+
+  return {
+    firstName,
+    lastName: parts.join(" "),
+  };
+}
+
+function getInitials(
+  firstName: string,
+  lastName: string,
+  fullName?: string | null,
+) {
+  const fallbackParts = (fullName || "").trim().split(" ").filter(Boolean);
+  const first = firstName || fallbackParts[0] || "";
+  const last = lastName || fallbackParts[1] || "";
+
+  return `${first[0] || ""}${last[0] || ""}`.toUpperCase() || "K";
 }

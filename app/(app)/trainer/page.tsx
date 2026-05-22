@@ -1,415 +1,520 @@
-import { Button } from "@/app/components/ui/button";
-import {
-  Download,
-  CalendarDays,
-  Banknote,
-  Users,
-  UserPlus,
-  CirclePlus,
-  CalendarPlus,
-  CircleDollarSign,
-  ChevronRight,
-} from "lucide-react";
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import TrainingCalendar from "@/app/components/TrainingCalendar";
-import TodayScheduleCard from "@/app/components/TodayScheduleCard";
-import { LogoutButton } from "@/app/components/logoutButton";
+import {
+  ArrowRight,
+  CalendarDays,
+  Clock3,
+  MapPin,
+  Sparkles,
+  Target,
+  Users,
+} from "lucide-react";
+import { showAppError } from "@/app/components/ui/app-toast";
+import {
+  getTrainerPortalClients,
+  getTrainerPortalDashboard,
+  type TrainerPortalClient,
+  type TrainerPortalDashboard,
+  type TrainerPortalSession,
+} from "@/app/lib/trainer/portal";
 
-const boxes = [
-  {
-    title: "Monthly Revenue",
-    value: "$24,500",
-    change: "+12.5%",
-    subtitle: "+$4.2k from last month",
-    icon: <Banknote size={22} />,
-  },
-  {
-    title: "Active Members",
-    value: "48",
-    change: "+5.2%",
-    subtitle: "Current active clients",
-    icon: <Users size={22} />,
-  },
-  {
-    title: "New Signups",
-    value: "12",
-    change: "+2.1%",
-    subtitle: "Last 30 days",
-    icon: <UserPlus size={22} />,
-  },
-];
+export default function TrainerDashboardPage() {
+  const [dashboard, setDashboard] = useState<TrainerPortalDashboard | null>(
+    null,
+  );
+  const [clients, setClients] = useState<TrainerPortalClient[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-const topTrainers = [
-  {
-    name: "Jordan Davis",
-    role: "HIIT & Strength",
-    sessions: 142,
-  },
-  {
-    name: "Sarah Rivera",
-    role: "Yoga & Mobility",
-    sessions: 128,
-  },
-  {
-    name: "Marcus Chen",
-    role: "Boxing & Cardio",
-    sessions: 115,
-  },
-];
+  async function loadDashboard() {
+    try {
+      setIsLoading(true);
+      const [dashboardData, clientsData] = await Promise.all([
+        getTrainerPortalDashboard(),
+        getTrainerPortalClients(),
+      ]);
 
-const quickActions = [
-  {
-    title: "Add New Member",
-    description: "Register client to the system",
-    icon: <CirclePlus size={18} />,
-  },
-  {
-    title: "Schedule Session",
-    description: "Open training calendar",
-    icon: <CalendarPlus size={18} />,
-  },
-  {
-    title: "Change Packages",
-    description: "Update client subscription",
-    icon: <CircleDollarSign size={18} />,
-  },
-];
+      setDashboard(dashboardData);
+      setClients(clientsData);
+    } catch (err) {
+      showAppError(err, "Nie udało się pobrać panelu trenera.", {
+        id: "trainer-dashboard-load-error",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
-function DashboardStatCard({
-  title,
-  value,
-  change,
-  subtitle,
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadDashboard();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const todaySessions = useMemo(
+    () =>
+      [...(dashboard?.todaySessions || [])]
+        .sort(sortSessionsByStart)
+        .slice(0, 3),
+    [dashboard],
+  );
+  const recentClients = useMemo(
+    () =>
+      [
+        ...(dashboard?.recentClients?.length
+          ? dashboard.recentClients
+          : clients),
+      ]
+        .sort(sortClientsByCreatedAt)
+        .slice(0, 3),
+    [clients, dashboard],
+  );
+  const upcomingSessions = useMemo(
+    () => [...(dashboard?.upcomingSessions || [])].sort(sortSessionsByStart),
+    [dashboard],
+  );
+  const focus = useMemo(
+    () => getTrainerFocus(clients, upcomingSessions),
+    [clients, upcomingSessions],
+  );
+  const firstName = getFirstName(dashboard?.me?.fullName);
+
+  return (
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-label text-primary-light">Panel trenera</p>
+          <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
+            Cześć{firstName ? `, ${firstName}` : ""}
+          </h1>
+          <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
+            Szybki przegląd dnia: najbliższe sesje, nowi podopieczni i rzeczy,
+            które warto sprawdzić przed treningami.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <DashboardLink href="/trainer/schedule" icon={<CalendarDays size={16} />}>
+            Otwórz plan
+          </DashboardLink>
+          <DashboardLink href="/trainer/clients" icon={<Users size={16} />}>
+            Klienci
+          </DashboardLink>
+        </div>
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <StatCard
+          label="Dzisiejsze sesje"
+          value={dashboard?.todaySessionsCount ?? 0}
+          note="Zaplanowane na dziś"
+          icon={<CalendarDays size={20} />}
+          loading={isLoading}
+        />
+        <StatCard
+          label="Aktywni klienci"
+          value={dashboard?.activeClientsCount ?? clients.length}
+          note="Twoi podopieczni"
+          icon={<Users size={20} />}
+          loading={isLoading}
+        />
+        <StatCard
+          label="Najbliższe sesje"
+          value={dashboard?.upcomingSessionsCount ?? 0}
+          note="W kolejce planu"
+          icon={<Clock3 size={20} />}
+          loading={isLoading}
+        />
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <TodaySessionsPanel sessions={todaySessions} loading={isLoading} />
+        <RecentClientsPanel clients={recentClients} loading={isLoading} />
+      </section>
+
+      <CoachFocusPanel focus={focus} loading={isLoading} />
+    </div>
+  );
+}
+
+function DashboardLink({
+  href,
   icon,
+  children,
 }: {
-  title: string;
-  value: string;
-  change: string;
-  subtitle: string;
+  href: string;
   icon: React.ReactNode;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="card-shell p-5 md:p-6 h-full">
-      <div className="flex justify-between items-start">
-        <div className="text-primary-light bg-surface-container-low p-3 rounded-2xl h-fit">
+    <Link
+      href={href}
+      className="inline-flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-primary-light transition hover:bg-surface-container-high"
+    >
+      {icon}
+      {children}
+    </Link>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  note,
+  icon,
+  loading,
+}: {
+  label: string;
+  value: number;
+  note: string;
+  icon: React.ReactNode;
+  loading: boolean;
+}) {
+  return (
+    <article className="card-shell p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-label text-on-surface-muted">{label}</p>
+          <p className="mt-4 text-[2.1rem] font-semibold leading-none text-on-surface">
+            {loading ? "..." : value}
+          </p>
+          <p className="mt-3 text-sm text-on-surface-variant">{note}</p>
+        </div>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
           {icon}
         </div>
-
-        <p className="text-success-toast-text text-label-sm bg-green-900/70 rounded-full px-2.5 py-1 h-fit">
-          {change}
-        </p>
       </div>
-
-      <div className="flex flex-col gap-2 mt-5">
-        <p className="text-sm md:text-base text-on-surface-variant">{title}</p>
-        <p className="text-[2rem] md:text-4xl font-semibold leading-none tracking-tight">
-          {value}
-        </p>
-        <p className="text-label text-primary-light mt-1">{subtitle}</p>
-      </div>
-    </div>
+    </article>
   );
 }
 
-function MobileMiniStat({
-  title,
-  value,
-  change,
+function TodaySessionsPanel({
+  sessions,
+  loading,
 }: {
-  title: string;
-  value: string;
-  change: string;
+  sessions: TrainerPortalSession[];
+  loading: boolean;
 }) {
   return (
-    <div className="card-shell p-5">
-      <p className="text-label text-on-surface-variant">{title}</p>
-      <div className="mt-4 flex items-end justify-between gap-3">
-        <p className="text-[2.4rem] font-semibold leading-none tracking-tight">
-          {value}
-        </p>
-        <p className="text-sm font-medium text-success-toast-text">{change}</p>
+    <section className="card-shell p-5 md:p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-section-title">Dzisiejsze sesje</p>
+          <p className="mt-2 text-sm text-on-surface-variant">
+            Trzy najbliższe pozycje z Twojego planu dnia.
+          </p>
+        </div>
+        <Link
+          href="/trainer/schedule"
+          className="inline-flex items-center gap-1 text-label text-primary-light"
+        >
+          Plan
+          <ArrowRight size={14} />
+        </Link>
       </div>
+
+      <div className="mt-5 flex flex-col gap-3">
+        {loading ? (
+          <EmptyState label="Ładowanie sesji..." />
+        ) : sessions.length > 0 ? (
+          sessions.map((session) => (
+            <SessionRow key={session.sessionId} session={session} />
+          ))
+        ) : (
+          <EmptyState label="Brak sesji zaplanowanych na dziś." />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function SessionRow({ session }: { session: TrainerPortalSession }) {
+  return (
+    <article className="rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-primary-light">
+            {formatTimeRange(session.startAt, session.endAt)}
+          </p>
+          <p className="mt-2 truncate text-lg font-semibold text-on-surface">
+            {session.title || "Sesja treningowa"}
+          </p>
+          <p className="mt-1 truncate text-sm text-on-surface-variant">
+            {session.clientFullName || "Klient bez nazwy"}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <StatusPill label={getSessionStatusLabel(session.status)} />
+          <p className="mt-3 inline-flex items-center gap-1 text-xs text-on-surface-muted">
+            <MapPin size={13} />
+            {session.locationName || "Brak lokalizacji"}
+          </p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function RecentClientsPanel({
+  clients,
+  loading,
+}: {
+  clients: TrainerPortalClient[];
+  loading: boolean;
+}) {
+  return (
+    <section className="card-shell p-5 md:p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-section-title">Nowi podopieczni</p>
+          <p className="mt-2 text-sm text-on-surface-variant">
+            Ostatnio przypisani klienci i podstawowe informacje.
+          </p>
+        </div>
+        <Link
+          href="/trainer/clients"
+          className="inline-flex items-center gap-1 text-label text-primary-light"
+        >
+          Wszyscy
+          <ArrowRight size={14} />
+        </Link>
+      </div>
+
+      <div className="mt-5 flex flex-col gap-3">
+        {loading ? (
+          <EmptyState label="Ładowanie klientów..." />
+        ) : clients.length > 0 ? (
+          clients.map((client) => (
+            <ClientRow key={client.clientId} client={client} />
+          ))
+        ) : (
+          <EmptyState label="Nie masz jeszcze przypisanych klientów." />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ClientRow({ client }: { client: TrainerPortalClient }) {
+  return (
+    <article className="rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-4">
+      <div className="flex items-center gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-lg)] bg-surface-container-lowest text-sm font-semibold text-primary-light">
+          {client.avatarUrl ? (
+            <img
+              src={client.avatarUrl}
+              alt={client.fullName || "Klient"}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            getInitials(client.fullName)
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold text-on-surface">
+            {client.fullName || `Klient #${client.clientId}`}
+          </p>
+          <p className="mt-1 truncate text-sm text-on-surface-variant">
+            {client.goal || "Cel nieuzupełniony"}
+          </p>
+        </div>
+        <StatusPill label={getClientStatusLabel(client.status)} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 text-xs text-on-surface-muted">
+        <span>{client.locationName || "Brak lokalizacji"}</span>
+        {client.billingStatus ? (
+          <span>{getBillingStatusLabel(client.billingStatus)}</span>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+type CoachFocus = {
+  nextSession: TrainerPortalSession | null;
+  newClientsCount: number;
+  missingGoalCount: number;
+};
+
+function CoachFocusPanel({
+  focus,
+  loading,
+}: {
+  focus: CoachFocus;
+  loading: boolean;
+}) {
+  return (
+    <section className="grid gap-4 md:grid-cols-3">
+      <FocusCard
+        label="Następna sesja"
+        value={
+          focus.nextSession
+            ? formatTimeRange(focus.nextSession.startAt, focus.nextSession.endAt)
+            : "Brak"
+        }
+        note={focus.nextSession?.clientFullName || "Najbliższy trening"}
+        icon={<Clock3 size={20} />}
+        loading={loading}
+      />
+      <FocusCard
+        label="Nowi w 14 dni"
+        value={String(focus.newClientsCount)}
+        note="Klienci, których warto wdrożyć"
+        icon={<Sparkles size={20} />}
+        loading={loading}
+      />
+      <FocusCard
+        label="Do uzupełnienia"
+        value={String(focus.missingGoalCount)}
+        note="Klienci bez celu treningowego"
+        icon={<Target size={20} />}
+        loading={loading}
+      />
+    </section>
+  );
+}
+
+function FocusCard({
+  label,
+  value,
+  note,
+  icon,
+  loading,
+}: {
+  label: string;
+  value: string;
+  note: string;
+  icon: React.ReactNode;
+  loading: boolean;
+}) {
+  return (
+    <article className="card-shell p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-label text-on-surface-muted">{label}</p>
+          <p className="mt-4 truncate text-2xl font-semibold text-on-surface">
+            {loading ? "..." : value}
+          </p>
+          <p className="mt-2 text-sm text-on-surface-variant">{note}</p>
+        </div>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container-low text-primary-light">
+          {icon}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function StatusPill({ label }: { label: string }) {
+  return (
+    <span className="rounded-full bg-surface-container-high px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary-light">
+      {label}
+    </span>
+  );
+}
+
+function EmptyState({ label }: { label: string }) {
+  return (
+    <div className="rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-6 text-center text-sm text-on-surface-variant">
+      {label}
     </div>
   );
 }
 
-export default function DashboardPage() {
+function getTrainerFocus(
+  clients: TrainerPortalClient[],
+  upcomingSessions: TrainerPortalSession[],
+): CoachFocus {
+  const now = Date.now();
+  const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
+
+  return {
+    nextSession: upcomingSessions[0] || null,
+    newClientsCount: clients.filter(
+      (client) => new Date(client.createdAt).getTime() >= twoWeeksAgo,
+    ).length,
+    missingGoalCount: clients.filter((client) => !client.goal?.trim()).length,
+  };
+}
+
+function sortSessionsByStart(
+  first: TrainerPortalSession,
+  second: TrainerPortalSession,
+) {
+  return new Date(first.startAt).getTime() - new Date(second.startAt).getTime();
+}
+
+function sortClientsByCreatedAt(
+  first: TrainerPortalClient,
+  second: TrainerPortalClient,
+) {
   return (
-    <div className="max-w-[1400px] mx-auto">
-      {/* Desktop */}
-      <div className="hidden md:block">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-5">
-          <div className="max-w-[560px]">
-            <p className="text-label text-primary-light">Performance Hub</p>
-            <h1 className="mt-2 text-[2.25rem] leading-[0.95] mb-3 font-semibold font-display tracking-tight">
-              Dashboard <span className="text-primary-light">Overview</span>
-            </h1>
-            <LogoutButton />
-          </div>
-
-          <div className="flex gap-4 ">
-            <Button
-              variant="secondary"
-              icon={<CalendarDays size={16} />}
-              className="h-16"
-            >
-              Last 30 Days
-            </Button>
-
-            <Button
-              variant="primary"
-              icon={<Download size={16} className="h-16" />}
-            >
-              Export Reports
-            </Button>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-3 gap-4">
-          {boxes.map((box, index) => (
-            <DashboardStatCard
-              key={index}
-              title={box.title}
-              value={box.value}
-              change={box.change}
-              subtitle={box.subtitle}
-              icon={box.icon}
-            />
-          ))}
-
-          <div className="col-span-2">
-            <TodayScheduleCard />
-          </div>
-
-          <div className="card-shell p-6">
-            <p className="text-section-title">Quick Actions</p>
-
-            <div className="flex flex-col gap-4 mt-5">
-              {quickActions.map((action) => (
-                <div
-                  key={action.title}
-                  className="bg-surface-container-low rounded-2xl p-3 flex gap-3 items-center"
-                >
-                  <div className="bg-surface-container p-3 rounded-xl text-primary-light shrink-0">
-                    {action.icon}
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="text-base font-medium truncate">
-                      {action.title}
-                    </p>
-                    <p className="text-xs text-on-surface-variant truncate">
-                      {action.description}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="col-span-2 card-shell p-6">
-            <div className="flex items-center justify-between">
-              <p className="text-section-title">Top Trainers</p>
-              <Link href="/trainers" className="text-label text-primary-light">
-                View All
-              </Link>
-            </div>
-
-            <div className="mt-5 grid grid-cols-3 gap-3">
-              {topTrainers.map((trainer) => (
-                <div
-                  key={trainer.name}
-                  className="bg-surface-container-low rounded-2xl px-4 py-4"
-                >
-                  <p className="text-base font-semibold">{trainer.name}</p>
-                  <p className="text-sm text-on-surface-variant mt-1">
-                    {trainer.role}
-                  </p>
-
-                  <div className="mt-4">
-                    <p className="text-2xl font-semibold leading-none">
-                      {trainer.sessions}
-                    </p>
-                    <p className="text-label text-on-surface-muted mt-1">
-                      Sessions
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="card-shell p-6 bg-tertiary-container">
-            <p className="text-section-title text-tertiary-light">Retention</p>
-            <p className="text-sm text-green-100/80 mt-3 leading-6">
-              Your studio retention is up by 4.2% this month.
-            </p>
-
-            <div className="mt-5 h-2 w-full rounded-full bg-white/15 overflow-hidden">
-              <div className="h-full w-[78%] rounded-full bg-tertiary-light" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile */}
-      <div className="md:hidden px-1 pb-6">
-        <div className="flex flex-col gap-5">
-          <div>
-            <p className="text-label text-primary-light">Morning, Coach</p>
-            <p className="text-page-title mt-2">Atlas Dashboard</p>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <Button
-              variant="secondary"
-              icon={<CalendarDays size={16} />}
-              className="w-fit"
-            >
-              Last 30 Days
-            </Button>
-
-            <Button
-              variant="primary"
-              icon={<Download size={16} />}
-              className="w-fit"
-            >
-              Generate Report
-            </Button>
-          </div>
-
-          <div className="space-y-4">
-            <MobileMiniStat
-              title="Total Revenue"
-              value="$42.8k"
-              change="+12%"
-            />
-
-            <div className="card-shell p-5">
-              <p className="text-label text-on-surface-variant">
-                Active Members
-              </p>
-
-              <div className="mt-4 flex items-end gap-2">
-                <p className="text-[2.4rem] font-semibold leading-none tracking-tight">
-                  1,284
-                </p>
-                <p className="text-sm text-on-surface-variant mb-1">
-                  / 1,500 cap
-                </p>
-              </div>
-
-              <div className="mt-5 h-1.5 w-full rounded-full bg-surface-container-lowest overflow-hidden">
-                <div className="h-full w-[82%] rounded-full bg-primary" />
-              </div>
-            </div>
-
-            <div className="card-shell p-5">
-              <p className="text-label text-on-surface-variant">New Signups</p>
-
-              <div className="mt-4 flex items-end gap-3">
-                <p className="text-[2.4rem] font-semibold leading-none tracking-tight">
-                  84
-                </p>
-                <div className="flex -space-x-2 mb-1">
-                  <div className="h-8 w-8 rounded-full bg-surface-container-high border-2 border-surface" />
-                  <div className="h-8 w-8 rounded-full bg-surface-container-high border-2 border-surface" />
-                  <div className="h-8 w-8 rounded-full bg-surface-container-high border-2 border-surface" />
-                  <div className="h-8 min-w-8 px-2 rounded-full bg-surface-container-high border-2 border-surface text-[10px] flex items-center justify-center text-on-surface-variant">
-                    +12
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between">
-              <p className="text-section-title">Top Trainers</p>
-              <Link href="/trainers" className="text-label text-primary-light">
-                View All
-              </Link>
-            </div>
-
-            <div className="card-shell p-4 mt-4">
-              {topTrainers.map((trainer, index) => (
-                <div
-                  key={trainer.name}
-                  className={`flex items-center justify-between gap-3 py-3 ${
-                    index !== topTrainers.length - 1
-                      ? "border-b border-white/5"
-                      : ""
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <p className="text-base font-semibold truncate">
-                      {trainer.name}
-                    </p>
-                    <p className="text-sm text-on-surface-variant truncate">
-                      {trainer.role}
-                    </p>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <p className="text-2xl font-semibold leading-none">
-                      {trainer.sessions}
-                    </p>
-                    <p className="text-label text-on-surface-muted mt-1">
-                      Sessions
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-section-title">Quick Actions</p>
-
-            <div className="mt-4 flex flex-col gap-4">
-              {quickActions.map((action) => (
-                <button
-                  key={action.title}
-                  className="card-shell p-4 flex items-center justify-between gap-4 text-left"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-12 w-12 rounded-full bg-surface-container-high flex items-center justify-center text-primary-light shrink-0">
-                      {action.icon}
-                    </div>
-
-                    <div className="min-w-0">
-                      <p className="text-base font-medium truncate">
-                        {action.title}
-                      </p>
-                      <p className="text-sm text-on-surface-variant truncate">
-                        {action.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  <ChevronRight
-                    size={18}
-                    className="text-on-surface-variant shrink-0"
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="card-shell p-5 bg-tertiary-container">
-            <p className="text-section-title text-tertiary-light">
-              Member Retention
-            </p>
-            <p className="mt-3 text-sm leading-6 text-green-100/80">
-              Your studio retention is up by 4.2% this month.
-            </p>
-
-            <div className="mt-5 h-2 w-full rounded-full bg-white/15 overflow-hidden">
-              <div className="h-full w-[93%] rounded-full bg-tertiary-light" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()
   );
+}
+
+function getFirstName(name?: string | null) {
+  return name?.trim().split(" ")[0] || "";
+}
+
+function normalize(value: string) {
+  return value.toLowerCase().trim();
+}
+
+function getSessionStatusLabel(status?: string | null) {
+  const normalized = normalize(status || "");
+
+  if (normalized.includes("cancel")) return "Anulowana";
+  if (normalized.includes("complete") || normalized.includes("done")) {
+    return "Zrealizowana";
+  }
+  if (normalized.includes("active")) return "Aktywna";
+
+  return "Zaplanowana";
+}
+
+function getClientStatusLabel(status?: string | null) {
+  const normalized = normalize(status || "");
+
+  if (normalized === "active") return "Aktywny";
+  if (normalized === "inactive") return "Nieaktywny";
+  if (normalized === "cancelled") return "Zakończony";
+
+  return status || "Aktywny";
+}
+
+function getBillingStatusLabel(status?: string | null) {
+  const normalized = normalize(status || "");
+
+  if (normalized === "paid") return "Opłacone";
+  if (normalized === "pending") return "Oczekuje";
+  if (normalized === "pendingpayment") return "Do zapłaty";
+  if (normalized === "overdue") return "Zaległość";
+
+  return status || "";
+}
+
+function getInitials(name?: string | null) {
+  const initials = (name || "")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || "K";
+}
+
+function formatTimeRange(start: string, end: string) {
+  return `${formatTime(start)} - ${formatTime(end)}`;
+}
+
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat("pl-PL", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }

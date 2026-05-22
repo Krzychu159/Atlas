@@ -19,14 +19,31 @@ import {
   updateClientTrainingPlan,
   type Client,
   type ClientTrainingPlan,
+  type UpdateClientTrainingPlanPayload,
   type UpdateClientPayload,
 } from "@/app/lib/owner/clients";
+import { isForbiddenError } from "@/app/lib/backend";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
+import {
+  getTrainerPortalClient,
+  getTrainerPortalClientTrainingPlan,
+  getTrainerPortalMe,
+  updateTrainerPortalClient,
+  updateTrainerPortalClientTrainingPlan,
+  type TrainerPortalMe,
+} from "@/app/lib/trainer/portal";
+import {
+  trainerPortalClientToClient,
+  trainerPortalMeToLocations,
+  trainerPortalMeToTrainer,
+} from "@/app/lib/trainer/portal-mappers";
 
 type EditClientModalProps = {
   open: boolean;
   client: Client | null;
+  access?: "owner" | "trainer";
+  trainerMe?: TrainerPortalMe | null;
   onClose: () => void;
   onSaved: (client: Client) => void;
   onTrainingPlanSaved?: (plan: ClientTrainingPlan) => void;
@@ -35,6 +52,8 @@ type EditClientModalProps = {
 export default function EditClientModal({
   open,
   client,
+  access = "owner",
+  trainerMe,
   onClose,
   onSaved,
   onTrainingPlanSaved,
@@ -58,7 +77,10 @@ export default function EditClientModal({
   useEffect(() => {
     if (!open) return;
 
-    Promise.all([getTrainers(), getLocations()])
+    Promise.all([
+      getTrainersForEditModal(access, trainerMe),
+      getLocationsForEditModal(access, trainerMe),
+    ])
       .then(([trainersData, locationsData]) => {
         setTrainers(trainersData);
         setLocations(locationsData);
@@ -85,7 +107,7 @@ export default function EditClientModal({
   useEffect(() => {
     if (!client || !open) return;
 
-    getClientTrainingPlan(client.id)
+    getTrainingPlanForEditModal(client.id, access)
       .then((plan) => {
         setTrainingPlan(plan);
         setTrainingPlanUrl(plan.url || plan.googleDriveFolderUrl || "");
@@ -142,8 +164,12 @@ export default function EditClientModal({
 
     try {
       setIsSaving(true);
-      await updateClient(client.id, payload);
-      const confirmedClient = await getClient(client.id);
+      await updateClientForEditModal(client.id, payload, access);
+      const confirmedClient = await getConfirmedClientForEditModal(
+        client.id,
+        access,
+        trainerMe,
+      );
       const failedFields = getClientUpdateFailedFields(confirmedClient, payload);
 
       if (failedFields.length) {
@@ -154,13 +180,17 @@ export default function EditClientModal({
 
       if (shouldSaveTrainingPlan) {
         const driveMeta = parseGoogleDriveLink(cleanTrainingPlanUrl);
-        const savedPlan = await updateClientTrainingPlan(client.id, {
+        const savedPlan = await updateTrainingPlanForEditModal(
+          client.id,
+          {
           googleDriveFolderId:
             driveMeta.folderId || trainingPlan?.googleDriveFolderId || "",
           fileId: driveMeta.fileId || trainingPlan?.fileId || "",
           fileName: cleanTrainingPlanUrl ? "Folder klienta" : "",
           url: cleanTrainingPlanUrl,
-        });
+          },
+          access,
+        );
         const normalizedPlan = {
           ...savedPlan,
           fileName: savedPlan.fileName || "Folder klienta",
@@ -327,6 +357,97 @@ export default function EditClientModal({
 
 function formatLocationLabel(location: Location) {
   return location.name || location.city || `Lokalizacja ${location.id}`;
+}
+
+async function getTrainersForEditModal(
+  access: "owner" | "trainer",
+  trainerMe?: TrainerPortalMe | null,
+) {
+  try {
+    return await getTrainers();
+  } catch (err) {
+    if (access !== "trainer" || !isForbiddenError(err)) throw err;
+
+    const me = trainerMe || (await getTrainerPortalMe().catch(() => null));
+    const trainer = trainerPortalMeToTrainer(me);
+
+    return trainer ? [trainer] : [];
+  }
+}
+
+async function getLocationsForEditModal(
+  access: "owner" | "trainer",
+  trainerMe?: TrainerPortalMe | null,
+) {
+  try {
+    return await getLocations();
+  } catch (err) {
+    if (access !== "trainer" || !isForbiddenError(err)) throw err;
+
+    const me = trainerMe || (await getTrainerPortalMe().catch(() => null));
+
+    return trainerPortalMeToLocations(me);
+  }
+}
+
+async function getTrainingPlanForEditModal(
+  clientId: number,
+  access: "owner" | "trainer",
+) {
+  try {
+    return await getClientTrainingPlan(clientId);
+  } catch (err) {
+    if (access !== "trainer" || !isForbiddenError(err)) throw err;
+
+    return getTrainerPortalClientTrainingPlan(clientId);
+  }
+}
+
+async function updateClientForEditModal(
+  clientId: number,
+  payload: UpdateClientPayload,
+  access: "owner" | "trainer",
+) {
+  try {
+    return await updateClient(clientId, payload);
+  } catch (err) {
+    if (access !== "trainer" || !isForbiddenError(err)) throw err;
+
+    return updateTrainerPortalClient(clientId, payload);
+  }
+}
+
+async function getConfirmedClientForEditModal(
+  clientId: number,
+  access: "owner" | "trainer",
+  trainerMe?: TrainerPortalMe | null,
+) {
+  try {
+    return await getClient(clientId);
+  } catch (err) {
+    if (access !== "trainer" || !isForbiddenError(err)) throw err;
+
+    const [clientData, me] = await Promise.all([
+      getTrainerPortalClient(clientId),
+      trainerMe ? Promise.resolve(trainerMe) : getTrainerPortalMe().catch(() => null),
+    ]);
+
+    return trainerPortalClientToClient(clientData, me);
+  }
+}
+
+async function updateTrainingPlanForEditModal(
+  clientId: number,
+  payload: UpdateClientTrainingPlanPayload,
+  access: "owner" | "trainer",
+) {
+  try {
+    return await updateClientTrainingPlan(clientId, payload);
+  } catch (err) {
+    if (access !== "trainer" || !isForbiddenError(err)) throw err;
+
+    return updateTrainerPortalClientTrainingPlan(clientId, payload);
+  }
 }
 
 function normalizeLocationName(value?: string | null) {

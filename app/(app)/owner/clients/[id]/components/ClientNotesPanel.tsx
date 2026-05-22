@@ -3,6 +3,13 @@
 import { useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { updateClient, type Client } from "@/app/lib/owner/clients";
+import { isForbiddenError } from "@/app/lib/backend";
+import {
+  getTrainerPortalMe,
+  updateTrainerPortalClient,
+  type TrainerPortalMe,
+} from "@/app/lib/trainer/portal";
+import { trainerPortalClientToClient } from "@/app/lib/trainer/portal-mappers";
 import {
   getPaymentStatusLabel,
   type ClientPayment,
@@ -15,10 +22,14 @@ import {
 export default function ClientNotesPanel({
   client,
   payments,
+  access = "owner",
+  trainerMe,
   onClientChange,
 }: {
   client: Client;
   payments: ClientPayment[];
+  access?: "owner" | "trainer";
+  trainerMe?: TrainerPortalMe | null;
   onClientChange: (client: Client) => void;
 }) {
   const [draft, setDraft] = useState({
@@ -36,7 +47,7 @@ export default function ClientNotesPanel({
 
     try {
       setIsSaving(true);
-      const updatedClient = await updateClient(client.id, {
+      const payload = {
         trainerId: client.trainerId ?? 0,
         firstName: client.firstName,
         lastName: client.lastName,
@@ -50,7 +61,8 @@ export default function ClientNotesPanel({
         status: client.status || "active",
         nextSessionAt: client.nextSessionAt || null,
         locationId: client.locationId ?? 0,
-      });
+      };
+      const updatedClient = await updateClientNotes(client, payload, access, trainerMe);
       onClientChange(updatedClient);
       showOwnerSuccess("Notatki klienta zostały zapisane.", {
         id: "owner-client-notes-success",
@@ -93,6 +105,24 @@ export default function ClientNotesPanel({
       <PaymentHistory payments={payments} />
     </aside>
   );
+}
+
+async function updateClientNotes(
+  client: Client,
+  payload: Parameters<typeof updateClient>[1],
+  access: "owner" | "trainer",
+  trainerMe?: TrainerPortalMe | null,
+) {
+  try {
+    return await updateClient(client.id, payload);
+  } catch (err) {
+    if (access !== "trainer" || !isForbiddenError(err)) throw err;
+
+    const updated = await updateTrainerPortalClient(client.id, payload);
+    const me = trainerMe || (await getTrainerPortalMe().catch(() => null));
+
+    return trainerPortalClientToClient(updated, me);
+  }
 }
 
 function PaymentHistory({ payments }: { payments: ClientPayment[] }) {

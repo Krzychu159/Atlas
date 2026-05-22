@@ -31,12 +31,15 @@ export const navigationByRole: Record<AppRole, NavItem[]> = {
   trainer: [
     { label: "Panel", href: "/trainer", icon: LayoutDashboard },
     { label: "Klienci", href: "/trainer/clients", icon: Users },
+    { label: "Plan", href: "/trainer/schedule", icon: CalendarDays },
+    { label: "Pakiety", href: "/trainer/packages", icon: Wallet },
+    { label: "Płatności", href: "/trainer/payments", icon: CreditCard },
     { label: "Ustawienia", href: "/trainer/settings", icon: Settings },
   ],
   client: [
     { label: "Panel", href: "/client", icon: LayoutDashboard },
     { label: "Płatności", href: "/client/payments", icon: Wallet },
-    { label: "Grafik", href: "/client/schedule", icon: CalendarDays },
+    { label: "Plan", href: "/client/schedule", icon: CalendarDays },
     { label: "Ustawienia", href: "/client/settings", icon: Settings },
   ],
 };
