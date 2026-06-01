@@ -124,6 +124,10 @@ export function isForbiddenError(error: unknown) {
   return error instanceof ApiError && error.status === 403;
 }
 
+export function isNotFoundError(error: unknown) {
+  return error instanceof ApiError && error.status === 404;
+}
+
 function buildBackendUrl(path: string, query?: ApiQuery) {
   const [rawPath, rawSearch = ""] = path.replace(/^\/+/, "").split("?");
   const searchParams = new URLSearchParams(rawSearch);

@@ -13,6 +13,7 @@ import {
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { showAppError, showAppSuccess } from "@/app/components/ui/app-toast";
+import { isNotFoundError } from "@/app/lib/backend";
 import { formatDateTime } from "@/app/lib/formatters/date";
 import { formatMoney } from "@/app/lib/formatters/money";
 import {
@@ -57,6 +58,13 @@ export default function ClientPaymentsPage() {
           : "";
       });
     } catch (err) {
+      if (isNotFoundError(err)) {
+        setBilling(null);
+        setSelectedPackageId("");
+        setAmount("");
+        return;
+      }
+
       showAppError(err, "Nie udało się pobrać płatności.", {
         id: "client-payments-load-error",
       });
@@ -217,6 +225,13 @@ export default function ClientPaymentsPage() {
               potwierdzenia w studiu.
             </p>
           </div>
+
+          {!packages.length && !isLoading ? (
+            <div className="mt-6 rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest p-4 text-sm leading-6 text-on-surface-variant">
+              Nie masz aktywnego pakietu do opłacenia. Po przypisaniu pakietu
+              formularz wpłaty będzie dostępny.
+            </div>
+          ) : null}
 
           <div className="mt-6 flex flex-col gap-4">
             <Field label="Kwota">
@@ -405,6 +420,13 @@ function MobilePayments({
         <h2 className="mt-2 font-display text-[1.55rem] font-semibold leading-none">
           Zgłoś płatność
         </h2>
+
+        {!packagesLength && !isLoading ? (
+          <div className="mt-5 rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest p-4 text-sm leading-6 text-on-surface-variant">
+            Nie masz jeszcze aktywnego pakietu do opłacenia. Skontaktuj się z
+            trenerem lub obsługą studia, żeby przypisać pakiet.
+          </div>
+        ) : null}
 
         <div className="mt-5 flex flex-col gap-4">
           <Field label="Kwota">

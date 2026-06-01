@@ -15,14 +15,17 @@ import {
 } from "lucide-react";
 import { Button, ButtonLink } from "@/app/components/ui/button";
 import { showAppError, showAppInfo } from "@/app/components/ui/app-toast";
+import { isNotFoundError } from "@/app/lib/backend";
 import { formatDateTime, formatSessionTime } from "@/app/lib/formatters/date";
 import { formatMoney } from "@/app/lib/formatters/money";
 import {
   getClientPortalBilling,
   getClientPortalDashboard,
+  getClientPortalMe,
   getClientPortalSubscription,
   getClientPortalTrainingPlan,
   type ClientBillingSummary,
+  type ClientPortalMe,
   type ClientSubscription,
   type ClientTrainingPlan,
   type ClientPortalDashboard,
@@ -31,6 +34,7 @@ import {
 
 export default function ClientDashboardPage() {
   const [dashboard, setDashboard] = useState<ClientPortalDashboard | null>(null);
+  const [profile, setProfile] = useState<ClientPortalMe | null>(null);
   const [billing, setBilling] = useState<ClientBillingSummary | null>(null);
   const [subscription, setSubscription] = useState<ClientSubscription | null>(
     null,
@@ -43,15 +47,23 @@ export default function ClientDashboardPage() {
   async function loadDashboard() {
     try {
       setIsLoading(true);
-      const [dashboardData, billingData, subscriptionData, trainingPlanData] =
+      const [
+        dashboardData,
+        profileData,
+        billingData,
+        subscriptionData,
+        trainingPlanData,
+      ] =
         await Promise.allSettled([
           getClientPortalDashboard(),
+          getClientPortalMe(),
           getClientPortalBilling(),
           getClientPortalSubscription(),
           getClientPortalTrainingPlan(),
         ]);
 
       if (dashboardData.status === "fulfilled") setDashboard(dashboardData.value);
+      if (profileData.status === "fulfilled") setProfile(profileData.value);
       if (billingData.status === "fulfilled") setBilling(billingData.value);
       if (subscriptionData.status === "fulfilled") {
         setSubscription(subscriptionData.value);
@@ -62,12 +74,16 @@ export default function ClientDashboardPage() {
 
       const firstError = [
         dashboardData,
+        profileData,
         billingData,
         subscriptionData,
         trainingPlanData,
-      ].find((result) => result.status === "rejected");
+      ].find(
+        (result): result is PromiseRejectedResult =>
+          result.status === "rejected" && !isNotFoundError(result.reason),
+      );
 
-      if (firstError && dashboardData.status !== "fulfilled") {
+      if (firstError && dashboardData.status !== "fulfilled" && profileData.status !== "fulfilled") {
         throw firstError.reason;
       }
     } catch (err) {
@@ -87,7 +103,7 @@ export default function ClientDashboardPage() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  const me = dashboard?.me;
+  const me = dashboard?.me ?? profile;
   const trainer = dashboard?.trainer;
   const packageData = dashboard?.package;
   const payment = dashboard?.payment;

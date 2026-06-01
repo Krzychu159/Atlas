@@ -1,11 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Menu, X, Dumbbell, CircleUserRound } from "lucide-react";
 import { SidebarNav } from "@/app/components/sidebar-nav";
 import { Header } from "@/app/components/header";
 import { navigationByRole, type AppRole } from "@/app/components/navigation";
+import { getCurrentUser, type CurrentUser } from "@/app/lib/auth/current-user";
 
 type AppShellProps = {
   children: ReactNode;
@@ -27,8 +28,25 @@ function getRoleSubtitle(role: AppRole) {
 
 export function AppShell({ children, role }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<CurrentUser | null>(null);
   const subtitle = getRoleSubtitle(role);
   const navItems = navigationByRole[role];
+
+  useEffect(() => {
+    let active = true;
+
+    getCurrentUser()
+      .then((data) => {
+        if (active) setUser(data);
+      })
+      .catch(() => {
+        if (active) setUser(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-surface text-on-surface">
@@ -71,10 +89,17 @@ export function AppShell({ children, role }: AppShellProps) {
 
           <div className="px-3 pb-2 pt-6">
             <div className="rounded-xl bg-surface-container p-4 shadow-soft">
-              <p className="text-label text-on-surface-muted">Status</p>
-              <p className="mt-2 text-sm text-on-surface-variant">
-                System w budowie
-              </p>
+              <div className="flex items-center gap-3">
+                <MobileUserAvatar user={user} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-on-surface">
+                    {user?.fullName || "Użytkownik"}
+                  </p>
+                  <p className="truncate text-xs text-on-surface-muted">
+                    {getRoleSubtitle(role)}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </aside>
@@ -128,7 +153,7 @@ export function AppShell({ children, role }: AppShellProps) {
                 Atlas
               </p>
             </div>
-            <CircleUserRound width={32} height={32} />
+            <MobileUserAvatar user={user} />
           </header>
 
           <div className="hidden px-4 md:block md:px-8">
@@ -148,6 +173,22 @@ export function AppShell({ children, role }: AppShellProps) {
           onClick={() => setMobileMenuOpen(false)}
           className="fixed inset-0 z-40 bg-black/50 md:hidden"
         />
+      )}
+    </div>
+  );
+}
+
+function MobileUserAvatar({ user }: { user: CurrentUser | null }) {
+  return (
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-container text-primary-light">
+      {user?.avatarUrl ? (
+        <div
+          className="h-full w-full bg-cover bg-center"
+          style={{ backgroundImage: `url(${user.avatarUrl})` }}
+          aria-label={user.fullName}
+        />
+      ) : (
+        <CircleUserRound width={28} height={28} />
       )}
     </div>
   );

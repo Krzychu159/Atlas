@@ -7,15 +7,20 @@ import {
   ChevronRight,
   Clock3,
   Dumbbell,
+  Mail,
   MapPin,
+  Phone,
   UserRound,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { showAppError } from "@/app/components/ui/app-toast";
+import { isNotFoundError } from "@/app/lib/backend";
 import { formatSessionTime } from "@/app/lib/formatters/date";
 import {
+  getClientPortalDashboard,
   getClientPortalSchedule,
   getClientPortalSubscriptionUsage,
+  type ClientPortalTrainer,
   type ClientPortalSession,
   type SubscriptionUsage,
 } from "@/app/lib/client/portal";
@@ -23,29 +28,36 @@ import {
 export default function ClientSchedulePage() {
   const [sessions, setSessions] = useState<ClientPortalSession[]>([]);
   const [usage, setUsage] = useState<SubscriptionUsage | null>(null);
+  const [trainer, setTrainer] = useState<ClientPortalTrainer | null>(null);
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
-  const [selectedDateKey, setSelectedDateKey] = useState(() =>
-    toDateKey(new Date()),
-  );
   const [loadedAt, setLoadedAt] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   async function loadPlan() {
     try {
       setIsLoading(true);
-      const [scheduleData, usageData] = await Promise.allSettled([
+      const [scheduleData, usageData, dashboardData] = await Promise.allSettled([
         getClientPortalSchedule(),
         getClientPortalSubscriptionUsage(),
+        getClientPortalDashboard(),
       ]);
 
       if (scheduleData.status === "fulfilled") {
         setSessions(scheduleData.value || []);
+      } else if (isNotFoundError(scheduleData.reason)) {
+        setSessions([]);
       } else {
         throw scheduleData.reason;
       }
 
       if (usageData.status === "fulfilled") {
         setUsage(usageData.value);
+      } else if (isNotFoundError(usageData.reason)) {
+        setUsage(null);
+      }
+
+      if (dashboardData.status === "fulfilled") {
+        setTrainer(dashboardData.value.trainer);
       }
 
       setLoadedAt(Date.now());
@@ -105,34 +117,24 @@ export default function ClientSchedulePage() {
   const usageProgress = usage?.totalSessions
     ? Math.round((usage.usedSessions / usage.totalSessions) * 100)
     : 0;
-  const selectedDay =
-    weekDays.find((day) => toDateKey(day) === selectedDateKey) || weekDays[0];
-  const selectedDaySessions =
-    sessionsByDay.get(toDateKey(selectedDay)) || [];
+  const upcomingSessions = useMemo(
+    () =>
+      [...sessions]
+        .filter((session) => getTime(session.startAt) >= loadedAt)
+        .sort(sortSessions)
+        .slice(0, 8),
+    [loadedAt, sessions],
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
       <MobileSchedule
-        weekDays={weekDays}
-        weekStart={weekStart}
-        selectedDateKey={selectedDateKey}
-        selectedDay={selectedDay}
-        selectedDaySessions={selectedDaySessions}
+        upcomingSessions={upcomingSessions}
         nextSession={nextSession}
         usage={usage}
         usageProgress={usageProgress}
+        trainer={trainer}
         isLoading={isLoading}
-        onSelectDate={setSelectedDateKey}
-        onPreviousWeek={() => {
-          const nextWeek = addDays(weekStart, -7);
-          setWeekStart(nextWeek);
-          setSelectedDateKey(toDateKey(nextWeek));
-        }}
-        onNextWeek={() => {
-          const nextWeek = addDays(weekStart, 7);
-          setWeekStart(nextWeek);
-          setSelectedDateKey(toDateKey(nextWeek));
-        }}
         onRefresh={loadPlan}
       />
 
@@ -280,96 +282,71 @@ export default function ClientSchedulePage() {
 }
 
 function MobileSchedule({
-  weekDays,
-  weekStart,
-  selectedDateKey,
-  selectedDay,
-  selectedDaySessions,
+  upcomingSessions,
   nextSession,
   usage,
   usageProgress,
+  trainer,
   isLoading,
-  onSelectDate,
-  onPreviousWeek,
-  onNextWeek,
   onRefresh,
 }: {
-  weekDays: Date[];
-  weekStart: Date;
-  selectedDateKey: string;
-  selectedDay: Date;
-  selectedDaySessions: ClientPortalSession[];
+  upcomingSessions: ClientPortalSession[];
   nextSession: ClientPortalSession | null;
   usage: SubscriptionUsage | null;
   usageProgress: number;
+  trainer: ClientPortalTrainer | null;
   isLoading: boolean;
-  onSelectDate: (value: string) => void;
-  onPreviousWeek: () => void;
-  onNextWeek: () => void;
   onRefresh: () => void;
 }) {
+  const trainerName = trainer?.fullName || "trenerem";
+
   return (
     <div className="flex flex-col gap-4 md:hidden">
       <section>
         <p className="text-label text-primary-light">Plan</p>
         <h1 className="mt-2 font-display text-[2.15rem] font-semibold leading-[0.95]">
-          Treningi w tygodniu
+          Najbliższe treningi
         </h1>
         <p className="mt-3 text-sm leading-6 text-on-surface-variant">
-          Wybierz dzień i sprawdź zaplanowane sesje.
+          Szybki podgląd terminów bez kalendarza.
         </p>
       </section>
 
-      <section className="card-shell p-3">
-        <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={onPreviousWeek}
-            className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-lowest text-on-surface-variant"
-            aria-label="Poprzedni tydzień"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <p className="text-sm font-semibold">
-            {formatWeekRange(weekStart, addDays(weekStart, 6))}
-          </p>
-          <button
-            type="button"
-            onClick={onNextWeek}
-            className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-lowest text-on-surface-variant"
-            aria-label="Następny tydzień"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
+      <section className="card-shell p-5">
+        {isLoading ? (
+          <PlanSkeleton />
+        ) : nextSession ? (
+          <>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-label text-primary-light">Najbliższa sesja</p>
+                <h2 className="mt-4 font-display text-[1.85rem] font-semibold leading-[1.05]">
+                  {nextSession.title || "Trening"}
+                </h2>
+              </div>
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
+                <CalendarDays size={22} />
+              </div>
+            </div>
 
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-          {weekDays.map((day) => {
-            const key = toDateKey(day);
-            const selected = key === selectedDateKey;
-
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onSelectDate(key)}
-                className={[
-                  "flex min-w-[58px] flex-col items-center rounded-[var(--radius-lg)] px-3 py-3 transition",
-                  selected
-                    ? "bg-primary text-on-primary"
-                    : "bg-surface-container-lowest text-on-surface-variant",
-                ].join(" ")}
-              >
-                <span className="text-[10px] font-semibold uppercase tracking-wider">
-                  {new Intl.DateTimeFormat("pl-PL", { weekday: "short" }).format(day)}
-                </span>
-                <span className="mt-2 text-[1.45rem] font-semibold leading-none">
-                  {new Intl.DateTimeFormat("pl-PL", { day: "2-digit" }).format(day)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+            <div className="mt-5 flex flex-col gap-2 text-sm text-on-surface-variant">
+              <span className="inline-flex items-center gap-2">
+                <Clock3 size={15} className="text-primary-light" />
+                {formatShortDateTime(nextSession.startAt)}
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <MapPin size={15} className="text-primary-light" />
+                {nextSession.locationName || "Brak lokalizacji"}
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <UserRound size={15} className="text-primary-light" />
+                {nextSession.trainerFullName || trainer?.fullName || "Trener"}
+              </span>
+            </div>
+          </>
+        ) : (
+          <MobilePlanEmptyState trainer={trainer} trainerName={trainerName} />
+        )}
       </section>
 
       <section className="grid grid-cols-2 gap-3">
@@ -381,22 +358,16 @@ function MobileSchedule({
         <MobilePlanMetric
           label="Pakiet"
           value={usage ? `${usage.usedSessions}/${usage.totalSessions}` : "-"}
-          note={`${usageProgress}% cyklu`}
+          note={usage ? `${usageProgress}% cyklu` : "brak aktywnego cyklu"}
         />
       </section>
 
       <section className="card-shell p-5">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-label text-on-surface-muted">
-              {new Intl.DateTimeFormat("pl-PL", {
-                weekday: "long",
-                day: "2-digit",
-                month: "short",
-              }).format(selectedDay)}
-            </p>
-            <h2 className="mt-2 font-display text-[1.6rem] font-semibold leading-none">
-              Sesje dnia
+            <p className="text-label text-on-surface-muted">Terminy</p>
+            <h2 className="mt-2 font-display text-[1.55rem] font-semibold leading-none">
+              Kolejne sesje
             </h2>
           </div>
           <Button type="button" variant="secondary" size="sm" onClick={onRefresh}>
@@ -407,12 +378,12 @@ function MobileSchedule({
         <div className="mt-5 flex flex-col gap-3">
           {isLoading ? (
             <PlanSkeleton />
-          ) : selectedDaySessions.length ? (
-            selectedDaySessions.map((session) => (
+          ) : upcomingSessions.length ? (
+            upcomingSessions.map((session) => (
               <SessionListRow key={session.id} session={session} />
             ))
           ) : (
-            <EmptyState text="W tym dniu nie masz treningów." />
+            <EmptyState text="Nie masz zaplanowanych treningów. Ustal pierwszy termin z trenerem." />
           )}
         </div>
       </section>
@@ -436,6 +407,52 @@ function MobileSchedule({
           />
         </div>
       </section>
+    </div>
+  );
+}
+
+function MobilePlanEmptyState({
+  trainer,
+  trainerName,
+}: {
+  trainer: ClientPortalTrainer | null;
+  trainerName: string;
+}) {
+  return (
+    <div>
+      <div className="flex h-14 w-14 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
+        <CalendarDays size={26} />
+      </div>
+      <h2 className="mt-5 font-display text-[1.85rem] font-semibold leading-[1.05]">
+        Brak zaplanowanych treningów
+      </h2>
+      <p className="mt-4 text-sm leading-6 text-on-surface-variant">
+        Zaplanuj najbliższy trening z {trainerName}. Po dodaniu terminu sesja
+        pojawi się tutaj automatycznie.
+      </p>
+
+      {trainer?.phone || trainer?.email ? (
+        <div className="mt-5 grid gap-2">
+          {trainer.phone ? (
+            <a
+              href={`tel:${trainer.phone}`}
+              className="flex h-11 items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm font-semibold text-on-surface"
+            >
+              <Phone size={15} className="text-primary-light" />
+              {trainer.phone}
+            </a>
+          ) : null}
+          {trainer.email ? (
+            <a
+              href={`mailto:${trainer.email}`}
+              className="flex h-11 items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm font-semibold text-on-surface"
+            >
+              <Mail size={15} className="text-primary-light" />
+              {trainer.email}
+            </a>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
