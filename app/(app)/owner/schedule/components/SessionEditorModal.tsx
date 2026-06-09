@@ -137,8 +137,9 @@ export default function SessionEditorModal({
           event.preventDefault();
           onSubmit(values);
         }}
-        className="relative z-10 max-h-[92vh] w-full max-w-[980px] overflow-y-auto rounded-[var(--radius-xl)] bg-surface-container p-5 shadow-ambient md:p-6"
+        className="relative z-10 flex max-h-[92vh] w-full max-w-[980px] flex-col overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient"
       >
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-label text-primary-light">
@@ -376,7 +377,9 @@ export default function SessionEditorModal({
           </div>
         ) : null}
 
-        <div className="mt-6 flex justify-end gap-3">
+        </div>
+
+        <div className="flex flex-col-reverse gap-3 border-t border-white/5 bg-surface-container px-5 py-4 sm:flex-row sm:justify-end md:px-6">
           <Button type="button" variant="secondary" onClick={onClose}>
             Zamknij
           </Button>

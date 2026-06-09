@@ -128,6 +128,21 @@ export function isNotFoundError(error: unknown) {
   return error instanceof ApiError && error.status === 404;
 }
 
+export function isNotFoundLikeError(error: unknown) {
+  if (isNotFoundError(error)) return true;
+
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.trim().toLowerCase();
+
+  return (
+    message === "not found" ||
+    message === "client profile not found." ||
+    message === "client profile not found" ||
+    message.includes("client profile not found")
+  );
+}
+
 function buildBackendUrl(path: string, query?: ApiQuery) {
   const [rawPath, rawSearch = ""] = path.replace(/^\/+/, "").split("?");
   const searchParams = new URLSearchParams(rawSearch);

@@ -317,16 +317,20 @@ export default function PackagesPage() {
 
       {packageToDelete ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-[420px] rounded-[var(--radius-xl)] bg-surface-container p-6 shadow-ambient">
-            <p className="font-display text-2xl font-semibold">Usunąć pakiet?</p>
-            <p className="mt-3 text-sm leading-6 text-on-surface-variant">
-              Tej akcji nie da się szybko cofnąć. Pakiet:{" "}
-              <span className="font-semibold text-on-surface">
-                {packageToDelete.name}
-              </span>
-              .
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
+          <div className="flex max-h-[90vh] w-full max-w-[420px] flex-col overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient">
+            <div className="min-h-0 flex-1 overflow-y-auto p-6">
+              <p className="font-display text-2xl font-semibold">
+                Usunąć pakiet?
+              </p>
+              <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+                Tej akcji nie da się szybko cofnąć. Pakiet:{" "}
+                <span className="font-semibold text-on-surface">
+                  {packageToDelete.name}
+                </span>
+                .
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-white/5 px-6 py-4">
               <Button
                 variant="secondary"
                 onClick={() => setPackageToDelete(null)}

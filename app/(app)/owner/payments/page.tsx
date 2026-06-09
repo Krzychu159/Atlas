@@ -17,6 +17,10 @@ import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { DateRangeFilter } from "@/app/components/ui/date-range-filter";
 import {
+  getPaymentBreakdown,
+  hasPaymentOverpayment,
+} from "@/app/lib/payments/display";
+import {
   OwnerTextArea,
   OwnerTextField,
 } from "../components/OwnerFormControls";
@@ -571,7 +575,7 @@ function PaymentRow({
   const confirmed = isConfirmedPayment(payment);
   const rejected = isRejectedPayment(payment);
   const reversed = isReversedPayment(payment);
-  const hasOverpayment = payment.balanceCreditAmount > 0;
+  const hasOverpayment = hasPaymentOverpayment(payment);
   const receiptIssued = isReceiptIssued(payment);
 
   return (
@@ -678,26 +682,34 @@ function PaymentRow({
 }
 
 function PaymentSplit({ payment }: { payment: ClientPayment }) {
+  const breakdown = getPaymentBreakdown(payment);
+
   return (
     <div className="rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-2 text-sm">
       <p className="text-label text-on-surface-muted">Rozliczenie</p>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
         <PaymentSplitItem
           label="Wpłata"
-          value={formatMoney(payment.amount, payment.currency)}
+          value={formatMoney(breakdown.amount, payment.currency)}
         />
         <PaymentSplitItem
-          label="Pakiet"
-          value={formatMoney(payment.appliedToPackageAmount, payment.currency)}
+          label="Na pakiet"
+          value={formatMoney(
+            breakdown.appliedToPackageAmount,
+            payment.currency,
+          )}
         />
         <PaymentSplitItem
-          label="Saldo"
+          label="Na saldo"
           value={
-            payment.balanceCreditAmount > 0
-              ? `+${formatMoney(payment.balanceCreditAmount, payment.currency)}`
-              : formatMoney(payment.balanceCreditAmount, payment.currency)
+            breakdown.balanceCreditAmount > 0
+              ? `+${formatMoney(
+                  breakdown.balanceCreditAmount,
+                  payment.currency,
+                )}`
+              : formatMoney(breakdown.balanceCreditAmount, payment.currency)
           }
-          accent={payment.balanceCreditAmount > 0}
+          accent={breakdown.balanceCreditAmount > 0}
         />
       </div>
     </div>
@@ -740,7 +752,7 @@ function RejectPaymentModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-[560px] rounded-[var(--radius-xl)] border border-white/8 bg-surface-container p-5 shadow-ambient">
+      <div className="max-h-[90vh] w-full max-w-[560px] overflow-y-auto rounded-[var(--radius-xl)] border border-white/8 bg-surface-container p-5 shadow-ambient">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-label text-primary-light">Odrzucenie wpłaty</p>
@@ -770,7 +782,7 @@ function RejectPaymentModal({
           placeholder="Np. nie znaleziono przelewu na koncie."
         />
 
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="sticky bottom-0 -mx-5 -mb-5 mt-5 flex flex-col-reverse gap-2 border-t border-white/5 bg-surface-container px-5 py-4 sm:flex-row sm:justify-end">
           <Button variant="secondary" onClick={onClose} disabled={processing}>
             Anuluj
           </Button>
@@ -805,7 +817,7 @@ function ReversePaymentModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-[560px] rounded-[var(--radius-xl)] border border-white/8 bg-surface-container p-5 shadow-ambient">
+      <div className="max-h-[90vh] w-full max-w-[560px] overflow-y-auto rounded-[var(--radius-xl)] border border-white/8 bg-surface-container p-5 shadow-ambient">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-label text-primary-light">Cofnięcie wpłaty</p>
@@ -840,7 +852,7 @@ function ReversePaymentModal({
           placeholder="Np. błędnie zaksięgowana wpłata."
         />
 
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="sticky bottom-0 -mx-5 -mb-5 mt-5 flex flex-col-reverse gap-2 border-t border-white/5 bg-surface-container px-5 py-4 sm:flex-row sm:justify-end">
           <Button variant="secondary" onClick={onClose} disabled={processing}>
             Anuluj
           </Button>
@@ -916,7 +928,10 @@ function sortPayments(payments: ClientPayment[], sortBy: string) {
           "pl",
         );
       case "overpaymentDesc":
-        return second.balanceCreditAmount - first.balanceCreditAmount;
+        return (
+          getPaymentBreakdown(second).balanceCreditAmount -
+          getPaymentBreakdown(first).balanceCreditAmount
+        );
       case "newest":
       default:
         return (

@@ -240,6 +240,14 @@ export function isReversedPayment(payment: ClientPayment) {
 export function isReceiptIssued(payment: ClientPayment) {
   const normalized = payment.receiptStatus?.toLowerCase() || "";
 
+  if (
+    normalized.includes("cancel") ||
+    normalized.includes("anul") ||
+    normalized.includes("void")
+  ) {
+    return false;
+  }
+
   return Boolean(
     payment.receiptIssuedAt ||
       payment.receiptNumber ||

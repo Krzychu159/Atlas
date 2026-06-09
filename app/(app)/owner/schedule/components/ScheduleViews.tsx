@@ -10,11 +10,7 @@ import {
   isSameDay,
   shortDayNames,
 } from "../date-utils";
-import {
-  getParticipantsLabel,
-  getSessionTitle,
-  getToneClasses,
-} from "../session-utils";
+import { getSessionTitle, getToneClasses } from "../session-utils";
 import { LoadingState } from "./ScheduleStates";
 import SessionMetaChip from "./SessionMetaChip";
 
@@ -179,9 +175,6 @@ function SessionCard({
             {getSessionTitle(session)}
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-black/20 px-2 py-1 text-[11px] font-semibold text-on-surface">
-          {getParticipantsLabel(session)}
-        </span>
       </div>
 
       <div

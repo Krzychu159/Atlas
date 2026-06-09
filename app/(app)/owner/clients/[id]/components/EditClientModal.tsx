@@ -242,8 +242,9 @@ export default function EditClientModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8">
       <form
         onSubmit={handleSubmit}
-        className="max-h-full w-full max-w-[820px] overflow-y-auto rounded-[var(--radius-xl)] bg-surface-container p-5 shadow-ambient md:p-6"
+        className="flex max-h-full w-full max-w-[820px] flex-col overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient"
       >
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-label text-primary-light">Edycja</p>
@@ -334,7 +335,9 @@ export default function EditClientModal({
           </div>
         </div>
 
-        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        </div>
+
+        <div className="flex flex-col-reverse gap-3 border-t border-white/5 bg-surface-container px-5 py-4 sm:flex-row sm:justify-end md:px-6">
           <button
             type="button"
             onClick={onClose}

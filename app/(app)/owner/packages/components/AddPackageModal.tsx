@@ -82,29 +82,30 @@ export default function AddPackageModal({
         className="absolute inset-0 bg-black/70 backdrop-blur-[4px]"
       />
 
-      <div className="relative z-10 w-full max-w-[760px] rounded-[28px] bg-surface-container-high p-5 shadow-ambient md:p-6">
-        <button
-          onClick={onClose}
-          className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-on-surface-variant hover:text-on-surface"
-        >
-          <X size={18} />
-        </button>
+      <div className="relative z-10 flex max-h-[92vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[28px] bg-surface-container-high shadow-ambient">
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
+          <button
+            onClick={onClose}
+            className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-on-surface-variant hover:text-on-surface"
+          >
+            <X size={18} />
+          </button>
 
-        <div className="flex items-start gap-4 pr-12">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-primary/20 text-primary-light">
-            <PackagePlus size={22} />
+          <div className="flex items-start gap-4 pr-12">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-primary/20 text-primary-light">
+              <PackagePlus size={22} />
+            </div>
+            <div>
+              <p className="font-display text-[2rem] font-semibold leading-none tracking-tight">
+                Dodaj pakiet
+              </p>
+              <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+                Uzupełnij ofertę treningową bez przewijania formularza.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="font-display text-[2rem] font-semibold leading-none tracking-tight">
-              Dodaj pakiet
-            </p>
-            <p className="mt-3 text-sm leading-6 text-on-surface-variant">
-              Uzupełnij ofertę treningową bez przewijania formularza.
-            </p>
-          </div>
-        </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
           <OwnerTextField
             label="Nazwa pakietu"
             value={form.name}
@@ -164,9 +165,10 @@ export default function AddPackageModal({
             rows={2}
             className="md:col-span-2"
           />
+          </div>
         </div>
 
-        <div className="mt-5 flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-4 border-t border-white/5 bg-surface-container-high px-5 py-4 md:px-6">
           <label className="flex cursor-pointer items-center gap-3">
             <input
               type="checkbox"

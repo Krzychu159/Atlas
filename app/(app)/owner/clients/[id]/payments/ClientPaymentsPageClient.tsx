@@ -15,6 +15,9 @@ import {
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import {
+  getPaymentBreakdown,
+} from "@/app/lib/payments/display";
+import {
   OwnerTextArea,
   OwnerTextField,
 } from "@/app/(app)/owner/components/OwnerFormControls";
@@ -1161,7 +1164,8 @@ function ClientPaymentRow({
   const confirmed = isConfirmedPayment(payment);
   const rejected = isRejectedPayment(payment);
   const reversed = isReversedPayment(payment);
-  const hasOverpayment = payment.balanceCreditAmount > 0;
+  const breakdown = getPaymentBreakdown(payment);
+  const hasOverpayment = breakdown.balanceCreditAmount > 0;
   const receiptIssued = isReceiptIssued(payment);
 
   return (
@@ -1170,12 +1174,13 @@ function ClientPaymentRow({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-semibold text-on-surface">
-              {formatMoney(payment.amount, payment.currency)}
+              {formatMoney(breakdown.amount, payment.currency)}
             </p>
             <StatusPill
               label={getPaymentStatusLabel(payment.status)}
               muted={!confirmed && !pending && !rejected}
             />
+            <StatusPill label={getPaymentMethodLabel(payment.method)} muted />
             {hasOverpayment ? <StatusPill label="Nadpłata" /> : null}
             {receiptIssued ? <StatusPill label="Paragon" muted /> : null}
           </div>
@@ -1195,27 +1200,26 @@ function ClientPaymentRow({
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
             <PaymentSplitItem
               label="Wpłata"
-              value={formatMoney(payment.amount, payment.currency)}
+              value={formatMoney(breakdown.amount, payment.currency)}
             />
             <PaymentSplitItem
-              label="Pakiet"
+              label="Na pakiet"
               value={formatMoney(
-                payment.appliedToPackageAmount,
+                breakdown.appliedToPackageAmount,
                 payment.currency,
               )}
             />
             <PaymentSplitItem
-              label="Saldo"
+              label="Na saldo"
               value={
-                payment.balanceCreditAmount > 0
-                  ? `+${formatMoney(payment.balanceCreditAmount, payment.currency)}`
-                  : formatMoney(payment.balanceCreditAmount, payment.currency)
+                breakdown.balanceCreditAmount > 0
+                  ? `+${formatMoney(
+                      breakdown.balanceCreditAmount,
+                      payment.currency,
+                    )}`
+                  : formatMoney(breakdown.balanceCreditAmount, payment.currency)
               }
-              accent={payment.balanceCreditAmount > 0}
-            />
-            <PaymentSplitItem
-              label="Metoda"
-              value={getPaymentMethodLabel(payment.method)}
+              accent={breakdown.balanceCreditAmount > 0}
             />
           </div>
         </div>
@@ -1301,7 +1305,7 @@ function ReversePaymentModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-[560px] rounded-[var(--radius-xl)] border border-white/8 bg-surface-container p-5 shadow-ambient">
+      <div className="max-h-[90vh] w-full max-w-[560px] overflow-y-auto rounded-[var(--radius-xl)] border border-white/8 bg-surface-container p-5 shadow-ambient">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-label text-primary-light">Cofnięcie wpłaty</p>
@@ -1331,7 +1335,7 @@ function ReversePaymentModal({
           placeholder="Np. błędnie zaksięgowana wpłata."
         />
 
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="sticky bottom-0 -mx-5 -mb-5 mt-5 flex flex-col-reverse gap-2 border-t border-white/5 bg-surface-container px-5 py-4 sm:flex-row sm:justify-end">
           <Button variant="secondary" onClick={onClose} disabled={processing}>
             Anuluj
           </Button>
@@ -1350,17 +1354,19 @@ function ReversePaymentModal({
 }
 
 function getCreatedPaymentMessage(payment: ClientPayment) {
+  const breakdown = getPaymentBreakdown(payment);
+
   if (isPendingPayment(payment)) {
     return "Wpłata została dodana i oczekuje na potwierdzenie.";
   }
 
   if (isConfirmedPayment(payment)) {
-    if (payment.balanceCreditAmount > 0) {
+    if (breakdown.balanceCreditAmount > 0) {
       return `Wpłata rozliczona: ${formatMoney(
-        payment.appliedToPackageAmount,
+        breakdown.appliedToPackageAmount,
         payment.currency,
       )} na pakiet i ${formatMoney(
-        payment.balanceCreditAmount,
+        breakdown.balanceCreditAmount,
         payment.currency,
       )} na saldo.`;
     }

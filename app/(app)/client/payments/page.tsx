@@ -13,9 +13,13 @@ import {
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { showAppError, showAppSuccess } from "@/app/components/ui/app-toast";
-import { isNotFoundError } from "@/app/lib/backend";
+import { isNotFoundLikeError } from "@/app/lib/backend";
 import { formatDateTime } from "@/app/lib/formatters/date";
 import { formatMoney } from "@/app/lib/formatters/money";
+import {
+  getPaymentBreakdown,
+  hasPaymentOverpayment,
+} from "@/app/lib/payments/display";
 import {
   createClientPortalPayment,
   getClientPortalBilling,
@@ -58,7 +62,7 @@ export default function ClientPaymentsPage() {
           : "";
       });
     } catch (err) {
-      if (isNotFoundError(err)) {
+      if (isNotFoundLikeError(err)) {
         setBilling(null);
         setSelectedPackageId("");
         setAmount("");
@@ -530,12 +534,14 @@ function MobilePaymentStat({ label, value }: { label: string; value: string }) {
 }
 
 function MobilePaymentRow({ payment }: { payment: ClientPayment }) {
+  const breakdown = getPaymentBreakdown(payment);
+
   return (
     <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-lg font-semibold">
-            {formatMoney(payment.amount, payment.currency)}
+            {formatMoney(breakdown.amount, payment.currency)}
           </p>
           <p className="mt-1 line-clamp-2 text-sm text-on-surface-variant">
             {payment.packageName || "Bez pakietu"}
@@ -544,17 +550,27 @@ function MobilePaymentRow({ payment }: { payment: ClientPayment }) {
         <StatusBadge status={payment.status} />
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="mt-4 grid grid-cols-3 gap-2">
         <MiniAmount
-          label="Na pakiet"
-          value={formatMoney(payment.appliedToPackageAmount, payment.currency)}
+          label="Wpłata"
+          value={formatMoney(breakdown.amount, payment.currency)}
         />
         <MiniAmount
-          label="Saldo"
+          label="Na pakiet"
+          value={formatMoney(
+            breakdown.appliedToPackageAmount,
+            payment.currency,
+          )}
+        />
+        <MiniAmount
+          label="Na saldo"
           value={
-            payment.balanceCreditAmount > 0
-              ? `+${formatMoney(payment.balanceCreditAmount, payment.currency)}`
-              : formatMoney(payment.balanceCreditAmount, payment.currency)
+            breakdown.balanceCreditAmount > 0
+              ? `+${formatMoney(
+                  breakdown.balanceCreditAmount,
+                  payment.currency,
+                )}`
+              : formatMoney(breakdown.balanceCreditAmount, payment.currency)
           }
         />
       </div>
@@ -622,16 +638,18 @@ function Field({
 }
 
 function PaymentRow({ payment }: { payment: ClientPayment }) {
+  const breakdown = getPaymentBreakdown(payment);
+
   return (
     <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-lg font-semibold">
-              {formatMoney(payment.amount, payment.currency)}
+              {formatMoney(breakdown.amount, payment.currency)}
             </p>
             <StatusBadge status={payment.status} />
-            {payment.balanceCreditAmount > 0 ? (
+            {hasPaymentOverpayment(payment) ? (
               <span className="rounded-full bg-tertiary-container/45 px-2.5 py-1 text-xs font-semibold text-tertiary-light">
                 Nadpłata
               </span>
@@ -649,18 +667,24 @@ function PaymentRow({ payment }: { payment: ClientPayment }) {
         <div className="grid min-w-[300px] grid-cols-3 gap-2">
           <MiniAmount
             label="Wpłata"
-            value={formatMoney(payment.amount, payment.currency)}
+            value={formatMoney(breakdown.amount, payment.currency)}
           />
           <MiniAmount
             label="Na pakiet"
-            value={formatMoney(payment.appliedToPackageAmount, payment.currency)}
+            value={formatMoney(
+              breakdown.appliedToPackageAmount,
+              payment.currency,
+            )}
           />
           <MiniAmount
-            label="Saldo"
+            label="Na saldo"
             value={
-              payment.balanceCreditAmount > 0
-                ? `+${formatMoney(payment.balanceCreditAmount, payment.currency)}`
-                : formatMoney(payment.balanceCreditAmount, payment.currency)
+              breakdown.balanceCreditAmount > 0
+                ? `+${formatMoney(
+                    breakdown.balanceCreditAmount,
+                    payment.currency,
+                  )}`
+                : formatMoney(breakdown.balanceCreditAmount, payment.currency)
             }
           />
         </div>

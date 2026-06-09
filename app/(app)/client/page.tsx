@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Button, ButtonLink } from "@/app/components/ui/button";
 import { showAppError, showAppInfo } from "@/app/components/ui/app-toast";
-import { isNotFoundError } from "@/app/lib/backend";
+import { isNotFoundLikeError } from "@/app/lib/backend";
 import { formatDateTime, formatSessionTime } from "@/app/lib/formatters/date";
 import { formatMoney } from "@/app/lib/formatters/money";
 import {
@@ -80,7 +80,8 @@ export default function ClientDashboardPage() {
         trainingPlanData,
       ].find(
         (result): result is PromiseRejectedResult =>
-          result.status === "rejected" && !isNotFoundError(result.reason),
+          result.status === "rejected" &&
+          !isNotFoundLikeError(result.reason),
       );
 
       if (firstError && dashboardData.status !== "fulfilled" && profileData.status !== "fulfilled") {

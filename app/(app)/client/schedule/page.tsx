@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { showAppError } from "@/app/components/ui/app-toast";
-import { isNotFoundError } from "@/app/lib/backend";
+import { isNotFoundLikeError } from "@/app/lib/backend";
 import { formatSessionTime } from "@/app/lib/formatters/date";
 import {
   getClientPortalDashboard,
@@ -44,7 +44,7 @@ export default function ClientSchedulePage() {
 
       if (scheduleData.status === "fulfilled") {
         setSessions(scheduleData.value || []);
-      } else if (isNotFoundError(scheduleData.reason)) {
+      } else if (isNotFoundLikeError(scheduleData.reason)) {
         setSessions([]);
       } else {
         throw scheduleData.reason;
@@ -52,7 +52,7 @@ export default function ClientSchedulePage() {
 
       if (usageData.status === "fulfilled") {
         setUsage(usageData.value);
-      } else if (isNotFoundError(usageData.reason)) {
+      } else if (isNotFoundLikeError(usageData.reason)) {
         setUsage(null);
       }
 
