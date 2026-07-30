@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { showOwnerError, showOwnerSuccess } from "@/app/(app)/owner/components/owner-toast";
@@ -129,7 +129,7 @@ export default function TrainerSchedulePage() {
     }
   }
 
-  async function loadResources() {
+  const loadResources = useCallback(async () => {
     try {
       setIsResourcesLoading(true);
       const meData = await getTrainerPortalMe().catch(() => null);
@@ -159,41 +159,7 @@ export default function TrainerSchedulePage() {
       setIsTrainerFilterReady(true);
       setIsResourcesLoading(false);
     }
-  }
-
-  async function getTrainersForTrainerView(meData: TrainerPortalMe | null) {
-    try {
-      return await getTrainers();
-    } catch (err) {
-      if (!isForbiddenError(err)) throw err;
-
-      const currentTrainer = trainerPortalMeToTrainer(meData);
-
-      return currentTrainer ? [currentTrainer] : [];
-    }
-  }
-
-  async function getLocationsForTrainerView(meData: TrainerPortalMe | null) {
-    try {
-      return await getLocations();
-    } catch (err) {
-      if (!isForbiddenError(err)) throw err;
-
-      return trainerPortalMeToLocations(meData);
-    }
-  }
-
-  async function getClientsForTrainerView(meData: TrainerPortalMe | null) {
-    try {
-      return await getClients();
-    } catch (err) {
-      if (!isForbiddenError(err)) throw err;
-
-      const portalClients = await getTrainerPortalClients();
-
-      return trainerPortalClientsToClients(portalClients, meData);
-    }
-  }
+  }, []);
 
   async function loadSessions() {
     try {
@@ -262,7 +228,7 @@ export default function TrainerSchedulePage() {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [outlookStatus?.isConnected]);
+  }, [loadResources, outlookStatus?.isConnected]);
 
   useEffect(() => {
     if (!outlookStatus?.isConnected || !isTrainerFilterReady) return;
@@ -465,4 +431,38 @@ export default function TrainerSchedulePage() {
       />
     </>
   );
+}
+
+async function getTrainersForTrainerView(meData: TrainerPortalMe | null) {
+  try {
+    return await getTrainers();
+  } catch (err) {
+    if (!isForbiddenError(err)) throw err;
+
+    const currentTrainer = trainerPortalMeToTrainer(meData);
+
+    return currentTrainer ? [currentTrainer] : [];
+  }
+}
+
+async function getLocationsForTrainerView(meData: TrainerPortalMe | null) {
+  try {
+    return await getLocations();
+  } catch (err) {
+    if (!isForbiddenError(err)) throw err;
+
+    return trainerPortalMeToLocations(meData);
+  }
+}
+
+async function getClientsForTrainerView(meData: TrainerPortalMe | null) {
+  try {
+    return await getClients();
+  } catch (err) {
+    if (!isForbiddenError(err)) throw err;
+
+    const portalClients = await getTrainerPortalClients();
+
+    return trainerPortalClientsToClients(portalClients, meData);
+  }
 }

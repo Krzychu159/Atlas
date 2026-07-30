@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
+import { Button } from "@/app/components/ui/button";
+import { TextArea, TextField } from "@/app/components/ui/input";
 import {
   updatePackage,
   type Package,
@@ -40,13 +42,15 @@ export default function PackageEditCard({
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    setForm({
-      name: item.name,
-      description: item.description || "",
-      price: String(item.price),
-      sessionsLimit: String(item.sessionsLimit),
-      durationDays: String(item.durationDays),
-      isActive: item.isActive,
+    void Promise.resolve().then(() => {
+      setForm({
+        name: item.name,
+        description: item.description || "",
+        price: String(item.price),
+        sessionsLimit: String(item.sessionsLimit),
+        durationDays: String(item.durationDays),
+        isActive: item.isActive,
+      });
     });
   }, [item]);
 
@@ -97,49 +101,37 @@ export default function PackageEditCard({
         </div>
       </div>
 
-      <div className="mt-6">
-        <label className="text-label text-on-surface-variant">
-          Nazwa pakietu
-        </label>
-        <input
-          value={form.name}
-          onChange={(event) => updateField("name", event.target.value)}
-          className="mt-2 h-14 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 outline-none"
-        />
-      </div>
+      <TextField
+        label="Nazwa pakietu"
+        value={form.name}
+        onChange={(value) => updateField("name", value)}
+        className="mt-6"
+      />
 
-      <div className="mt-4">
-        <label className="text-label text-on-surface-variant">Opis</label>
-        <textarea
-          value={form.description}
-          onChange={(event) => updateField("description", event.target.value)}
-          rows={3}
-          className="mt-2 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-4 outline-none resize-none"
-        />
-      </div>
+      <TextArea
+        label="Opis"
+        value={form.description}
+        onChange={(value) => updateField("description", value)}
+        rows={3}
+        className="mt-4"
+      />
 
       <div className="mt-4 grid grid-cols-2 gap-4">
         <div>
-          <label className="text-label text-on-surface-variant">
-            Cena ({item.currency || "PLN"})
-          </label>
-          <input
+          <TextField
+            label={`Cena (${item.currency || "PLN"})`}
             value={form.price}
-            onChange={(event) => updateField("price", event.target.value)}
+            onChange={(value) => updateField("price", value)}
             type="number"
-            className="mt-2 h-14 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 outline-none"
           />
         </div>
 
         <div>
-          <label className="text-label text-on-surface-variant">Sesje</label>
-          <input
+          <TextField
+            label="Sesje"
             value={form.sessionsLimit}
-            onChange={(event) =>
-              updateField("sessionsLimit", event.target.value)
-            }
+            onChange={(value) => updateField("sessionsLimit", value)}
             type="number"
-            className="mt-2 h-14 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 outline-none"
           />
         </div>
       </div>
@@ -168,14 +160,14 @@ export default function PackageEditCard({
         <span className="text-sm text-on-surface-variant">Pakiet aktywny</span>
       </label>
 
-      <button
+      <Button
         onClick={handleSave}
         disabled={isSaving || !form.name}
-        className="mt-6 h-14 w-full rounded-[var(--radius-lg)] bg-primary text-on-primary font-semibold flex items-center justify-center gap-3 disabled:opacity-60"
+        className="mt-6 h-14 w-full"
+        icon={<Save size={17} />}
       >
-        <Save size={17} />
         {isSaving ? "Zapisywanie..." : "Zapisz zmiany"}
-      </button>
+      </Button>
     </div>
   );
 }

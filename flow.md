@@ -148,6 +148,33 @@ Komponenty nie powinny:
 - robić `JSON.stringify` dla requestów domenowych,
 - znać `BACKEND_API_URL`.
 
+## Wspólne komponenty UI
+
+Nowe formularze, modale i akcje powinny używać wspólnych komponentów:
+
+- przyciski: `app/components/ui/button.tsx`,
+- pola tekstowe i textarea: `app/components/ui/input.tsx`,
+- selecty: `app/components/ui/custom-select.tsx`,
+- zakres dat: `app/components/ui/date-range-filter.tsx`,
+- wrapper modala, nagłówek i sticky footer: `app/components/ui/modal.tsx`,
+- upload avatara: `app/components/ui/avatar-file-picker.tsx`.
+
+Ekrany ownera mogą dalej importować kompatybilnościowe aliasy z
+`app/(app)/owner/components/OwnerFormControls.tsx`, ale nowe wspólne
+komponenty powinny trafiać do `app/components/ui` albo do domenowego folderu
+`app/components/<domain>`.
+
+Jeżeli dany wzorzec występuje w ownerze i trenerze, nie duplikujemy go w dwóch
+folderach paneli. Przykłady obecnego współdzielenia:
+
+- lista i podział płatności: `app/components/payments/*`,
+- karty i filtry pakietów: `app/components/packages/*`,
+- kontrolki grafiku: `app/components/schedule/*` oraz komponenty grafiku
+  ownera używane też przez panel trenera.
+
+Widoczne teksty w komponentach muszą być po polsku i nie powinny ujawniać
+technicznych szczegółów typu "backend", "API", "mock" albo "tymczasowo".
+
 ## Mutacje
 
 Po mutacji są dwa dopuszczalne wzorce:

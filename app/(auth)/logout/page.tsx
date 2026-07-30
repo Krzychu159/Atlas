@@ -47,19 +47,15 @@ export default function LogoutPage() {
         loginParams.set("next", nextPath);
       }
 
-      try {
-        await fetch("/api/auth/logout", {
-          method: "POST",
-          cache: "no-store",
-        });
-      } catch (error) {
-        console.error("Logout error:", error);
-      } finally {
-        if (!cancelled) {
-          const query = loginParams.toString();
-          router.replace(query ? `/login?${query}` : "/login");
-          router.refresh();
-        }
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        cache: "no-store",
+      }).catch(() => undefined);
+
+      if (!cancelled) {
+        const query = loginParams.toString();
+        router.replace(query ? `/login?${query}` : "/login");
+        router.refresh();
       }
     }
 

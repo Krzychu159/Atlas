@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CalendarDays, Check, ChevronDown, X } from "lucide-react";
+import { Button } from "@/app/components/ui/button";
 
 export type DateRangeValue = {
   from: string;
@@ -97,22 +98,23 @@ export function DateRangeFilter({
           </div>
 
           <div className="mt-3 flex items-center justify-between gap-2">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={clearRange}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-md)] px-3 text-xs font-semibold text-on-surface-muted transition hover:bg-surface-container-low hover:text-on-surface"
+              icon={<X size={14} />}
             >
-              <X size={14} />
               Wyczyść
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              size="sm"
               onClick={() => setIsOpen(false)}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-md)] bg-primary px-4 text-xs font-semibold text-on-primary transition hover:bg-primary-container"
+              icon={<Check size={14} />}
             >
-              <Check size={14} />
               Zastosuj
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}

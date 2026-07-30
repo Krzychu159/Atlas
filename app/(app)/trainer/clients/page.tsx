@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import ClientFilters, {
@@ -24,6 +24,7 @@ import {
 import { isForbiddenError } from "@/app/lib/backend";
 import {
   getTrainerPortalClients,
+  getTrainerPortalClientSubscription,
   getTrainerPortalMe,
   type TrainerPortalMe,
 } from "@/app/lib/trainer/portal";
@@ -63,17 +64,39 @@ export default function TrainerClientsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const defaultFilterApplied = useRef(false);
 
-  async function loadClients() {
+  const getClientsForTrainerView = useCallback(
+    async (meData: TrainerPortalMe | null) => {
+      try {
+        return {
+          clients: await getClients(),
+          canUseOwnerClientEndpoints: true,
+        };
+      } catch (err) {
+        if (!isForbiddenError(err)) throw err;
+
+        const portalClients = await getTrainerPortalClients();
+
+        return {
+          clients: trainerPortalClientsToClients(portalClients, meData),
+          canUseOwnerClientEndpoints: false,
+        };
+      }
+    },
+    [],
+  );
+
+  const loadClients = useCallback(async () => {
     try {
       setIsLoading(true);
       const meData = await getTrainerPortalMe().catch(() => null);
       const { clients: clientsData, canUseOwnerClientEndpoints } =
         await getClientsForTrainerView(meData);
-      const subscriptions = canUseOwnerClientEndpoints
-        ? await Promise.allSettled(
-            clientsData.map((client) => getClientSubscription(client.id)),
-          )
-        : [];
+      const subscriptionLoader = canUseOwnerClientEndpoints
+        ? getClientSubscription
+        : getTrainerPortalClientSubscription;
+      const subscriptions = await Promise.allSettled(
+        clientsData.map((client) => subscriptionLoader(client.id)),
+      );
 
       setMe(meData);
       setClients(
@@ -117,25 +140,7 @@ export default function TrainerClientsPage() {
     } finally {
       setIsLoading(false);
     }
-  }
-
-  async function getClientsForTrainerView(meData: TrainerPortalMe | null) {
-    try {
-      return {
-        clients: await getClients(),
-        canUseOwnerClientEndpoints: true,
-      };
-    } catch (err) {
-      if (!isForbiddenError(err)) throw err;
-
-      const portalClients = await getTrainerPortalClients();
-
-      return {
-        clients: trainerPortalClientsToClients(portalClients, meData),
-        canUseOwnerClientEndpoints: false,
-      };
-    }
-  }
+  }, [getClientsForTrainerView]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -143,7 +148,7 @@ export default function TrainerClientsPage() {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [loadClients]);
 
   const trainerOptions = useMemo(() => {
     const uniqueTrainers = new Set<string>();

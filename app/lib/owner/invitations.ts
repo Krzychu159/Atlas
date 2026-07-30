@@ -41,10 +41,7 @@ export function getInvitations(params?: GetInvitationsParams) {
 }
 
 export function createInvitation(payload: CreateInvitationPayload) {
-  return backendPost<Invitation>("Invitations", {
-    ...payload,
-    locationId: 2,
-  });
+  return backendPost<Invitation>("Invitations", payload);
 }
 
 export function resendInvitation(id: number) {

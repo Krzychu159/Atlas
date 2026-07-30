@@ -1,8 +1,10 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
-import { Link2, MapPin, X } from "lucide-react";
+import { Link2, MapPin, Save } from "lucide-react";
+import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
+import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
 import AvatarFilePicker from "../../../components/AvatarFilePicker";
 import {
   OwnerTextArea,
@@ -89,19 +91,21 @@ export default function EditClientModal({
         setTrainers([]);
         setLocations([]);
       });
-  }, [open]);
+  }, [access, open, trainerMe]);
 
   useEffect(() => {
     if (!client || !open) return;
 
-    setFirstName(client.firstName || "");
-    setLastName(client.lastName || "");
-    setEmail(client.email || "");
-    setPhoneNumber(client.phoneNumber || "");
-    setAvatarUrl(client.avatarUrl || "");
-    setTrainerId(client.trainerId ? String(client.trainerId) : "");
-    setLocationId(resolveClientLocationId(client, locations));
-    setGoal(client.goal || "");
+    void Promise.resolve().then(() => {
+      setFirstName(client.firstName || "");
+      setLastName(client.lastName || "");
+      setEmail(client.email || "");
+      setPhoneNumber(client.phoneNumber || "");
+      setAvatarUrl(client.avatarUrl || "");
+      setTrainerId(client.trainerId ? String(client.trainerId) : "");
+      setLocationId(resolveClientLocationId(client, locations));
+      setGoal(client.goal || "");
+    });
   }, [client, locations, open]);
 
   useEffect(() => {
@@ -116,7 +120,7 @@ export default function EditClientModal({
         setTrainingPlan(null);
         setTrainingPlanUrl("");
       });
-  }, [client, open]);
+  }, [access, client, open]);
 
   if (!open || !client) return null;
 
@@ -239,28 +243,13 @@ export default function EditClientModal({
   const avatarFallback = `${firstName[0] || ""}${lastName[0] || ""}` || "K";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8">
+    <ModalOverlay onClose={onClose} className="px-4 py-8">
       <form
         onSubmit={handleSubmit}
-        className="flex max-h-full w-full max-w-[820px] flex-col overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient"
+        className="relative z-10 flex max-h-full w-full max-w-[820px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient"
       >
         <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-label text-primary-light">Edycja</p>
-            <h2 className="mt-2 font-display text-3xl font-semibold">
-              Dane klienta
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container-low text-on-surface-variant transition hover:bg-surface-container-high hover:text-on-surface"
-            aria-label="Zamknij"
-          >
-            <X size={18} />
-          </button>
-        </div>
+        <ModalHeader eyebrow="Edycja" title="Dane klienta" onClose={onClose} />
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <OwnerTextField
@@ -337,24 +326,25 @@ export default function EditClientModal({
 
         </div>
 
-        <div className="flex flex-col-reverse gap-3 border-t border-white/5 bg-surface-container px-5 py-4 sm:flex-row sm:justify-end md:px-6">
-          <button
+        <ModalFooter>
+          <Button
             type="button"
+            variant="secondary"
             onClick={onClose}
-            className="h-12 rounded-[var(--radius-lg)] bg-surface-container-low px-6 text-sm font-semibold text-on-surface transition hover:bg-surface-container-high"
+            disabled={isSaving}
           >
             Anuluj
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             disabled={isSaving}
-            className="h-12 rounded-[var(--radius-lg)] bg-primary px-6 text-sm font-semibold text-on-primary transition hover:bg-primary-container disabled:opacity-60"
+            icon={<Save size={16} />}
           >
             {isSaving ? "Zapisywanie..." : "Zapisz zmiany"}
-          </button>
-        </div>
+          </Button>
+        </ModalFooter>
       </form>
-    </div>
+    </ModalOverlay>
   );
 }
 

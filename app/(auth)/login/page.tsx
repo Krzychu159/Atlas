@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AtSign, Lock, ArrowRight, Eye, EyeOff, Dumbbell } from "lucide-react";
 
@@ -90,12 +90,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice] = useState(() => {
+    if (typeof window === "undefined") return "";
 
-  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setNotice(getLoginNotice(params.get("reason")));
-  }, []);
+
+    return getLoginNotice(params.get("reason"));
+  });
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

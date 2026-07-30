@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { getClients, type Client } from "@/app/lib/owner/clients";
+import {
+  matchesOwnerLocationId,
+  useOwnerLocationFilter,
+} from "@/app/lib/owner/location-filter";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { getOutlookStatus, type OutlookStatus } from "@/app/lib/owner/outlook";
 import {
@@ -38,6 +42,7 @@ import { showOwnerError, showOwnerSuccess } from "../components/owner-toast";
 
 export default function SchedulePage() {
   const [view, setView] = useState<ScheduleView>("week");
+  const { selectedLocationId } = useOwnerLocationFilter();
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [outlookStatus, setOutlookStatus] = useState<OutlookStatus | null>(
     null,
@@ -60,12 +65,37 @@ export default function SchedulePage() {
   const [isSavingSession, setIsSavingSession] = useState(false);
 
   const period = useMemo(() => getPeriod(view, anchorDate), [anchorDate, view]);
+  const scopedTrainers = useMemo(
+    () =>
+      trainers.filter((trainer) =>
+        matchesOwnerLocationId(trainer, selectedLocationId),
+      ),
+    [selectedLocationId, trainers],
+  );
+  const scopedLocations = useMemo(
+    () =>
+      selectedLocationId
+        ? locations.filter((location) => location.id === selectedLocationId)
+        : locations,
+    [locations, selectedLocationId],
+  );
+  const scopedClients = useMemo(
+    () =>
+      clients.filter((client) =>
+        matchesOwnerLocationId(client, selectedLocationId),
+      ),
+    [clients, selectedLocationId],
+  );
   const visibleSessions = useMemo(
     () =>
       sortSessions(
-        sessions.filter((session) => matchesStatusFilter(session, statusFilter)),
+        sessions.filter(
+          (session) =>
+            matchesOwnerLocationId(session, selectedLocationId) &&
+            matchesStatusFilter(session, statusFilter),
+        ),
       ),
-    [sessions, statusFilter],
+    [selectedLocationId, sessions, statusFilter],
   );
   const weekDays = useMemo(() => {
     const weekStart = startOfWeek(anchorDate);
@@ -74,6 +104,8 @@ export default function SchedulePage() {
   }, [anchorDate]);
 
   async function loadOutlookStatus() {
+    await Promise.resolve();
+
     try {
       setIsStatusLoading(true);
       const data = await getOutlookStatus();
@@ -89,6 +121,8 @@ export default function SchedulePage() {
   }
 
   async function loadResources() {
+    await Promise.resolve();
+
     try {
       setIsResourcesLoading(true);
       const [trainersData, locationsData, clientsData] = await Promise.all([
@@ -109,12 +143,15 @@ export default function SchedulePage() {
   }
 
   async function loadSessions() {
+    await Promise.resolve();
+
     try {
       setIsSessionsLoading(true);
       const data = await getOwnerSessions({
         from: period.fromIso,
         to: period.toIso,
         trainerId: trainerFilter ? Number(trainerFilter) : undefined,
+        locationId: selectedLocationId ?? undefined,
         status:
           statusFilter !== "all" && statusFilter !== "without-cancelled"
             ? statusFilter
@@ -132,27 +169,40 @@ export default function SchedulePage() {
   }
 
   useEffect(() => {
-    loadOutlookStatus();
+    void Promise.resolve().then(() => loadOutlookStatus());
   }, []);
 
   useEffect(() => {
     if (!outlookStatus?.isConnected) return;
 
-    loadResources();
+    void Promise.resolve().then(() => loadResources());
   }, [outlookStatus?.isConnected]);
 
   useEffect(() => {
     if (!outlookStatus?.isConnected) return;
 
-    loadSessions();
+    void Promise.resolve().then(() => loadSessions());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     outlookStatus?.isConnected,
     period.fromIso,
     period.toIso,
+    selectedLocationId,
     trainerFilter,
     statusFilter,
   ]);
+
+  useEffect(() => {
+    if (!trainerFilter) return;
+
+    const selectedTrainerVisible = scopedTrainers.some(
+      (trainer) => String(trainer.id) === trainerFilter,
+    );
+
+    if (!selectedTrainerVisible) {
+      void Promise.resolve().then(() => setTrainerFilter(""));
+    }
+  }, [scopedTrainers, trainerFilter]);
 
   function movePeriod(direction: -1 | 1) {
     setAnchorDate((current) =>
@@ -256,7 +306,7 @@ export default function SchedulePage() {
           <ScheduleFilters
             statusFilter={statusFilter}
             trainerFilter={trainerFilter}
-            trainers={trainers}
+            trainers={scopedTrainers}
             visibleCount={visibleSessions.length}
             onStatusFilterChange={setStatusFilter}
             onTrainerFilterChange={setTrainerFilter}
@@ -299,9 +349,9 @@ export default function SchedulePage() {
         open={isSessionModalOpen}
         session={selectedSession}
         anchorDate={selectedSession ? anchorDate : createSessionDate}
-        trainers={trainers}
-        locations={locations}
-        clients={clients}
+        trainers={scopedTrainers}
+        locations={scopedLocations}
+        clients={scopedClients}
         isSaving={isSavingSession}
         onClose={() => {
           setIsSessionModalOpen(false);

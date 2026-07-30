@@ -14,39 +14,6 @@ import PackageEditCard from "./components/PackageEditCard";
 import PackageClientsList from "./components/PackageClientsList";
 import { showOwnerError } from "../../components/owner-toast";
 
-const mockPackageClients: PackageClient[] = [
-  {
-    id: 1,
-    fullName: "Jakub Wiśniewski",
-    email: "jakub@example.com",
-    avatarUrl: null,
-    joinedAt: "2024-05-12T10:00:00Z",
-    usedSessions: 3,
-    sessionsLimit: 8,
-    status: "Active",
-  },
-  {
-    id: 2,
-    fullName: "Anna Kowalska",
-    email: "anna@example.com",
-    avatarUrl: null,
-    joinedAt: "2024-05-08T10:00:00Z",
-    usedSessions: 6,
-    sessionsLimit: 8,
-    status: "Active",
-  },
-  {
-    id: 3,
-    fullName: "Marek Kwiatkowski",
-    email: "marek@example.com",
-    avatarUrl: null,
-    joinedAt: "2024-05-20T10:00:00Z",
-    usedSessions: 1,
-    sessionsLimit: 8,
-    status: "Active",
-  },
-];
-
 export default function PackageDetailsPage({
   params,
 }: {
@@ -58,10 +25,11 @@ export default function PackageDetailsPage({
   const [item, setItem] = useState<Package | null>(null);
   const [clients, setClients] = useState<PackageClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [clientsSource, setClientsSource] = useState<"api" | "mock">("api");
 
   useEffect(() => {
     async function loadData() {
+      await Promise.resolve();
+
       try {
         setIsLoading(true);
 
@@ -71,15 +39,8 @@ export default function PackageDetailsPage({
         try {
           const packageClients = await getPackageClients(packageId);
           setClients(packageClients);
-          setClientsSource("api");
         } catch {
-          setClients(
-            mockPackageClients.map((client) => ({
-              ...client,
-              sessionsLimit: packageData.sessionsLimit,
-            })),
-          );
-          setClientsSource("mock");
+          setClients([]);
         }
       } catch (err) {
         showOwnerError(err, "Nie udało się pobrać pakietu.", {
@@ -91,12 +52,12 @@ export default function PackageDetailsPage({
     }
 
     if (Number.isFinite(packageId)) {
-      loadData();
+      void loadData();
     } else {
       showOwnerError(new Error("Nieprawidłowe ID pakietu."), "", {
         id: "owner-package-invalid-id",
       });
-      setIsLoading(false);
+      void Promise.resolve().then(() => setIsLoading(false));
     }
   }, [packageId]);
 
@@ -124,13 +85,6 @@ export default function PackageDetailsPage({
 
       {item ? (
         <div className="mt-6 flex flex-col gap-5">
-          {clientsSource === "mock" ? (
-            <div className="rounded-[var(--radius-lg)] bg-warning-container/30 px-4 py-3 text-sm text-warning-light">
-              Lista klientów jest tymczasowo mockowana. Po dodaniu endpointu GET
-              /api/Packages/{item.id}/clients podłączy się automatycznie.
-            </div>
-          ) : null}
-
           <PackageDetailsHero item={item} clients={clients} />
 
           <div className="grid grid-cols-1 lg:grid-cols-[390px_minmax(0,1fr)] gap-5 items-start">

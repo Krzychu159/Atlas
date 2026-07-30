@@ -2,6 +2,7 @@
 
 import { Search, SlidersHorizontal } from "lucide-react";
 import { CustomSelect } from "@/app/components/ui/custom-select";
+import { Input } from "@/app/components/ui/input";
 
 export type ParticipantsFilter = "all" | "solo" | "duo" | "group";
 export type SessionsFilter = "all" | "short" | "medium" | "long";
@@ -42,15 +43,13 @@ export default function PackageFilters({
   return (
     <div className="card-shell p-4">
       <div className="grid gap-3 lg:grid-cols-[1fr_190px_190px_190px_190px]">
-        <label className="flex h-12 items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4">
-          <Search size={18} className="shrink-0 text-on-surface-muted" />
-          <input
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Szukaj pakietu..."
-            className="w-full bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
-          />
-        </label>
+        <Input
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="Szukaj pakietu..."
+          icon={<Search size={18} />}
+          className="h-12"
+        />
 
         <CustomSelect
           icon={<SlidersHorizontal size={16} />}

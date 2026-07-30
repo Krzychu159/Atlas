@@ -9,6 +9,10 @@ import {
   getClientSubscription,
   type Client,
 } from "@/app/lib/owner/clients";
+import {
+  matchesOwnerLocationId,
+  useOwnerLocationFilter,
+} from "@/app/lib/owner/location-filter";
 import AddClientModal from "@/app/(app)/owner/clients/components/AddClientModal";
 import ClientFilters, {
   type ClientPackageFilter,
@@ -44,6 +48,7 @@ function getTime(value?: string | null) {
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
+  const { selectedLocationId } = useOwnerLocationFilter();
   const [search, setSearch] = useState("");
   const [packageFilter, setPackageFilter] =
     useState<ClientPackageFilter>("all");
@@ -94,25 +99,41 @@ export default function ClientsPage() {
   }
 
   useEffect(() => {
-    loadClients();
+    void Promise.resolve().then(() => loadClients());
   }, []);
+
+  const scopedClients = useMemo(
+    () =>
+      clients.filter((client) =>
+        matchesOwnerLocationId(client, selectedLocationId),
+      ),
+    [clients, selectedLocationId],
+  );
 
   const trainerOptions = useMemo(() => {
     const uniqueTrainers = new Set<string>();
 
-    clients.forEach((client) => {
+    scopedClients.forEach((client) => {
       if (client.trainerFullName) uniqueTrainers.add(client.trainerFullName);
     });
 
     return Array.from(uniqueTrainers).sort((first, second) =>
       first.localeCompare(second, "pl"),
     );
-  }, [clients]);
+  }, [scopedClients]);
+
+  useEffect(() => {
+    if (trainerFilter === "all") return;
+
+    if (!trainerOptions.includes(trainerFilter)) {
+      void Promise.resolve().then(() => setTrainerFilter("all"));
+    }
+  }, [trainerFilter, trainerOptions]);
 
   const filteredClients = useMemo(() => {
     const query = normalize(search);
 
-    const result = clients.filter((client) => {
+    const result = scopedClients.filter((client) => {
       const fullName = normalize(getClientName(client));
       const email = normalize(client.email || "");
       const phoneNumber = normalize(client.phoneNumber || "");
@@ -162,9 +183,9 @@ export default function ClientsPage() {
 
       return getTime(second.createdAt) - getTime(first.createdAt);
     });
-  }, [clients, search, trainerFilter, packageFilter, sort]);
+  }, [scopedClients, search, trainerFilter, packageFilter, sort]);
 
-  const activeClientsCount = clients.filter(hasActiveClientPackage).length;
+  const activeClientsCount = scopedClients.filter(hasActiveClientPackage).length;
 
   return (
     <>
@@ -179,7 +200,7 @@ export default function ClientsPage() {
                     Klienci
                   </h1>
                   <span className="px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-sm">
-                    {clients.length} total
+                    {scopedClients.length} total
                   </span>
                 </div>
 
@@ -253,10 +274,10 @@ export default function ClientsPage() {
                     Wydajność bazy
                   </p>
                   <p className="mt-4 text-[2.6rem] leading-none font-semibold text-primary-light">
-                    {clients.length}
+                    {scopedClients.length}
                   </p>
                   <p className="mt-3 text-sm text-on-surface-variant">
-                    Łączna liczba klientów w systemie.
+                    Liczba klientów w aktualnym widoku lokalizacji.
                   </p>
                 </div>
 

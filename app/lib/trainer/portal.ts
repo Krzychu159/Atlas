@@ -55,6 +55,7 @@ export type TrainerSessionPayload = {
 
 export type TrainerPortalClient = {
   clientId: number;
+  activePackageId?: number | null;
   fullName: string | null;
   email: string | null;
   emailContactUrl: string | null;
@@ -64,6 +65,24 @@ export type TrainerPortalClient = {
   goal: string | null;
   status: string | null;
   billingStatus: string | null;
+  hasActivePackage?: boolean | null;
+  isPackageActive?: boolean | null;
+  activePackageName?: string | null;
+  currentPackageName?: string | null;
+  packageName?: string | null;
+  packageSessionsUsed?: number | null;
+  packageSessionsLimit?: number | null;
+  usedSessions?: number | null;
+  sessionsUsed?: number | null;
+  sessionsLimit?: number | null;
+  remainingSessions?: number | null;
+  balance?: number | null;
+  balanceAmount?: number | null;
+  accountBalance?: number | null;
+  currentBalance?: number | null;
+  billingBalance?: number | null;
+  currency?: string | null;
+  balanceCurrency?: string | null;
   locationName: string | null;
   createdAt: string;
 };
@@ -84,6 +103,24 @@ export type TrainerPortalClientDetails = {
   notes: string | null;
   billingStatus: string | null;
   status: string | null;
+  hasActivePackage?: boolean | null;
+  isPackageActive?: boolean | null;
+  activePackageName?: string | null;
+  currentPackageName?: string | null;
+  packageName?: string | null;
+  packageSessionsUsed?: number | null;
+  packageSessionsLimit?: number | null;
+  usedSessions?: number | null;
+  sessionsUsed?: number | null;
+  sessionsLimit?: number | null;
+  remainingSessions?: number | null;
+  balance?: number | null;
+  balanceAmount?: number | null;
+  accountBalance?: number | null;
+  currentBalance?: number | null;
+  billingBalance?: number | null;
+  currency?: string | null;
+  balanceCurrency?: string | null;
   nextSessionAt: string | null;
   createdAt: string;
   updatedAt: string;

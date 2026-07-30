@@ -17,6 +17,12 @@ import type { AppRole } from "@/app/components/navigation";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { getCurrentUser, type CurrentUser } from "@/app/lib/auth/current-user";
 import { getClients, type Client } from "@/app/lib/owner/clients";
+import {
+  matchesOwnerLocationId,
+  OWNER_LOCATION_ALL,
+  useOwnerLocationFilter,
+} from "@/app/lib/owner/location-filter";
+import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
 
 type HeaderProps = {
@@ -30,12 +36,6 @@ type SearchResult = {
   subtitle: string;
   href: string;
 };
-
-const locationOptions = [
-  { value: "all", label: "Wszystkie lokalizacje" },
-  { value: "klaj", label: "Kłaj" },
-  { value: "niepolomice", label: "Niepołomice" },
-];
 
 function normalize(value: string) {
   return value.toLowerCase().trim();
@@ -69,11 +69,17 @@ function getRoleLabel(role: string) {
 export function Header({ role }: HeaderProps) {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState("all");
+  const {
+    selectedLocationValue,
+    selectedLocationId,
+    setSelectedLocationValue,
+  } = useOwnerLocationFilter();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [query, setQuery] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [locationsLoaded, setLocationsLoaded] = useState(false);
   const [directoriesLoaded, setDirectoriesLoaded] = useState(false);
 
   useEffect(() => {
@@ -81,6 +87,27 @@ export function Header({ role }: HeaderProps) {
       .then(setUser)
       .catch(() => setUser(null));
   }, []);
+
+  useEffect(() => {
+    if (role !== "owner") return;
+
+    let active = true;
+
+    getLocations()
+      .then((data) => {
+        if (!active) return;
+
+        setLocations(data.filter((location) => location.isActive));
+        setLocationsLoaded(true);
+      })
+      .catch(() => {
+        if (active) setLocationsLoaded(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [role]);
 
   async function ensureDirectories() {
     if (directoriesLoaded || role !== "owner") return;
@@ -104,6 +131,7 @@ export function Header({ role }: HeaderProps) {
     if (!value || role !== "owner") return [];
 
     const clientResults = clients
+      .filter((client) => matchesOwnerLocationId(client, selectedLocationId))
       .filter((client) => {
         const name = normalize(getClientName(client));
         const email = normalize(client.email || "");
@@ -120,6 +148,7 @@ export function Header({ role }: HeaderProps) {
       }));
 
     const trainerResults = trainers
+      .filter((trainer) => matchesOwnerLocationId(trainer, selectedLocationId))
       .filter((trainer) => {
         const name = normalize(getTrainerName(trainer));
         const email = normalize(trainer.email || "");
@@ -136,7 +165,42 @@ export function Header({ role }: HeaderProps) {
       }));
 
     return [...clientResults, ...trainerResults].slice(0, 6);
-  }, [clients, query, role, trainers]);
+  }, [clients, query, role, selectedLocationId, trainers]);
+
+  const locationOptions = useMemo(
+    () => [
+      { value: OWNER_LOCATION_ALL, label: "Wszystkie lokalizacje" },
+      ...locations.map((location) => ({
+        value: String(location.id),
+        label: location.name || location.city || `Lokalizacja ${location.id}`,
+      })),
+    ],
+    [locations],
+  );
+
+  useEffect(() => {
+    if (
+      role !== "owner" ||
+      !locationsLoaded ||
+      selectedLocationValue === OWNER_LOCATION_ALL
+    ) {
+      return;
+    }
+
+    const selectedLocationExists = locationOptions.some(
+      (option) => option.value === selectedLocationValue,
+    );
+
+    if (!selectedLocationExists) {
+      setSelectedLocationValue(OWNER_LOCATION_ALL);
+    }
+  }, [
+    locationOptions,
+    locationsLoaded,
+    role,
+    selectedLocationValue,
+    setSelectedLocationValue,
+  ]);
 
   const displayUser = user ?? {
     id: "",
@@ -206,9 +270,9 @@ export function Header({ role }: HeaderProps) {
         <div className="flex min-w-0 items-center gap-3">
           {role === "owner" ? (
             <CustomSelect
-              value={selectedLocation}
+              value={selectedLocationValue}
               options={locationOptions}
-              onChange={setSelectedLocation}
+              onChange={setSelectedLocationValue}
               icon={<MapPin size={16} />}
               className="hidden w-[240px] shrink-0 xl:block"
             />

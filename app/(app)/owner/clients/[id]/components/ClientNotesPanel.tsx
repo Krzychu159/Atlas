@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PaymentCompactRow } from "@/app/components/payments/PaymentDisplay";
 import { Button } from "@/app/components/ui/button";
 import { updateClient, type Client } from "@/app/lib/owner/clients";
 import { isForbiddenError } from "@/app/lib/backend";
@@ -10,11 +11,7 @@ import {
   type TrainerPortalMe,
 } from "@/app/lib/trainer/portal";
 import { trainerPortalClientToClient } from "@/app/lib/trainer/portal-mappers";
-import {
-  getPaymentStatusLabel,
-  type ClientPayment,
-} from "@/app/lib/owner/billing";
-import { getPaymentBreakdown } from "@/app/lib/payments/display";
+import { type ClientPayment } from "@/app/lib/owner/billing";
 import {
   showOwnerError,
   showOwnerSuccess,
@@ -41,11 +38,6 @@ export default function ClientNotesPanel({
   const notes = draft.clientId === client.id ? draft.notes : client.notes || "";
 
   async function handleSaveNotes() {
-    console.log("handleSaveNotes start", {
-      clientId: client.id,
-      notes,
-    });
-
     try {
       setIsSaving(true);
       const payload = {
@@ -68,9 +60,7 @@ export default function ClientNotesPanel({
       showOwnerSuccess("Notatki klienta zostały zapisane.", {
         id: "owner-client-notes-success",
       });
-      console.log("Updated client:", updatedClient);
     } catch (err) {
-      console.error("handleSaveNotes error", err);
       showOwnerError(err, "Nie udało się zapisać notatek.", {
         id: "owner-client-notes-error",
       });
@@ -141,7 +131,7 @@ function PaymentHistory({ payments }: { payments: ClientPayment[] }) {
       <div className="mt-4 flex flex-col gap-2">
         {payments.length > 0 ? (
           payments.slice(0, 3).map((payment) => (
-            <PaymentHistoryItem key={payment.id} payment={payment} />
+            <PaymentCompactRow key={payment.id} payment={payment} />
           ))
         ) : (
           <div className="rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-4 text-center text-sm text-on-surface-variant">
@@ -151,90 +141,4 @@ function PaymentHistory({ payments }: { payments: ClientPayment[] }) {
       </div>
     </section>
   );
-}
-
-function PaymentHistoryItem({ payment }: { payment: ClientPayment }) {
-  const breakdown = getPaymentBreakdown(payment);
-
-  return (
-    <div className="rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <p className="min-w-0 truncate text-sm font-semibold text-on-surface">
-          {payment.packageName || "Wpłata klienta"}
-        </p>
-        <p className="shrink-0 text-sm font-semibold text-tertiary-light">
-          {formatMoney(breakdown.amount, payment.currency)}
-        </p>
-      </div>
-      <div className="mt-1 flex items-center justify-between gap-3 text-xs text-on-surface-muted">
-        <span>{formatDate(payment.paymentDate)}</span>
-        <span>{getPaymentStatusLabel(payment.status)}</span>
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <PaymentMiniAmount
-          label="Wpłata"
-          value={formatMoney(breakdown.amount, payment.currency)}
-        />
-        <PaymentMiniAmount
-          label="Na pakiet"
-          value={formatMoney(
-            breakdown.appliedToPackageAmount,
-            payment.currency,
-          )}
-        />
-        <PaymentMiniAmount
-          label="Na saldo"
-          value={
-            breakdown.balanceCreditAmount > 0
-              ? `+${formatMoney(breakdown.balanceCreditAmount, payment.currency)}`
-              : formatMoney(breakdown.balanceCreditAmount, payment.currency)
-          }
-          accent={breakdown.balanceCreditAmount > 0}
-        />
-      </div>
-    </div>
-  );
-}
-
-function PaymentMiniAmount({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string;
-  accent?: boolean;
-}) {
-  return (
-    <div className="min-w-0 rounded-[var(--radius-md)] bg-surface-container-low px-2 py-2">
-      <p className="text-[9px] font-semibold uppercase tracking-wider text-on-surface-muted">
-        {label}
-      </p>
-      <p
-        className={[
-          "mt-1 truncate text-xs font-semibold",
-          accent ? "text-tertiary-light" : "text-on-surface",
-        ].join(" ")}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function formatMoney(amount: number, currency?: string | null) {
-  return `${amount.toLocaleString("pl-PL", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} ${currency || "PLN"}`;
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "Brak daty";
-
-  return new Intl.DateTimeFormat("pl-PL", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
 }

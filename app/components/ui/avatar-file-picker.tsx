@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, useRef, useState } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
+import { Button } from "@/app/components/ui/button";
 
 type AvatarFilePickerProps = {
   label?: string;
@@ -68,25 +69,26 @@ export default function AvatarFilePicker({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap gap-2">
-            <button
+            <Button
               type="button"
+              size="sm"
               onClick={() => inputRef.current?.click()}
               disabled={isProcessing}
-              className="inline-flex h-10 items-center gap-2 rounded-[var(--radius-md)] bg-primary px-3 text-xs font-semibold text-on-primary transition hover:bg-primary-container disabled:opacity-60"
+              icon={<ImagePlus size={15} />}
             >
-              <ImagePlus size={15} />
               {isProcessing ? "Przetwarzanie..." : "Wgraj plik"}
-            </button>
+            </Button>
 
             {value ? (
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => onChange("")}
-                className="inline-flex h-10 items-center gap-2 rounded-[var(--radius-md)] bg-surface-container-low px-3 text-xs font-semibold text-on-surface transition hover:bg-surface-container-high"
+                icon={<Trash2 size={14} />}
               >
-                <Trash2 size={14} />
                 Usuń
-              </button>
+              </Button>
             ) : null}
           </div>
 

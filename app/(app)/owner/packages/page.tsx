@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
 import {
   createPackage,
   deletePackage,
@@ -10,14 +11,14 @@ import {
   type CreatePackagePayload,
   type Package,
 } from "@/app/lib/owner/packages";
-import AddPackageModal from "./components/AddPackageModal";
-import PackageCard from "./components/PackageCard";
+import PackageCard from "@/app/components/packages/PackageCard";
 import PackageFilters, {
   type DurationFilter,
   type PackageSort,
   type ParticipantsFilter,
   type SessionsFilter,
-} from "./components/PackageFilters";
+} from "@/app/components/packages/PackageFilters";
+import AddPackageModal from "./components/AddPackageModal";
 import { showOwnerError, showOwnerSuccess } from "../components/owner-toast";
 
 function normalize(value: string) {
@@ -75,7 +76,7 @@ export default function PackagesPage() {
   }
 
   useEffect(() => {
-    loadPackages();
+    void Promise.resolve().then(() => loadPackages());
   }, []);
 
   const filteredPackages = useMemo(() => {
@@ -316,12 +317,16 @@ export default function PackagesPage() {
       />
 
       {packageToDelete ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="flex max-h-[90vh] w-full max-w-[420px] flex-col overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient">
+        <ModalOverlay
+          onClose={() => setPackageToDelete(null)}
+          className="p-4"
+        >
+          <div className="relative z-10 flex max-h-[90vh] w-full max-w-[420px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient">
             <div className="min-h-0 flex-1 overflow-y-auto p-6">
-              <p className="font-display text-2xl font-semibold">
-                Usunąć pakiet?
-              </p>
+              <ModalHeader
+                title="Usunąć pakiet?"
+                onClose={() => setPackageToDelete(null)}
+              />
               <p className="mt-3 text-sm leading-6 text-on-surface-variant">
                 Tej akcji nie da się szybko cofnąć. Pakiet:{" "}
                 <span className="font-semibold text-on-surface">
@@ -330,7 +335,7 @@ export default function PackagesPage() {
                 .
               </p>
             </div>
-            <div className="flex justify-end gap-3 border-t border-white/5 px-6 py-4">
+            <ModalFooter>
               <Button
                 variant="secondary"
                 onClick={() => setPackageToDelete(null)}
@@ -343,9 +348,9 @@ export default function PackagesPage() {
               >
                 Usuń pakiet
               </Button>
-            </div>
+            </ModalFooter>
           </div>
-        </div>
+        </ModalOverlay>
       ) : null}
     </>
   );

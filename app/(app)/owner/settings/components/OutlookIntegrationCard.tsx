@@ -116,7 +116,7 @@ export default function OutlookIntegrationCard() {
       const data = await getOutlookConnectUrl();
 
       if (!data.url) {
-        throw new Error("Backend nie zwrócił adresu połączenia Microsoft.");
+        throw new Error("Nie udało się przygotować połączenia Microsoft.");
       }
 
       const authWindow = window.open(
@@ -206,7 +206,7 @@ export default function OutlookIntegrationCard() {
             <p className="text-section-title">Kalendarz Microsoft Outlook</p>
             <p className="mt-2 max-w-[680px] text-sm leading-6 text-on-surface-variant">
               Połączenie służy do pobierania i synchronizacji sesji w zakładce
-              Grafik. Na tym etapie panel tylko wyświetla sesje z backendu.
+              Grafik.
             </p>
           </div>
         </div>

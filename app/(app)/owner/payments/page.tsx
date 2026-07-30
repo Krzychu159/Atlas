@@ -1,42 +1,23 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import {
-  CheckCircle2,
-  ExternalLink,
-  RefreshCw,
-  ReceiptText,
-  RotateCcw,
-  Search,
-  SlidersHorizontal,
-  XCircle,
-} from "lucide-react";
+import { RefreshCw, Search, SlidersHorizontal } from "lucide-react";
+import { PaymentActionConfirmModal } from "@/app/components/payments/PaymentActionConfirmModal";
+import { PaymentOperationRow } from "@/app/components/payments/PaymentDisplay";
+import { PaymentReasonModal } from "@/app/components/payments/PaymentReasonModal";
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { DateRangeFilter } from "@/app/components/ui/date-range-filter";
 import {
   getPaymentBreakdown,
-  hasPaymentOverpayment,
 } from "@/app/lib/payments/display";
-import {
-  OwnerTextArea,
-  OwnerTextField,
-} from "../components/OwnerFormControls";
 import {
   cancelPaymentReceipt,
   confirmClientPayment,
   getOwnerPayments,
-  getPaymentMethodLabel,
-  getPaymentSourceLabel,
-  getPaymentStatusLabel,
   issuePaymentReceipt,
-  isConfirmedPayment,
   isPendingPayment,
-  isReceiptIssued,
-  isRejectedPayment,
-  isReversedPayment,
   rejectClientPayment,
   reverseClientPayment,
   type ClientPayment,
@@ -54,6 +35,11 @@ import {
   rejectTrainerPortalPayment,
 } from "@/app/lib/trainer/portal";
 
+type PaymentAction =
+  | "confirm"
+  | "issueReceipt"
+  | "cancelReceipt";
+
 export default function OwnerPaymentsPage() {
   const pathname = usePathname();
   const basePath = pathname.startsWith("/trainer") ? "/trainer" : "/owner";
@@ -65,6 +51,10 @@ export default function OwnerPaymentsPage() {
     useState<ClientPayment | null>(null);
   const [paymentToReverse, setPaymentToReverse] =
     useState<ClientPayment | null>(null);
+  const [paymentAction, setPaymentAction] = useState<{
+    type: PaymentAction;
+    payment: ClientPayment;
+  } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [reversalReason, setReversalReason] = useState("");
   const [clientFilter, setClientFilter] = useState("");
@@ -267,17 +257,6 @@ export default function OwnerPaymentsPage() {
     [clientFilter, payments, sortBy],
   );
 
-  const activeFilterCount = [
-    clientFilter.trim(),
-    statusFilter !== "all",
-    sourceFilter !== "all",
-    overpaymentFilter !== "all",
-    dateFrom,
-    dateTo,
-    amountMin.trim(),
-    amountMax.trim(),
-  ].filter(Boolean).length;
-
   function clearFilters() {
     setClientFilter("");
     setStatusFilter("all");
@@ -323,8 +302,7 @@ export default function OwnerPaymentsPage() {
             Płatności
           </h1>
           <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
-            Historia operacji płatniczych klientów z podziałem na kwotę wpłaty,
-            część rozliczoną z pakietem i nadpłatę przeniesioną na saldo.
+            Historia operacji płatniczych klientów ze szczegółami rozliczeń.
           </p>
         </div>
 
@@ -381,45 +359,37 @@ export default function OwnerPaymentsPage() {
 
         {advancedFiltersOpen ? (
           <div className="mt-4 rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-low p-3">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[repeat(3,minmax(170px,1fr))_minmax(135px,0.7fr)_minmax(135px,0.7fr)]">
-            <CustomSelect
-              label="Status"
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={paymentStatusOptions}
-            />
-            <CustomSelect
-              label="Źródło"
-              value={sourceFilter}
-              onChange={setSourceFilter}
-              options={paymentSourceOptions}
-            />
-            <CustomSelect
-              label="Nadpłata"
-              value={overpaymentFilter}
-              onChange={setOverpaymentFilter}
-              options={overpaymentOptions}
-            />
-            <OwnerTextField
-              label="Kwota od"
-              value={amountMin}
-              onChange={setAmountMin}
-              inputMode="decimal"
-            />
-            <OwnerTextField
-              label="Kwota do"
-              value={amountMax}
-              onChange={setAmountMax}
-              inputMode="decimal"
-            />
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_minmax(180px,1fr)_minmax(150px,0.75fr)_minmax(150px,0.75fr)]">
+              <CustomSelect
+                label="Status"
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={paymentStatusOptions}
+              />
+              <CustomSelect
+                label="Źródło"
+                value={sourceFilter}
+                onChange={setSourceFilter}
+                options={paymentSourceOptions}
+              />
+              <CustomSelect
+                label="Nadpłata"
+                value={overpaymentFilter}
+                onChange={setOverpaymentFilter}
+                options={overpaymentOptions}
+              />
+              <MoneyFilterField
+                label="Kwota od"
+                value={amountMin}
+                onChange={setAmountMin}
+              />
+              <MoneyFilterField
+                label="Kwota do"
+                value={amountMax}
+                onChange={setAmountMax}
+              />
             </div>
           </div>
-        ) : null}
-
-        {activeFilterCount > 0 ? (
-          <p className="mt-4 text-xs font-semibold text-primary-light">
-            Filtry są aktywne.
-          </p>
         ) : null}
       </section>
 
@@ -441,22 +411,27 @@ export default function OwnerPaymentsPage() {
         ) : filteredPayments.length > 0 ? (
           <div className="flex flex-col gap-3">
             {filteredPayments.map((payment) => (
-              <PaymentRow
+              <PaymentOperationRow
                 key={payment.id}
                 payment={payment}
                 processing={processingId === payment.id}
-                onConfirm={() => handleConfirm(payment)}
+                showActions
+                detailsHref={`${basePath}/clients/${payment.clientId}/payments`}
+                onConfirm={() => setPaymentAction({ type: "confirm", payment })}
                 onReject={() => {
                   setPaymentToReject(payment);
                   setRejectReason("");
                 }}
-                onIssueReceipt={() => handleIssueReceipt(payment)}
-                onCancelReceipt={() => handleCancelReceipt(payment)}
+                onIssueReceipt={() =>
+                  setPaymentAction({ type: "issueReceipt", payment })
+                }
+                onCancelReceipt={() =>
+                  setPaymentAction({ type: "cancelReceipt", payment })
+                }
                 onReverse={() => {
                   setPaymentToReverse(payment);
                   setReversalReason("");
                 }}
-                basePath={basePath}
               />
             ))}
           </div>
@@ -468,10 +443,16 @@ export default function OwnerPaymentsPage() {
       </section>
 
       {paymentToReject ? (
-        <RejectPaymentModal
+        <PaymentReasonModal
           payment={paymentToReject}
+          title="Odrzucić wpłatę?"
+          description="Podaj powód, żeby było jasne, dlaczego zgłoszenie płatności nie zostało przyjęte."
+          reasonLabel="Powód odrzucenia"
           reason={rejectReason}
+          placeholder="Np. nie znaleziono przelewu na koncie."
+          confirmLabel="Odrzuć wpłatę"
           processing={processingId === paymentToReject.id}
+          action="reject"
           onReasonChange={setRejectReason}
           onClose={() => {
             setPaymentToReject(null);
@@ -482,10 +463,16 @@ export default function OwnerPaymentsPage() {
       ) : null}
 
       {paymentToReverse ? (
-        <ReversePaymentModal
+        <PaymentReasonModal
           payment={paymentToReverse}
+          title="Cofnąć wpłatę?"
+          description="Podaj powód cofnięcia. System zapisze korektę zamiast usuwać historię płatności."
+          reasonLabel="Powód cofnięcia"
           reason={reversalReason}
+          placeholder="Np. błędnie zaksięgowana wpłata."
+          confirmLabel="Cofnij wpłatę"
           processing={processingId === paymentToReverse.id}
+          action="reverse"
           onReasonChange={setReversalReason}
           onClose={() => {
             setPaymentToReverse(null);
@@ -494,8 +481,60 @@ export default function OwnerPaymentsPage() {
           onConfirm={handleReversePayment}
         />
       ) : null}
+
+      {paymentAction ? (
+        <PaymentActionConfirmModal
+          payment={paymentAction.payment}
+          processing={processingId === paymentAction.payment.id}
+          {...getPaymentActionModalCopy(paymentAction.type)}
+          onClose={() => setPaymentAction(null)}
+          onConfirm={async () => {
+            if (paymentAction.type === "confirm") {
+              await handleConfirm(paymentAction.payment);
+            }
+            if (paymentAction.type === "issueReceipt") {
+              await handleIssueReceipt(paymentAction.payment);
+            }
+            if (paymentAction.type === "cancelReceipt") {
+              await handleCancelReceipt(paymentAction.payment);
+            }
+            setPaymentAction(null);
+          }}
+        />
+      ) : null}
     </div>
   );
+}
+
+function getPaymentActionModalCopy(type: PaymentAction) {
+  if (type === "issueReceipt") {
+    return {
+      title: "Wystawić paragon?",
+      description:
+        "Po potwierdzeniu płatność będzie oznaczona jako rozliczona fiskalnie.",
+      confirmLabel: "Wystaw paragon",
+      icon: "receipt" as const,
+    };
+  }
+
+  if (type === "cancelReceipt") {
+    return {
+      title: "Cofnąć paragon?",
+      description:
+        "Status paragonu zostanie cofnięty, a przy płatności ponownie pojawi się możliwość wystawienia paragonu.",
+      confirmLabel: "Cofnij paragon",
+      tone: "danger" as const,
+      icon: "receipt" as const,
+    };
+  }
+
+  return {
+    title: "Potwierdzić wpłatę?",
+    description:
+      "Wpłata zostanie zaksięgowana na wybranym pakiecie, a ewentualna nadpłata trafi na saldo klienta.",
+    confirmLabel: "Potwierdź wpłatę",
+    icon: "confirm" as const,
+  };
 }
 
 const paymentStatusOptions = [
@@ -552,361 +591,28 @@ function PaymentSearchField({
   );
 }
 
-function PaymentRow({
-  payment,
-  processing,
-  onConfirm,
-  onReject,
-  onIssueReceipt,
-  onCancelReceipt,
-  onReverse,
-  basePath,
-}: {
-  payment: ClientPayment;
-  processing: boolean;
-  onConfirm: () => void;
-  onReject: () => void;
-  onIssueReceipt: () => void;
-  onCancelReceipt: () => void;
-  onReverse: () => void;
-  basePath: string;
-}) {
-  const pending = isPendingPayment(payment);
-  const confirmed = isConfirmedPayment(payment);
-  const rejected = isRejectedPayment(payment);
-  const reversed = isReversedPayment(payment);
-  const hasOverpayment = hasPaymentOverpayment(payment);
-  const receiptIssued = isReceiptIssued(payment);
-
-  return (
-    <article className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">
-      <div className="grid gap-4 xl:grid-cols-[0.7fr_1.15fr_1fr_0.9fr_auto] xl:items-center">
-        <div>
-          <p className="text-label text-on-surface-muted">Data</p>
-          <p className="mt-1 text-sm font-semibold text-on-surface">
-            {formatDate(payment.paymentDate)}
-          </p>
-          <p className="mt-1 text-xs text-on-surface-muted">
-            Źródło: {getPaymentSourceLabel(payment.source)}
-          </p>
-        </div>
-
-        <div className="min-w-0">
-          <p className="truncate text-base font-semibold text-on-surface">
-            {payment.clientName || `Klient #${payment.clientId}`}
-          </p>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            {payment.packageName || "Bez przypisanego pakietu"}
-          </p>
-          {payment.note ? (
-            <p className="mt-2 line-clamp-2 text-xs text-on-surface-muted">
-              {payment.note}
-            </p>
-          ) : null}
-        </div>
-
-        <PaymentSplit payment={payment} />
-
-        <div>
-          <p className="text-label text-on-surface-muted">Status i metoda</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <StatusPill
-              label={getPaymentStatusLabel(payment.status)}
-              tone={
-                pending
-                  ? "warning"
-                  : rejected || reversed
-                    ? "danger"
-                    : confirmed
-                      ? "success"
-                      : "neutral"
-              }
-            />
-            <StatusPill label={getPaymentMethodLabel(payment.method)} muted />
-            {hasOverpayment ? (
-              <StatusPill label="Nadpłata" tone="success" />
-            ) : null}
-            {receiptIssued ? <StatusPill label="Paragon" muted /> : null}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2 xl:justify-end">
-          {pending ? (
-            <>
-              <Button
-                size="sm"
-                icon={<CheckCircle2 size={15} />}
-                onClick={onConfirm}
-                disabled={processing}
-              >
-                Potwierdź
-              </Button>
-              <Button
-                size="sm"
-                variant="danger"
-                icon={<XCircle size={15} />}
-                onClick={onReject}
-                disabled={processing}
-              >
-                Odrzuć
-              </Button>
-            </>
-          ) : null}
-          {confirmed && !reversed ? (
-            <>
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={<ReceiptText size={15} />}
-                onClick={receiptIssued ? onCancelReceipt : onIssueReceipt}
-                disabled={processing}
-              >
-                {receiptIssued ? "Cofnij paragon" : "Wystaw paragon"}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                icon={<RotateCcw size={15} />}
-                onClick={onReverse}
-                disabled={processing}
-              >
-                Cofnij wpłatę
-              </Button>
-            </>
-          ) : null}
-          <ButtonLinkLike href={`${basePath}/clients/${payment.clientId}/payments`} />
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function PaymentSplit({ payment }: { payment: ClientPayment }) {
-  const breakdown = getPaymentBreakdown(payment);
-
-  return (
-    <div className="rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-2 text-sm">
-      <p className="text-label text-on-surface-muted">Rozliczenie</p>
-      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
-        <PaymentSplitItem
-          label="Wpłata"
-          value={formatMoney(breakdown.amount, payment.currency)}
-        />
-        <PaymentSplitItem
-          label="Na pakiet"
-          value={formatMoney(
-            breakdown.appliedToPackageAmount,
-            payment.currency,
-          )}
-        />
-        <PaymentSplitItem
-          label="Na saldo"
-          value={
-            breakdown.balanceCreditAmount > 0
-              ? `+${formatMoney(
-                  breakdown.balanceCreditAmount,
-                  payment.currency,
-                )}`
-              : formatMoney(breakdown.balanceCreditAmount, payment.currency)
-          }
-          accent={breakdown.balanceCreditAmount > 0}
-        />
-      </div>
-    </div>
-  );
-}
-
-function PaymentSplitItem({
+function MoneyFilterField({
   label,
   value,
-  accent,
+  onChange,
 }: {
   label: string;
   value: string;
-  accent?: boolean;
+  onChange: (value: string) => void;
 }) {
   return (
-    <span className="inline-flex items-center gap-1 text-on-surface-muted">
-      {label}:{" "}
-      <strong className={accent ? "text-tertiary-light" : "text-on-surface"}>
-        {value}
-      </strong>
-    </span>
-  );
-}
-
-function RejectPaymentModal({
-  payment,
-  reason,
-  processing,
-  onReasonChange,
-  onClose,
-  onConfirm,
-}: {
-  payment: ClientPayment;
-  reason: string;
-  processing: boolean;
-  onReasonChange: (value: string) => void;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="max-h-[90vh] w-full max-w-[560px] overflow-y-auto rounded-[var(--radius-xl)] border border-white/8 bg-surface-container p-5 shadow-ambient">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-label text-primary-light">Odrzucenie wpłaty</p>
-            <h2 className="mt-2 text-2xl font-semibold text-on-surface">
-              {payment.clientName || `Klient #${payment.clientId}`}
-            </h2>
-            <p className="mt-2 text-sm text-on-surface-variant">
-              {formatMoney(payment.amount, payment.currency)} ·{" "}
-              {payment.packageName || "Bez przypisanego pakietu"}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-on-surface-muted transition hover:text-on-surface"
-          >
-            <XCircle size={18} />
-          </button>
-        </div>
-
-        <OwnerTextArea
-          label="Powód odrzucenia"
-          value={reason}
-          onChange={onReasonChange}
-          rows={4}
-          className="mt-5"
-          placeholder="Np. nie znaleziono przelewu na koncie."
-        />
-
-        <div className="sticky bottom-0 -mx-5 -mb-5 mt-5 flex flex-col-reverse gap-2 border-t border-white/5 bg-surface-container px-5 py-4 sm:flex-row sm:justify-end">
-          <Button variant="secondary" onClick={onClose} disabled={processing}>
-            Anuluj
-          </Button>
-          <Button
-            variant="danger"
-            icon={<XCircle size={16} />}
-            onClick={onConfirm}
-            disabled={processing}
-          >
-            Odrzuć wpłatę
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ReversePaymentModal({
-  payment,
-  reason,
-  processing,
-  onReasonChange,
-  onClose,
-  onConfirm,
-}: {
-  payment: ClientPayment;
-  reason: string;
-  processing: boolean;
-  onReasonChange: (value: string) => void;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="max-h-[90vh] w-full max-w-[560px] overflow-y-auto rounded-[var(--radius-xl)] border border-white/8 bg-surface-container p-5 shadow-ambient">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-label text-primary-light">Cofnięcie wpłaty</p>
-            <h2 className="mt-2 text-2xl font-semibold text-on-surface">
-              {formatMoney(payment.amount, payment.currency)}
-            </h2>
-            <p className="mt-2 text-sm text-on-surface-variant">
-              {payment.clientName || `Klient #${payment.clientId}`} ·{" "}
-              {payment.packageName || "Bez przypisanego pakietu"}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-on-surface-muted transition hover:text-on-surface"
-          >
-            <XCircle size={18} />
-          </button>
-        </div>
-
-        <p className="mt-4 rounded-[var(--radius-md)] bg-surface-container-low px-3 py-2 text-sm text-on-surface-variant">
-          Cofnięcie zrobi korektę: zmniejszy rozliczenie pakietu i cofnie
-          ewentualną nadpłatę z salda klienta.
-        </p>
-
-        <OwnerTextArea
-          label="Powód cofnięcia"
-          value={reason}
-          onChange={onReasonChange}
-          rows={4}
-          className="mt-5"
-          placeholder="Np. błędnie zaksięgowana wpłata."
-        />
-
-        <div className="sticky bottom-0 -mx-5 -mb-5 mt-5 flex flex-col-reverse gap-2 border-t border-white/5 bg-surface-container px-5 py-4 sm:flex-row sm:justify-end">
-          <Button variant="secondary" onClick={onClose} disabled={processing}>
-            Anuluj
-          </Button>
-          <Button
-            variant="danger"
-            icon={<RotateCcw size={16} />}
-            onClick={onConfirm}
-            disabled={processing}
-          >
-            Cofnij wpłatę
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ButtonLinkLike({ href }: { href: string }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-lg)] border border-secondary px-4 text-xs font-semibold text-primary-light transition hover:border-primary-light hover:bg-surface-container-high"
-    >
-      <ExternalLink size={15} />
-      Szczegóły
-    </Link>
-  );
-}
-
-function StatusPill({
-  label,
-  muted,
-  tone = "neutral",
-}: {
-  label: string;
-  muted?: boolean;
-  tone?: "neutral" | "success" | "warning" | "danger";
-}) {
-  const toneClass = {
-    neutral: "bg-surface-container text-on-surface-muted",
-    success: "bg-tertiary-light/15 text-tertiary-light",
-    warning: "bg-warning-container/30 text-warning-light",
-    danger: "bg-error-container/40 text-error-light",
-  }[muted ? "neutral" : tone];
-
-  return (
-    <span
-      className={[
-        "rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider",
-        toneClass,
-      ].join(" ")}
-    >
-      {label}
-    </span>
+    <label className="flex h-12 w-full flex-col justify-center rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest px-3 transition focus-within:border-primary-light/40 hover:border-white/10 hover:bg-surface-container-low">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
+        {label}
+      </span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        inputMode="decimal"
+        placeholder="0,00"
+        className="mt-0.5 h-5 w-full bg-transparent text-sm font-semibold text-on-surface outline-none placeholder:font-normal placeholder:text-on-surface-muted"
+      />
+    </label>
   );
 }
 
@@ -975,21 +681,4 @@ function parseMoneyFilter(value: string) {
   const parsed = Number(value.replace(",", "."));
 
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-function formatMoney(amount: number, currency?: string | null) {
-  return `${amount.toLocaleString("pl-PL", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} ${currency || "PLN"}`;
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "Brak daty";
-
-  return new Intl.DateTimeFormat("pl-PL", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
 }

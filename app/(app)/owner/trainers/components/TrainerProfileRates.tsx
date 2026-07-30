@@ -67,7 +67,7 @@ export default function TrainerProfileRates({
           ))
         ) : (
           <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-5 text-on-surface-variant">
-            Brak stawek z API dla tego trenera.
+            Nie ustawiono stawek dla tego trenera.
           </div>
         )}
       </div>

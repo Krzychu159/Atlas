@@ -2,6 +2,7 @@
 
 import { Search } from "lucide-react";
 import { CustomSelect } from "@/app/components/ui/custom-select";
+import { Input } from "@/app/components/ui/input";
 
 export type ClientPackageFilter = "all" | "active-package" | "inactive-package";
 export type ClientSort =
@@ -58,15 +59,14 @@ export default function ClientFilters({
   return (
     <div className="card-shell p-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="flex min-w-0 flex-1 items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3">
-          <Search size={18} className="shrink-0 text-on-surface-variant" />
-          <input
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Szukaj po nazwisku, mailu lub telefonie..."
-            className="w-full min-w-0 bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
-          />
-        </div>
+        <Input
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="Szukaj po nazwisku, mailu lub telefonie..."
+          icon={<Search size={18} />}
+          wrapperClassName="min-w-0 flex-1"
+          className="h-12 bg-surface-container-low"
+        />
 
         <CustomSelect
           value={trainerFilter}

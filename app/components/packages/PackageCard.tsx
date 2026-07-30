@@ -9,6 +9,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import Link from "next/link";
+import { formatMoney } from "@/app/lib/formatters/money";
 
 export type PackageCardItem = {
   id: number;
@@ -94,7 +95,7 @@ export default function PackageCard<TItem extends PackageCardItem>({
         <div>
           <p className="text-label text-on-surface-muted">Cena pakietu</p>
           <p className="mt-2 text-[1.7rem] font-semibold leading-none tracking-tight">
-            {item.price} {item.currency}
+            {formatMoney(item.price, item.currency)}
           </p>
         </div>
 

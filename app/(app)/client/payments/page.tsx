@@ -1,25 +1,22 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
-  CheckCircle2,
   CreditCard,
   Dumbbell,
-  Landmark,
-  ReceiptText,
   Wallet,
 } from "lucide-react";
+import { PaymentEntryModal } from "@/app/components/payments/PaymentEntryModal";
+import {
+  PaymentCompactRow,
+  PaymentOperationRow,
+} from "@/app/components/payments/PaymentDisplay";
 import { Button } from "@/app/components/ui/button";
-import { CustomSelect } from "@/app/components/ui/custom-select";
 import { showAppError, showAppSuccess } from "@/app/components/ui/app-toast";
 import { isNotFoundLikeError } from "@/app/lib/backend";
-import { formatDateTime } from "@/app/lib/formatters/date";
 import { formatMoney } from "@/app/lib/formatters/money";
-import {
-  getPaymentBreakdown,
-  hasPaymentOverpayment,
-} from "@/app/lib/payments/display";
+import { getPaymentStatusLabel } from "@/app/lib/payments/display";
 import {
   createClientPortalPayment,
   getClientPortalBilling,
@@ -43,6 +40,7 @@ export default function ClientPaymentsPage() {
   const [method, setMethod] = useState("2");
   const [note, setNote] = useState("");
   const [selectedPackageId, setSelectedPackageId] = useState("");
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   async function loadBilling() {
     try {
@@ -90,25 +88,18 @@ export default function ClientPaymentsPage() {
     [billing],
   );
   const packages = billing?.packages || [];
-  const selectedPackage = packages.find(
-    (item) => String(item.clientPackageId) === selectedPackageId,
-  );
   const packageOptions = packages.map((item) => ({
     value: String(item.clientPackageId),
     label: `${item.packageName || "Pakiet"} · ${formatMoney(
       item.amountDue,
       item.currency,
     )} do zapłaty`,
+    amountDue: item.amountDue,
+    currency: item.currency,
   }));
   const numericAmount = Number(amount.replace(",", "."));
-  const overpayment =
-    selectedPackage && numericAmount > selectedPackage.amountDue
-      ? numericAmount - selectedPackage.amountDue
-      : 0;
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function handleSubmit() {
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       showAppError(
         new Error("Wpisz poprawną kwotę wpłaty."),
@@ -133,6 +124,7 @@ export default function ClientPaymentsPage() {
         id: "client-payment-create-success",
       });
       setNote("");
+      setIsPaymentModalOpen(false);
       await loadBilling();
     } catch (err) {
       showAppError(err, "Nie udało się zgłosić wpłaty.", {
@@ -149,20 +141,9 @@ export default function ClientPaymentsPage() {
         billing={billing}
         payments={payments}
         packagesLength={packages.length}
-        packageOptions={packageOptions}
-        selectedPackage={selectedPackage}
-        selectedPackageId={selectedPackageId}
-        amount={amount}
-        method={method}
-        note={note}
-        overpayment={overpayment}
         isLoading={isLoading}
         isSubmitting={isSubmitting}
-        onAmountChange={setAmount}
-        onMethodChange={setMethod}
-        onNoteChange={setNote}
-        onPackageChange={setSelectedPackageId}
-        onSubmit={handleSubmit}
+        onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
       />
 
       <div className="hidden flex-col gap-5 md:flex">
@@ -217,84 +198,32 @@ export default function ClientPaymentsPage() {
         />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[0.86fr_1.14fr]">
-        <form onSubmit={handleSubmit} className="card-shell p-5 md:p-6">
+      <section className="grid gap-4">
+        <div className="card-shell flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between md:p-6">
           <div>
             <p className="text-label text-on-surface-muted">Nowa wpłata</p>
             <h2 className="mt-3 font-display text-[1.85rem] font-semibold leading-none">
               Zgłoś płatność
             </h2>
-            <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+            <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
               Wybierz pakiet, wpisz kwotę i metodę. Wpłata trafi do
               potwierdzenia w studiu.
             </p>
-          </div>
-
-          {!packages.length && !isLoading ? (
-            <div className="mt-6 rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest p-4 text-sm leading-6 text-on-surface-variant">
-              Nie masz aktywnego pakietu do opłacenia. Po przypisaniu pakietu
-              formularz wpłaty będzie dostępny.
-            </div>
-          ) : null}
-
-          <div className="mt-6 flex flex-col gap-4">
-            <Field label="Kwota">
-              <input
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                inputMode="decimal"
-                placeholder="0,00"
-                className="mt-2 h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
-              />
-            </Field>
-
-            <CustomSelect
-              label="Pakiet"
-              value={selectedPackageId}
-              onChange={setSelectedPackageId}
-              options={
-                packageOptions.length
-                  ? packageOptions
-                  : [{ value: "", label: "Brak pakietu do wyboru" }]
-              }
-              icon={<ReceiptText size={16} />}
-            />
-
-            <CustomSelect
-              label="Metoda"
-              value={method}
-              onChange={setMethod}
-              options={methodOptions}
-              icon={<Landmark size={16} />}
-            />
-
-            {overpayment > 0 ? (
-              <div className="rounded-[var(--radius-lg)] bg-tertiary-container/35 p-4 text-sm leading-6 text-tertiary-light">
-                Nadpłata {formatMoney(overpayment, selectedPackage?.currency)} zasili
-                saldo i zostanie odjęta od kolejnego pakietu.
-              </div>
+            {!packages.length && !isLoading ? (
+              <p className="mt-3 text-sm font-semibold text-warning-light">
+                Nie masz aktywnego pakietu do opłacenia.
+              </p>
             ) : null}
-
-            <Field label="Notatka">
-              <textarea
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-                rows={4}
-                placeholder="Np. przelew za aktywny pakiet"
-                className="mt-2 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
-              />
-            </Field>
-
-            <Button
-              type="submit"
-              disabled={isSubmitting || !packages.length}
-              icon={<CheckCircle2 size={16} />}
-              className="w-full"
-            >
-              {isSubmitting ? "Zgłaszanie..." : "Zgłoś wpłatę"}
-            </Button>
           </div>
-        </form>
+          <Button
+            size="lg"
+            disabled={isSubmitting || !packages.length}
+            onClick={() => setIsPaymentModalOpen(true)}
+            className="w-full md:w-auto"
+          >
+            Zgłoś wpłatę
+          </Button>
+        </div>
 
         <div className="card-shell p-5 md:p-6">
           <div className="flex items-start justify-between gap-4">
@@ -315,7 +244,11 @@ export default function ClientPaymentsPage() {
               <PaymentSkeleton />
             ) : payments.length ? (
               payments.map((payment) => (
-                <PaymentRow key={payment.id} payment={payment} />
+                <PaymentOperationRow
+                  key={payment.id}
+                  payment={payment}
+                  showClient={false}
+                />
               ))
             ) : (
               <div className="rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest p-5 text-sm text-on-surface-variant">
@@ -326,6 +259,29 @@ export default function ClientPaymentsPage() {
         </div>
       </section>
       </div>
+
+      <PaymentEntryModal
+        open={isPaymentModalOpen}
+        eyebrow="Płatność"
+        title="Zgłoś wpłatę"
+        description="Wybierz pakiet i wpisz kwotę. Studio potwierdzi wpłatę po sprawdzeniu płatności."
+        amount={amount}
+        packageId={selectedPackageId}
+        method={method}
+        note={note}
+        packageOptions={packageOptions}
+        methodOptions={methodOptions}
+        isSubmitting={isSubmitting}
+        submitLabel="Zgłoś wpłatę"
+        submittingLabel="Zgłaszanie..."
+        emptyPackagesMessage="Nie masz aktywnego pakietu do opłacenia. Skontaktuj się z trenerem lub obsługą studia."
+        onAmountChange={setAmount}
+        onPackageChange={setSelectedPackageId}
+        onMethodChange={setMethod}
+        onNoteChange={setNote}
+        onClose={() => setIsPaymentModalOpen(false)}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }
@@ -334,38 +290,16 @@ function MobilePayments({
   billing,
   payments,
   packagesLength,
-  packageOptions,
-  selectedPackage,
-  selectedPackageId,
-  amount,
-  method,
-  note,
-  overpayment,
   isLoading,
   isSubmitting,
-  onAmountChange,
-  onMethodChange,
-  onNoteChange,
-  onPackageChange,
-  onSubmit,
+  onOpenPaymentModal,
 }: {
   billing: ClientBillingSummary | null;
   payments: ClientPayment[];
   packagesLength: number;
-  packageOptions: { value: string; label: string }[];
-  selectedPackage?: { currency: string | null } | null;
-  selectedPackageId: string;
-  amount: string;
-  method: string;
-  note: string;
-  overpayment: number;
   isLoading: boolean;
   isSubmitting: boolean;
-  onAmountChange: (value: string) => void;
-  onMethodChange: (value: string) => void;
-  onNoteChange: (value: string) => void;
-  onPackageChange: (value: string) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onOpenPaymentModal: () => void;
 }) {
   const currency = getCurrency(billing);
   const due = billing?.activePackageAmountDue ?? 0;
@@ -419,7 +353,7 @@ function MobilePayments({
         </div>
       </section>
 
-      <form onSubmit={onSubmit} className="card-shell p-5">
+      <section className="card-shell p-5">
         <p className="text-label text-on-surface-muted">Nowa wpłata</p>
         <h2 className="mt-2 font-display text-[1.55rem] font-semibold leading-none">
           Zgłoś płatność
@@ -432,64 +366,15 @@ function MobilePayments({
           </div>
         ) : null}
 
-        <div className="mt-5 flex flex-col gap-4">
-          <Field label="Kwota">
-            <input
-              value={amount}
-              onChange={(event) => onAmountChange(event.target.value)}
-              inputMode="decimal"
-              placeholder="0,00"
-              className="mt-2 h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
-            />
-          </Field>
-
-          <CustomSelect
-            label="Pakiet"
-            value={selectedPackageId}
-            onChange={onPackageChange}
-            options={
-              packageOptions.length
-                ? packageOptions
-                : [{ value: "", label: "Brak pakietu do wyboru" }]
-            }
-            icon={<ReceiptText size={16} />}
-          />
-
-          <CustomSelect
-            label="Metoda"
-            value={method}
-            onChange={onMethodChange}
-            options={methodOptions}
-            icon={<Landmark size={16} />}
-          />
-
-          {overpayment > 0 ? (
-            <div className="rounded-[var(--radius-lg)] bg-tertiary-container/35 p-4 text-sm leading-6 text-tertiary-light">
-              Nadpłata {formatMoney(overpayment, selectedPackage?.currency)} przejdzie
-              na saldo.
-            </div>
-          ) : null}
-
-          <Field label="Notatka">
-            <textarea
-              value={note}
-              onChange={(event) => onNoteChange(event.target.value)}
-              rows={3}
-              placeholder="Np. przelew za pakiet"
-              className="mt-2 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
-            />
-          </Field>
-
-          <Button
-            type="submit"
-            disabled={isSubmitting || !packagesLength}
-            icon={<CheckCircle2 size={16} />}
-            className="w-full"
-          >
-            {isSubmitting ? "Zgłaszanie..." : "Zgłoś wpłatę"}
-          </Button>
-        </div>
-      </form>
+        <Button
+          size="lg"
+          disabled={isSubmitting || !packagesLength}
+          onClick={onOpenPaymentModal}
+          className="mt-5 w-full"
+        >
+          Zgłoś wpłatę
+        </Button>
+      </section>
 
       <section className="card-shell p-5">
         <div className="flex items-center justify-between gap-4">
@@ -509,7 +394,7 @@ function MobilePayments({
             <PaymentSkeleton />
           ) : payments.length ? (
             payments.slice(0, 5).map((payment) => (
-              <MobilePaymentRow key={payment.id} payment={payment} />
+              <PaymentCompactRow key={payment.id} payment={payment} />
             ))
           ) : (
             <div className="rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest p-5 text-sm text-on-surface-variant">
@@ -529,55 +414,6 @@ function MobilePaymentStat({ label, value }: { label: string; value: string }) {
         {label}
       </p>
       <p className="mt-2 truncate text-sm font-semibold">{value}</p>
-    </div>
-  );
-}
-
-function MobilePaymentRow({ payment }: { payment: ClientPayment }) {
-  const breakdown = getPaymentBreakdown(payment);
-
-  return (
-    <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-lg font-semibold">
-            {formatMoney(breakdown.amount, payment.currency)}
-          </p>
-          <p className="mt-1 line-clamp-2 text-sm text-on-surface-variant">
-            {payment.packageName || "Bez pakietu"}
-          </p>
-        </div>
-        <StatusBadge status={payment.status} />
-      </div>
-
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <MiniAmount
-          label="Wpłata"
-          value={formatMoney(breakdown.amount, payment.currency)}
-        />
-        <MiniAmount
-          label="Na pakiet"
-          value={formatMoney(
-            breakdown.appliedToPackageAmount,
-            payment.currency,
-          )}
-        />
-        <MiniAmount
-          label="Na saldo"
-          value={
-            breakdown.balanceCreditAmount > 0
-              ? `+${formatMoney(
-                  breakdown.balanceCreditAmount,
-                  payment.currency,
-                )}`
-              : formatMoney(breakdown.balanceCreditAmount, payment.currency)
-          }
-        />
-      </div>
-
-      <p className="mt-3 text-xs text-on-surface-muted">
-        {getPaymentMethodLabel(payment.method)} · {formatDateTime(payment.paymentDate)}
-      </p>
     </div>
   );
 }
@@ -622,111 +458,6 @@ function SummaryCard({
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label>
-      <span className="text-label text-on-surface-muted">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function PaymentRow({ payment }: { payment: ClientPayment }) {
-  const breakdown = getPaymentBreakdown(payment);
-
-  return (
-    <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-lg font-semibold">
-              {formatMoney(breakdown.amount, payment.currency)}
-            </p>
-            <StatusBadge status={payment.status} />
-            {hasPaymentOverpayment(payment) ? (
-              <span className="rounded-full bg-tertiary-container/45 px-2.5 py-1 text-xs font-semibold text-tertiary-light">
-                Nadpłata
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-2 text-sm text-on-surface-variant">
-            {payment.packageName || "Bez przypisanego pakietu"} ·{" "}
-            {formatDateTime(payment.paymentDate)}
-          </p>
-          {payment.note ? (
-            <p className="mt-2 text-sm text-on-surface-muted">{payment.note}</p>
-          ) : null}
-        </div>
-
-        <div className="grid min-w-[300px] grid-cols-3 gap-2">
-          <MiniAmount
-            label="Wpłata"
-            value={formatMoney(breakdown.amount, payment.currency)}
-          />
-          <MiniAmount
-            label="Na pakiet"
-            value={formatMoney(
-              breakdown.appliedToPackageAmount,
-              payment.currency,
-            )}
-          />
-          <MiniAmount
-            label="Na saldo"
-            value={
-              breakdown.balanceCreditAmount > 0
-                ? `+${formatMoney(
-                    breakdown.balanceCreditAmount,
-                    payment.currency,
-                  )}`
-                : formatMoney(breakdown.balanceCreditAmount, payment.currency)
-            }
-          />
-        </div>
-
-        <div className="min-w-[150px] text-sm">
-          <p className="text-label text-on-surface-muted">Metoda</p>
-          <p className="mt-1 font-semibold">{getPaymentMethodLabel(payment.method)}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MiniAmount({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-[var(--radius-md)] bg-surface-container-low px-3 py-2">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
-        {label}
-      </p>
-      <p className="mt-1 truncate text-sm font-semibold">{value}</p>
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status?: number | null }) {
-  const normalized = status ?? 0;
-  const className =
-    normalized === 2
-      ? "bg-tertiary-container/45 text-tertiary-light"
-      : normalized === 1
-        ? "bg-warning-container/55 text-warning-light"
-        : normalized === 3 || normalized === 5
-          ? "bg-error-container/55 text-error-light"
-          : "bg-surface-container-low text-on-surface-variant";
-
-  return (
-    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>
-      {getPaymentStatusLabel(status)}
-    </span>
-  );
-}
-
 function PaymentSkeleton() {
   return (
     <>
@@ -757,39 +488,4 @@ function getCurrency(billing?: ClientBillingSummary | null) {
   );
 
   return activePackage?.currency || billing?.payments?.[0]?.currency || "PLN";
-}
-
-function getPaymentMethodLabel(method?: number | null) {
-  const labels: Record<number, string> = {
-    1: "Blik",
-    2: "Przelew",
-    3: "Gotówka",
-    4: "Bramka płatności",
-  };
-
-  return method ? labels[method] || `Metoda ${method}` : "Brak metody";
-}
-
-function getPaymentStatusLabel(status?: number | string | null) {
-  if (typeof status === "string") {
-    const normalized = status.toLowerCase();
-    if (normalized.includes("paid") || normalized.includes("confirm")) {
-      return "Opłacone";
-    }
-    if (normalized.includes("pending")) return "Oczekuje";
-    if (normalized.includes("reject")) return "Odrzucone";
-    if (normalized.includes("reverse")) return "Cofnięte";
-
-    return status || "Brak statusu";
-  }
-
-  const labels: Record<number, string> = {
-    1: "Oczekuje",
-    2: "Opłacone",
-    3: "Odrzucone",
-    4: "Anulowane",
-    5: "Cofnięte",
-  };
-
-  return status ? labels[status] || `Status ${status}` : "Brak statusu";
 }

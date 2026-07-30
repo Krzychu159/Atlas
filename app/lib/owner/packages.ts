@@ -88,12 +88,6 @@ export function getDeletedPackages() {
   return backendGet<Package[]>("Packages/deleted");
 }
 
-/**
- * Docelowo:
- * GET /api/Packages/{id}/clients
- *
- * Na razie backend tego nie ma, więc page.tsx używa mocka po catch.
- */
 export function getPackageClients(id: number) {
   return backendGet<PackageClient[]>(`Packages/${id}/clients`);
 }

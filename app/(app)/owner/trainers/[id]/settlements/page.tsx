@@ -91,7 +91,7 @@ function formatSessionType(value: string | null) {
 export default function TrainerSettlementPage() {
   const params = useParams<{ id: string }>();
   const trainerId = Number(params.id);
-  const [monthValue, setMonthValue] = useState(getCurrentMonthValue);
+  const [monthValue, setMonthValue] = useState(getMonthValueFromUrl);
   const [trainer, setTrainer] = useState<Trainer | null>(null);
   const [rates, setRates] = useState<TrainerRate[]>([]);
   const [settlement, setSettlement] = useState<TrainerMonthlySettlement | null>(
@@ -101,11 +101,9 @@ export default function TrainerSettlementPage() {
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
 
   useEffect(() => {
-    setMonthValue(getMonthValueFromUrl());
-  }, []);
-
-  useEffect(() => {
     async function loadSettlement() {
+      await Promise.resolve();
+
       const { year, month } = parseMonth(monthValue);
 
       if (!trainerId || !year || !month) {
@@ -272,7 +270,7 @@ export default function TrainerSettlementPage() {
                   ))
                 ) : (
                   <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-5 text-on-surface-variant">
-                    Brak stawek z API.
+                    Nie ustawiono stawek dla tego trenera.
                   </div>
                 )}
               </div>

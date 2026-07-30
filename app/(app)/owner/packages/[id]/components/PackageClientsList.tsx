@@ -1,4 +1,3 @@
-import { MoreVertical, RotateCcw } from "lucide-react";
 import type { PackageClient } from "@/app/lib/owner/packages";
 
 function getInitials(name: string) {
@@ -39,9 +38,6 @@ export default function PackageClientsList({
           </p>
         </div>
 
-        <button className="hidden md:flex h-11 px-5 rounded-full bg-surface-container-high text-label text-primary-light items-center">
-          Dodaj klienta
-        </button>
       </div>
 
       <div className="mt-6 flex flex-col gap-3">
@@ -98,15 +94,9 @@ export default function PackageClientsList({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <button className="hidden md:flex h-10 w-10 rounded-[var(--radius-md)] bg-surface-container-high items-center justify-center text-on-surface-variant">
-                    <RotateCcw size={16} />
-                  </button>
-
-                  <button className="h-10 w-10 rounded-[var(--radius-md)] bg-surface-container-high flex items-center justify-center text-on-surface-variant">
-                    <MoreVertical size={16} />
-                  </button>
-                </div>
+                <p className="hidden shrink-0 text-xs font-semibold text-on-surface-muted md:block">
+                  {client.status || "Aktywny"}
+                </p>
               </div>
             );
           })

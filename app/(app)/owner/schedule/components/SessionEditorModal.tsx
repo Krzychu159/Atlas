@@ -15,6 +15,7 @@ import {
   matchesClientSearch,
   normalizeSearch,
 } from "../client-utils";
+import { toDateTimeLocalValue } from "../date-utils";
 import { statusOptions, sessionTypeOptions } from "../options";
 import {
   getDefaultFormValues,
@@ -101,6 +102,14 @@ export default function SessionEditorModal({
     value: string,
   ) {
     setValues((current) => ({ ...current, [key]: value }));
+  }
+
+  function updateStartAt(value: string) {
+    setValues((current) => ({
+      ...current,
+      startAt: value,
+      endAt: getOneHourLaterDateTimeLocal(value) || current.endAt,
+    }));
   }
 
   function updateTitle(value: string) {
@@ -206,7 +215,7 @@ export default function SessionEditorModal({
             <input
               type="datetime-local"
               value={values.startAt}
-              onChange={(event) => updateValue("startAt", event.target.value)}
+              onChange={(event) => updateStartAt(event.target.value)}
               className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
             />
           </Field>
@@ -417,4 +426,16 @@ function Field({
       {children}
     </label>
   );
+}
+
+function getOneHourLaterDateTimeLocal(value: string) {
+  if (!value) return null;
+
+  const start = new Date(value);
+
+  if (Number.isNaN(start.getTime())) return null;
+
+  start.setHours(start.getHours() + 1);
+
+  return toDateTimeLocalValue(start);
 }

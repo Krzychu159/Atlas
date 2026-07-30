@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { UserPlus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import {
+  matchesOwnerLocationId,
+  useOwnerLocationFilter,
+} from "@/app/lib/owner/location-filter";
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
 import { showOwnerError } from "../components/owner-toast";
 import AddTrainerModal from "./components/AddTrainerModal";
@@ -14,6 +18,7 @@ function normalize(value: string) {
 
 export default function TrainersPage() {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const { selectedLocationId } = useOwnerLocationFilter();
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -32,10 +37,18 @@ export default function TrainersPage() {
   }
 
   useEffect(() => {
-    loadTrainers();
+    void Promise.resolve().then(() => loadTrainers());
   }, []);
 
-  const activeTrainers = trainers.filter((trainer) =>
+  const scopedTrainers = useMemo(
+    () =>
+      trainers.filter((trainer) =>
+        matchesOwnerLocationId(trainer, selectedLocationId),
+      ),
+    [selectedLocationId, trainers],
+  );
+
+  const activeTrainers = scopedTrainers.filter((trainer) =>
     normalize(trainer.status || "").includes("active"),
   );
 
@@ -81,9 +94,9 @@ export default function TrainersPage() {
             <div className="card-shell p-5 text-on-surface-variant">
               Ładowanie trenerów...
             </div>
-          ) : trainers.length > 0 ? (
+          ) : scopedTrainers.length > 0 ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {trainers.map((trainer) => (
+              {scopedTrainers.map((trainer) => (
                 <TrainerCard key={trainer.id} trainer={trainer} />
               ))}
             </div>
