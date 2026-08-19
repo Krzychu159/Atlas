@@ -46,8 +46,13 @@ async function handler(req: NextRequest, context: RouteContext) {
     response = await fetch(url.toString(), {
       method: req.method,
       headers: {
-        Accept: "application/json",
-        ...(body ? { "Content-Type": "application/json" } : {}),
+        Accept: req.headers.get("accept") || "application/json",
+        ...(body
+          ? {
+              "Content-Type":
+                req.headers.get("content-type") || "application/json",
+            }
+          : {}),
         Authorization: `Bearer ${token}`,
       },
       body,
@@ -56,8 +61,6 @@ async function handler(req: NextRequest, context: RouteContext) {
   } catch {
     return jsonError("Nie udało się połączyć z backendem.", 502);
   }
-
-  const text = await response.text();
 
   if ([204, 205, 304].includes(response.status)) {
     const nextResponse = new NextResponse(null, {
@@ -73,7 +76,9 @@ async function handler(req: NextRequest, context: RouteContext) {
     return nextResponse;
   }
 
-  const nextResponse = new NextResponse(text, {
+  const bodyBytes = await response.arrayBuffer();
+
+  const nextResponse = new NextResponse(bodyBytes, {
     status: response.status,
     headers: {
       "Content-Type":
@@ -81,6 +86,12 @@ async function handler(req: NextRequest, context: RouteContext) {
       "Cache-Control": "no-store",
     },
   });
+
+  const contentDisposition = response.headers.get("content-disposition");
+
+  if (contentDisposition) {
+    nextResponse.headers.set("Content-Disposition", contentDisposition);
+  }
 
   if (response.status === 401) {
     expireAuthCookies(nextResponse);

@@ -10,6 +10,7 @@ import {
 } from "@/app/lib/owner/sessions";
 import { getTrainer, type Trainer } from "@/app/lib/owner/trainers";
 import EditTrainerModal from "../components/EditTrainerModal";
+import TrainerContractsModal from "../components/TrainerContractsModal";
 import TrainerProfileClients from "../components/TrainerProfileClients";
 import TrainerProfileHeader from "../components/TrainerProfileHeader";
 import TrainerSchedulePanel from "../components/TrainerSchedulePanel";
@@ -23,6 +24,7 @@ export default function TrainerPage() {
   const [sessions, setSessions] = useState<OwnerSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isContractsOpen, setIsContractsOpen] = useState(false);
 
   useEffect(() => {
     async function loadTrainer() {
@@ -83,6 +85,7 @@ export default function TrainerPage() {
               trainer={trainer}
               rates={rates}
               onEdit={() => setIsEditOpen(true)}
+              onContracts={() => setIsContractsOpen(true)}
             />
 
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -100,6 +103,15 @@ export default function TrainerPage() {
               setTrainer(updatedTrainer);
               setRates(updatedRates);
             }}
+          />
+
+          <TrainerContractsModal
+            open={isContractsOpen}
+            trainerId={trainer.id}
+            trainerName={
+              trainer.fullName || `${trainer.firstName} ${trainer.lastName}`
+            }
+            onClose={() => setIsContractsOpen(false)}
           />
         </>
       ) : null}

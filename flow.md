@@ -88,6 +88,61 @@ Gdy `backendFetch` dostanie `401`:
 
 Dzięki temu komponenty nie muszą ręcznie obsługiwać wylogowania po wygasłej sesji.
 
+## Publiczne akcje auth
+
+Logowanie i odzyskiwanie hasła nie przechodzą przez `app/api/backend/[...path]`,
+bo użytkownik nie ma jeszcze ważnego `accessToken`.
+
+Używane route handlery:
+
+- `app/api/auth/login/route.ts` - logowanie, zapis tokenów do httpOnly cookies,
+- `app/api/auth/forgot-password/route.ts` - wysłanie instrukcji resetu hasła,
+- `app/api/auth/reset-password/route.ts` - zapis nowego hasła na podstawie tokenu.
+
+`forgot-password` i `reset-password` używają wspólnego helpera
+`app/api/auth/_utils/public-auth-proxy.ts`. Helper wysyła request bez
+autoryzacji do `BACKEND_API_URL/api/auth/...`, wymusza `no-store` i zwraca
+frontendowi stabilną odpowiedź JSON.
+
+Ekran `app/(auth)/login/page.tsx` obsługuje trzy tryby w jednym miejscu:
+
+- logowanie,
+- wysłanie instrukcji resetu,
+- ustawienie nowego hasła z tokenem.
+
+Link resetujący może kierować na `/login?token=<token>`,
+`/login?resetToken=<token>` albo `/reset-password?token=<token>`. Ścieżka
+`/reset-password` nie ma osobnego UI - przekierowuje do ekranu logowania z
+trybem resetu.
+
+## Podział lokalizacji ownera
+
+Wybrana lokalizacja ownera jest globalnym stanem frontu obsługiwanym przez
+`app/lib/owner/location-filter.ts`.
+
+Zasady:
+
+- `locationId = null` oznacza widok wszystkich lokalizacji,
+- `locationId = 1` oznacza widok jednej lokalizacji,
+- wybór jest zapisywany w `localStorage` pod kluczem
+  `atlas-owner-location-id`,
+- zmiana emituje event `atlas-owner-location-changed`, więc inne komponenty
+  reagują bez odświeżenia strony,
+- filtrowanie lokalne używa `matchesOwnerLocationId(entity, selectedLocationId)`.
+
+Obecnie ten mechanizm ogranicza:
+
+- globalną wyszukiwarkę w headerze,
+- listę klientów,
+- listę trenerów,
+- grafik ownera,
+- listę pakietów.
+
+Grafik dodatkowo wysyła `locationId` do endpointu sesji, bo sesje mogą być
+filtrowane po stronie backendu. Listy klientów, trenerów i pakietów filtrują
+dane po stronie frontu na podstawie pól `locationId` albo `locationIds`
+zwracanych przez API.
+
 ## Błędy
 
 Wspólny typ błędu to `ApiError` z `app/lib/backend.ts`.

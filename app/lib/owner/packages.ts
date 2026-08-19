@@ -17,6 +17,7 @@ export type Package = {
   billingType?: number;
   participantsCount: number;
   locationId?: number | null;
+  locationIds?: number[] | null;
   locationName?: string | null;
   isActive: boolean;
   createdAt: string;

@@ -9,14 +9,17 @@ import {
   CheckCircle2,
   Clock3,
   Dumbbell,
+  FileDown,
   ReceiptText,
   Wallet,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import {
+  downloadTrainerWorkHoursDocument,
   getTrainerRates,
   getTrainerSettlement,
   markTrainerSettlementAsPaid,
+  reopenTrainerSettlement,
   type TrainerMonthlySettlement,
   type TrainerRate,
   type TrainerSettlementItem,
@@ -99,6 +102,8 @@ export default function TrainerSettlementPage() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
+  const [isUndoingPaid, setIsUndoingPaid] = useState(false);
+  const [isGeneratingDocument, setIsGeneratingDocument] = useState(false);
 
   useEffect(() => {
     async function loadSettlement() {
@@ -180,6 +185,67 @@ export default function TrainerSettlementPage() {
     }
   }
 
+  async function handleUndoMarkAsPaid() {
+    if (!settlement) return;
+
+    try {
+      setIsUndoingPaid(true);
+      const data = await reopenTrainerSettlement(
+        settlement.trainerId,
+        settlement.year,
+        settlement.month,
+      );
+      setSettlement(data);
+      showOwnerSuccess("Rozliczenie ponownie oznaczone jako niewypłacone.", {
+        id: "owner-trainer-settlement-reopened",
+      });
+    } catch (err) {
+      showOwnerError(
+        err,
+        "Nie udało się cofnąć oznaczenia wypłaty.",
+        { id: "owner-trainer-settlement-reopen-error" },
+      );
+    } finally {
+      setIsUndoingPaid(false);
+    }
+  }
+
+  async function handleGenerateDocument() {
+    if (!settlement) return;
+
+    try {
+      setIsGeneratingDocument(true);
+      const { blob, fileName } = await downloadTrainerWorkHoursDocument(
+        settlement.trainerId,
+        settlement.year,
+        settlement.month,
+      );
+      const objectUrl = URL.createObjectURL(blob);
+      const downloadLink = document.createElement("a");
+
+      downloadLink.href = objectUrl;
+      downloadLink.download =
+        fileName ||
+        `ewidencja-godzin-${settlement.trainerId}-${settlement.year}-${String(
+          settlement.month,
+        ).padStart(2, "0")}.docx`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
+
+      showOwnerSuccess("Dokument ewidencji godzin został wygenerowany.", {
+        id: "owner-trainer-work-hours-document-success",
+      });
+    } catch (err) {
+      showOwnerError(err, "Nie udało się wygenerować ewidencji godzin.", {
+        id: "owner-trainer-work-hours-document-error",
+      });
+    } finally {
+      setIsGeneratingDocument(false);
+    }
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -241,7 +307,7 @@ export default function TrainerSettlementPage() {
             />
             <SummaryCard
               label="Status"
-              value={settlement.isPaid ? "Paid" : "Unpaid"}
+              value={settlement.isPaid ? "Wypłacone" : "Niewypłacone"}
               icon={<CheckCircle2 size={20} />}
             />
           </div>
@@ -292,16 +358,44 @@ export default function TrainerSettlementPage() {
                 </span>
 
                 <Button
+                  type="button"
+                  variant="secondary"
                   className="mt-4 h-12 w-full justify-center rounded-[var(--radius-lg)]"
-                  onClick={handleMarkAsPaid}
-                  disabled={settlement.isPaid || isMarkingPaid}
+                  icon={<FileDown size={17} />}
+                  onClick={handleGenerateDocument}
+                  disabled={
+                    isGeneratingDocument || isMarkingPaid || isUndoingPaid
+                  }
                 >
-                  {settlement.isPaid
-                    ? "Już wypłacone"
-                    : isMarkingPaid
+                  {isGeneratingDocument
+                    ? "Generowanie..."
+                    : "Generuj ewidencję godzin"}
+                </Button>
+
+                {settlement.isPaid ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2 h-12 w-full justify-center rounded-[var(--radius-lg)]"
+                    onClick={handleUndoMarkAsPaid}
+                    disabled={isUndoingPaid || isGeneratingDocument}
+                  >
+                    {isUndoingPaid
+                      ? "Cofanie..."
+                      : "Cofnij oznaczenie jako wypłacone"}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    className="mt-2 h-12 w-full justify-center rounded-[var(--radius-lg)]"
+                    onClick={handleMarkAsPaid}
+                    disabled={isMarkingPaid || isGeneratingDocument}
+                  >
+                    {isMarkingPaid
                       ? "Zapisywanie..."
                       : "Oznacz jako wypłacone"}
-                </Button>
+                  </Button>
+                )}
               </div>
             </section>
 

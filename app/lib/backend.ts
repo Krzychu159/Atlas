@@ -14,6 +14,11 @@ type ApiErrorOptions = {
   path?: string;
 };
 
+export type BackendDownload = {
+  blob: Blob;
+  fileName: string | null;
+};
+
 let authRedirectStarted = false;
 
 export class ApiError extends Error {
@@ -107,6 +112,39 @@ export function backendPatch<T>(path: string, json?: unknown, query?: ApiQuery) 
 
 export function backendDelete<T>(path: string, query?: ApiQuery) {
   return backendFetch<T>(path, { method: "DELETE", query });
+}
+
+export async function backendDownload(
+  path: string,
+  query?: ApiQuery,
+): Promise<BackendDownload> {
+  const response = await fetch(buildBackendUrl(path, query), {
+    method: "GET",
+    cache: "no-store",
+    headers: {
+      Accept:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword, application/octet-stream",
+    },
+  });
+
+  if (response.status === 401) {
+    handleUnauthorizedSession();
+  }
+
+  if (!response.ok) {
+    const payload = await readResponsePayload(response);
+
+    throw new ApiError(getBackendErrorMessage(payload), {
+      status: response.status,
+      payload,
+      path,
+    });
+  }
+
+  return {
+    blob: await response.blob(),
+    fileName: getDownloadFileName(response.headers.get("content-disposition")),
+  };
 }
 
 export function getErrorMessage(
@@ -214,6 +252,24 @@ function looksLikeJson(text: string) {
     (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
     (trimmed.startsWith("[") && trimmed.endsWith("]"))
   );
+}
+
+function getDownloadFileName(contentDisposition: string | null) {
+  if (!contentDisposition) return null;
+
+  const encodedMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+
+  if (encodedMatch?.[1]) {
+    try {
+      return decodeURIComponent(encodedMatch[1].replace(/^"|"$/g, ""));
+    } catch {
+      return encodedMatch[1].replace(/^"|"$/g, "");
+    }
+  }
+
+  const plainMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+
+  return plainMatch?.[1]?.trim() || null;
 }
 
 function handleUnauthorizedSession() {

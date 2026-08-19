@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   ArrowLeft,
+  FileSignature,
   Mail,
   Phone,
   Pencil,
@@ -34,10 +35,12 @@ export default function TrainerProfileHeader({
   trainer,
   rates,
   onEdit,
+  onContracts,
 }: {
   trainer: Trainer;
   rates: TrainerRate[];
   onEdit: () => void;
+  onContracts: () => void;
 }) {
   const fullName =
     trainer.fullName || `${trainer.firstName} ${trainer.lastName}`;
@@ -124,7 +127,7 @@ export default function TrainerProfileHeader({
           </div>
         </div>
 
-        <div className="flex gap-3  lg:flex-col">
+        <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
           <Button
             type="button"
             onClick={onEdit}
@@ -145,6 +148,17 @@ export default function TrainerProfileHeader({
           >
             Rozliczenia
           </ButtonLink>
+
+          <Button
+            type="button"
+            onClick={onContracts}
+            variant="outline"
+            size="lg"
+            icon={<FileSignature size={16} />}
+            className="flex-1 p-4"
+          >
+            Umowa
+          </Button>
         </div>
       </div>
     </section>

@@ -1,4 +1,9 @@
-import { backendGet, backendPost, backendPut } from "../backend";
+import {
+  backendDownload,
+  backendGet,
+  backendPost,
+  backendPut,
+} from "../backend";
 import { getTrainers, type Trainer } from "./trainers";
 
 export type TrainerRate = {
@@ -84,8 +89,31 @@ export function markTrainerSettlementAsPaid(
   month: number,
 ) {
   return backendPost<TrainerMonthlySettlement>(
-    `Trainers/${trainerId}/settlement/mark-as-paid`,
+    `trainers/${trainerId}/settlement/mark-as-paid`,
     undefined,
+    { year, month },
+  );
+}
+
+export function reopenTrainerSettlement(
+  trainerId: number,
+  year: number,
+  month: number,
+) {
+  return backendPost<TrainerMonthlySettlement>(
+    `trainers/${trainerId}/settlement/reopen`,
+    undefined,
+    { year, month },
+  );
+}
+
+export function downloadTrainerWorkHoursDocument(
+  trainerId: number,
+  year: number,
+  month: number,
+) {
+  return backendDownload(
+    `trainers/${trainerId}/settlement/work-hours-document`,
     { year, month },
   );
 }

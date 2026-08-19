@@ -2,7 +2,22 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AtSign, Lock, ArrowRight, Eye, EyeOff, Dumbbell } from "lucide-react";
+import {
+  AtSign,
+  Lock,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Dumbbell,
+  KeyRound,
+  MailCheck,
+} from "lucide-react";
+
+type AuthMode = "login" | "forgot" | "reset";
+
+type ApiMessage = {
+  message?: string;
+};
 
 function getRedirectPath(role?: string) {
   switch (role) {
@@ -40,7 +55,65 @@ function getLoginNotice(reason: string | null) {
   return "";
 }
 
-function LoginLoadingOverlay() {
+function getInitialEmail() {
+  if (typeof window === "undefined") return "";
+
+  return new URLSearchParams(window.location.search).get("email") || "";
+}
+
+function getInitialResetToken() {
+  if (typeof window === "undefined") return "";
+
+  const params = new URLSearchParams(window.location.search);
+
+  return params.get("token") || params.get("resetToken") || "";
+}
+
+function getInitialAuthMode(): AuthMode {
+  return getInitialResetToken() ? "reset" : "login";
+}
+
+function getAuthCopy(mode: AuthMode) {
+  if (mode === "forgot") {
+    return {
+      title: "Odzyskaj dostęp",
+      description:
+        "Podaj adres e-mail konta. Wyślemy instrukcję ustawienia nowego hasła.",
+      submit: "Wyślij instrukcję",
+      pending: "Wysyłanie...",
+      loadingTitle: "Wysyłanie...",
+      loadingDescription: "Przygotowujemy bezpieczny link do resetu hasła.",
+    };
+  }
+
+  if (mode === "reset") {
+    return {
+      title: "Ustaw nowe hasło",
+      description: "Wklej token resetu i wpisz nowe hasło do konta.",
+      submit: "Zapisz nowe hasło",
+      pending: "Zapisywanie...",
+      loadingTitle: "Zapisywanie...",
+      loadingDescription: "Aktualizujemy hasło do Twojego konta.",
+    };
+  }
+
+  return {
+    title: "Zaloguj się",
+    description: "Wprowadź swoje dane, aby uzyskać dostęp.",
+    submit: "Zaloguj się",
+    pending: "Logowanie...",
+    loadingTitle: "Logowanie...",
+    loadingDescription: "Sprawdzamy dane i przygotowujemy Twój panel Atlas.",
+  };
+}
+
+async function readApiMessage(response: Response) {
+  return response.json().catch(() => ({} as ApiMessage)) as Promise<ApiMessage>;
+}
+
+function LoginLoadingOverlay({ mode }: { mode: AuthMode }) {
+  const copy = getAuthCopy(mode);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-surface-bright/60 px-6 backdrop-blur-[20px]"
@@ -63,11 +136,11 @@ function LoginLoadingOverlay() {
           </p>
 
           <h3 className="mt-3 text-[1.8rem] font-semibold leading-none tracking-tight text-on-surface">
-            Logowanie...
+            {copy.loadingTitle}
           </h3>
 
           <p className="mt-4 max-w-[280px] text-[0.98rem] leading-7 text-on-surface-variant">
-            Sprawdzamy dane i przygotowujemy Twój panel Atlas.
+            {copy.loadingDescription}
           </p>
 
           <div className="mt-7 flex w-full gap-2">
@@ -84,12 +157,17 @@ function LoginLoadingOverlay() {
 export default function LoginPage() {
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
+  const [mode, setMode] = useState<AuthMode>(getInitialAuthMode);
+  const [email, setEmail] = useState(getInitialEmail);
   const [password, setPassword] = useState("");
+  const [resetToken, setResetToken] = useState(getInitialResetToken);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [notice] = useState(() => {
     if (typeof window === "undefined") return "";
 
@@ -97,6 +175,14 @@ export default function LoginPage() {
 
     return getLoginNotice(params.get("reason"));
   });
+  const authCopy = getAuthCopy(mode);
+
+  function changeMode(nextMode: AuthMode) {
+    setMode(nextMode);
+    setError("");
+    setSuccess("");
+    setShowPassword(false);
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -104,6 +190,7 @@ export default function LoginPage() {
     if (isSubmitting) return;
 
     setError("");
+    setSuccess("");
     setIsSubmitting(true);
 
     try {
@@ -119,14 +206,14 @@ export default function LoginPage() {
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiMessage(response);
 
       if (!response.ok) {
         throw new Error(data?.message || "Logowanie nie powiodło się.");
       }
 
       const params = new URLSearchParams(window.location.search);
-      const role = data?.user?.role;
+      const role = (data as { user?: { role?: string } })?.user?.role;
       const nextPath = getSafeRedirectPath(params.get("next"));
 
       router.replace(nextPath || getRedirectPath(role));
@@ -135,6 +222,101 @@ export default function LoginPage() {
       setError(
         err instanceof Error ? err.message : "Wystąpił nieoczekiwany błąd.",
       );
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleForgotSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    if (isSubmitting) return;
+
+    setError("");
+    setSuccess("");
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+        cache: "no-store",
+      });
+      const data = await readApiMessage(response);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message || "Nie udało się wysłać instrukcji resetu hasła.",
+        );
+      }
+
+      setSuccess(
+        "Jeśli konto istnieje, wysłaliśmy instrukcję resetu hasła na podany adres e-mail.",
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Wystąpił nieoczekiwany błąd.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleResetSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    if (isSubmitting) return;
+
+    setError("");
+    setSuccess("");
+
+    if (!resetToken.trim()) {
+      setError("Wklej token resetu hasła.");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setError("Nowe hasło musi mieć co najmniej 8 znaków.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError("Hasła muszą być takie same.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          token: resetToken.trim(),
+          newPassword,
+        }),
+        cache: "no-store",
+      });
+      const data = await readApiMessage(response);
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Nie udało się ustawić nowego hasła.");
+      }
+
+      setPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setMode("login");
+      setSuccess("Hasło zostało zmienione. Możesz się zalogować.");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Wystąpił nieoczekiwany błąd.",
+      );
+    } finally {
       setIsSubmitting(false);
     }
   }
@@ -163,22 +345,6 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-9">
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  className="text-label text-on-surface-variant transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
-                >
-                  Poproś o dostęp
-                </button>
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  className="text-label text-on-surface-variant transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
-                >
-                  Wsparcie
-                </button>
-              </div>
             </div>
           </header>
 
@@ -239,10 +405,10 @@ export default function LoginPage() {
                   <div>
                     <div className="mx-auto max-w-[460px]">
                       <h2 className="text-[2.25rem] font-semibold leading-none tracking-tight">
-                        Zaloguj się
+                        {authCopy.title}
                       </h2>
                       <p className="mt-4 text-[1.05rem] leading-8 text-on-surface-variant">
-                        Wprowadź swoje dane, aby uzyskać dostęp.
+                        {authCopy.description}
                       </p>
 
                       {notice ? (
@@ -251,6 +417,13 @@ export default function LoginPage() {
                         </div>
                       ) : null}
 
+                      {success ? (
+                        <div className="mt-6 rounded-[var(--radius-lg)] border border-tertiary-light/20 bg-tertiary-container/30 px-4 py-3 text-sm leading-6 text-tertiary-light">
+                          {success}
+                        </div>
+                      ) : null}
+
+                      {mode === "login" ? (
                       <form className="mt-12 space-y-7" onSubmit={handleSubmit}>
                         <div>
                           <label className="mb-3 block text-label text-on-surface-variant">
@@ -284,6 +457,7 @@ export default function LoginPage() {
                             <button
                               type="button"
                               disabled={isSubmitting}
+                              onClick={() => changeMode("forgot")}
                               className="text-label text-primary-light transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
                             >
                               Zapomniałeś hasła?
@@ -342,23 +516,184 @@ export default function LoginPage() {
                           disabled={isSubmitting}
                           className="flex h-[66px] w-full items-center justify-center gap-3 rounded-[24px] bg-primary-gradient text-[1.05rem] font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
                         >
-                          {isSubmitting ? "Logowanie..." : "Zaloguj się"}
+                          {isSubmitting ? authCopy.pending : authCopy.submit}
                           <ArrowRight size={18} />
                         </button>
                       </form>
+                      ) : mode === "forgot" ? (
+                      <form
+                        className="mt-12 space-y-7"
+                        onSubmit={handleForgotSubmit}
+                      >
+                        <div>
+                          <label className="mb-3 block text-label text-on-surface-variant">
+                            Adres e-mail
+                          </label>
 
-                      <div className="mt-12 border-t border-white/5 pt-10 text-center">
-                        <p className="text-[1rem] text-on-surface-variant">
-                          Pierwszy raz w Atlas?{" "}
+                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                            <input
+                              type="email"
+                              placeholder="nazwa@studio.pl"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              disabled={isSubmitting}
+                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                              autoComplete="email"
+                              required
+                            />
+                            <AtSign
+                              size={22}
+                              className="shrink-0 text-on-surface-muted"
+                            />
+                          </div>
+                        </div>
+
+                        {error ? (
+                          <p className="text-sm text-red-400">{error}</p>
+                        ) : null}
+
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="flex h-[66px] w-full items-center justify-center gap-3 rounded-[24px] bg-primary-gradient text-[1.05rem] font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
+                        >
+                          {isSubmitting ? authCopy.pending : authCopy.submit}
+                          <MailCheck size={18} />
+                        </button>
+
+                        <div className="flex items-center justify-between gap-4">
                           <button
                             type="button"
                             disabled={isSubmitting}
-                            className="font-semibold text-on-surface transition-colors hover:text-primary-light disabled:pointer-events-none disabled:opacity-50"
+                            onClick={() => changeMode("login")}
+                            className="text-sm font-semibold text-on-surface-variant transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
                           >
-                            Poproś o dostęp
+                            Wróć do logowania
                           </button>
-                        </p>
-                      </div>
+                          <button
+                            type="button"
+                            disabled={isSubmitting}
+                            onClick={() => changeMode("reset")}
+                            className="text-sm font-semibold text-primary-light transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+                          >
+                            Mam token resetu
+                          </button>
+                        </div>
+                      </form>
+                      ) : (
+                      <form
+                        className="mt-12 space-y-7"
+                        onSubmit={handleResetSubmit}
+                      >
+                        <div>
+                          <label className="mb-3 block text-label text-on-surface-variant">
+                            Token resetu
+                          </label>
+
+                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                            <KeyRound
+                              size={22}
+                              className="shrink-0 text-on-surface-muted"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Wklej token z wiadomości"
+                              value={resetToken}
+                              onChange={(e) => setResetToken(e.target.value)}
+                              disabled={isSubmitting}
+                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                              autoComplete="one-time-code"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-3 block text-label text-on-surface-variant">
+                            Nowe hasło
+                          </label>
+
+                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                            <Lock
+                              size={22}
+                              className="shrink-0 text-on-surface-muted"
+                            />
+                            <input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="Minimum 8 znaków"
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                              disabled={isSubmitting}
+                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                              autoComplete="new-password"
+                              required
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword((prev) => !prev)}
+                              disabled={isSubmitting}
+                              className="shrink-0 text-on-surface-muted disabled:pointer-events-none disabled:opacity-50"
+                              aria-label={
+                                showPassword ? "Ukryj hasło" : "Pokaż hasło"
+                              }
+                            >
+                              {showPassword ? (
+                                <EyeOff size={22} />
+                              ) : (
+                                <Eye size={22} />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-3 block text-label text-on-surface-variant">
+                            Powtórz hasło
+                          </label>
+
+                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                            <Lock
+                              size={22}
+                              className="shrink-0 text-on-surface-muted"
+                            />
+                            <input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="Powtórz nowe hasło"
+                              value={confirmPassword}
+                              onChange={(e) =>
+                                setConfirmPassword(e.target.value)
+                              }
+                              disabled={isSubmitting}
+                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                              autoComplete="new-password"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        {error ? (
+                          <p className="text-sm text-red-400">{error}</p>
+                        ) : null}
+
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="flex h-[66px] w-full items-center justify-center gap-3 rounded-[24px] bg-primary-gradient text-[1.05rem] font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
+                        >
+                          {isSubmitting ? authCopy.pending : authCopy.submit}
+                          <ArrowRight size={18} />
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isSubmitting}
+                          onClick={() => changeMode("login")}
+                          className="text-sm font-semibold text-on-surface-variant transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          Wróć do logowania
+                        </button>
+                      </form>
+                      )}
                     </div>
                   </div>
                 </section>
@@ -369,27 +704,6 @@ export default function LoginPage() {
           <footer className="relative z-10 px-9 pb-8">
             <div className="mx-auto flex max-w-[1180px] items-center justify-center gap-8 text-on-surface-muted">
               <span className="text-label">© 2026 Atlas </span>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                className="text-label transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
-              >
-                Prywatność
-              </button>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                className="text-label transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
-              >
-                Warunki
-              </button>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                className="text-label transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
-              >
-                Wsparcie
-              </button>
             </div>
           </footer>
         </div>
@@ -408,13 +722,29 @@ export default function LoginPage() {
           <main className="flex flex-1 flex-col pt-10">
             <div>
               <h1 className="font-display text-[4.2rem] font-semibold leading-[0.88] tracking-[-0.05em]">
-                UWOLNIJ
-                <br />
-                <span className="text-primary">POTENCJAŁ.</span>
+                {mode === "forgot" ? (
+                  <>
+                    ODZYSKAJ
+                    <br />
+                    <span className="text-primary">DOSTĘP.</span>
+                  </>
+                ) : mode === "reset" ? (
+                  <>
+                    USTAW
+                    <br />
+                    <span className="text-primary">HASŁO.</span>
+                  </>
+                ) : (
+                  <>
+                    UWOLNIJ
+                    <br />
+                    <span className="text-primary">POTENCJAŁ.</span>
+                  </>
+                )}
               </h1>
 
               <p className="mt-5 text-[1.05rem] uppercase leading-8 tracking-[0.03em] text-on-surface-muted">
-                Zaloguj się do swojego centrum dowodzenia
+                {authCopy.description}
               </p>
 
               {notice ? (
@@ -422,8 +752,15 @@ export default function LoginPage() {
                   {notice}
                 </div>
               ) : null}
+
+              {success ? (
+                <div className="mt-6 rounded-[var(--radius-lg)] border border-tertiary-light/20 bg-tertiary-container/30 px-4 py-3 text-sm leading-6 text-tertiary-light">
+                  {success}
+                </div>
+              ) : null}
             </div>
 
+            {mode === "login" ? (
             <form className="mt-12 space-y-7" onSubmit={handleSubmit}>
               <div>
                 <label className="mb-3 block text-label text-on-surface-variant">
@@ -494,6 +831,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   disabled={isSubmitting}
+                  onClick={() => changeMode("forgot")}
                   className="text-[1rem] font-medium uppercase tracking-[0.04em] text-primary-light disabled:pointer-events-none disabled:opacity-50"
                 >
                   Zapomniałeś hasła?
@@ -507,68 +845,170 @@ export default function LoginPage() {
                 disabled={isSubmitting}
                 className="flex h-[74px] w-full items-center justify-center gap-4 rounded-[26px] bg-primary-gradient text-[1.15rem] font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
               >
-                {isSubmitting ? "Logowanie..." : "Zaloguj się"}
+                {isSubmitting ? authCopy.pending : authCopy.submit}
                 <ArrowRight size={22} />
               </button>
             </form>
+            ) : mode === "forgot" ? (
+            <form className="mt-12 space-y-7" onSubmit={handleForgotSubmit}>
+              <div>
+                <label className="mb-3 block text-label text-on-surface-variant">
+                  Adres e-mail
+                </label>
 
-            <div className="mt-14 grid grid-cols-2 gap-4">
-              <button
-                type="button"
-                disabled={isSubmitting}
-                className="flex h-28 items-center justify-center gap-4 rounded-[26px] bg-surface-container px-6 disabled:pointer-events-none disabled:opacity-50"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-surface-container-low text-sm font-semibold text-primary-light">
-                  G
+                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                  <AtSign
+                    size={22}
+                    className="shrink-0 text-on-surface-muted"
+                  />
+                  <input
+                    type="email"
+                    placeholder="nazwa@studio.pl"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isSubmitting}
+                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                    autoComplete="email"
+                    required
+                  />
                 </div>
-                <span className="text-label text-on-surface">Google</span>
+              </div>
+
+              {error ? <p className="text-sm text-red-400">{error}</p> : null}
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex h-[74px] w-full items-center justify-center gap-4 rounded-[26px] bg-primary-gradient text-[1.15rem] font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
+              >
+                {isSubmitting ? authCopy.pending : authCopy.submit}
+                <MailCheck size={22} />
+              </button>
+
+              <div className="flex items-center justify-between gap-4">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => changeMode("login")}
+                  className="text-sm font-semibold uppercase tracking-[0.04em] text-on-surface-variant transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+                >
+                  Wróć
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => changeMode("reset")}
+                  className="text-sm font-semibold uppercase tracking-[0.04em] text-primary-light transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+                >
+                  Mam token
+                </button>
+              </div>
+            </form>
+            ) : (
+            <form className="mt-12 space-y-7" onSubmit={handleResetSubmit}>
+              <div>
+                <label className="mb-3 block text-label text-on-surface-variant">
+                  Token resetu
+                </label>
+
+                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                  <KeyRound
+                    size={22}
+                    className="shrink-0 text-on-surface-muted"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Wklej token z wiadomości"
+                    value={resetToken}
+                    onChange={(e) => setResetToken(e.target.value)}
+                    disabled={isSubmitting}
+                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                    autoComplete="one-time-code"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-3 block text-label text-on-surface-variant">
+                  Nowe hasło
+                </label>
+
+                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                  <Lock size={22} className="shrink-0 text-on-surface-muted" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Minimum 8 znaków"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    disabled={isSubmitting}
+                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                    autoComplete="new-password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    disabled={isSubmitting}
+                    className="shrink-0 text-on-surface-muted disabled:pointer-events-none disabled:opacity-50"
+                    aria-label={showPassword ? "Ukryj hasło" : "Pokaż hasło"}
+                  >
+                    {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-3 block text-label text-on-surface-variant">
+                  Powtórz hasło
+                </label>
+
+                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                  <Lock size={22} className="shrink-0 text-on-surface-muted" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Powtórz nowe hasło"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={isSubmitting}
+                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                    autoComplete="new-password"
+                    required
+                  />
+                </div>
+              </div>
+
+              {error ? <p className="text-sm text-red-400">{error}</p> : null}
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex h-[74px] w-full items-center justify-center gap-4 rounded-[26px] bg-primary-gradient text-[1.15rem] font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
+              >
+                {isSubmitting ? authCopy.pending : authCopy.submit}
+                <ArrowRight size={22} />
               </button>
 
               <button
                 type="button"
                 disabled={isSubmitting}
-                className="flex h-28 items-center justify-center gap-4 rounded-[26px] bg-surface-container px-6 disabled:pointer-events-none disabled:opacity-50"
+                onClick={() => changeMode("login")}
+                className="text-sm font-semibold uppercase tracking-[0.04em] text-on-surface-variant transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-surface-container-low text-sm font-semibold text-on-surface">
-                  iOS
-                </div>
-                <span className="text-label text-on-surface">Apple ID</span>
+                Wróć do logowania
               </button>
-            </div>
+            </form>
+            )}
           </main>
 
           <footer className="pt-14 text-center">
             <p className="text-label text-on-surface-muted">
               © 2026 Atlas Kinetic Ops
             </p>
-
-            <div className="mt-8 flex items-center justify-center gap-8">
-              <button
-                type="button"
-                disabled={isSubmitting}
-                className="text-label text-on-surface-muted transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
-              >
-                Prywatność
-              </button>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                className="text-label text-on-surface-muted transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
-              >
-                Warunki
-              </button>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                className="text-label text-on-surface-muted transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
-              >
-                Wsparcie
-              </button>
-            </div>
           </footer>
         </div>
 
-        {isSubmitting ? <LoginLoadingOverlay /> : null}
+        {isSubmitting ? <LoginLoadingOverlay mode={mode} /> : null}
       </div>
     </div>
   );

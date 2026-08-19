@@ -11,6 +11,11 @@ import {
   type CreatePackagePayload,
   type Package,
 } from "@/app/lib/owner/packages";
+import { getLocations, type Location } from "@/app/lib/owner/locations";
+import {
+  matchesOwnerLocationId,
+  useOwnerLocationFilter,
+} from "@/app/lib/owner/location-filter";
 import PackageCard from "@/app/components/packages/PackageCard";
 import PackageFilters, {
   type DurationFilter,
@@ -49,7 +54,9 @@ function matchesDuration(item: Package, filter: DurationFilter) {
 }
 
 export default function PackagesPage() {
+  const { selectedLocationId } = useOwnerLocationFilter();
   const [packages, setPackages] = useState<Package[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [search, setSearch] = useState("");
   const [participantsFilter, setParticipantsFilter] =
     useState<ParticipantsFilter>("all");
@@ -64,8 +71,21 @@ export default function PackagesPage() {
   async function loadPackages() {
     try {
       setIsLoading(true);
-      const data = await getPackages();
-      setPackages(data);
+      const [packagesResult, locationsResult] = await Promise.allSettled([
+        getPackages(),
+        getLocations(),
+      ]);
+
+      if (packagesResult.status !== "fulfilled") {
+        throw packagesResult.reason;
+      }
+
+      setPackages(packagesResult.value);
+      setLocations(
+        locationsResult.status === "fulfilled"
+          ? locationsResult.value.filter((location) => location.isActive)
+          : [],
+      );
     } catch (err) {
       showOwnerError(err, "Błąd ładowania pakietów", {
         id: "owner-packages-load-error",
@@ -79,10 +99,18 @@ export default function PackagesPage() {
     void Promise.resolve().then(() => loadPackages());
   }, []);
 
+  const locationPackages = useMemo(
+    () =>
+      packages.filter((item) =>
+        matchesOwnerLocationId(item, selectedLocationId),
+      ),
+    [packages, selectedLocationId],
+  );
+
   const filteredPackages = useMemo(() => {
     const query = normalize(search);
 
-    const result = packages.filter((item) => {
+    const result = locationPackages.filter((item) => {
       const name = normalize(item.name || "");
       const description = normalize(item.description || "");
 
@@ -108,12 +136,25 @@ export default function PackagesPage() {
 
       return new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime();
     });
-  }, [packages, search, participantsFilter, sessionsFilter, durationFilter, sort]);
+  }, [
+    locationPackages,
+    search,
+    participantsFilter,
+    sessionsFilter,
+    durationFilter,
+    sort,
+  ]);
 
   const handleCreatePackage = async (payload: CreatePackagePayload) => {
     try {
       setIsSubmitting(true);
-      await createPackage(payload);
+      await createPackage({
+        ...payload,
+        locationId:
+          payload.locationId === undefined
+            ? selectedLocationId
+            : payload.locationId,
+      });
       await loadPackages();
       setIsModalOpen(false);
       showOwnerSuccess("Pakiet został dodany.", {
@@ -310,8 +351,11 @@ export default function PackagesPage() {
       </div>
 
       <AddPackageModal
+        key={selectedLocationId ?? "all"}
         open={isModalOpen}
         isSubmitting={isSubmitting}
+        locations={locations}
+        defaultLocationId={selectedLocationId}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreatePackage}
       />

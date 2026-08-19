@@ -39,14 +39,6 @@ export default function TrainerCard({ trainer }: { trainer: Trainer }) {
             {fullName}
           </h3>
 
-          <div className="mt-2">
-            {trainer.hourlyRate ? (
-              <span className="rounded-full bg-surface-container-high px-2 py-1 text-[8px] font-medium leading-none text-secondary-light">
-                {trainer.hourlyRate} PLN/h
-              </span>
-            ) : null}
-          </div>
-
           <p className="mt-2 line-clamp-2 text-sm leading-5 text-on-surface-variant">
             {trainer.bio || trainer.role || "Trener personalny"}
           </p>

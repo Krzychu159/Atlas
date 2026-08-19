@@ -1,18 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { PackagePlus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { MapPin, PackagePlus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import { CustomSelect } from "@/app/components/ui/custom-select";
 import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
 import {
   OwnerTextArea,
   OwnerTextField,
 } from "../../components/OwnerFormControls";
 import type { CreatePackagePayload } from "@/app/lib/owner/packages";
+import type { Location } from "@/app/lib/owner/locations";
 
 type AddPackageModalProps = {
   open: boolean;
   isSubmitting: boolean;
+  locations: Location[];
+  defaultLocationId: number | null;
   onClose: () => void;
   onSubmit: (payload: CreatePackagePayload) => Promise<void>;
 };
@@ -27,16 +31,49 @@ const initialForm = {
   durationDays: "",
   participantsCount: "1",
   billingType: "1",
+  locationId: "",
   isActive: true,
 };
+
+function createInitialForm(defaultLocationId: number | null) {
+  return {
+    ...initialForm,
+    locationId: defaultLocationId ? String(defaultLocationId) : "",
+  };
+}
 
 export default function AddPackageModal({
   open,
   isSubmitting,
+  locations,
+  defaultLocationId,
   onClose,
   onSubmit,
 }: AddPackageModalProps) {
-  const [form, setForm] = useState(initialForm);
+  const [form, setForm] = useState(() => createInitialForm(defaultLocationId));
+
+  const locationOptions = useMemo(() => {
+    const options = [
+      { value: "", label: "Bez przypisania" },
+      ...locations.map((location) => ({
+        value: String(location.id),
+        label: location.name || location.city || `Lokalizacja ${location.id}`,
+      })),
+    ];
+    const defaultValue = defaultLocationId ? String(defaultLocationId) : "";
+
+    if (
+      defaultValue &&
+      !options.some((option) => option.value === defaultValue)
+    ) {
+      options.push({
+        value: defaultValue,
+        label: `Lokalizacja ${defaultLocationId}`,
+      });
+    }
+
+    return options;
+  }, [defaultLocationId, locations]);
 
   if (!open) return null;
 
@@ -58,11 +95,12 @@ export default function AddPackageModal({
       durationDays: Number(form.durationDays || 0),
       billingType: Number(form.billingType || 1),
       participantsCount: Number(form.participantsCount || 1),
+      locationId: form.locationId ? Number(form.locationId) : null,
       isActive: form.isActive,
       createdBy: 0,
     });
 
-    setForm(initialForm);
+    setForm(createInitialForm(defaultLocationId));
   };
 
   return (
@@ -128,6 +166,18 @@ export default function AddPackageModal({
             onChange={(value) => updateField("billingType", value)}
             type="number"
           />
+          <label>
+            <span className="text-label text-on-surface-muted">
+              Lokalizacja
+            </span>
+            <CustomSelect
+              value={form.locationId}
+              onChange={(value) => updateField("locationId", value)}
+              options={locationOptions}
+              icon={<MapPin size={16} />}
+              className="mt-2"
+            />
+          </label>
           <OwnerTextArea
             label="Opis"
             value={form.description}
