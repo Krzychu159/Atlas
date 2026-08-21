@@ -17,10 +17,44 @@ function getCurrentMonthValue() {
   return `${now.getFullYear()}-${month}`;
 }
 
+function getMonthValueFromUrl() {
+  if (typeof window === "undefined") return getCurrentMonthValue();
+
+  const params = new URLSearchParams(window.location.search);
+  const year = Number(params.get("year"));
+  const month = Number(params.get("month"));
+
+  if (!year || !month) return getCurrentMonthValue();
+
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
 function parseMonth(value: string) {
   const [year, month] = value.split("-").map(Number);
 
   return { year, month };
+}
+
+function formatMonth(value: string) {
+  const { year, month } = parseMonth(value);
+
+  if (!year || !month) return "Wybierz miesiąc";
+
+  return new Intl.DateTimeFormat("pl-PL", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(year, month - 1, 1));
+}
+
+function updateUrlMonth(value: string) {
+  const { year, month } = parseMonth(value);
+
+  if (!year || !month) return;
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("year", String(year));
+  url.searchParams.set("month", String(month));
+  window.history.replaceState(null, "", url.toString());
 }
 
 function normalize(value: string) {
@@ -28,7 +62,7 @@ function normalize(value: string) {
 }
 
 export default function OwnerSettlementsPage() {
-  const [monthValue, setMonthValue] = useState(getCurrentMonthValue);
+  const [monthValue, setMonthValue] = useState("");
   const [search, setSearch] = useState("");
   const [settlements, setSettlements] = useState<TrainerMonthlySettlement[]>(
     [],
@@ -36,7 +70,13 @@ export default function OwnerSettlementsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    void Promise.resolve().then(() => setMonthValue(getMonthValueFromUrl()));
+  }, []);
+
+  useEffect(() => {
     async function loadSettlements() {
+      if (!monthValue) return;
+
       const { year, month } = parseMonth(monthValue);
 
       if (!year || !month) return;
@@ -80,18 +120,34 @@ export default function OwnerSettlementsPage() {
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-[180px_260px]">
-          <label className="flex items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3">
-            <CalendarDays size={18} className="text-primary-light" />
+        <div className="grid gap-3 sm:grid-cols-[220px_260px]">
+          <label className="relative flex min-h-[68px] cursor-pointer items-center rounded-[var(--radius-lg)] bg-surface-container px-4 py-2.5 shadow-soft transition hover:bg-surface-container-high">
+            <span className="min-w-0 flex-1 pr-10">
+              <span className="block text-label text-primary-light">
+                Miesiąc rozliczenia
+              </span>
+              <span className="mt-1 block truncate text-sm font-semibold text-on-surface">
+                {formatMonth(monthValue)}
+              </span>
+            </span>
+            <CalendarDays
+              size={19}
+              className="pointer-events-none absolute right-4 text-primary-light"
+            />
             <input
               type="month"
               value={monthValue}
-              onChange={(event) => setMonthValue(event.target.value)}
-              className="w-full bg-transparent text-sm font-semibold text-on-surface outline-none"
+              aria-label="Wybierz miesiąc rozliczenia"
+              onChange={(event) => {
+                setMonthValue(event.target.value);
+                updateUrlMonth(event.target.value);
+              }}
+              onClick={(event) => event.currentTarget.showPicker?.()}
+              className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
             />
           </label>
 
-          <label className="flex items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3">
+          <label className="flex min-h-[68px] items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3 shadow-soft transition focus-within:bg-surface-container-high hover:bg-surface-container-high">
             <Search size={18} className="text-on-surface-muted" />
             <input
               value={search}

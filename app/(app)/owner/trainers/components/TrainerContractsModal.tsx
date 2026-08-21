@@ -2,14 +2,17 @@
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   CalendarDays,
   CheckCircle2,
   FileSignature,
   Pencil,
   Plus,
   Save,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import { CustomSelect } from "@/app/components/ui/custom-select";
 import { TextArea, TextField } from "@/app/components/ui/input";
 import {
   ModalFooter,
@@ -18,10 +21,12 @@ import {
 } from "@/app/components/ui/modal";
 import {
   createTrainerContract,
+  deleteTrainerContract,
   getTrainerContract,
   getTrainerContracts,
   updateTrainerContract,
   type TrainerContract,
+  type TrainerContractType,
 } from "@/app/lib/owner/contracts";
 import {
   showOwnerError,
@@ -36,7 +41,7 @@ type TrainerContractsModalProps = {
 };
 
 type ContractForm = {
-  contractType: string;
+  contractType: TrainerContractType | "";
   contractNumber: string;
   signedAt: string;
   validFrom: string;
@@ -68,7 +73,7 @@ function emptyForm(): ContractForm {
 
 function contractToForm(contract: TrainerContract): ContractForm {
   return {
-    contractType: contract.contractType || "",
+    contractType: normalizeContractType(contract.contractType),
     contractNumber: contract.contractNumber || "",
     signedAt: contract.signedAt.slice(0, 10),
     validFrom: contract.validFrom.slice(0, 10),
@@ -76,6 +81,30 @@ function contractToForm(contract: TrainerContract): ContractForm {
     notes: contract.notes || "",
     isActive: contract.isActive,
   };
+}
+
+const contractTypeOptions = [
+  { value: "", label: "Wybierz typ umowy" },
+  { value: "Zlecenie", label: "Umowa Zlecenie" },
+  { value: "B2B", label: "Umowa B2B" },
+];
+
+function normalizeContractType(value: string | null): ContractForm["contractType"] {
+  const normalized = (value || "").toLowerCase();
+
+  if (normalized.includes("b2b")) return "B2B";
+  if (normalized.includes("zlecen")) return "Zlecenie";
+
+  return "";
+}
+
+function formatContractType(value: string | null) {
+  const normalized = normalizeContractType(value);
+
+  if (normalized === "B2B") return "Umowa B2B";
+  if (normalized === "Zlecenie") return "Umowa Zlecenie";
+
+  return "Umowa bez typu";
 }
 
 function toApiDate(value: string) {
@@ -100,6 +129,9 @@ export default function TrainerContractsModal({
   const [isCreating, setIsCreating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [contractToDelete, setContractToDelete] =
+    useState<TrainerContract | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const selectedContract = useMemo(
     () => contracts.find((contract) => contract.id === selectedId) ?? null,
     [contracts, selectedId],
@@ -178,8 +210,15 @@ export default function TrainerContractsModal({
       return;
     }
 
+    if (!form.contractType) {
+      showOwnerError(new Error("Wybierz typ umowy."), "", {
+        id: "owner-trainer-contract-type-required",
+      });
+      return;
+    }
+
     const payload = {
-      contractType: form.contractType.trim() || null,
+      contractType: form.contractType,
       contractNumber: form.contractNumber.trim() || null,
       signedAt: toApiDate(form.signedAt),
       validFrom: toApiDate(form.validFrom),
@@ -218,11 +257,44 @@ export default function TrainerContractsModal({
     }
   }
 
+  async function handleDeleteContract() {
+    if (!contractToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      await deleteTrainerContract(trainerId, contractToDelete.id);
+
+      const remaining = contracts.filter(
+        (contract) => contract.id !== contractToDelete.id,
+      );
+      const preferred =
+        remaining.find((contract) => contract.isCurrent) ??
+        remaining[0] ??
+        null;
+
+      setContracts(remaining);
+      setSelectedId(preferred?.id ?? null);
+      setForm(preferred ? contractToForm(preferred) : emptyForm());
+      setIsCreating(!preferred);
+      setContractToDelete(null);
+      showOwnerSuccess("Umowa trenera została usunięta.", {
+        id: "owner-trainer-contract-delete-success",
+      });
+    } catch (error) {
+      showOwnerError(error, "Nie udało się usunąć umowy trenera.", {
+        id: "owner-trainer-contract-delete-error",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   return (
-    <ModalOverlay onClose={onClose} className="px-4 py-8">
+    <>
+    <ModalOverlay onClose={onClose} className="px-3 py-3 md:px-4 md:py-6">
       <form
         onSubmit={handleSubmit}
-        className="relative z-10 flex max-h-full w-full max-w-[980px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient"
+        className="relative z-10 flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[980px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient md:max-h-[calc(100dvh-3rem)]"
       >
         <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
           <ModalHeader
@@ -233,8 +305,8 @@ export default function TrainerContractsModal({
             onClose={onClose}
           />
 
-          <div className="mt-6 grid gap-5 lg:grid-cols-[0.78fr_1.22fr]">
-            <section>
+          <div className="mt-6 grid min-w-0 gap-5 lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]">
+            <section className="min-w-0">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-label text-on-surface-muted">Umowy</p>
                 <Button
@@ -249,7 +321,7 @@ export default function TrainerContractsModal({
                 </Button>
               </div>
 
-              <div className="mt-3 flex flex-col gap-2">
+              <div className="mt-3 flex snap-x gap-2 overflow-x-auto pb-2 lg:max-h-[520px] lg:snap-none lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:pr-1">
                 {isLoading && contracts.length === 0 ? (
                   <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-5 text-sm text-on-surface-variant">
                     Ładowanie umów...
@@ -261,7 +333,7 @@ export default function TrainerContractsModal({
                       type="button"
                       onClick={() => void selectContract(contract.id)}
                       className={[
-                        "rounded-[var(--radius-lg)] p-4 text-left transition",
+                        "min-w-[min(78vw,280px)] snap-start rounded-[var(--radius-lg)] p-4 text-left transition lg:min-w-0",
                         selectedId === contract.id && !isCreating
                           ? "bg-primary/15 outline outline-1 outline-primary-light/30"
                           : "bg-surface-container-low hover:bg-surface-container-high",
@@ -270,7 +342,7 @@ export default function TrainerContractsModal({
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-on-surface">
-                            {contract.contractType || "Umowa bez typu"}
+                            {formatContractType(contract.contractType)}
                           </p>
                           <p className="mt-1 text-xs text-on-surface-muted">
                             {contract.contractNumber || "Bez numeru"}
@@ -297,7 +369,7 @@ export default function TrainerContractsModal({
               </div>
             </section>
 
-            <section className="rounded-[var(--radius-lg)] bg-surface-container-low p-4 md:p-5">
+            <section className="min-w-0 rounded-[var(--radius-lg)] bg-surface-container-low p-4 md:p-5">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-label text-primary-light">
@@ -314,20 +386,20 @@ export default function TrainerContractsModal({
                 ) : null}
               </div>
 
-              <datalist id="contract-types">
-                <option value="Umowa zlecenie" />
-                <option value="Umowa o pracę" />
-                <option value="B2B" />
-              </datalist>
-
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <TextField
-                  label="Typ umowy"
-                  value={form.contractType}
-                  onChange={(value) => updateForm("contractType", value)}
-                  list="contract-types"
-                  placeholder="np. Umowa zlecenie"
-                />
+                <div>
+                  <span className="text-label text-on-surface-muted">
+                    Typ umowy
+                  </span>
+                  <CustomSelect
+                    value={form.contractType}
+                    options={contractTypeOptions}
+                    onChange={(value) =>
+                      updateForm("contractType", value as TrainerContractType)
+                    }
+                    className="mt-2"
+                  />
+                </div>
                 <TextField
                   label="Numer umowy"
                   value={form.contractNumber}
@@ -382,18 +454,37 @@ export default function TrainerContractsModal({
         </div>
 
         <ModalFooter>
+          {!isCreating && selectedContract ? (
+            <Button
+              type="button"
+              variant="danger"
+              icon={<Trash2 size={16} />}
+              onClick={() => setContractToDelete(selectedContract)}
+              disabled={isSaving || isDeleting}
+              className="w-full sm:mr-auto sm:w-auto"
+            >
+              Usuń umowę
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="secondary"
             onClick={onClose}
-            disabled={isSaving}
+            disabled={isSaving || isDeleting}
+            className="w-full sm:w-auto"
           >
             Zamknij
           </Button>
           <Button
             type="submit"
             icon={<Save size={16} />}
-            disabled={isSaving || (!isCreating && !selectedId)}
+            disabled={
+              isSaving ||
+              isDeleting ||
+              !form.contractType ||
+              (!isCreating && !selectedId)
+            }
+            className="w-full sm:w-auto"
           >
             {isSaving
               ? "Zapisywanie..."
@@ -404,5 +495,84 @@ export default function TrainerContractsModal({
         </ModalFooter>
       </form>
     </ModalOverlay>
+    {contractToDelete ? (
+      <DeleteContractConfirmModal
+        contract={contractToDelete}
+        isDeleting={isDeleting}
+        onClose={() => setContractToDelete(null)}
+        onConfirm={() => void handleDeleteContract()}
+      />
+    ) : null}
+    </>
+  );
+}
+
+function DeleteContractConfirmModal({
+  contract,
+  isDeleting,
+  onClose,
+  onConfirm,
+}: {
+  contract: TrainerContract;
+  isDeleting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4 backdrop-blur-[3px]">
+      <button
+        type="button"
+        aria-label="Anuluj usuwanie umowy"
+        onClick={onClose}
+        disabled={isDeleting}
+        className="absolute inset-0 cursor-default"
+      />
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="delete-contract-title"
+        className="relative z-10 w-full max-w-[480px] overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient"
+      >
+        <ModalHeader
+          title="Usunąć umowę?"
+          description="Tej operacji nie można cofnąć. Umowa zostanie trwale usunięta z historii trenera."
+          icon={<AlertTriangle size={19} />}
+          iconTone="danger"
+          onClose={onClose}
+          className="p-5 md:p-6"
+        />
+
+        <div className="mx-5 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 md:mx-6">
+          <p id="delete-contract-title" className="font-semibold text-on-surface">
+            {formatContractType(contract.contractType)}
+          </p>
+          <p className="mt-1 break-words text-sm text-on-surface-variant">
+            {contract.contractNumber || "Bez numeru"}
+          </p>
+        </div>
+
+        <ModalFooter className="mt-5">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={isDeleting}
+            className="w-full sm:w-auto"
+          >
+            Anuluj
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            icon={<Trash2 size={16} />}
+            onClick={onConfirm}
+            disabled={isDeleting}
+            className="w-full sm:w-auto"
+          >
+            {isDeleting ? "Usuwanie..." : "Usuń umowę"}
+          </Button>
+        </ModalFooter>
+      </div>
+    </div>
   );
 }

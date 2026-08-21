@@ -422,6 +422,7 @@ export default function TrainerSchedulePage() {
         trainers={modalTrainers}
         locations={locations}
         clients={clients}
+        defaultTrainerId={me?.trainerId}
         isSaving={isSavingSession}
         onClose={() => {
           setIsSessionModalOpen(false);

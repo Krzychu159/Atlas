@@ -8,6 +8,8 @@ export type Invitation = {
   role: string;
   locationId: number;
   locationName: string;
+  trainerId: number | null;
+  trainerName: string | null;
   token: string;
   inviteLink: string;
   expiresAt: string;
@@ -22,6 +24,7 @@ export type CreateInvitationPayload = {
   email: string;
   role: InvitationRole;
   locationId: number;
+  trainerId?: number | null;
 };
 
 export type GetInvitationsParams = {

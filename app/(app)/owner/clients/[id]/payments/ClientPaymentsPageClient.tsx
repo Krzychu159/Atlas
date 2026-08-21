@@ -8,7 +8,6 @@ import {
   PackagePlus,
   ReceiptText,
   RefreshCw,
-  Repeat2,
   WalletCards,
 } from "lucide-react";
 import { PaymentActionConfirmModal } from "@/app/components/payments/PaymentActionConfirmModal";
@@ -17,9 +16,7 @@ import { PaymentOperationRow } from "@/app/components/payments/PaymentDisplay";
 import { PaymentReasonModal } from "@/app/components/payments/PaymentReasonModal";
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
-import {
-  getPaymentBreakdown,
-} from "@/app/lib/payments/display";
+import { getPaymentBreakdown } from "@/app/lib/payments/display";
 import {
   cancelClientSubscription,
   getClient,
@@ -27,15 +24,16 @@ import {
   getClientSubscription,
   getClientSubscriptionUsage,
   resumeClientSubscription,
-  setClientNextPackage,
   type Client,
   type ClientSubscription,
   type SubscriptionCycle,
   type SubscriptionUsage,
 } from "@/app/lib/owner/clients";
 import {
+  activateClientPackage,
   cancelPaymentReceipt,
   confirmClientPayment,
+  createClientPackage,
   createClientPayment,
   getClientActivePackage,
   getClientBilling,
@@ -65,7 +63,6 @@ import {
   getTrainerPortalClientSubscriptionUsage,
   getTrainerPortalMe,
   resumeTrainerPortalClientSubscription,
-  setTrainerPortalClientNextPackage,
 } from "@/app/lib/trainer/portal";
 import { trainerPortalClientToClient } from "@/app/lib/trainer/portal-mappers";
 
@@ -95,7 +92,7 @@ export default function ClientPaymentsPageClient({
   const [clientPayments, setClientPayments] = useState<ClientPayment[]>([]);
   const [hasMorePayments, setHasMorePayments] = useState(false);
   const [packages, setPackages] = useState<Package[]>([]);
-  const [nextPackageId, setNextPackageId] = useState("");
+  const [selectedPackageId, setSelectedPackageId] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentPackageId, setPaymentPackageId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("2");
@@ -172,7 +169,13 @@ export default function ClientPaymentsPageClient({
       setHasMorePayments(paymentsData.page < paymentsData.totalPages);
       setActivePackage(activePackageData);
       setCurrentCycle(currentCycleData);
-      setPackages(packagesData.filter((item) => item.isActive));
+      setPackages(
+        packagesData.filter(
+          (item) =>
+            item.isActive &&
+            packageMatchesClientLocation(item, clientData.locationId),
+        ),
+      );
       setPaymentAmount(String(Math.max(billingData.activePackageAmountDue, 0)));
 
       const activeClientPackageId = billingData.activeClientPackageId
@@ -180,11 +183,7 @@ export default function ClientPaymentsPageClient({
         : "";
 
       setPaymentPackageId(activeClientPackageId);
-      setNextPackageId(
-        subscriptionData.nextPackage?.packageId
-          ? String(subscriptionData.nextPackage.packageId)
-          : "",
-      );
+      setSelectedPackageId("");
     } catch (err) {
       showOwnerError(err, "Nie udało się pobrać płatności klienta.", {
         id: "owner-client-payments-load-error",
@@ -219,7 +218,9 @@ export default function ClientPaymentsPageClient({
         (item) => item.clientPackageId === billingData.activeClientPackageId,
       ) || null;
 
-    setClient(trainerPortalClientToClient(clientData, meData));
+    const mappedClient = trainerPortalClientToClient(clientData, meData);
+
+    setClient(mappedClient);
     setBilling(billingData);
     setSubscription(subscriptionData);
     setUsage(usageData);
@@ -227,35 +228,74 @@ export default function ClientPaymentsPageClient({
     setHasMorePayments((billingData.payments?.length || 0) > 3);
     setActivePackage(activePackageData);
     setCurrentCycle(subscriptionData.currentCycle || null);
-    setPackages(packagesData.filter((item) => item.isActive));
+    setPackages(
+      packagesData.filter(
+        (item) =>
+          item.isActive &&
+          packageMatchesClientLocation(item, mappedClient.locationId),
+      ),
+    );
     setPaymentAmount(String(Math.max(billingData.activePackageAmountDue, 0)));
     setPaymentPackageId(activeClientPackageId);
-    setNextPackageId(
-      subscriptionData.nextPackage?.packageId
-        ? String(subscriptionData.nextPackage.packageId)
-        : "",
-    );
+    setSelectedPackageId("");
   }
 
-  async function handleSetNextPackage() {
-    if (!clientId || !nextPackageId) return;
+  async function handleAssignPackage() {
+    if (!clientId || !selectedPackageId || basePath !== "/owner") return;
+
+    const selectedPackage = packages.find(
+      (item) => item.id === Number(selectedPackageId),
+    );
+
+    if (!selectedPackage) {
+      showOwnerError(new Error("Wybierz pakiet z lokalizacji klienta."), "", {
+        id: "owner-client-package-location-required",
+      });
+      return;
+    }
 
     try {
       setIsSaving(true);
-      const data =
-        basePath === "/trainer"
-          ? await setTrainerPortalClientNextPackage(
-              clientId,
-              Number(nextPackageId),
-            )
-          : await setClientNextPackage(clientId, Number(nextPackageId));
-      setSubscription(data);
-      showOwnerSuccess("Pakiet od następnego cyklu został ustawiony.", {
-        id: "owner-client-next-package-set",
+      const existingPackageIds = new Set(
+        (billing?.packages || []).map((item) => item.clientPackageId),
+      );
+      const purchaseDate = new Date();
+      const validUntil = new Date(purchaseDate);
+
+      validUntil.setDate(validUntil.getDate() + selectedPackage.durationDays);
+
+      await createClientPackage({
+        clientId,
+        packageId: selectedPackage.id,
+        name: selectedPackage.name,
+        totalSessions: selectedPackage.sessionsLimit,
+        totalPrice: selectedPackage.price,
+        expectedBillingType: selectedPackage.billingType || 1,
+        purchaseDate: purchaseDate.toISOString(),
+        validUntil: validUntil.toISOString(),
+        paymentDueDate: null,
+      });
+
+      const refreshedBilling = await getClientBilling(clientId);
+      const createdPackage = (refreshedBilling.packages || [])
+        .filter(
+          (item) =>
+            item.packageId === selectedPackage.id &&
+            !existingPackageIds.has(item.clientPackageId),
+        )
+        .sort((first, second) => second.clientPackageId - first.clientPackageId)[0];
+
+      if (createdPackage && !createdPackage.isActive) {
+        await activateClientPackage(clientId, createdPackage.clientPackageId);
+      }
+
+      await loadClientPayments(clientId);
+      showOwnerSuccess("Pakiet klienta został ustawiony.", {
+        id: "owner-client-package-set",
       });
     } catch (err) {
-      showOwnerError(err, "Nie udało się ustawić kolejnego pakietu.", {
-        id: "owner-client-next-package-error",
+      showOwnerError(err, "Nie udało się ustawić pakietu klienta.", {
+        id: "owner-client-package-error",
       });
     } finally {
       setIsSaving(false);
@@ -266,7 +306,7 @@ export default function ClientPaymentsPageClient({
     if (!clientId || !subscription) return;
 
     if (subscription.cancelRenewalRequested) {
-      showOwnerSuccess("Zakończenie po obecnym cyklu jest już ustawione.", {
+      showOwnerSuccess("Zakończenie po obecnym pakiecie jest już ustawione.", {
         id: "owner-client-cancel-after-cycle-already-set",
       });
       return;
@@ -283,11 +323,11 @@ export default function ClientPaymentsPageClient({
         autoRenewEnabled: false,
         cancelRenewalRequested: true,
       });
-      showOwnerSuccess("Zakończenie po cyklu zostało ustawione.", {
+      showOwnerSuccess("Zakończenie po pakiecie zostało ustawione.", {
         id: "owner-client-cancel-after-cycle-updated",
       });
     } catch (err) {
-      showOwnerError(err, "Nie udało się ustawić zakończenia po cyklu.", {
+      showOwnerError(err, "Nie udało się ustawić zakończenia po pakiecie.", {
         id: "owner-client-cancel-after-cycle-error",
       });
     } finally {
@@ -552,6 +592,11 @@ export default function ClientPaymentsPageClient({
     billing?.activePackageAmountPaid ??
     0;
   const activeCurrency = activePackage?.currency || currentCycle?.currency || "PLN";
+  const hasActiveClientPackage = Boolean(
+    activePackage?.isActive ||
+      currentCycle?.isActive ||
+      billing?.activeClientPackageId,
+  );
   const lastPayment = payments[0] || null;
   const visiblePayments = payments.slice(0, 3);
   const allClientPaymentsHref = clientId
@@ -614,7 +659,7 @@ export default function ClientPaymentsPageClient({
               icon={<PackagePlus size={18} />}
             />
             <BillingStat
-              label="Zapłacono w cyklu"
+              label="Zapłacono za pakiet"
               value={formatMoney(activeAmountPaid, activeCurrency)}
               icon={<CheckCircle2 size={18} />}
             />
@@ -711,19 +756,27 @@ export default function ClientPaymentsPageClient({
             </div>
           </section>
 
-          <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-            <UsageCard usage={usage} />
+          <section
+            className={
+              hasActiveClientPackage
+                ? "grid gap-5 xl:grid-cols-[0.9fr_1.1fr]"
+                : "grid gap-5"
+            }
+          >
+            {hasActiveClientPackage ? <UsageCard usage={usage} /> : null}
 
             <SubscriptionPanel
               billing={billing}
               subscription={subscription}
               activePackage={activePackage}
               currentCycle={currentCycle}
-              nextPackageId={nextPackageId}
+              selectedPackageId={selectedPackageId}
               packageOptions={packageOptions}
+              clientLocationName={client?.locationName || "lokalizacji klienta"}
+              canAssignPackage={basePath === "/owner"}
               isSaving={isSaving}
-              onNextPackageChange={setNextPackageId}
-              onSetNextPackage={handleSetNextPackage}
+              onPackageChange={setSelectedPackageId}
+              onAssignPackage={handleAssignPackage}
               onCancelAfterCycle={handleRequestCancelAfterCycle}
               onResumeAutoRenew={handleResumeAutoRenew}
             />
@@ -835,11 +888,13 @@ function SubscriptionPanel({
   subscription,
   activePackage,
   currentCycle,
-  nextPackageId,
+  selectedPackageId,
   packageOptions,
+  clientLocationName,
+  canAssignPackage,
   isSaving,
-  onNextPackageChange,
-  onSetNextPackage,
+  onPackageChange,
+  onAssignPackage,
   onCancelAfterCycle,
   onResumeAutoRenew,
 }: {
@@ -847,11 +902,13 @@ function SubscriptionPanel({
   subscription: ClientSubscription | null;
   activePackage: ClientPackageBilling | null;
   currentCycle: SubscriptionCycle | null;
-  nextPackageId: string;
+  selectedPackageId: string;
   packageOptions: Array<{ value: string; label: string }>;
+  clientLocationName: string;
+  canAssignPackage: boolean;
   isSaving: boolean;
-  onNextPackageChange: (value: string) => void;
-  onSetNextPackage: () => void;
+  onPackageChange: (value: string) => void;
+  onAssignPackage: () => void;
   onCancelAfterCycle: () => void;
   onResumeAutoRenew: () => void;
 }) {
@@ -874,23 +931,63 @@ function SubscriptionPanel({
   const progress = totalSessions
     ? Math.min(100, Math.round((usedSessions / totalSessions) * 100))
     : 0;
-  const nextPackageName =
-    subscription?.nextPackage?.packageName || "Nie ustawiono";
-  const nextPackagePrice = subscription?.nextPackage
-    ? formatMoney(
-        subscription.nextPackage.price,
-        subscription.nextPackage.currency,
-      )
-    : "";
+  const hasActivePackage = Boolean(
+    activePackage?.isActive || cycle?.isActive || billing.activeClientPackageId,
+  );
+
+  if (!hasActivePackage) {
+    return (
+      <section className="card-shell flex min-h-[360px] flex-col items-center justify-center p-6 text-center md:p-10">
+        <div className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-xl)] bg-primary/15 text-primary-light">
+          <PackagePlus size={28} />
+        </div>
+        <p className="mt-5 text-section-title">Ustaw pakiet klienta</p>
+        <p className="mt-3 max-w-[560px] text-sm leading-6 text-on-surface-variant">
+          Klient nie ma aktywnego pakietu. Wybierz jeden z pakietów dostępnych
+          w lokalizacji {clientLocationName}.
+        </p>
+
+        {canAssignPackage ? (
+          <div className="mt-7 grid w-full max-w-[680px] gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <CustomSelect
+              label="Pakiet"
+              value={selectedPackageId}
+              onChange={onPackageChange}
+              options={packageOptions}
+            />
+            <Button
+              icon={<PackagePlus size={16} />}
+              onClick={onAssignPackage}
+              disabled={
+                isSaving || !selectedPackageId || packageOptions.length <= 1
+              }
+              className="w-full sm:w-auto"
+            >
+              {isSaving ? "Ustawianie..." : "Ustaw pakiet"}
+            </Button>
+          </div>
+        ) : (
+          <p className="mt-6 text-sm font-semibold text-on-surface-muted">
+            Pakiet może ustawić właściciel studia.
+          </p>
+        )}
+
+        {canAssignPackage && packageOptions.length <= 1 ? (
+          <p className="mt-4 text-sm font-semibold text-warning-light">
+            Brak aktywnych pakietów dla tej lokalizacji.
+          </p>
+        ) : null}
+      </section>
+    );
+  }
 
   return (
     <section className="card-shell p-4 md:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-section-title">Subskrypcja klienta</p>
+          <p className="text-section-title">Pakiet klienta</p>
           <p className="mt-2 text-sm text-on-surface-variant">
-            Aktualny cykl pokazuje pakiet używany teraz. Następny cykl mówi,
-            co system ma zrobić po zakończeniu obecnego pakietu.
+            Aktualny pakiet, wykorzystanie wejść i status płatności.
           </p>
         </div>
         <StatusPill label={subscription?.status || "Brak statusu"} muted />
@@ -900,7 +997,7 @@ function SubscriptionPanel({
         <div className="rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-low p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-label text-on-surface-muted">Aktualny cykl</p>
+              <p className="text-label text-on-surface-muted">Aktualny pakiet</p>
               <h3 className="mt-2 text-xl font-semibold text-on-surface">
                 {activePackageName}
               </h3>
@@ -926,9 +1023,11 @@ function SubscriptionPanel({
         <div className="rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-low p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-label text-on-surface-muted">Następny cykl</p>
+              <p className="text-label text-on-surface-muted">
+                Automatyczne przedłużanie
+              </p>
               <h3 className="mt-2 text-xl font-semibold text-on-surface">
-                {willRenew ? nextPackageName : "Nie odnowi się"}
+                {willRenew ? "Włączone" : "Wyłączone"}
               </h3>
             </div>
             <StatusPill
@@ -938,10 +1037,8 @@ function SubscriptionPanel({
           </div>
           <p className="mt-3 text-sm leading-5 text-on-surface-variant">
             {willRenew
-              ? `Po zakończeniu obecnego cyklu system utworzy kolejny pakiet${
-                  nextPackagePrice ? ` (${nextPackagePrice})` : ""
-                }.`
-              : "Klient kończy obecny cykl, ale kolejny pakiet nie zostanie automatycznie utworzony."}
+              ? "Po wykorzystaniu aktualnego pakietu system przedłuży subskrypcję automatycznie."
+              : "Po wykorzystaniu aktualnego pakietu subskrypcja klienta zostanie zakończona."}
           </p>
           <div className="mt-4">
             {willRenew ? (
@@ -950,7 +1047,7 @@ function SubscriptionPanel({
                 onClick={onCancelAfterCycle}
                 disabled={isSaving || !subscription}
               >
-                Zakończ po cyklu
+                Zakończ po pakiecie
               </Button>
             ) : (
               <Button
@@ -965,29 +1062,6 @@ function SubscriptionPanel({
         </div>
       </div>
 
-      <div className="mt-3 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
-        <div className="grid gap-3 xl:grid-cols-[1fr_auto] xl:items-end">
-          <CustomSelect
-            label="Pakiet od następnego cyklu"
-            value={nextPackageId}
-            onChange={onNextPackageChange}
-            options={packageOptions}
-          />
-          <Button
-            variant="secondary"
-            icon={<Repeat2 size={16} />}
-            onClick={onSetNextPackage}
-            disabled={isSaving || !nextPackageId}
-            className="w-full xl:w-auto"
-          >
-            Ustaw następny pakiet
-          </Button>
-        </div>
-        <p className="mt-3 text-xs leading-5 text-on-surface-muted">
-          To nie zmienia aktualnego pakietu. Wybór działa dopiero przy odnowieniu
-          subskrypcji na kolejny cykl.
-        </p>
-      </div>
     </section>
   );
 }
@@ -1032,7 +1106,7 @@ function UsageCard({ usage }: { usage: SubscriptionUsage | null }) {
 
   return (
     <section className="card-shell p-4 md:p-5">
-      <p className="text-section-title">Wykorzystanie cyklu</p>
+      <p className="text-section-title">Wykorzystanie pakietu</p>
       {usage?.clientPackageId ? (
         <>
           <div className="mt-4 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
@@ -1076,7 +1150,7 @@ function UsageCard({ usage }: { usage: SubscriptionUsage | null }) {
             <div className="mt-4 flex flex-col gap-2">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-label text-on-surface-muted">
-                  Różnice w cyklu
+                  Różnice w pakiecie
                 </p>
                 <p className="text-xs font-semibold text-on-surface-muted">
                   {sessions.length} z {allSessions.length}
@@ -1116,7 +1190,7 @@ function UsageCard({ usage }: { usage: SubscriptionUsage | null }) {
           ) : null}
         </>
       ) : (
-        <EmptyState label="Brak aktywnego cyklu do policzenia wykorzystania." />
+        <EmptyState label="Brak aktywnego pakietu do policzenia wykorzystania." />
       )}
     </section>
   );
@@ -1177,6 +1251,18 @@ function EmptyState({ label }: { label: string }) {
     <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-6 text-center text-on-surface-variant">
       {label}
     </div>
+  );
+}
+
+function packageMatchesClientLocation(
+  item: Package,
+  clientLocationId: number,
+) {
+  if (!clientLocationId) return false;
+
+  return (
+    item.locationId === clientLocationId ||
+    Boolean(item.locationIds?.includes(clientLocationId))
   );
 }
 

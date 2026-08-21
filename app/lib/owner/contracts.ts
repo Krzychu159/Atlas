@@ -1,4 +1,6 @@
-import { backendGet, backendPost, backendPut } from "../backend";
+import { backendDelete, backendGet, backendPost, backendPut } from "../backend";
+
+export type TrainerContractType = "Zlecenie" | "B2B";
 
 export type TrainerContract = {
   id: number;
@@ -18,7 +20,7 @@ export type TrainerContract = {
 };
 
 export type CreateTrainerContractPayload = {
-  contractType: string | null;
+  contractType: TrainerContractType;
   contractNumber: string | null;
   signedAt: string;
   validFrom: string;
@@ -58,5 +60,11 @@ export function updateTrainerContract(
   return backendPut<TrainerContract>(
     `trainers/${trainerId}/contracts/${contractId}`,
     payload,
+  );
+}
+
+export function deleteTrainerContract(trainerId: number, contractId: number) {
+  return backendDelete<void>(
+    `trainers/${trainerId}/contracts/${contractId}`,
   );
 }

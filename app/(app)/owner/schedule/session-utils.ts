@@ -112,11 +112,13 @@ export function getDefaultFormValues({
   date,
   trainers,
   locations,
+  defaultTrainerId,
 }: {
   session: OwnerSession | null;
   date: Date;
   trainers: Trainer[];
   locations: Location[];
+  defaultTrainerId?: number | null;
 }): SessionFormValues {
   if (session) {
     return {
@@ -140,12 +142,19 @@ export function getDefaultFormValues({
   start.setHours(10, 0, 0, 0);
   const end = new Date(start);
   end.setHours(start.getHours() + 1);
+  const defaultTrainer = trainers.find(
+    (trainer) => trainer.id === defaultTrainerId,
+  );
 
   return {
     title: "",
     startAt: toDateTimeLocalValue(start),
     endAt: toDateTimeLocalValue(end),
-    trainerId: trainers[0]?.id ? String(trainers[0].id) : "",
+    trainerId: defaultTrainer?.id
+      ? String(defaultTrainer.id)
+      : trainers[0]?.id
+        ? String(trainers[0].id)
+        : "",
     locationId: locations[0]?.id ? String(locations[0].id) : "",
     status: "",
     plannedSessionType: "",

@@ -94,7 +94,7 @@ function formatSessionType(value: string | null) {
 export default function TrainerSettlementPage() {
   const params = useParams<{ id: string }>();
   const trainerId = Number(params.id);
-  const [monthValue, setMonthValue] = useState(getMonthValueFromUrl);
+  const [monthValue, setMonthValue] = useState("");
   const [trainer, setTrainer] = useState<Trainer | null>(null);
   const [rates, setRates] = useState<TrainerRate[]>([]);
   const [settlement, setSettlement] = useState<TrainerMonthlySettlement | null>(
@@ -106,10 +106,16 @@ export default function TrainerSettlementPage() {
   const [isGeneratingDocument, setIsGeneratingDocument] = useState(false);
 
   useEffect(() => {
+    void Promise.resolve().then(() => setMonthValue(getMonthValueFromUrl()));
+  }, []);
+
+  useEffect(() => {
     async function loadSettlement() {
       await Promise.resolve();
 
       const { year, month } = parseMonth(monthValue);
+
+      if (!monthValue) return;
 
       if (!trainerId || !year || !month) {
         showOwnerError(new Error("Nieprawidłowe dane rozliczenia."), "", {

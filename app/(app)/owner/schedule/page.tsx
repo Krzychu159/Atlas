@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import { getCurrentUser } from "@/app/lib/auth/current-user";
 import { getClients, type Client } from "@/app/lib/owner/clients";
 import {
   matchesOwnerLocationId,
@@ -54,6 +55,7 @@ export default function SchedulePage() {
   const [statusFilter, setStatusFilter] =
     useState<SessionStatusFilter>("without-cancelled");
   const [trainerFilter, setTrainerFilter] = useState("");
+  const [defaultTrainerId, setDefaultTrainerId] = useState<number | null>(null);
   const [selectedSession, setSelectedSession] = useState<OwnerSession | null>(
     null,
   );
@@ -86,6 +88,18 @@ export default function SchedulePage() {
       ),
     [clients, selectedLocationId],
   );
+  const modalTrainers = useMemo(() => {
+    const currentTrainer = trainers.find(
+      (trainer) => trainer.id === defaultTrainerId,
+    );
+
+    if (!currentTrainer) return scopedTrainers;
+
+    return [
+      currentTrainer,
+      ...scopedTrainers.filter((trainer) => trainer.id !== currentTrainer.id),
+    ];
+  }, [defaultTrainerId, scopedTrainers, trainers]);
   const visibleSessions = useMemo(
     () =>
       sortSessions(
@@ -125,14 +139,23 @@ export default function SchedulePage() {
 
     try {
       setIsResourcesLoading(true);
-      const [trainersData, locationsData, clientsData] = await Promise.all([
-        getTrainers(),
-        getLocations(),
-        getClients(),
-      ]);
+      const [trainersData, locationsData, clientsData, currentUser] =
+        await Promise.all([
+          getTrainers(),
+          getLocations(),
+          getClients(),
+          getCurrentUser().catch(() => null),
+        ]);
+      const currentTrainer = trainersData.find(
+        (trainer) =>
+          String(trainer.userId) === currentUser?.id ||
+          trainer.email.toLowerCase() === currentUser?.email.toLowerCase(),
+      );
+
       setTrainers(trainersData);
       setLocations(locationsData.filter((item) => item.isActive));
       setClients(clientsData);
+      setDefaultTrainerId(currentTrainer?.id ?? null);
     } catch (err) {
       showOwnerError(err, "Nie udało się pobrać trenerów i lokalizacji.", {
         id: "owner-schedule-resources",
@@ -349,9 +372,10 @@ export default function SchedulePage() {
         open={isSessionModalOpen}
         session={selectedSession}
         anchorDate={selectedSession ? anchorDate : createSessionDate}
-        trainers={scopedTrainers}
+        trainers={modalTrainers}
         locations={scopedLocations}
         clients={scopedClients}
+        defaultTrainerId={defaultTrainerId}
         isSaving={isSavingSession}
         onClose={() => {
           setIsSessionModalOpen(false);

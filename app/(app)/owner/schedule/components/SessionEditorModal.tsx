@@ -16,7 +16,7 @@ import {
   normalizeSearch,
 } from "../client-utils";
 import { toDateTimeLocalValue } from "../date-utils";
-import { statusOptions, sessionTypeOptions } from "../options";
+import { statusOptions } from "../options";
 import {
   getDefaultFormValues,
   getSessionPackageName,
@@ -33,6 +33,7 @@ export default function SessionEditorModal({
   trainers,
   locations,
   clients,
+  defaultTrainerId,
   isSaving,
   onClose,
   onSubmit,
@@ -43,12 +44,19 @@ export default function SessionEditorModal({
   trainers: Trainer[];
   locations: Location[];
   clients: Client[];
+  defaultTrainerId?: number | null;
   isSaving: boolean;
   onClose: () => void;
   onSubmit: (values: SessionFormValues) => void;
 }) {
   const [values, setValues] = useState<SessionFormValues>(() =>
-    getDefaultFormValues({ session, date: anchorDate, trainers, locations }),
+    getDefaultFormValues({
+      session,
+      date: anchorDate,
+      trainers,
+      locations,
+      defaultTrainerId,
+    }),
   );
   const [clientSearch, setClientSearch] = useState("");
   const [isTitleEdited, setIsTitleEdited] = useState(() =>
@@ -326,7 +334,7 @@ export default function SessionEditorModal({
             </div>
           </Field>
 
-          <Field label="Status">
+          <Field label="Status" className="md:col-span-2">
             <CustomSelect
               value={values.status}
               options={statusOptions}
@@ -334,6 +342,7 @@ export default function SessionEditorModal({
             />
           </Field>
 
+          {/*
           <Field label="Typ sesji">
             <CustomSelect
               value={values.plannedSessionType}
@@ -341,6 +350,7 @@ export default function SessionEditorModal({
               onChange={(value) => updateValue("plannedSessionType", value)}
             />
           </Field>
+          */}
 
           <Field label="Kategorie Outlook" className="md:col-span-2">
             <input
