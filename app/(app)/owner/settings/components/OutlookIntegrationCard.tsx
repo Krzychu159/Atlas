@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CalendarSync, CheckCircle2, ExternalLink, Loader2, Unplug } from "lucide-react";
+import {
+  CalendarSync,
+  CheckCircle2,
+  ExternalLink,
+  Loader2,
+  RefreshCw,
+  Unplug,
+} from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import {
   showAppError,
@@ -12,6 +19,7 @@ import {
   disconnectOutlook,
   getOutlookConnectUrl,
   getOutlookStatus,
+  syncOutlookClients,
   type OutlookStatus,
 } from "@/app/lib/calendar/outlook";
 
@@ -32,6 +40,7 @@ export default function OutlookIntegrationCard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const authWindowRef = useRef<Window | null>(null);
   const pollingRef = useRef<number | null>(null);
 
@@ -179,6 +188,23 @@ export default function OutlookIntegrationCard() {
     }
   }
 
+  async function handleSyncClients() {
+    try {
+      setIsSyncing(true);
+      await syncOutlookClients();
+      await loadStatus();
+      showAppSuccess("Kontakty klientów zostały zsynchronizowane z Outlook.", {
+        id: "outlook-clients-sync-success",
+      });
+    } catch (err) {
+      showAppError(err, "Nie udało się zsynchronizować kontaktów klientów.", {
+        id: "outlook-clients-sync-error",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  }
+
   const connected = Boolean(status?.isConnected);
 
   return (
@@ -212,12 +238,33 @@ export default function OutlookIntegrationCard() {
         </div>
 
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+          <Button
+            variant="secondary"
+            icon={
+              <RefreshCw
+                size={16}
+                className={isSyncing ? "animate-spin" : ""}
+              />
+            }
+            onClick={handleSyncClients}
+            disabled={
+              !connected ||
+              isLoading ||
+              isConnecting ||
+              isDisconnecting ||
+              isSyncing
+            }
+            className="w-full sm:w-auto"
+          >
+            {isSyncing ? "Synchronizowanie..." : "Synchronizuj"}
+          </Button>
           {connected ? (
             <Button
               variant="outline"
               icon={<Unplug size={16} />}
               onClick={handleDisconnect}
-              disabled={isDisconnecting}
+              disabled={isDisconnecting || isSyncing}
+              className="w-full sm:w-auto"
             >
               {isDisconnecting ? "Odłączanie..." : "Odłącz"}
             </Button>
@@ -225,7 +272,8 @@ export default function OutlookIntegrationCard() {
             <Button
               icon={<ExternalLink size={16} />}
               onClick={handleConnect}
-              disabled={isLoading || isConnecting}
+              disabled={isLoading || isConnecting || isSyncing}
+              className="w-full sm:w-auto"
             >
               {isConnecting ? "Przekierowanie..." : "Połącz Microsoft"}
             </Button>

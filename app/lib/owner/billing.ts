@@ -1,4 +1,4 @@
-import { backendGet, backendPost } from "../backend";
+import { backendDelete, backendGet, backendPost } from "../backend";
 
 export type PaymentMethod = 1 | 2 | 3 | 4;
 export type ClientPaymentStatus = 1 | 2 | 3 | 4 | 5;
@@ -218,6 +218,12 @@ export function createClientPackage(payload: CreateClientPackagePayload) {
 export function activateClientPackage(clientId: number, clientPackageId: number) {
   return backendPost<void>(
     `client-packages/clients/${clientId}/packages/${clientPackageId}/activate`,
+  );
+}
+
+export function deleteClientPackage(clientId: number, clientPackageId: number) {
+  return backendDelete<void>(
+    `client-packages/clients/${clientId}/packages/${clientPackageId}`,
   );
 }
 

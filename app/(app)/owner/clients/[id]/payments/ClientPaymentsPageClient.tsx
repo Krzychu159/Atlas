@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   CheckCircle2,
   PackagePlus,
   ReceiptText,
   RefreshCw,
+  Trash2,
   WalletCards,
 } from "lucide-react";
 import { PaymentActionConfirmModal } from "@/app/components/payments/PaymentActionConfirmModal";
@@ -16,6 +18,11 @@ import { PaymentOperationRow } from "@/app/components/payments/PaymentDisplay";
 import { PaymentReasonModal } from "@/app/components/payments/PaymentReasonModal";
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
+import {
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
+} from "@/app/components/ui/modal";
 import { getPaymentBreakdown } from "@/app/lib/payments/display";
 import {
   cancelClientSubscription,
@@ -35,6 +42,7 @@ import {
   confirmClientPayment,
   createClientPackage,
   createClientPayment,
+  deleteClientPackage,
   getClientActivePackage,
   getClientBilling,
   getClientPayments,
@@ -73,6 +81,11 @@ type ClientPaymentsPageClientProps = {
 
 type PaymentAction = "confirm" | "issueReceipt" | "cancelReceipt";
 
+type PackageDeleteTarget = {
+  clientPackageId: number;
+  packageName: string;
+};
+
 export default function ClientPaymentsPageClient({
   clientIdParam,
   basePath = "/owner",
@@ -110,6 +123,9 @@ export default function ClientPaymentsPageClient({
     payment: ClientPayment;
   } | null>(null);
   const [reversalReason, setReversalReason] = useState("");
+  const [packageToDelete, setPackageToDelete] =
+    useState<PackageDeleteTarget | null>(null);
+  const [isDeletingPackage, setIsDeletingPackage] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -299,6 +315,26 @@ export default function ClientPaymentsPageClient({
       });
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleDeletePackage() {
+    if (!clientId || !packageToDelete || basePath !== "/owner") return;
+
+    try {
+      setIsDeletingPackage(true);
+      await deleteClientPackage(clientId, packageToDelete.clientPackageId);
+      setPackageToDelete(null);
+      await loadClientPayments(clientId);
+      showOwnerSuccess("Pakiet klienta został usunięty.", {
+        id: "owner-client-package-delete-success",
+      });
+    } catch (err) {
+      showOwnerError(err, "Nie udało się usunąć pakietu klienta.", {
+        id: "owner-client-package-delete-error",
+      });
+    } finally {
+      setIsDeletingPackage(false);
     }
   }
 
@@ -597,6 +633,31 @@ export default function ClientPaymentsPageClient({
       currentCycle?.isActive ||
       billing?.activeClientPackageId,
   );
+  const activeClientPackageId =
+    activePackage?.clientPackageId ??
+    currentCycle?.clientPackageId ??
+    billing?.activeClientPackageId ??
+    null;
+  const billingActivePackage = billing?.packages?.find(
+    (item) => item.clientPackageId === activeClientPackageId,
+  );
+  const activePackageUsedSessions =
+    activePackage?.usedSessions ??
+    currentCycle?.usedSessions ??
+    billingActivePackage?.usedSessions ??
+    usage?.usedSessions ??
+    0;
+  const activePackageName =
+    activePackage?.packageName ||
+    currentCycle?.packageName ||
+    billingActivePackage?.packageName ||
+    billing?.activePackageName ||
+    "Pakiet klienta";
+  const canDeleteActivePackage = Boolean(
+    basePath === "/owner" &&
+      activeClientPackageId &&
+      activePackageUsedSessions === 0,
+  );
   const lastPayment = payments[0] || null;
   const visiblePayments = payments.slice(0, 3);
   const allClientPaymentsHref = clientId
@@ -774,11 +835,20 @@ export default function ClientPaymentsPageClient({
               packageOptions={packageOptions}
               clientLocationName={client?.locationName || "lokalizacji klienta"}
               canAssignPackage={basePath === "/owner"}
-              isSaving={isSaving}
+              canDeletePackage={canDeleteActivePackage}
+              isSaving={isSaving || isDeletingPackage}
               onPackageChange={setSelectedPackageId}
               onAssignPackage={handleAssignPackage}
               onCancelAfterCycle={handleRequestCancelAfterCycle}
               onResumeAutoRenew={handleResumeAutoRenew}
+              onDeletePackage={() => {
+                if (!activeClientPackageId || !canDeleteActivePackage) return;
+
+                setPackageToDelete({
+                  clientPackageId: activeClientPackageId,
+                  packageName: activePackageName,
+                });
+              }}
             />
           </section>
         </>
@@ -848,6 +918,15 @@ export default function ClientPaymentsPageClient({
           onConfirm={handleReversePayment}
         />
       ) : null}
+
+      {packageToDelete ? (
+        <PackageDeleteConfirmModal
+          packageName={packageToDelete.packageName}
+          processing={isDeletingPackage}
+          onClose={() => setPackageToDelete(null)}
+          onConfirm={() => void handleDeletePackage()}
+        />
+      ) : null}
     </div>
   );
 }
@@ -892,11 +971,13 @@ function SubscriptionPanel({
   packageOptions,
   clientLocationName,
   canAssignPackage,
+  canDeletePackage,
   isSaving,
   onPackageChange,
   onAssignPackage,
   onCancelAfterCycle,
   onResumeAutoRenew,
+  onDeletePackage,
 }: {
   billing: ClientBillingSummary;
   subscription: ClientSubscription | null;
@@ -906,11 +987,13 @@ function SubscriptionPanel({
   packageOptions: Array<{ value: string; label: string }>;
   clientLocationName: string;
   canAssignPackage: boolean;
+  canDeletePackage: boolean;
   isSaving: boolean;
   onPackageChange: (value: string) => void;
   onAssignPackage: () => void;
   onCancelAfterCycle: () => void;
   onResumeAutoRenew: () => void;
+  onDeletePackage: () => void;
 }) {
   const cancelRequested = Boolean(subscription?.cancelRenewalRequested);
   const willRenew = Boolean(subscription?.autoRenewEnabled && !cancelRequested);
@@ -1018,6 +1101,22 @@ function SubscriptionPanel({
             <SmallMetric label="Zapłacono" value={formatMoney(amountPaid, currency)} />
             <SmallMetric label="Do zapłaty" value={formatMoney(amountDue, currency)} />
           </div>
+          {canDeletePackage ? (
+            <div className="mt-4 border-t border-white/5 pt-4">
+              <Button
+                variant="danger"
+                icon={<Trash2 size={16} />}
+                onClick={onDeletePackage}
+                disabled={isSaving}
+                className="w-full sm:w-auto"
+              >
+                Usuń pakiet
+              </Button>
+              <p className="mt-2 text-xs leading-5 text-on-surface-muted">
+                Pakiet można usunąć, ponieważ nie wykorzystano żadnego wejścia.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <div className="rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-low p-4">
@@ -1063,6 +1162,70 @@ function SubscriptionPanel({
       </div>
 
     </section>
+  );
+}
+
+function PackageDeleteConfirmModal({
+  packageName,
+  processing,
+  onClose,
+  onConfirm,
+}: {
+  packageName: string;
+  processing: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <ModalOverlay onClose={processing ? undefined : onClose}>
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="delete-client-package-title"
+        className="relative z-10 w-full max-w-[500px] overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient"
+      >
+        <ModalHeader
+          title="Usunąć pakiet klienta?"
+          description="Tej operacji nie można cofnąć. Pakiet zostanie odpięty od klienta."
+          icon={<AlertTriangle size={19} />}
+          iconTone="danger"
+          onClose={processing ? () => undefined : onClose}
+          className="p-5 md:p-6"
+        />
+
+        <div className="mx-5 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 md:mx-6">
+          <p
+            id="delete-client-package-title"
+            className="break-words font-semibold text-on-surface"
+          >
+            {packageName}
+          </p>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            Wykorzystane wejścia: 0
+          </p>
+        </div>
+
+        <ModalFooter className="mt-5">
+          <Button
+            variant="secondary"
+            onClick={onClose}
+            disabled={processing}
+            className="w-full sm:w-auto"
+          >
+            Anuluj
+          </Button>
+          <Button
+            variant="danger"
+            icon={<Trash2 size={16} />}
+            onClick={onConfirm}
+            disabled={processing}
+            className="w-full sm:w-auto"
+          >
+            {processing ? "Usuwanie..." : "Usuń pakiet"}
+          </Button>
+        </ModalFooter>
+      </div>
+    </ModalOverlay>
   );
 }
 

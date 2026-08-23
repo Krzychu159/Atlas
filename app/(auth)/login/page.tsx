@@ -52,6 +52,10 @@ function getLoginNotice(reason: string | null) {
     return "Twoja sesja wygasła. Zaloguj się ponownie, żeby kontynuować pracę.";
   }
 
+  if (reason === "invitation-accepted") {
+    return "Konto zostało utworzone. Możesz się teraz zalogować.";
+  }
+
   return "";
 }
 

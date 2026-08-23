@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Lock, MapPin, User } from "lucide-react";
+import { Info, Lock, MapPin, Settings2, User } from "lucide-react";
 import OutlookIntegrationCard from "@/app/(app)/owner/settings/components/OutlookIntegrationCard";
 import AvatarFilePicker from "@/app/components/ui/avatar-file-picker";
 import { Button } from "@/app/components/ui/button";
-import { showAppError, showAppSuccess } from "@/app/components/ui/app-toast";
+import { showAppError } from "@/app/components/ui/app-toast";
 import {
   getTrainerPortalMe,
-  updateTrainerPortalMe,
   type TrainerPortalMe,
 } from "@/app/lib/trainer/portal";
 
@@ -50,7 +49,6 @@ export default function TrainerSettingsPage() {
   const [me, setMe] = useState<TrainerPortalMe | null>(null);
   const [form, setForm] = useState<ProfileForm>(() => toProfileForm(null));
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
 
   const locationNames = useMemo(
     () => me?.locationNames?.filter(Boolean).join(", ") || "Brak lokalizacji",
@@ -79,31 +77,6 @@ export default function TrainerSettingsPage() {
 
     return () => window.clearTimeout(timer);
   }, []);
-
-  async function handleSave() {
-    try {
-      setIsSaving(true);
-      const updated = await updateTrainerPortalMe({
-        firstName: form.firstName.trim() || null,
-        lastName: form.lastName.trim() || null,
-        phone: form.phone.trim() || null,
-        avatarUrl: form.avatarUrl || null,
-        bio: form.bio.trim() || null,
-      });
-
-      setMe(updated);
-      setForm(toProfileForm(updated));
-      showAppSuccess("Profil trenera został zapisany.", {
-        id: "trainer-profile-save-success",
-      });
-    } catch (err) {
-      showAppError(err, "Nie udało się zapisać profilu.", {
-        id: "trainer-profile-save-error",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  }
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 pb-10">
@@ -221,18 +194,35 @@ export default function TrainerSettingsPage() {
           </div>
         </div>
 
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex flex-col gap-3 border-t border-white/5 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-2 text-sm text-on-surface-variant">
+            <Info size={17} className="mt-0.5 shrink-0 text-warning-light" />
+            <p>Edycja profilu nie jest jeszcze dostępna.</p>
+          </div>
           <Button
             icon={<Lock size={16} />}
-            onClick={handleSave}
-            disabled={isLoading || isSaving}
+            disabled
+            className="w-full sm:w-auto"
           >
-            {isSaving ? "Zapisywanie..." : "Zapisz zmiany"}
+            Zapisz zmiany w Profilu
           </Button>
         </div>
       </section>
 
-      <OutlookIntegrationCard />
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-primary-light">
+            <Settings2 size={18} />
+          </div>
+          <div>
+            <p className="text-section-title">Ustawienia systemowe</p>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              Integracja i synchronizacja danych z Microsoft Outlook.
+            </p>
+          </div>
+        </div>
+        <OutlookIntegrationCard />
+      </section>
     </div>
   );
 }

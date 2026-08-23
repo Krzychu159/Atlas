@@ -22,3 +22,7 @@ export function getOutlookConnectUrl() {
 export function disconnectOutlook() {
   return backendPost<unknown>("outlook/disconnect");
 }
+
+export function syncOutlookClients() {
+  return backendPost<unknown>("outlook/contacts/sync-clients");
+}

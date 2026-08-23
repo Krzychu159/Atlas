@@ -136,137 +136,142 @@ export default function ClientSettingsPage() {
       />
 
       <div className="hidden flex-col gap-6 md:flex">
-      <section>
-        <p className="text-label text-primary-light">Ustawienia</p>
-        <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
-          Profil klienta
-        </h1>
-        <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
-          Dane kontaktowe widoczne dla studia i trenera.
-        </p>
-      </section>
+        <section>
+          <p className="text-label text-primary-light">Ustawienia</p>
+          <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
+            Profil klienta
+          </h1>
+          <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
+            Dane kontaktowe widoczne dla studia i trenera.
+          </p>
+        </section>
 
-      <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-        <form onSubmit={handleSave} className="card-shell p-5 md:p-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary-light">
-              <User size={18} />
-            </div>
-            <div>
-              <p className="text-label text-on-surface-muted">Profil</p>
-              <h2 className="font-display text-[1.65rem] font-semibold leading-none">
-                Dane osobowe
-              </h2>
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <AvatarFilePicker
-              value={form.avatarUrl}
-              fallbackText={initials}
-              onChange={(value) =>
-                setForm((current) => ({ ...current, avatarUrl: value }))
-              }
-            />
-          </div>
-
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <TextField
-              label="Imię"
-              value={form.firstName}
-              onChange={(value) =>
-                setForm((current) => ({ ...current, firstName: value }))
-              }
-              disabled={isLoading}
-            />
-            <TextField
-              label="Nazwisko"
-              value={form.lastName}
-              onChange={(value) =>
-                setForm((current) => ({ ...current, lastName: value }))
-              }
-              disabled={isLoading}
-            />
-            <TextField
-              label="Telefon"
-              value={form.phoneNumber}
-              onChange={(value) =>
-                setForm((current) => ({ ...current, phoneNumber: value }))
-              }
-              disabled={isLoading}
-              className="sm:col-span-2"
-            />
-          </div>
-
-          <div className="mt-6 flex justify-end">
-            <Button
-              type="submit"
-              disabled={isSaving || isLoading}
-              icon={<Lock size={16} />}
-            >
-              {isSaving ? "Zapisywanie..." : "Zapisz zmiany"}
-            </Button>
-          </div>
-        </form>
-
-        <div className="flex flex-col gap-4">
-          <div className="card-shell p-5 md:p-6">
+        <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+          <form onSubmit={handleSave} className="card-shell p-5 md:p-6">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary-light">
-                <Mail size={18} />
+                <User size={18} />
               </div>
               <div>
-                <p className="text-label text-on-surface-muted">Konto</p>
+                <p className="text-label text-on-surface-muted">Profil</p>
                 <h2 className="font-display text-[1.65rem] font-semibold leading-none">
-                  E-mail
+                  Dane osobowe
                 </h2>
               </div>
             </div>
 
-            <div className="mt-5 rounded-[var(--radius-lg)] bg-surface-container-lowest p-4">
-              <p className="text-label text-on-surface-muted">Aktualny adres</p>
-              <p className="mt-2 text-base font-semibold">
-                {me?.email || "Brak e-maila"}
+            <div className="mt-6">
+              <AvatarFilePicker
+                value={form.avatarUrl}
+                fallbackText={initials}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, avatarUrl: value }))
+                }
+              />
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <TextField
+                label="Imię"
+                value={form.firstName}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, firstName: value }))
+                }
+                disabled={isLoading}
+              />
+              <TextField
+                label="Nazwisko"
+                value={form.lastName}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, lastName: value }))
+                }
+                disabled={isLoading}
+              />
+              <TextField
+                label="Telefon"
+                value={form.phoneNumber}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, phoneNumber: value }))
+                }
+                disabled={isLoading}
+                className="sm:col-span-2"
+              />
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <Button
+                type="submit"
+                disabled={isSaving || isLoading}
+                icon={<Lock size={16} />}
+              >
+                {isSaving ? "Zapisywanie..." : "Zapisz zmiany"}
+              </Button>
+            </div>
+          </form>
+
+          <div className="flex flex-col gap-4">
+            <div className="card-shell p-5 md:p-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary-light">
+                  <Mail size={18} />
+                </div>
+                <div>
+                  <p className="text-label text-on-surface-muted">Konto</p>
+                  <h2 className="font-display text-[1.65rem] font-semibold leading-none">
+                    E-mail
+                  </h2>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-[var(--radius-lg)] bg-surface-container-lowest p-4">
+                <p className="text-label text-on-surface-muted">
+                  Aktualny adres
+                </p>
+                <p className="mt-2 text-base font-semibold">
+                  {me?.email || "Brak e-maila"}
+                </p>
+              </div>
+
+              <form
+                onSubmit={handleEmailRequest}
+                className="mt-4 flex flex-col gap-3 sm:flex-row"
+              >
+                <input
+                  value={requestedEmail}
+                  onChange={(event) => setRequestedEmail(event.target.value)}
+                  type="email"
+                  placeholder="Nowy adres e-mail"
+                  className="h-12 min-w-0 flex-1 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
+                />
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  disabled={isRequestingEmail}
+                >
+                  {isRequestingEmail ? "Wysyłanie..." : "Poproś o zmianę"}
+                </Button>
+              </form>
+
+              <p className="mt-3 text-sm leading-6 text-on-surface-muted">
+                Zmiana e-maila wymaga potwierdzenia w studiu, dlatego wysyłasz
+                prośbę zamiast edytować adres bezpośrednio.
               </p>
             </div>
 
-            <form onSubmit={handleEmailRequest} className="mt-4 flex flex-col gap-3 sm:flex-row">
-              <input
-                value={requestedEmail}
-                onChange={(event) => setRequestedEmail(event.target.value)}
-                type="email"
-                placeholder="Nowy adres e-mail"
-                className="h-12 min-w-0 flex-1 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
+            <div className="grid gap-4 sm:grid-cols-2">
+              <InfoCard
+                icon={<MapPin size={18} />}
+                label="Lokalizacja"
+                value={me?.locationName || "Brak lokalizacji"}
               />
-              <Button
-                type="submit"
-                variant="secondary"
-                disabled={isRequestingEmail}
-              >
-                {isRequestingEmail ? "Wysyłanie..." : "Poproś o zmianę"}
-              </Button>
-            </form>
-
-            <p className="mt-3 text-sm leading-6 text-on-surface-muted">
-              Zmiana e-maila wymaga potwierdzenia w studiu, dlatego wysyłasz
-              prośbę zamiast edytować adres bezpośrednio.
-            </p>
+              <InfoCard
+                icon={<Phone size={18} />}
+                label="Trener"
+                value={me?.trainerFullName || "Nie przypisano"}
+              />
+            </div>
           </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <InfoCard
-              icon={<MapPin size={18} />}
-              label="Lokalizacja"
-              value={me?.locationName || "Brak lokalizacji"}
-            />
-            <InfoCard
-              icon={<Phone size={18} />}
-              label="Trener"
-              value={me?.trainerFullName || "Nie przypisano"}
-            />
-          </div>
-        </div>
-      </section>
+        </section>
       </div>
     </div>
   );
@@ -351,7 +356,7 @@ function MobileSettings({
           icon={<Lock size={16} />}
           className="mt-5 w-full"
         >
-          {isSaving ? "Zapisywanie..." : "Zapisz profil"}
+          {isSaving ? "Zapisywanie..." : "Zapisz"}
         </Button>
       </form>
 
