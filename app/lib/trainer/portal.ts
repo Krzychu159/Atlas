@@ -20,6 +20,7 @@ export type TrainerPortalMe = {
   experienceYears: number;
   locationIds: number[] | null;
   locationNames: string[] | null;
+  outlookCategoryName?: string | null;
 };
 
 export type TrainerPortalSession = {

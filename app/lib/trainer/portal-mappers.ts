@@ -38,6 +38,7 @@ export function trainerPortalMeToTrainer(
     createdBy: 0,
     locationIds: me.locationIds || [],
     locationNames: me.locationNames || [],
+    outlookCategoryName: me.outlookCategoryName || null,
   };
 }
 

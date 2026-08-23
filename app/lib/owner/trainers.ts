@@ -22,6 +22,8 @@ export type Trainer = {
   createdBy: number;
   locationIds: number[];
   locationNames: string[];
+  outlookCategoryName?: string | null;
+  outlookCategoryColor?: string | null;
 };
 
 export type CreateTrainerPayload = {

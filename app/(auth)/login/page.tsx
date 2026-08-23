@@ -70,7 +70,7 @@ function getInitialResetToken() {
 
   const params = new URLSearchParams(window.location.search);
 
-  return params.get("token") || params.get("resetToken") || "";
+  return params.get("resetToken") || "";
 }
 
 function getInitialAuthMode(): AuthMode {

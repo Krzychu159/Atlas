@@ -136,14 +136,14 @@ export default function AcceptInvitationForm({
               Twoje konto jest prawie gotowe.
             </h1>
             <p className="mt-6 max-w-md text-base leading-7 text-on-surface-variant">
-              Potwierdź dane, ustaw bezpieczne hasło i zacznij korzystać z
-              Atlas w swojej lokalizacji.
+              Potwierdź dane, ustaw bezpieczne hasło i zacznij korzystać z Atlas
+              w swojej lokalizacji.
             </p>
           </div>
 
           <div className="relative grid gap-3 text-sm text-on-surface-variant">
-            <Feature text="Token sprawdzamy przed pokazaniem formularza" />
-            <Feature text="Hasło trafia bezpośrednio do bezpiecznego API" />
+            <Feature text="Poprawnie otworzono zaproszenie" />
+            <Feature text="Ustaw silne hasło" />
             <Feature text="Po aktywacji przejdziesz od razu do logowania" />
           </div>
         </section>
@@ -184,10 +184,6 @@ export default function AcceptInvitationForm({
                 <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">
                   Utwórz swoje konto
                 </h2>
-                <p className="mt-3 text-sm leading-6 text-on-surface-variant">
-                  Zaproszenie zostało zweryfikowane. Uzupełnij dane, których
-                  będziesz używać w systemie.
-                </p>
 
                 <InvitationSummary invitation={validation.invitation} />
 
@@ -316,11 +312,7 @@ function InvitationSummary({ invitation }: { invitation: InvitationDetails }) {
         label="Adres e-mail"
         value={invitation.email || "Nie podano"}
       />
-      <SummaryItem
-        icon={<UserRound size={16} />}
-        label="Rola"
-        value={role}
-      />
+      <SummaryItem icon={<UserRound size={16} />} label="Rola" value={role} />
       <SummaryItem
         icon={<MapPin size={16} />}
         label="Lokalizacja"
@@ -357,7 +349,10 @@ function SummaryItem({
         <span className="text-primary-light">{icon}</span>
         {label}
       </div>
-      <p className="mt-2 truncate text-sm font-bold text-on-surface" title={value}>
+      <p
+        className="mt-2 truncate text-sm font-bold text-on-surface"
+        title={value}
+      >
         {value}
       </p>
     </div>

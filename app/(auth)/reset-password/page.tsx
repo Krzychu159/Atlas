@@ -22,7 +22,7 @@ export default async function ResetPasswordPage({
   const email = getSearchParam(params.email);
   const query = new URLSearchParams();
 
-  if (token) query.set("token", token);
+  if (token) query.set("resetToken", token);
   if (email) query.set("email", email);
 
   redirect(query.toString() ? `/login?${query.toString()}` : "/login");

@@ -75,6 +75,11 @@ export default function SessionEditorModal({
   }));
   const selectedClientIds = new Set(values.participantIds);
   const selectedTrainerId = Number(values.trainerId);
+  const selectedTrainer = trainers.find(
+    (trainer) => trainer.id === selectedTrainerId,
+  );
+  const outlookCategoryPlaceholder =
+    selectedTrainer?.outlookCategoryName?.trim() || "Np. Personal, Paid";
   const clientQuery = normalizeSearch(clientSearch);
   const activeClients = clients.filter(
     (client) =>
@@ -358,7 +363,7 @@ export default function SessionEditorModal({
               onChange={(event) =>
                 updateValue("outlookCategories", event.target.value)
               }
-              placeholder="Np. Personal, Paid"
+              placeholder={outlookCategoryPlaceholder}
               className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
             />
           </Field>
