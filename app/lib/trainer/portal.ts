@@ -84,6 +84,7 @@ export type TrainerPortalClient = {
   billingBalance?: number | null;
   currency?: string | null;
   balanceCurrency?: string | null;
+  trainingStartDate?: string | null;
   locationName: string | null;
   createdAt: string;
 };
@@ -122,6 +123,7 @@ export type TrainerPortalClientDetails = {
   billingBalance?: number | null;
   currency?: string | null;
   balanceCurrency?: string | null;
+  trainingStartDate?: string | null;
   nextSessionAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -142,6 +144,7 @@ export type UpdateTrainerClientPayload = {
   notes?: string | null;
   billingStatus?: string | null;
   status?: string | null;
+  trainingStartDate?: string | null;
   nextSessionAt?: string | null;
   locationId?: number;
 };

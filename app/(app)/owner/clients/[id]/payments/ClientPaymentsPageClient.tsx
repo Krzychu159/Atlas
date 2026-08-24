@@ -31,6 +31,7 @@ import {
   getClientSubscription,
   getClientSubscriptionUsage,
   resumeClientSubscription,
+  setClientNextPackage,
   type Client,
   type ClientSubscription,
   type SubscriptionCycle,
@@ -106,6 +107,7 @@ export default function ClientPaymentsPageClient({
   const [hasMorePayments, setHasMorePayments] = useState(false);
   const [packages, setPackages] = useState<Package[]>([]);
   const [selectedPackageId, setSelectedPackageId] = useState("");
+  const [selectedNextPackageId, setSelectedNextPackageId] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentPackageId, setPaymentPackageId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("2");
@@ -200,6 +202,11 @@ export default function ClientPaymentsPageClient({
 
       setPaymentPackageId(activeClientPackageId);
       setSelectedPackageId("");
+      setSelectedNextPackageId(
+        subscriptionData.nextPackage?.packageId
+          ? String(subscriptionData.nextPackage.packageId)
+          : "",
+      );
     } catch (err) {
       showOwnerError(err, "Nie udało się pobrać płatności klienta.", {
         id: "owner-client-payments-load-error",
@@ -254,6 +261,11 @@ export default function ClientPaymentsPageClient({
     setPaymentAmount(String(Math.max(billingData.activePackageAmountDue, 0)));
     setPaymentPackageId(activeClientPackageId);
     setSelectedPackageId("");
+    setSelectedNextPackageId(
+      subscriptionData.nextPackage?.packageId
+        ? String(subscriptionData.nextPackage.packageId)
+        : "",
+    );
   }
 
   async function handleAssignPackage() {
@@ -335,6 +347,42 @@ export default function ClientPaymentsPageClient({
       });
     } finally {
       setIsDeletingPackage(false);
+    }
+  }
+
+  async function handleSetNextPackage() {
+    if (!clientId || !selectedNextPackageId || basePath !== "/owner") return;
+
+    const selectedPackage = packages.find(
+      (item) => item.id === Number(selectedNextPackageId),
+    );
+
+    if (!selectedPackage) {
+      showOwnerError(new Error("Wybierz pakiet z lokalizacji klienta."), "", {
+        id: "owner-client-next-package-location-required",
+      });
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      const data = await setClientNextPackage(clientId, selectedPackage.id);
+
+      setSubscription(data);
+      setSelectedNextPackageId(
+        data.nextPackage?.packageId
+          ? String(data.nextPackage.packageId)
+          : String(selectedPackage.id),
+      );
+      showOwnerSuccess("Kolejny pakiet klienta został zapisany.", {
+        id: "owner-client-next-package-set",
+      });
+    } catch (err) {
+      showOwnerError(err, "Nie udało się ustawić kolejnego pakietu.", {
+        id: "owner-client-next-package-error",
+      });
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -832,13 +880,16 @@ export default function ClientPaymentsPageClient({
               activePackage={activePackage}
               currentCycle={currentCycle}
               selectedPackageId={selectedPackageId}
+              selectedNextPackageId={selectedNextPackageId}
               packageOptions={packageOptions}
               clientLocationName={client?.locationName || "lokalizacji klienta"}
               canAssignPackage={basePath === "/owner"}
               canDeletePackage={canDeleteActivePackage}
               isSaving={isSaving || isDeletingPackage}
               onPackageChange={setSelectedPackageId}
+              onNextPackageChange={setSelectedNextPackageId}
               onAssignPackage={handleAssignPackage}
+              onSetNextPackage={handleSetNextPackage}
               onCancelAfterCycle={handleRequestCancelAfterCycle}
               onResumeAutoRenew={handleResumeAutoRenew}
               onDeletePackage={() => {
@@ -968,13 +1019,16 @@ function SubscriptionPanel({
   activePackage,
   currentCycle,
   selectedPackageId,
+  selectedNextPackageId,
   packageOptions,
   clientLocationName,
   canAssignPackage,
   canDeletePackage,
   isSaving,
   onPackageChange,
+  onNextPackageChange,
   onAssignPackage,
+  onSetNextPackage,
   onCancelAfterCycle,
   onResumeAutoRenew,
   onDeletePackage,
@@ -984,13 +1038,16 @@ function SubscriptionPanel({
   activePackage: ClientPackageBilling | null;
   currentCycle: SubscriptionCycle | null;
   selectedPackageId: string;
+  selectedNextPackageId: string;
   packageOptions: Array<{ value: string; label: string }>;
   clientLocationName: string;
   canAssignPackage: boolean;
   canDeletePackage: boolean;
   isSaving: boolean;
   onPackageChange: (value: string) => void;
+  onNextPackageChange: (value: string) => void;
   onAssignPackage: () => void;
+  onSetNextPackage: () => void;
   onCancelAfterCycle: () => void;
   onResumeAutoRenew: () => void;
   onDeletePackage: () => void;
@@ -1017,6 +1074,12 @@ function SubscriptionPanel({
   const hasActivePackage = Boolean(
     activePackage?.isActive || cycle?.isActive || billing.activeClientPackageId,
   );
+  const savedNextPackageId = subscription?.nextPackage?.packageId
+    ? String(subscription.nextPackage.packageId)
+    : "";
+  const nextPackageUnchanged =
+    Boolean(selectedNextPackageId) &&
+    selectedNextPackageId === savedNextPackageId;
 
   if (!hasActivePackage) {
     return (
@@ -1160,6 +1223,47 @@ function SubscriptionPanel({
           </div>
         </div>
       </div>
+
+      {canAssignPackage ? (
+        <div className="mt-3 rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest/50 p-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-on-surface-variant">
+                Kolejny pakiet
+              </p>
+              <p className="mt-1 text-xs leading-5 text-on-surface-muted">
+                {willRenew
+                  ? "Zostanie użyty po wykorzystaniu aktualnego pakietu."
+                  : "Wybór zacznie obowiązywać po ponownym włączeniu auto-przedłużania."}
+              </p>
+            </div>
+            <div className="grid w-full shrink-0 gap-2 sm:grid-cols-[minmax(0,280px)_auto] md:w-auto">
+              <CustomSelect
+                value={selectedNextPackageId}
+                onChange={onNextPackageChange}
+                options={packageOptions}
+              />
+              <Button
+                variant="outline"
+                onClick={onSetNextPackage}
+                disabled={
+                  isSaving ||
+                  !selectedNextPackageId ||
+                  nextPackageUnchanged ||
+                  packageOptions.length <= 1
+                }
+              >
+                {nextPackageUnchanged ? "Zapisano" : "Zapisz"}
+              </Button>
+            </div>
+          </div>
+          {packageOptions.length <= 1 ? (
+            <p className="mt-2 text-xs text-warning-light">
+              Brak aktywnych pakietów dla lokalizacji {clientLocationName}.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
     </section>
   );

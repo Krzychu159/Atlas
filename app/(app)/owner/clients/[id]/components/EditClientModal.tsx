@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { Link2, MapPin, Save } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
+import { DateInput } from "@/app/components/ui/date-input";
 import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
 import AvatarFilePicker from "../../../components/AvatarFilePicker";
 import {
@@ -25,6 +26,10 @@ import {
   type UpdateClientPayload,
 } from "@/app/lib/owner/clients";
 import { isForbiddenError } from "@/app/lib/backend";
+import {
+  dateInputToIsoDateTime,
+  toDateInputValue,
+} from "@/app/lib/formatters/date";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
 import {
@@ -70,6 +75,7 @@ export default function EditClientModal({
   const [trainerId, setTrainerId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [goal, setGoal] = useState("");
+  const [trainingStartDate, setTrainingStartDate] = useState("");
   const [trainingPlan, setTrainingPlan] = useState<ClientTrainingPlan | null>(
     null,
   );
@@ -105,6 +111,7 @@ export default function EditClientModal({
       setTrainerId(client.trainerId ? String(client.trainerId) : "");
       setLocationId(resolveClientLocationId(client, locations));
       setGoal(client.goal || "");
+      setTrainingStartDate(toDateInputValue(client.trainingStartDate));
     });
   }, [client, locations, open]);
 
@@ -150,6 +157,7 @@ export default function EditClientModal({
       progressPercent: client.progressPercent ?? 0,
       billingStatus: client.billingStatus || null,
       status: client.status || null,
+      trainingStartDate: dateInputToIsoDateTime(trainingStartDate),
       nextSessionAt: client.nextSessionAt || null,
     };
     const cleanTrainingPlanUrl = trainingPlanUrl.trim();
@@ -298,6 +306,12 @@ export default function EditClientModal({
               options={locationOptions}
             />
           </div>
+
+          <DateInput
+            label="Data rozpoczęcia treningów"
+            value={trainingStartDate}
+            onChange={setTrainingStartDate}
+          />
 
           <OwnerTextArea
             label="Cel"
@@ -530,6 +544,12 @@ function getClientUpdateFailedFields(
     failedFields.push("zdjęcie");
   }
   if (!isSameOptionalText(client.goal, payload.goal)) failedFields.push("cel");
+  if (
+    toDateInputValue(client.trainingStartDate) !==
+    toDateInputValue(payload.trainingStartDate)
+  ) {
+    failedFields.push("data rozpoczęcia treningów");
+  }
 
   return failedFields;
 }

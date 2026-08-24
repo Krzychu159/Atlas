@@ -53,3 +53,25 @@ export function formatSessionTime(value?: string | null) {
     minute: "2-digit",
   }).format(date);
 }
+
+export function toDateInputValue(value?: string | null) {
+  if (!value) return "";
+
+  return value.match(/^\d{4}-\d{2}-\d{2}/)?.[0] || "";
+}
+
+export function formatDateInputValue(value?: string | null) {
+  const normalized = toDateInputValue(value);
+
+  if (!normalized) return "";
+
+  const [year, month, day] = normalized.split("-");
+
+  return `${day}.${month}.${year}`;
+}
+
+export function dateInputToIsoDateTime(value?: string | null) {
+  const normalized = toDateInputValue(value);
+
+  return normalized ? `${normalized}T00:00:00.000Z` : null;
+}

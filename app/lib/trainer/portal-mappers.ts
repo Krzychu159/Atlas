@@ -124,6 +124,7 @@ export function trainerPortalClientToClient(
     billingBalance: client.billingBalance ?? null,
     currency: client.currency ?? null,
     balanceCurrency: client.balanceCurrency ?? null,
+    trainingStartDate: client.trainingStartDate ?? null,
     nextSessionAt: client.nextSessionAt || null,
     createdAt: client.createdAt || "",
     updatedAt: client.updatedAt || "",

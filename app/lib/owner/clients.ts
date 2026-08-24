@@ -36,6 +36,7 @@ export type Client = {
   billingBalance?: number | null;
   currency?: string | null;
   balanceCurrency?: string | null;
+  trainingStartDate?: string | null;
   nextSessionAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -158,6 +159,7 @@ export type UpdateClientPayload = {
   progressPercent?: number;
   billingStatus?: string | null;
   status?: string | null;
+  trainingStartDate?: string | null;
   nextSessionAt?: string | null;
   locationId?: number;
 };
