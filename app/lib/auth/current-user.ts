@@ -1,7 +1,11 @@
-import { backendGet } from "../backend";
+import { backendGet, backendPatch } from "../backend";
+
+export const CURRENT_USER_CHANGED_EVENT = "atlas:current-user-changed";
 
 export type CurrentUser = {
   id: string;
+  firstName: string;
+  lastName: string;
   fullName: string;
   email: string;
   role: string;
@@ -19,6 +23,12 @@ type AuthMeResponse = Partial<CurrentUser> & {
   };
 };
 
+export type UpdateCurrentUserProfilePayload = {
+  firstName: string;
+  lastName: string;
+  email: string;
+};
+
 export async function getCurrentUser() {
   try {
     const backendUser = await backendGet<AuthMeResponse>("Auth/me");
@@ -30,6 +40,21 @@ export async function getCurrentUser() {
 
     const localUser = (await response.json()) as AuthMeResponse;
     return normalizeUser(localUser);
+  }
+}
+
+export async function updateCurrentUserProfile(
+  payload: UpdateCurrentUserProfilePayload,
+) {
+  const updated = await backendPatch<AuthMeResponse | null>("Auth/me", payload);
+  const user = updated ? normalizeUser(updated) : await getCurrentUser();
+  notifyCurrentUserChanged();
+  return user;
+}
+
+export function notifyCurrentUserChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(CURRENT_USER_CHANGED_EVENT));
   }
 }
 
@@ -45,6 +70,8 @@ function normalizeUser(data: AuthMeResponse): CurrentUser {
 
   return {
     id: String(source.id || source.userId || ""),
+    firstName,
+    lastName,
     fullName,
     email: source.email || "Brak e-maila",
     role: source.role || "user",

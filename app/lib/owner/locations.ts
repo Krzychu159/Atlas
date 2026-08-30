@@ -7,6 +7,8 @@ export type Location = {
   address: string | null;
   isActive: boolean;
   createdAt: string;
+  legalEntityId?: number | null;
+  legalEntityName?: string | null;
 };
 
 export function getLocations() {

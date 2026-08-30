@@ -9,6 +9,9 @@ type AvatarFilePickerProps = {
   value: string;
   fallbackText: string;
   onChange: (value: string) => void;
+  onUpload: (file: File) => Promise<string>;
+  onRemove: () => Promise<void>;
+  disabled?: boolean;
   className?: string;
 };
 
@@ -20,6 +23,9 @@ export default function AvatarFilePicker({
   value,
   fallbackText,
   onChange,
+  onUpload,
+  onRemove,
+  disabled = false,
   className,
 }: AvatarFilePickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,10 +52,31 @@ export default function AvatarFilePicker({
       setError(null);
       setIsProcessing(true);
       const compressedFile = await compressImage(file);
-      const avatarUrl = await uploadAvatar(compressedFile);
+      const avatarUrl = await onUpload(compressedFile);
       onChange(avatarUrl);
-    } catch {
-      setError("Nie udało się zapisać zdjęcia.");
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error && uploadError.message
+          ? uploadError.message
+          : "Nie udało się zapisać zdjęcia.",
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
+  async function handleRemove() {
+    try {
+      setError(null);
+      setIsProcessing(true);
+      await onRemove();
+      onChange("");
+    } catch (removeError) {
+      setError(
+        removeError instanceof Error && removeError.message
+          ? removeError.message
+          : "Nie udało się usunąć zdjęcia.",
+      );
     } finally {
       setIsProcessing(false);
     }
@@ -73,7 +100,7 @@ export default function AvatarFilePicker({
               type="button"
               size="sm"
               onClick={() => inputRef.current?.click()}
-              disabled={isProcessing}
+              disabled={disabled || isProcessing}
               icon={<ImagePlus size={15} />}
             >
               {isProcessing ? "Przetwarzanie..." : "Wgraj plik"}
@@ -84,7 +111,8 @@ export default function AvatarFilePicker({
                 type="button"
                 variant="secondary"
                 size="sm"
-                onClick={() => onChange("")}
+                onClick={handleRemove}
+                disabled={disabled || isProcessing}
                 icon={<Trash2 size={14} />}
               >
                 Usuń
@@ -105,6 +133,7 @@ export default function AvatarFilePicker({
           type="file"
           accept="image/*"
           onChange={handleFileChange}
+          disabled={disabled || isProcessing}
           className="hidden"
         />
       </div>
@@ -145,27 +174,6 @@ async function compressImage(file: File) {
   } finally {
     URL.revokeObjectURL(sourceUrl);
   }
-}
-
-async function uploadAvatar(file: File) {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetch("/api/uploads/avatar", {
-    method: "POST",
-    body: formData,
-  });
-
-  const data = (await response.json().catch(() => null)) as {
-    url?: string;
-    message?: string;
-  } | null;
-
-  if (!response.ok || !data?.url) {
-    throw new Error(data?.message || "Nie udało się wgrać zdjęcia.");
-  }
-
-  return data.url;
 }
 
 function loadImage(src: string) {

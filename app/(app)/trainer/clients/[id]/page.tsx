@@ -270,6 +270,11 @@ export default function TrainerClientDetailsPage() {
             trainerMe={me}
             onClose={() => setIsEditOpen(false)}
             onSaved={setClient}
+            onAvatarChanged={(avatarUrl) =>
+              setClient((current) =>
+                current ? { ...current, avatarUrl } : current,
+              )
+            }
             onTrainingPlanSaved={setTrainingPlan}
           />
         </>

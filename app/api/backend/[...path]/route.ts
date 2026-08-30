@@ -38,7 +38,7 @@ async function handler(req: NextRequest, context: RouteContext) {
   const body =
     req.method === "GET" || req.method === "HEAD"
       ? undefined
-      : await req.text();
+      : await req.arrayBuffer();
 
   let response: Response;
 
@@ -47,7 +47,7 @@ async function handler(req: NextRequest, context: RouteContext) {
       method: req.method,
       headers: {
         Accept: req.headers.get("accept") || "application/json",
-        ...(body
+        ...(body?.byteLength
           ? {
               "Content-Type":
                 req.headers.get("content-type") || "application/json",
@@ -55,7 +55,7 @@ async function handler(req: NextRequest, context: RouteContext) {
           : {}),
         Authorization: `Bearer ${token}`,
       },
-      body,
+      body: body?.byteLength ? body : undefined,
       cache: "no-store",
     });
   } catch {

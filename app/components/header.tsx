@@ -15,7 +15,11 @@ import {
 import NotificationsPanel from "@/app/(app)/owner/components/NotificationsPanel";
 import type { AppRole } from "@/app/components/navigation";
 import { CustomSelect } from "@/app/components/ui/custom-select";
-import { getCurrentUser, type CurrentUser } from "@/app/lib/auth/current-user";
+import {
+  CURRENT_USER_CHANGED_EVENT,
+  getCurrentUser,
+  type CurrentUser,
+} from "@/app/lib/auth/current-user";
 import { getClients, type Client } from "@/app/lib/owner/clients";
 import {
   matchesOwnerLocationId,
@@ -24,6 +28,10 @@ import {
 } from "@/app/lib/owner/location-filter";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
+import {
+  getUnreadNotificationCount,
+  NOTIFICATIONS_CHANGED_EVENT,
+} from "@/app/lib/notifications";
 
 type HeaderProps = {
   role: AppRole;
@@ -81,12 +89,57 @@ export function Header({ role }: HeaderProps) {
   const [locations, setLocations] = useState<Location[]>([]);
   const [locationsLoaded, setLocationsLoaded] = useState(false);
   const [directoriesLoaded, setDirectoriesLoaded] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const notificationsHref = `/${role}/notifications`;
 
   useEffect(() => {
-    getCurrentUser()
-      .then(setUser)
-      .catch(() => setUser(null));
+    let active = true;
+
+    const refreshUser = () => {
+      getCurrentUser()
+        .then((currentUser) => {
+          if (active) setUser(currentUser);
+        })
+        .catch(() => {
+          if (active) setUser(null);
+        });
+    };
+
+    refreshUser();
+    window.addEventListener(CURRENT_USER_CHANGED_EVENT, refreshUser);
+
+    return () => {
+      active = false;
+      window.removeEventListener(CURRENT_USER_CHANGED_EVENT, refreshUser);
+    };
   }, []);
+
+  useEffect(() => {
+    if (role === "client") return;
+
+    let active = true;
+
+    const refreshUnreadCount = () => {
+      getUnreadNotificationCount()
+        .then(({ unreadCount }) => {
+          if (active) setUnreadNotificationCount(unreadCount);
+        })
+        .catch(() => {
+          if (active) setUnreadNotificationCount(0);
+        });
+    };
+
+    refreshUnreadCount();
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshUnreadCount);
+
+    return () => {
+      active = false;
+      window.removeEventListener(
+        NOTIFICATIONS_CHANGED_EVENT,
+        refreshUnreadCount,
+      );
+    };
+  }, [role]);
 
   useEffect(() => {
     if (role !== "owner") return;
@@ -278,22 +331,42 @@ export function Header({ role }: HeaderProps) {
             />
           ) : null}
 
-          <Link
-            href="/owner/notifications"
-            className="relative text-on-surface-variant hover:text-on-surface md:hidden"
-          >
-            <Bell width={18} height={18} />
-            <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-tertiary-light" />
-          </Link>
+          {role !== "client" ? (
+            <>
+              <Link
+                href={notificationsHref}
+                className="relative text-on-surface-variant hover:text-on-surface md:hidden"
+              >
+                <Bell width={18} height={18} />
+                {unreadNotificationCount > 0 ? (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-tertiary-light px-1 text-[0.58rem] font-bold text-on-tertiary">
+                    {unreadNotificationCount > 99
+                      ? "99+"
+                      : unreadNotificationCount}
+                  </span>
+                ) : null}
+              </Link>
 
-          <button
-            onClick={() => setIsNotificationsOpen(true)}
-            className="relative hidden h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant transition hover:bg-surface-container hover:text-on-surface md:flex"
-            aria-label="Otwórz powiadomienia"
-          >
-            <Bell width={18} height={18} />
-            <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-tertiary-light" />
-          </button>
+              <button
+                onClick={() => setIsNotificationsOpen(true)}
+                className="relative hidden h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant transition hover:bg-surface-container hover:text-on-surface md:flex"
+                aria-label={
+                  unreadNotificationCount > 0
+                    ? `Otwórz powiadomienia, nieprzeczytane: ${unreadNotificationCount}`
+                    : "Otwórz powiadomienia"
+                }
+              >
+                <Bell width={18} height={18} />
+                {unreadNotificationCount > 0 ? (
+                  <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-tertiary-light px-1 text-[0.58rem] font-bold text-on-tertiary">
+                    {unreadNotificationCount > 99
+                      ? "99+"
+                      : unreadNotificationCount}
+                  </span>
+                ) : null}
+              </button>
+            </>
+          ) : null}
 
           <div className="relative">
             <button
@@ -363,10 +436,15 @@ export function Header({ role }: HeaderProps) {
         </div>
       </header>
 
-      <NotificationsPanel
-        open={isNotificationsOpen}
-        onClose={() => setIsNotificationsOpen(false)}
-      />
+      {role !== "client" ? (
+        <NotificationsPanel
+          open={isNotificationsOpen}
+          onClose={() => setIsNotificationsOpen(false)}
+          notificationsHref={notificationsHref}
+          totalUnreadCount={unreadNotificationCount}
+          onUnreadCountChange={setUnreadNotificationCount}
+        />
+      ) : null}
     </>
   );
 }

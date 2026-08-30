@@ -2,17 +2,13 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  CircleUserRound,
-  Info,
-  Lock,
   Save,
   Settings2,
-  User,
 } from "lucide-react";
+import ProfileSettingsCard from "@/app/components/settings/profile-settings-card";
 import { Button } from "@/app/components/ui/button";
 import { TextField } from "@/app/components/ui/input";
 import { showAppError, showAppSuccess } from "@/app/components/ui/app-toast";
-import { getCurrentUser } from "@/app/lib/auth/current-user";
 import {
   getOwnerSettings,
   updateOwnerSettings,
@@ -20,22 +16,10 @@ import {
 } from "@/app/lib/owner/settings";
 import OutlookIntegrationCard from "./components/OutlookIntegrationCard";
 
-type ProfileForm = {
-  firstName: string;
-  lastName: string;
-  email: string;
-};
-
 type SystemForm = {
   defaultPackageValidityDays: string;
   defaultSessionDurationMinutes: string;
   defaultPaymentDueDays: string;
-};
-
-const emptyProfile: ProfileForm = {
-  firstName: "",
-  lastName: "",
-  email: "",
 };
 
 const emptySystem: SystemForm = {
@@ -45,7 +29,6 @@ const emptySystem: SystemForm = {
 };
 
 export default function OwnerSettingsPage() {
-  const [profile, setProfile] = useState<ProfileForm>(emptyProfile);
   const [system, setSystem] = useState<SystemForm>(emptySystem);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingSystem, setIsSavingSystem] = useState(false);
@@ -53,17 +36,7 @@ export default function OwnerSettingsPage() {
   async function loadSettings() {
     try {
       setIsLoading(true);
-      const [user, ownerSettings] = await Promise.all([
-        getCurrentUser(),
-        getOwnerSettings(),
-      ]);
-      const names = splitFullName(user.fullName);
-
-      setProfile({
-        firstName: names.firstName,
-        lastName: names.lastName,
-        email: user.email,
-      });
+      const ownerSettings = await getOwnerSettings();
       setSystem(toSystemForm(ownerSettings));
     } catch (err) {
       showAppError(err, "Nie udało się pobrać ustawień ownera.", {
@@ -123,50 +96,7 @@ export default function OwnerSettingsPage() {
         </p>
       </section>
 
-      <section className="card-shell p-5 md:p-6">
-        <SectionTitle icon={<User size={18} />} title="Ustawienia profilu" />
-
-        <div className="mt-6 grid gap-6 lg:grid-cols-[180px_1fr]">
-          <div className="flex flex-col items-center justify-center rounded-[var(--radius-xl)] bg-surface-container-low p-5 text-center">
-            <div className="flex h-24 w-24 items-center justify-center rounded-[var(--radius-xl)] bg-primary/15 text-3xl font-semibold text-primary-light">
-              {getInitials(profile.firstName, profile.lastName) || (
-                <CircleUserRound size={38} />
-              )}
-            </div>
-            <p className="mt-3 text-sm font-semibold text-on-surface">
-              {`${profile.firstName} ${profile.lastName}`.trim() || "Owner"}
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <TextField
-              label="Imię"
-              value={profile.firstName}
-              onChange={(firstName) =>
-                setProfile((current) => ({ ...current, firstName }))
-              }
-              disabled={isLoading}
-            />
-            <TextField
-              label="Nazwisko"
-              value={profile.lastName}
-              onChange={(lastName) =>
-                setProfile((current) => ({ ...current, lastName }))
-              }
-              disabled={isLoading}
-            />
-            <TextField
-              label="E-mail"
-              value={profile.email}
-              onChange={() => undefined}
-              disabled
-              className="md:col-span-2"
-            />
-          </div>
-        </div>
-
-        <UnavailableProfileSave />
-      </section>
+      <ProfileSettingsCard fallbackLabel="Owner" />
 
       <section className="flex flex-col gap-4">
         <div className="card-shell p-5 md:p-6">
@@ -287,33 +217,6 @@ function SystemNumberField({
       </p>
     </div>
   );
-}
-
-function UnavailableProfileSave() {
-  return (
-    <div className="mt-6 flex flex-col gap-3 border-t border-white/5 pt-5 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex gap-2 text-sm text-on-surface-variant">
-        <Info size={17} className="mt-0.5 shrink-0 text-warning-light" />
-        <p>Edycja profilu nie jest jeszcze dostępna.</p>
-      </div>
-      <Button icon={<Lock size={16} />} disabled className="w-full sm:w-auto">
-        Zapisz zmiany w Profilu
-      </Button>
-    </div>
-  );
-}
-
-function splitFullName(value: string) {
-  const parts = value.trim().split(" ").filter(Boolean);
-
-  return {
-    firstName: parts.shift() || "",
-    lastName: parts.join(" "),
-  };
-}
-
-function getInitials(firstName: string, lastName: string) {
-  return `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase();
 }
 
 function toSystemForm(settings: OwnerSettings): SystemForm {

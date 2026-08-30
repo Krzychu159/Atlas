@@ -123,7 +123,7 @@ export async function backendDownload(
     cache: "no-store",
     headers: {
       Accept:
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword, application/octet-stream",
+        "application/pdf, image/*, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword, application/octet-stream",
     },
   });
 

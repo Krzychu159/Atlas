@@ -6,7 +6,11 @@ import { Menu, X, Dumbbell, CircleUserRound } from "lucide-react";
 import { SidebarNav } from "@/app/components/sidebar-nav";
 import { Header } from "@/app/components/header";
 import { navigationByRole, type AppRole } from "@/app/components/navigation";
-import { getCurrentUser, type CurrentUser } from "@/app/lib/auth/current-user";
+import {
+  CURRENT_USER_CHANGED_EVENT,
+  getCurrentUser,
+  type CurrentUser,
+} from "@/app/lib/auth/current-user";
 
 type AppShellProps = {
   children: ReactNode;
@@ -35,16 +39,22 @@ export function AppShell({ children, role }: AppShellProps) {
   useEffect(() => {
     let active = true;
 
-    getCurrentUser()
-      .then((data) => {
-        if (active) setUser(data);
-      })
-      .catch(() => {
-        if (active) setUser(null);
-      });
+    const refreshUser = () => {
+      getCurrentUser()
+        .then((data) => {
+          if (active) setUser(data);
+        })
+        .catch(() => {
+          if (active) setUser(null);
+        });
+    };
+
+    refreshUser();
+    window.addEventListener(CURRENT_USER_CHANGED_EVENT, refreshUser);
 
     return () => {
       active = false;
+      window.removeEventListener(CURRENT_USER_CHANGED_EVENT, refreshUser);
     };
   }, []);
 

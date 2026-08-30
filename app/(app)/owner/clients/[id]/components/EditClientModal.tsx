@@ -27,6 +27,12 @@ import {
 } from "@/app/lib/owner/clients";
 import { isForbiddenError } from "@/app/lib/backend";
 import {
+  deleteClientAvatar,
+  deleteTrainerClientAvatar,
+  uploadClientAvatar,
+  uploadTrainerClientAvatar,
+} from "@/app/lib/avatars";
+import {
   dateInputToIsoDateTime,
   toDateInputValue,
 } from "@/app/lib/formatters/date";
@@ -53,6 +59,7 @@ type EditClientModalProps = {
   trainerMe?: TrainerPortalMe | null;
   onClose: () => void;
   onSaved: (client: Client) => void;
+  onAvatarChanged?: (avatarUrl: string) => void;
   onTrainingPlanSaved?: (plan: ClientTrainingPlan) => void;
 };
 
@@ -63,6 +70,7 @@ export default function EditClientModal({
   trainerMe,
   onClose,
   onSaved,
+  onAvatarChanged,
   onTrainingPlanSaved,
 }: EditClientModalProps) {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
@@ -130,6 +138,7 @@ export default function EditClientModal({
   }, [access, client, open]);
 
   if (!open || !client) return null;
+  const clientId = client.id;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -151,7 +160,6 @@ export default function EditClientModal({
       lastName: lastName.trim() || null,
       email: email.trim() || null,
       phoneNumber: phoneNumber.trim() || null,
-      avatarUrl: avatarUrl.trim() || null,
       goal: goal.trim() || null,
       locationId: resolvedLocationId,
       progressPercent: client.progressPercent ?? 0,
@@ -250,6 +258,30 @@ export default function EditClientModal({
       ];
   const avatarFallback = `${firstName[0] || ""}${lastName[0] || ""}` || "K";
 
+  async function handleAvatarUpload(file: File) {
+    const uploadedUrl =
+      access === "trainer"
+        ? await uploadTrainerClientAvatar(clientId, file)
+        : await uploadClientAvatar(clientId, file);
+    onAvatarChanged?.(uploadedUrl);
+    showOwnerSuccess("Avatar klienta został zmieniony.", {
+      id: "client-avatar-upload-success",
+    });
+    return uploadedUrl;
+  }
+
+  async function handleAvatarRemove() {
+    if (access === "trainer") {
+      await deleteTrainerClientAvatar(clientId);
+    } else {
+      await deleteClientAvatar(clientId);
+    }
+    onAvatarChanged?.("");
+    showOwnerSuccess("Avatar klienta został usunięty.", {
+      id: "client-avatar-delete-success",
+    });
+  }
+
   return (
     <ModalOverlay onClose={onClose} className="px-4 py-8">
       <form
@@ -280,6 +312,8 @@ export default function EditClientModal({
             label="Zdjęcie klienta"
             value={avatarUrl}
             onChange={setAvatarUrl}
+            onUpload={handleAvatarUpload}
+            onRemove={handleAvatarRemove}
             fallbackText={avatarFallback}
             className="md:col-span-2"
           />
@@ -539,9 +573,6 @@ function getClientUpdateFailedFields(
   }
   if (!isSameOptionalText(client.phoneNumber, payload.phoneNumber)) {
     failedFields.push("telefon");
-  }
-  if (!isSameOptionalText(client.avatarUrl, payload.avatarUrl)) {
-    failedFields.push("zdjęcie");
   }
   if (!isSameOptionalText(client.goal, payload.goal)) failedFields.push("cel");
   if (

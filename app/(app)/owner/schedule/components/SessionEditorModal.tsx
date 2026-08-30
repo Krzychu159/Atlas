@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { MapPin, Plus, Save, Search, UserRound, WalletCards, X } from "lucide-react";
+import {
+  MapPin,
+  Plus,
+  Save,
+  Search,
+  UserRound,
+  WalletCards,
+  X,
+} from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import type { Client } from "@/app/lib/owner/clients";
@@ -162,192 +170,192 @@ export default function SessionEditorModal({
         className="relative z-10 flex max-h-[92vh] w-full max-w-[980px] flex-col overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient"
       >
         <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-label text-primary-light">
-              {session ? "Szczegóły sesji" : "Nowa sesja"}
-            </p>
-            <h2 className="mt-2 font-display text-2xl font-semibold">
-              {session ? getSessionTitle(session) : "Dodaj sesję do grafiku"}
-            </h2>
-            {session ? (
-              <p className="mt-2 text-sm text-on-surface-variant">
-                ID #{session.id} · {getSessionStatusLabel(session.status)}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-label text-primary-light">
+                {session ? "Szczegóły sesji" : "Nowa sesja"}
               </p>
-            ) : null}
+              <h2 className="mt-2 font-display text-2xl font-semibold">
+                {session ? getSessionTitle(session) : "Dodaj sesję do grafiku"}
+              </h2>
+              {session ? (
+                <p className="mt-2 text-sm text-on-surface-variant">
+                  ID #{session.id} · {getSessionStatusLabel(session.status)}
+                </p>
+              ) : null}
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-container-low text-on-surface-variant transition hover:text-on-surface"
+              aria-label="Zamknij"
+            >
+              <X size={20} />
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-container-low text-on-surface-variant transition hover:text-on-surface"
-            aria-label="Zamknij"
-          >
-            <X size={20} />
-          </button>
-        </div>
+          {session ? (
+            <div className="mt-5 grid gap-2 md:grid-cols-3">
+              <SessionMetaChip
+                icon={<UserRound size={14} />}
+                label="Trener"
+                value={session.trainerFullName || "Brak"}
+                tone="primary"
+              />
+              <SessionMetaChip
+                icon={<MapPin size={14} />}
+                label="Lokalizacja"
+                value={session.locationName || "Brak"}
+                tone="neutral"
+              />
+              <SessionMetaChip
+                icon={<WalletCards size={14} />}
+                label="Pakiet"
+                value={getSessionPackageName(session)}
+                tone="success"
+              />
+            </div>
+          ) : null}
 
-        {session ? (
-          <div className="mt-5 grid gap-2 md:grid-cols-3">
-            <SessionMetaChip
-              icon={<UserRound size={14} />}
-              label="Trener"
-              value={session.trainerFullName || "Brak"}
-              tone="primary"
-            />
-            <SessionMetaChip
-              icon={<MapPin size={14} />}
-              label="Lokalizacja"
-              value={session.locationName || "Brak"}
-              tone="neutral"
-            />
-            <SessionMetaChip
-              icon={<WalletCards size={14} />}
-              label="Pakiet"
-              value={getSessionPackageName(session)}
-              tone="success"
-            />
-          </div>
-        ) : null}
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <Field label="Tytuł" className="md:col-span-2">
+              <input
+                value={values.title}
+                onChange={(event) => updateTitle(event.target.value)}
+                placeholder={
+                  values.participantIds.length
+                    ? getSuggestedSessionTitle(values.participantIds, clients)
+                    : "Np. Anna N + Dominik S"
+                }
+                className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
+              />
+            </Field>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Field label="Tytuł" className="md:col-span-2">
-            <input
-              value={values.title}
-              onChange={(event) => updateTitle(event.target.value)}
-              placeholder={
-                values.participantIds.length
-                  ? getSuggestedSessionTitle(values.participantIds, clients)
-                  : "Np. Anna N + Dominik S"
-              }
-              className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
-            />
-          </Field>
+            <Field label="Start">
+              <input
+                type="datetime-local"
+                value={values.startAt}
+                onChange={(event) => updateStartAt(event.target.value)}
+                className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
+              />
+            </Field>
 
-          <Field label="Start">
-            <input
-              type="datetime-local"
-              value={values.startAt}
-              onChange={(event) => updateStartAt(event.target.value)}
-              className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
-            />
-          </Field>
+            <Field label="Koniec">
+              <input
+                type="datetime-local"
+                value={values.endAt}
+                onChange={(event) => updateValue("endAt", event.target.value)}
+                className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
+              />
+            </Field>
 
-          <Field label="Koniec">
-            <input
-              type="datetime-local"
-              value={values.endAt}
-              onChange={(event) => updateValue("endAt", event.target.value)}
-              className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
-            />
-          </Field>
+            <Field label="Trener">
+              <CustomSelect
+                value={values.trainerId}
+                options={
+                  trainerOptions.length
+                    ? trainerOptions
+                    : [{ value: "", label: "Brak trenerów" }]
+                }
+                onChange={(value) => updateValue("trainerId", value)}
+              />
+            </Field>
 
-          <Field label="Trener">
-            <CustomSelect
-              value={values.trainerId}
-              options={
-                trainerOptions.length
-                  ? trainerOptions
-                  : [{ value: "", label: "Brak trenerów" }]
-              }
-              onChange={(value) => updateValue("trainerId", value)}
-            />
-          </Field>
+            <Field label="Lokalizacja">
+              <CustomSelect
+                value={values.locationId}
+                options={
+                  locationOptions.length
+                    ? locationOptions
+                    : [{ value: "", label: "Brak lokalizacji" }]
+                }
+                onChange={(value) => updateValue("locationId", value)}
+              />
+            </Field>
 
-          <Field label="Lokalizacja">
-            <CustomSelect
-              value={values.locationId}
-              options={
-                locationOptions.length
-                  ? locationOptions
-                  : [{ value: "", label: "Brak lokalizacji" }]
-              }
-              onChange={(value) => updateValue("locationId", value)}
-            />
-          </Field>
-
-          <Field label="Klienci sesji" className="md:col-span-2">
-            <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-2">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-md)] bg-surface-container px-3">
-                  <Search size={16} className="shrink-0 text-primary-light" />
-                  <input
-                    value={clientSearch}
-                    onChange={(event) => setClientSearch(event.target.value)}
-                    placeholder="Szukaj klienta..."
-                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-on-surface-muted"
-                  />
+            <Field label="Klienci sesji" className="md:col-span-2">
+              <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-2">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-md)] bg-surface-container px-3">
+                    <Search size={16} className="shrink-0 text-primary-light" />
+                    <input
+                      value={clientSearch}
+                      onChange={(event) => setClientSearch(event.target.value)}
+                      placeholder="Szukaj klienta..."
+                      className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-on-surface-muted"
+                    />
+                  </div>
+                  <span className="shrink-0 rounded-full bg-surface-container px-3 py-2 text-xs font-semibold text-on-surface-variant">
+                    {values.participantIds.length}/{activeClients.length}
+                  </span>
                 </div>
-                <span className="shrink-0 rounded-full bg-surface-container px-3 py-2 text-xs font-semibold text-on-surface-variant">
-                  {values.participantIds.length}/{activeClients.length}
-                </span>
-              </div>
 
-              {activeClients.length ? (
-                visibleClients.length ? (
-                  <div className="mt-2 grid max-h-[260px] gap-2 overflow-y-auto md:grid-cols-2">
-                    {visibleClients.map((client) => {
-                      const clientId = String(client.id);
-                      const selected = selectedClientIds.has(clientId);
+                {activeClients.length ? (
+                  visibleClients.length ? (
+                    <div className="mt-2 grid max-h-[260px] gap-2 overflow-y-auto md:grid-cols-2">
+                      {visibleClients.map((client) => {
+                        const clientId = String(client.id);
+                        const selected = selectedClientIds.has(clientId);
 
-                      return (
-                        <button
-                          key={client.id}
-                          type="button"
-                          onClick={() => toggleParticipant(clientId)}
-                          className={[
-                            "flex min-w-0 items-center justify-between gap-3 rounded-[var(--radius-md)] border px-3 py-2 text-left transition",
-                            selected
-                              ? "border-primary/60 bg-primary/10 text-on-surface"
-                              : "border-transparent bg-surface-container text-on-surface-variant hover:border-white/10 hover:text-on-surface",
-                          ].join(" ")}
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-semibold">
-                              {getClientDisplayName(client)}
-                            </span>
-                            <span className="mt-0.5 block truncate text-xs text-on-surface-muted">
-                              {client.email ||
-                                client.phoneNumber ||
-                                "Brak kontaktu"}
-                            </span>
-                          </span>
-                          <span
+                        return (
+                          <button
+                            key={client.id}
+                            type="button"
+                            onClick={() => toggleParticipant(clientId)}
                             className={[
-                              "shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider",
+                              "flex min-w-0 items-center justify-between gap-3 rounded-[var(--radius-md)] border px-3 py-2 text-left transition",
                               selected
-                                ? "bg-primary text-on-primary"
-                                : "bg-surface-container-low text-on-surface-muted",
+                                ? "border-primary/60 bg-primary/10 text-on-surface"
+                                : "border-transparent bg-surface-container text-on-surface-variant hover:border-white/10 hover:text-on-surface",
                             ].join(" ")}
                           >
-                            {selected ? "Wybrany" : "Dodaj"}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-semibold">
+                                {getClientDisplayName(client)}
+                              </span>
+                              <span className="mt-0.5 block truncate text-xs text-on-surface-muted">
+                                {client.email ||
+                                  client.phoneNumber ||
+                                  "Brak kontaktu"}
+                              </span>
+                            </span>
+                            <span
+                              className={[
+                                "shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider",
+                                selected
+                                  ? "bg-primary text-on-primary"
+                                  : "bg-surface-container-low text-on-surface-muted",
+                              ].join(" ")}
+                            >
+                              {selected ? "Wybrany" : "Dodaj"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="mt-2 rounded-[var(--radius-md)] bg-surface-container px-4 py-3 text-sm text-on-surface-muted">
+                      Brak wyników.
+                    </div>
+                  )
                 ) : (
                   <div className="mt-2 rounded-[var(--radius-md)] bg-surface-container px-4 py-3 text-sm text-on-surface-muted">
-                    Brak wyników.
+                    Brak aktywnych klientów do przypisania.
                   </div>
-                )
-              ) : (
-                <div className="mt-2 rounded-[var(--radius-md)] bg-surface-container px-4 py-3 text-sm text-on-surface-muted">
-                  Brak aktywnych klientów do przypisania.
-                </div>
-              )}
-            </div>
-          </Field>
+                )}
+              </div>
+            </Field>
 
-          <Field label="Status" className="md:col-span-2">
-            <CustomSelect
-              value={values.status}
-              options={statusOptions}
-              onChange={(value) => updateValue("status", value)}
-            />
-          </Field>
+            <Field label="Status" className="md:col-span-2">
+              <CustomSelect
+                value={values.status}
+                options={statusOptions}
+                onChange={(value) => updateValue("status", value)}
+              />
+            </Field>
 
-          {/*
+            {/*
           <Field label="Typ sesji">
             <CustomSelect
               value={values.plannedSessionType}
@@ -357,50 +365,49 @@ export default function SessionEditorModal({
           </Field>
           */}
 
-          <Field label="Kategorie Outlook" className="md:col-span-2">
-            <input
-              value={values.outlookCategories}
-              onChange={(event) =>
-                updateValue("outlookCategories", event.target.value)
-              }
-              placeholder={outlookCategoryPlaceholder}
-              className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
-            />
-          </Field>
+            <Field label="Kategorie Outlook" className="md:col-span-2">
+              <input
+                value={values.outlookCategories}
+                onChange={(event) =>
+                  updateValue("outlookCategories", event.target.value)
+                }
+                placeholder={outlookCategoryPlaceholder}
+                className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
+              />
+            </Field>
 
-          <Field label="Notatka" className="md:col-span-2">
-            <textarea
-              value={values.note}
-              onChange={(event) => updateValue("note", event.target.value)}
-              rows={4}
-              className="w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3 text-sm outline-none"
-            />
-          </Field>
-        </div>
-
-        {session?.participants?.length ? (
-          <div className="mt-6 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
-            <p className="text-label text-on-surface-muted">Uczestnicy</p>
-            <div className="mt-3 grid gap-2 md:grid-cols-2">
-              {session.participants.map((participant) => (
-                <div
-                  key={participant.id}
-                  className="rounded-[var(--radius-md)] bg-surface-container px-3 py-2"
-                >
-                  <p className="text-sm font-semibold text-on-surface">
-                    {participant.clientFullName ||
-                      `Klient #${participant.clientId}`}
-                  </p>
-                  <p className="mt-1 text-xs text-on-surface-muted">
-                    {participant.packageName || "Brak pakietu"} ·{" "}
-                    {participant.sessionsCharged} ses.
-                  </p>
-                </div>
-              ))}
-            </div>
+            <Field label="Notatka" className="md:col-span-2">
+              <textarea
+                value={values.note}
+                onChange={(event) => updateValue("note", event.target.value)}
+                rows={4}
+                className="w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3 text-sm outline-none"
+              />
+            </Field>
           </div>
-        ) : null}
 
+          {session?.participants?.length ? (
+            <div className="mt-6 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
+              <p className="text-label text-on-surface-muted">Uczestnicy</p>
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {session.participants.map((participant) => (
+                  <div
+                    key={participant.id}
+                    className="rounded-[var(--radius-md)] bg-surface-container px-3 py-2"
+                  >
+                    <p className="text-sm font-semibold text-on-surface">
+                      {participant.clientFullName ||
+                        `Klient #${participant.clientId}`}
+                    </p>
+                    <p className="mt-1 text-xs text-on-surface-muted">
+                      {participant.packageName || "Brak pakietu"} ·{" "}
+                      {participant.sessionsCharged} ses.
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-col-reverse gap-3 border-t border-white/5 bg-surface-container px-5 py-4 sm:flex-row sm:justify-end md:px-6">

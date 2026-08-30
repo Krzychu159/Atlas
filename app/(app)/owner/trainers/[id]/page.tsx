@@ -99,6 +99,11 @@ export default function TrainerPage() {
             trainer={trainer}
             rates={rates}
             onClose={() => setIsEditOpen(false)}
+            onAvatarChanged={(avatarUrl) =>
+              setTrainer((current) =>
+                current ? { ...current, avatarUrl } : current,
+              )
+            }
             onSaved={(updatedTrainer, updatedRates) => {
               setTrainer(updatedTrainer);
               setRates(updatedRates);

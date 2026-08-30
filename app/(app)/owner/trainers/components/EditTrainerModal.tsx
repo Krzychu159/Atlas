@@ -3,17 +3,22 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, MapPin, Save } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
-import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
+import {
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
+} from "@/app/components/ui/modal";
 import AvatarFilePicker from "../../components/AvatarFilePicker";
 import {
   OwnerTextArea,
   OwnerTextField,
 } from "../../components/OwnerFormControls";
-import {
-  showOwnerError,
-  showOwnerSuccess,
-} from "../../components/owner-toast";
+import { showOwnerError, showOwnerSuccess } from "../../components/owner-toast";
 import { CustomSelect } from "@/app/components/ui/custom-select";
+import {
+  deleteTrainerAvatar,
+  uploadTrainerAvatar,
+} from "@/app/lib/avatars";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
 import {
   updateTrainerRates,
@@ -31,6 +36,7 @@ type EditTrainerModalProps = {
   rates: TrainerRate[];
   onClose: () => void;
   onSaved: (trainer: Trainer, rates: TrainerRate[]) => void;
+  onAvatarChanged?: (avatarUrl: string) => void;
 };
 
 const trainerStatusOptions = [
@@ -67,6 +73,7 @@ export default function EditTrainerModal({
   rates,
   onClose,
   onSaved,
+  onAvatarChanged,
 }: EditTrainerModalProps) {
   const activeRate = useMemo(
     () => rates.find((rate) => rate.isActive) ?? rates[0],
@@ -80,6 +87,7 @@ export default function EditTrainerModal({
   const [bio, setBio] = useState("");
   const [status, setStatus] = useState("");
   const [experienceYears, setExperienceYears] = useState("0");
+  const [outlookCategory, setOutlookCategory] = useState("");
   const [locationIds, setLocationIds] = useState<string[]>([]);
   const [hourlyRate, setHourlyRate] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -103,12 +111,14 @@ export default function EditTrainerModal({
       setBio(trainer.bio || "");
       setStatus(normalizeTrainerStatus(trainer.status));
       setExperienceYears(String(trainer.experienceYears ?? 0));
+      setOutlookCategory(trainer.outlookCategoryName || "");
       setLocationIds(toLocationValues(trainer.locationIds));
       setHourlyRate(String(activeRate?.rate ?? trainer.hourlyRate ?? 0));
     });
   }, [activeRate, open, trainer]);
 
   if (!open || !trainer) return null;
+  const trainerId = trainer.id;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -119,10 +129,10 @@ export default function EditTrainerModal({
       firstName: firstName.trim() || null,
       lastName: lastName.trim() || null,
       phone: phone.trim() || null,
-      avatarUrl: avatarUrl.trim() || null,
       bio: bio.trim() || null,
       status: status || null,
       experienceYears: Number(experienceYears) || 0,
+      outlookCategoryName: outlookCategory.trim() || null,
       locationIds: parseLocationIds(locationIds),
     };
 
@@ -157,6 +167,23 @@ export default function EditTrainerModal({
   const avatarFallback =
     `${firstName[0] || ""}${lastName[0] || ""}` || trainer.fullName || "T";
 
+  async function handleAvatarUpload(file: File) {
+    const uploadedUrl = await uploadTrainerAvatar(trainerId, file);
+    onAvatarChanged?.(uploadedUrl);
+    showOwnerSuccess("Avatar trenera został zmieniony.", {
+      id: "trainer-avatar-upload-success",
+    });
+    return uploadedUrl;
+  }
+
+  async function handleAvatarRemove() {
+    await deleteTrainerAvatar(trainerId);
+    onAvatarChanged?.("");
+    showOwnerSuccess("Avatar trenera został usunięty.", {
+      id: "trainer-avatar-delete-success",
+    });
+  }
+
   return (
     <ModalOverlay onClose={onClose} className="px-4 py-8">
       <form
@@ -164,64 +191,74 @@ export default function EditTrainerModal({
         className="relative z-10 flex max-h-full w-full max-w-[760px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient"
       >
         <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
-        <ModalHeader eyebrow="Edycja" title="Dane trenera" onClose={onClose} />
+          <ModalHeader
+            eyebrow="Edycja"
+            title="Dane trenera"
+            onClose={onClose}
+          />
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <OwnerTextField
-            label="Imię"
-            value={firstName}
-            onChange={setFirstName}
-          />
-          <OwnerTextField
-            label="Nazwisko"
-            value={lastName}
-            onChange={setLastName}
-          />
-          <OwnerTextField label="Telefon" value={phone} onChange={setPhone} />
-          <div>
-            <span className="text-label text-on-surface-muted">Status</span>
-            <CustomSelect
-              value={status}
-              onChange={setStatus}
-              className="mt-2"
-              options={statusOptions}
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <OwnerTextField
+              label="Imię"
+              value={firstName}
+              onChange={setFirstName}
             />
-          </div>
-          <OwnerTextField
+            <OwnerTextField
+              label="Nazwisko"
+              value={lastName}
+              onChange={setLastName}
+            />
+            <OwnerTextField label="Telefon" value={phone} onChange={setPhone} />
+            <div>
+              <span className="text-label text-on-surface-muted">Status</span>
+              <CustomSelect
+                value={status}
+                onChange={setStatus}
+                className="mt-2"
+                options={statusOptions}
+              />
+            </div>
+            {/* <OwnerTextField
             label="Doświadczenie"
             value={experienceYears}
             onChange={setExperienceYears}
             type="number"
-          />
-          <OwnerTextField
-            label="Stawka godzinowa"
-            value={hourlyRate}
-            onChange={setHourlyRate}
-            type="number"
-          />
-          <AvatarFilePicker
-            label="Zdjęcie trenera"
-            value={avatarUrl}
-            onChange={setAvatarUrl}
-            fallbackText={avatarFallback}
-            className="md:col-span-2"
-          />
-          <LocationMultiSelect
-            label="Lokalizacje"
-            values={locationIds}
-            locations={locations}
-            fallbackNames={trainer.locationNames}
-            onChange={setLocationIds}
-            className="md:col-span-2"
-          />
-          <OwnerTextArea
-            label="Opis"
-            value={bio}
-            onChange={setBio}
-            className="md:col-span-2"
-          />
-        </div>
-
+          /> */}
+            <OwnerTextField
+              label="Kategoria Outlook"
+              value={outlookCategory}
+              onChange={setOutlookCategory}
+            />
+            <OwnerTextField
+              label="Stawka godzinowa"
+              value={hourlyRate}
+              onChange={setHourlyRate}
+              type="number"
+            />
+            <AvatarFilePicker
+              label="Zdjęcie trenera"
+              value={avatarUrl}
+              onChange={setAvatarUrl}
+              onUpload={handleAvatarUpload}
+              onRemove={handleAvatarRemove}
+              fallbackText={avatarFallback}
+              className="md:col-span-2"
+            />
+            <LocationMultiSelect
+              label="Lokalizacje"
+              values={locationIds}
+              locations={locations}
+              fallbackNames={trainer.locationNames}
+              onChange={setLocationIds}
+              className="md:col-span-2"
+            />
+            <OwnerTextArea
+              label="Opis"
+              value={bio}
+              onChange={setBio}
+              className="md:col-span-2"
+            />
+          </div>
         </div>
 
         <ModalFooter>
@@ -233,11 +270,7 @@ export default function EditTrainerModal({
           >
             Anuluj
           </Button>
-          <Button
-            type="submit"
-            disabled={isSaving}
-            icon={<Save size={16} />}
-          >
+          <Button type="submit" disabled={isSaving} icon={<Save size={16} />}>
             {isSaving ? "Zapisywanie..." : "Zapisz zmiany"}
           </Button>
         </ModalFooter>
@@ -304,7 +337,10 @@ function LocationMultiSelect({
   }
 
   return (
-    <div ref={rootRef} className={["relative", className].filter(Boolean).join(" ")}>
+    <div
+      ref={rootRef}
+      className={["relative", className].filter(Boolean).join(" ")}
+    >
       <span className="text-label text-on-surface-muted">{label}</span>
       <button
         type="button"
