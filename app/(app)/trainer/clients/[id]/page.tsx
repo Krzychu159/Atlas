@@ -241,6 +241,7 @@ export default function TrainerClientDetailsPage() {
         <>
           <ClientProfileHero
             client={client}
+            milestoneAccess="trainer"
             backHref="/trainer/clients"
             paymentsHref={`/trainer/clients/${client.id}/payments`}
             onEdit={() => setIsEditOpen(true)}

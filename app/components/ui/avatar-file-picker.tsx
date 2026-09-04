@@ -86,16 +86,26 @@ export default function AvatarFilePicker({
     <div className={className}>
       <span className="text-label text-on-surface-muted">{label}</span>
 
-      <div className="mt-2 flex items-center gap-4 rounded-[var(--radius-lg)] bg-surface-container-lowest p-3">
+      <div className="mt-2 flex flex-col gap-5 rounded-[var(--radius-xl)] border border-white/6 bg-surface-container-low p-4 sm:flex-row sm:items-center sm:p-5">
         <div
-          className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-lg)] bg-surface-container-low bg-cover bg-center text-xl font-semibold text-primary-light"
+          role="img"
+          aria-label={
+            value ? "Aktualne zdjęcie profilowe" : "Podgląd inicjałów profilu"
+          }
+          className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-surface-container bg-surface-container-lowest bg-cover bg-center text-2xl font-semibold text-primary-light shadow-soft sm:h-28 sm:w-28"
           style={value ? { backgroundImage: `url(${value})` } : undefined}
         >
           {value ? null : fallbackText.slice(0, 2).toUpperCase()}
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap gap-2">
+          <p className="text-sm font-semibold text-on-surface">Zdjęcie profilowe</p>
+          <p className="mt-1 max-w-xl text-xs leading-5 text-on-surface-muted">
+            JPG, PNG lub WEBP, maksymalnie 8 MB. Zdjęcie zostanie automatycznie
+            zmniejszone przed zapisaniem.
+          </p>
+
+          <div className="mt-4 flex flex-wrap gap-2">
             <Button
               type="button"
               size="sm"
@@ -103,7 +113,11 @@ export default function AvatarFilePicker({
               disabled={disabled || isProcessing}
               icon={<ImagePlus size={15} />}
             >
-              {isProcessing ? "Przetwarzanie..." : "Wgraj plik"}
+              {isProcessing
+                ? "Przetwarzanie..."
+                : value
+                  ? "Zmień zdjęcie"
+                  : "Dodaj zdjęcie"}
             </Button>
 
             {value ? (
@@ -114,17 +128,16 @@ export default function AvatarFilePicker({
                 onClick={handleRemove}
                 disabled={disabled || isProcessing}
                 icon={<Trash2 size={14} />}
+                className="text-error-light"
               >
-                Usuń
+                Usuń zdjęcie
               </Button>
             ) : null}
           </div>
-
-          <p className="mt-2 text-xs leading-5 text-on-surface-muted">
-            JPG, PNG lub WEBP. Obraz zostanie zmniejszony przed zapisem.
-          </p>
           {error ? (
-            <p className="mt-1 text-xs font-semibold text-error">{error}</p>
+            <p className="mt-3 text-xs font-semibold text-error-light">
+              {error}
+            </p>
           ) : null}
         </div>
 

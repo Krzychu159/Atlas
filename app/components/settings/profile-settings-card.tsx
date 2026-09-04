@@ -131,52 +131,50 @@ export default function ProfileSettingsCard({
       </div>
 
       <form onSubmit={handleSave} className="mt-6">
-        <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-          <AvatarFilePicker
-            value={profile.avatarUrl}
-            fallbackText={initials || fallbackLabel}
-            onChange={(avatarUrl) =>
-              setProfile((current) => ({ ...current, avatarUrl }))
+        <AvatarFilePicker
+          value={profile.avatarUrl}
+          fallbackText={initials || fallbackLabel}
+          onChange={(avatarUrl) =>
+            setProfile((current) => ({ ...current, avatarUrl }))
+          }
+          onUpload={handleAvatarUpload}
+          onRemove={handleAvatarRemove}
+          disabled={isLoading}
+        />
+
+        <div className="mt-6 grid gap-4 border-t border-white/5 pt-6 md:grid-cols-2">
+          <TextField
+            label="Imię"
+            value={profile.firstName}
+            onChange={(firstName) =>
+              setProfile((current) => ({ ...current, firstName }))
             }
-            onUpload={handleAvatarUpload}
-            onRemove={handleAvatarRemove}
+            autoComplete="given-name"
             disabled={isLoading}
           />
-
-          <div className="grid content-start gap-4 md:grid-cols-2">
-            <TextField
-              label="Imię"
-              value={profile.firstName}
-              onChange={(firstName) =>
-                setProfile((current) => ({ ...current, firstName }))
-              }
-              autoComplete="given-name"
-              disabled={isLoading}
-            />
-            <TextField
-              label="Nazwisko"
-              value={profile.lastName}
-              onChange={(lastName) =>
-                setProfile((current) => ({ ...current, lastName }))
-              }
-              autoComplete="family-name"
-              disabled={isLoading}
-            />
-            <TextField
-              label="E-mail"
-              value={profile.email}
-              onChange={(email) =>
-                setProfile((current) => ({ ...current, email }))
-              }
-              type="email"
-              autoComplete="email"
-              disabled={isLoading}
-              className="md:col-span-2"
-            />
-          </div>
+          <TextField
+            label="Nazwisko"
+            value={profile.lastName}
+            onChange={(lastName) =>
+              setProfile((current) => ({ ...current, lastName }))
+            }
+            autoComplete="family-name"
+            disabled={isLoading}
+          />
+          <TextField
+            label="E-mail"
+            value={profile.email}
+            onChange={(email) =>
+              setProfile((current) => ({ ...current, email }))
+            }
+            type="email"
+            autoComplete="email"
+            disabled={isLoading}
+            className="md:col-span-2"
+          />
         </div>
 
-        <div className="mt-6 flex justify-end border-t border-white/5 pt-5">
+        <div className="mt-6 flex justify-end">
           <Button
             type="submit"
             icon={<Save size={16} />}

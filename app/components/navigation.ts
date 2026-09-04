@@ -8,6 +8,8 @@ import {
   ReceiptText,
   CreditCard,
   HandCoins,
+  ChartNoAxesCombined,
+  Gift,
 } from "lucide-react";
 
 export type AppRole = "owner" | "trainer" | "client";
@@ -27,6 +29,11 @@ export const navigationByRole: Record<AppRole, NavItem[]> = {
     { label: "Pakiety", href: "/owner/packages", icon: Wallet },
     { label: "Płatności", href: "/owner/payments", icon: CreditCard },
     { label: "Wydatki", href: "/owner/expenses", icon: HandCoins },
+    {
+      label: "Statystyki",
+      href: "/owner/statistics",
+      icon: ChartNoAxesCombined,
+    },
     { label: "Rozliczenia", href: "/owner/settlements", icon: ReceiptText },
     { label: "Ustawienia", href: "/owner/settings", icon: Settings },
   ],
@@ -40,6 +47,7 @@ export const navigationByRole: Record<AppRole, NavItem[]> = {
   ],
   client: [
     { label: "Panel", href: "/client", icon: LayoutDashboard },
+    { label: "Nagrody", href: "/client/rewards", icon: Gift },
     { label: "Płatności", href: "/client/payments", icon: Wallet },
     { label: "Plan", href: "/client/schedule", icon: CalendarDays },
     { label: "Ustawienia", href: "/client/settings", icon: Settings },

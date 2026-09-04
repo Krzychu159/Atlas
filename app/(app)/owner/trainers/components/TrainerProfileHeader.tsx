@@ -105,25 +105,8 @@ export default function TrainerProfileHeader({
 
           <div className="mt-7 grid grid-cols-2 gap-4 border-t border-secondary/30 pt-6 md:grid-cols-4">
             <HeroStat label="Sesje" value={trainer.sessionsCount ?? 0} />
-            <HeroStat
-              label="Ocena"
-              value={
-                <span className="inline-flex items-center gap-1">
-                  {trainer.ratingAverage
-                    ? trainer.ratingAverage.toFixed(1)
-                    : "0.0"}
-                  <Star
-                    size={18}
-                    className="fill-tertiary-light text-tertiary-light"
-                  />
-                </span>
-              }
-            />
-            <HeroStat
-              label="Doświadczenie"
-              value={`${trainer.experienceYears ?? 0} lat`}
-            />
             <HeroStat label="Stawka" value={getRateLabel(trainer, rates)} />
+            <HeroStat label="BIO" value={trainer.bio || "Brak specjalizacji"} />
           </div>
         </div>
 

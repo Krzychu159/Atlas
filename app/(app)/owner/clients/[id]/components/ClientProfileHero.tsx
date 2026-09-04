@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { Client } from "@/app/lib/owner/clients";
 import ClientRewardProgress from "@/app/components/clients/ClientRewardProgress";
+import type { MilestoneAccess } from "@/app/lib/milestones";
 import { getClientName } from "../../components/client-display";
 
 function getInitials(client: Client) {
@@ -27,12 +28,14 @@ export default function ClientProfileHero({
   onFiles,
   backHref = "/owner/clients",
   paymentsHref,
+  milestoneAccess = "owner",
 }: {
   client: Client;
   onEdit: () => void;
   onFiles: () => void;
   backHref?: string;
   paymentsHref?: string;
+  milestoneAccess?: Exclude<MilestoneAccess, "client">;
 }) {
   const fullName = getClientName(client);
   const resolvedPaymentsHref = paymentsHref || `/owner/clients/${client.id}/payments`;
@@ -101,6 +104,8 @@ export default function ClientProfileHero({
               value={client.locationName || "Brak"}
             />
             <ClientRewardProgress
+              access={milestoneAccess}
+              clientId={client.id}
               trainingStartDate={client.trainingStartDate}
             />
           </div>
