@@ -2,16 +2,13 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, Search, SlidersHorizontal } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { PaymentActionConfirmModal } from "@/app/components/payments/PaymentActionConfirmModal";
-import { PaymentOperationRow } from "@/app/components/payments/PaymentDisplay";
 import { PaymentReasonModal } from "@/app/components/payments/PaymentReasonModal";
+import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
+import { PaymentsList } from "@/app/components/payments/PaymentsList";
 import { Button } from "@/app/components/ui/button";
-import { CustomSelect } from "@/app/components/ui/custom-select";
-import { DateRangeFilter } from "@/app/components/ui/date-range-filter";
-import {
-  getPaymentBreakdown,
-} from "@/app/lib/payments/display";
+import { getPaymentBreakdown } from "@/app/lib/payments/display";
 import {
   cancelPaymentReceipt,
   confirmClientPayment,
@@ -34,11 +31,18 @@ import {
   getTrainerPortalPendingPayments,
   rejectTrainerPortalPayment,
 } from "@/app/lib/trainer/portal";
+import {
+  defaultPaymentFilters,
+  PaymentFilters,
+  type PaymentFiltersValue,
+} from "./components/PaymentFilters";
 
 type PaymentAction =
   | "confirm"
   | "issueReceipt"
   | "cancelReceipt";
+
+const PAYMENTS_PER_PAGE = 8;
 
 export default function OwnerPaymentsPage() {
   const pathname = usePathname();
@@ -57,16 +61,11 @@ export default function OwnerPaymentsPage() {
   } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [reversalReason, setReversalReason] = useState("");
-  const [clientFilter, setClientFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [sourceFilter, setSourceFilter] = useState("all");
-  const [overpaymentFilter, setOverpaymentFilter] = useState("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [amountMin, setAmountMin] = useState("");
-  const [amountMax, setAmountMax] = useState("");
-  const [sortBy, setSortBy] = useState("newest");
+  const [filters, setFilters] = useState<PaymentFiltersValue>(
+    defaultPaymentFilters,
+  );
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -74,7 +73,7 @@ export default function OwnerPaymentsPage() {
       const clientId = params.get("clientId");
 
       if (clientId) {
-        setClientFilter(clientId);
+        setFilters((current) => ({ ...current, client: clientId }));
       }
     }, 0);
 
@@ -89,14 +88,14 @@ export default function OwnerPaymentsPage() {
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    amountMax,
-    amountMin,
-    clientFilter,
-    dateFrom,
-    dateTo,
-    overpaymentFilter,
-    sourceFilter,
-    statusFilter,
+    filters.amountMax,
+    filters.amountMin,
+    filters.client,
+    filters.dateFrom,
+    filters.dateTo,
+    filters.overpayment,
+    filters.source,
+    filters.status,
   ]);
 
   async function loadPayments() {
@@ -251,43 +250,55 @@ export default function OwnerPaymentsPage() {
   const filteredPayments = useMemo(
     () =>
       sortPayments(
-        filterPaymentsByClientText(payments, clientFilter),
-        sortBy,
+        filterPaymentsByClientText(payments, filters.client),
+        filters.sortBy,
       ),
-    [clientFilter, payments, sortBy],
+    [filters.client, filters.sortBy, payments],
+  );
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredPayments.length / PAYMENTS_PER_PAGE),
+  );
+  const currentPage = Math.min(page, totalPages);
+  const visiblePayments = filteredPayments.slice(
+    (currentPage - 1) * PAYMENTS_PER_PAGE,
+    currentPage * PAYMENTS_PER_PAGE,
   );
 
   function clearFilters() {
-    setClientFilter("");
-    setStatusFilter("all");
-    setSourceFilter("all");
-    setOverpaymentFilter("all");
-    setDateFrom("");
-    setDateTo("");
-    setAmountMin("");
-    setAmountMax("");
-    setSortBy("newest");
+    setFilters(defaultPaymentFilters);
+    setPage(1);
+  }
+
+  function handleFiltersChange(nextFilters: PaymentFiltersValue) {
+    setFilters(nextFilters);
+    setPage(1);
   }
 
   function buildBackendPaymentQuery() {
-    const clientId = parseClientIdFilter(clientFilter);
+    const clientId = parseClientIdFilter(filters.client);
 
     return {
       clientId,
       status:
-        statusFilter === "all"
+        filters.status === "all"
           ? null
-          : (Number(statusFilter) as ClientPaymentStatus),
+          : (Number(filters.status) as ClientPaymentStatus),
       source:
-        sourceFilter === "all"
+        filters.source === "all"
           ? null
-          : (Number(sourceFilter) as ClientPaymentSource),
+          : (Number(filters.source) as ClientPaymentSource),
       hasOverpayment:
-        overpaymentFilter === "all" ? null : overpaymentFilter === "yes",
-      from: dateFrom ? new Date(`${dateFrom}T00:00:00`).toISOString() : null,
-      to: dateTo ? new Date(`${dateTo}T23:59:59`).toISOString() : null,
-      amountMin: parseMoneyFilter(amountMin),
-      amountMax: parseMoneyFilter(amountMax),
+        filters.overpayment === "all" ? null : filters.overpayment === "yes",
+      from: filters.dateFrom
+        ? new Date(`${filters.dateFrom}T00:00:00`).toISOString()
+        : null,
+      to: filters.dateTo
+        ? new Date(`${filters.dateTo}T23:59:59`).toISOString()
+        : null,
+      amountMin: parseMoneyFilter(filters.amountMin),
+      amountMax: parseMoneyFilter(filters.amountMax),
       page: 1,
       pageSize: 1000,
     };
@@ -321,125 +332,63 @@ export default function OwnerPaymentsPage() {
         </Button>
       </div>
 
-      <section className="card-shell p-4 md:p-5">
-        <div className="grid gap-3 xl:grid-cols-[minmax(280px,1fr)_260px_220px_auto_auto] xl:items-end">
-          <PaymentSearchField
-            value={clientFilter}
-            onChange={setClientFilter}
-          />
-          <DateRangeFilter
-            value={{ from: dateFrom, to: dateTo }}
-            onChange={(range) => {
-              setDateFrom(range.from);
-              setDateTo(range.to);
-            }}
-          />
-          <CustomSelect
-            label="Sortuj"
-            value={sortBy}
-            onChange={setSortBy}
-            options={paymentSortOptions}
-          />
-          <Button
-            variant={advancedFiltersOpen ? "primary" : "secondary"}
-            icon={<SlidersHorizontal size={16} />}
-            onClick={() => setAdvancedFiltersOpen((current) => !current)}
-            className="w-full xl:w-auto"
-          >
-            Filtry
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={clearFilters}
-            className="w-full xl:w-auto"
-          >
-            Wyczyść
-          </Button>
-        </div>
+      <PaymentFilters
+        value={filters}
+        advancedOpen={advancedFiltersOpen}
+        onAdvancedOpenChange={setAdvancedFiltersOpen}
+        onChange={handleFiltersChange}
+        onClear={clearFilters}
+      />
 
-        {advancedFiltersOpen ? (
-          <div className="mt-4 rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-low p-3">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_minmax(180px,1fr)_minmax(150px,0.75fr)_minmax(150px,0.75fr)]">
-              <CustomSelect
-                label="Status"
-                value={statusFilter}
-                onChange={setStatusFilter}
-                options={paymentStatusOptions}
-              />
-              <CustomSelect
-                label="Źródło"
-                value={sourceFilter}
-                onChange={setSourceFilter}
-                options={paymentSourceOptions}
-              />
-              <CustomSelect
-                label="Nadpłata"
-                value={overpaymentFilter}
-                onChange={setOverpaymentFilter}
-                options={overpaymentOptions}
-              />
-              <MoneyFilterField
-                label="Kwota od"
-                value={amountMin}
-                onChange={setAmountMin}
-              />
-              <MoneyFilterField
-                label="Kwota do"
-                value={amountMax}
-                onChange={setAmountMax}
-              />
-            </div>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="card-shell p-4 md:p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <section className="overflow-hidden rounded-[var(--radius-xl)] bg-surface-container-low shadow-soft">
+        <div className="flex flex-col gap-2 px-4 py-5 md:flex-row md:items-end md:justify-between md:px-5">
           <div>
             <p className="text-section-title">Operacje płatnicze</p>
             <p className="mt-2 text-sm text-on-surface-variant">
-              Każdy wiersz pokazuje faktycznie wpłaconą kwotę oraz to, jak
-              została rozdzielona między pakiet i saldo klienta.
+              Kwota, sposób rozliczenia i najważniejsze akcje w jednym wierszu.
             </p>
           </div>
+          {!isLoading ? (
+            <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-muted">
+              {filteredPayments.length} {pluralizePayments(filteredPayments.length)}
+            </p>
+          ) : null}
         </div>
 
-        {isLoading ? (
-          <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-5 text-on-surface-variant">
-            Ładowanie płatności...
-          </div>
-        ) : filteredPayments.length > 0 ? (
-          <div className="flex flex-col gap-3">
-            {filteredPayments.map((payment) => (
-              <PaymentOperationRow
-                key={payment.id}
-                payment={payment}
-                processing={processingId === payment.id}
-                showActions
-                detailsHref={`${basePath}/clients/${payment.clientId}/payments`}
-                onConfirm={() => setPaymentAction({ type: "confirm", payment })}
-                onReject={() => {
-                  setPaymentToReject(payment);
-                  setRejectReason("");
-                }}
-                onIssueReceipt={() =>
-                  setPaymentAction({ type: "issueReceipt", payment })
-                }
-                onCancelReceipt={() =>
-                  setPaymentAction({ type: "cancelReceipt", payment })
-                }
-                onReverse={() => {
-                  setPaymentToReverse(payment);
-                  setReversalReason("");
-                }}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-8 text-center text-on-surface-variant">
-            Brak płatności pasujących do filtrów.
-          </div>
-        )}
+        <PaymentsList
+          payments={visiblePayments}
+          isLoading={isLoading}
+          processingId={processingId}
+          getDetailsHref={(payment) =>
+            `${basePath}/clients/${payment.clientId}/payments`
+          }
+          onConfirm={(payment) =>
+            setPaymentAction({ type: "confirm", payment })
+          }
+          onReject={(payment) => {
+            setPaymentToReject(payment);
+            setRejectReason("");
+          }}
+          onIssueReceipt={(payment) =>
+            setPaymentAction({ type: "issueReceipt", payment })
+          }
+          onCancelReceipt={(payment) =>
+            setPaymentAction({ type: "cancelReceipt", payment })
+          }
+          onReverse={(payment) => {
+            setPaymentToReverse(payment);
+            setReversalReason("");
+          }}
+        />
+
+        {!isLoading && filteredPayments.length > 0 ? (
+          <PaymentPagination
+            page={currentPage}
+            pageSize={PAYMENTS_PER_PAGE}
+            totalItems={filteredPayments.length}
+            onPageChange={setPage}
+          />
+        ) : null}
       </section>
 
       {paymentToReject ? (
@@ -537,85 +486,6 @@ function getPaymentActionModalCopy(type: PaymentAction) {
   };
 }
 
-const paymentStatusOptions = [
-  { value: "all", label: "Wszystkie" },
-  { value: "1", label: "Do potwierdzenia" },
-  { value: "2", label: "Opłacone" },
-  { value: "3", label: "Odrzucone" },
-  { value: "4", label: "Anulowane" },
-  { value: "5", label: "Cofnięte" },
-];
-
-const paymentSourceOptions = [
-  { value: "all", label: "Wszystkie" },
-  { value: "1", label: "Obsługa" },
-  { value: "2", label: "Klient" },
-  { value: "3", label: "System" },
-];
-
-const overpaymentOptions = [
-  { value: "all", label: "Wszystkie" },
-  { value: "yes", label: "Z nadpłatą" },
-  { value: "no", label: "Bez nadpłaty" },
-];
-
-const paymentSortOptions = [
-  { value: "newest", label: "Najnowsze" },
-  { value: "oldest", label: "Najstarsze" },
-  { value: "amountDesc", label: "Kwota malejąco" },
-  { value: "amountAsc", label: "Kwota rosnąco" },
-  { value: "clientAsc", label: "Klient A-Z" },
-  { value: "overpaymentDesc", label: "Największa nadpłata" },
-];
-
-function PaymentSearchField({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label>
-      <span className="text-label text-on-surface-muted">Szukaj</span>
-      <div className="mt-2 flex h-12 items-center gap-3 rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest px-4 transition focus-within:border-primary-light/40">
-        <Search size={17} className="shrink-0 text-on-surface-muted" />
-        <input
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="Imię, nazwisko lub ID klienta"
-          className="h-full min-w-0 flex-1 bg-transparent text-sm font-semibold text-on-surface outline-none placeholder:font-normal placeholder:text-on-surface-muted"
-        />
-      </div>
-    </label>
-  );
-}
-
-function MoneyFilterField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="flex h-12 w-full flex-col justify-center rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest px-3 transition focus-within:border-primary-light/40 hover:border-white/10 hover:bg-surface-container-low">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
-        {label}
-      </span>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        inputMode="decimal"
-        placeholder="0,00"
-        className="mt-0.5 h-5 w-full bg-transparent text-sm font-semibold text-on-surface outline-none placeholder:font-normal placeholder:text-on-surface-muted"
-      />
-    </label>
-  );
-}
-
 function sortPayments(payments: ClientPayment[], sortBy: string) {
   return [...payments].sort((first, second) => {
     switch (sortBy) {
@@ -681,4 +551,17 @@ function parseMoneyFilter(value: string) {
   const parsed = Number(value.replace(",", "."));
 
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function pluralizePayments(count: number) {
+  if (count === 1) return "płatność";
+
+  const lastTwo = count % 100;
+  const last = count % 10;
+
+  if (last >= 2 && last <= 4 && !(lastTwo >= 12 && lastTwo <= 14)) {
+    return "płatności";
+  }
+
+  return "płatności";
 }

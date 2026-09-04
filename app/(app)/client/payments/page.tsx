@@ -8,10 +8,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { PaymentEntryModal } from "@/app/components/payments/PaymentEntryModal";
-import {
-  PaymentCompactRow,
-  PaymentOperationRow,
-} from "@/app/components/payments/PaymentDisplay";
+import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
+import { PaymentsList } from "@/app/components/payments/PaymentsList";
 import { Button } from "@/app/components/ui/button";
 import { showAppError, showAppSuccess } from "@/app/components/ui/app-toast";
 import { isNotFoundLikeError } from "@/app/lib/backend";
@@ -31,6 +29,8 @@ const methodOptions = [
   { value: "3", label: "Gotówka" },
   { value: "4", label: "Bramka płatności" },
 ];
+
+const CLIENT_PAYMENTS_PER_PAGE = 6;
 
 export default function ClientPaymentsPage() {
   const [billing, setBilling] = useState<ClientBillingSummary | null>(null);
@@ -139,7 +139,6 @@ export default function ClientPaymentsPage() {
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
       <MobilePayments
         billing={billing}
-        payments={payments}
         packagesLength={packages.length}
         isLoading={isLoading}
         isSubmitting={isSubmitting}
@@ -225,40 +224,10 @@ export default function ClientPaymentsPage() {
           </Button>
         </div>
 
-        <div className="card-shell p-5 md:p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-label text-on-surface-muted">Historia</p>
-              <h2 className="mt-3 font-display text-[1.85rem] font-semibold leading-none">
-                Wpłaty klienta
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-on-surface-variant">
-                Kwota wpłaty pokazuje ile faktycznie wpłacono. Osobno widać,
-                ile poszło na pakiet i ile zostało jako saldo.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-col gap-3">
-            {isLoading ? (
-              <PaymentSkeleton />
-            ) : payments.length ? (
-              payments.map((payment) => (
-                <PaymentOperationRow
-                  key={payment.id}
-                  payment={payment}
-                  showClient={false}
-                />
-              ))
-            ) : (
-              <div className="rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest p-5 text-sm text-on-surface-variant">
-                Brak zapisanych wpłat.
-              </div>
-            )}
-          </div>
-        </div>
       </section>
       </div>
+
+      <ClientPaymentHistory payments={payments} isLoading={isLoading} />
 
       <PaymentEntryModal
         open={isPaymentModalOpen}
@@ -288,14 +257,12 @@ export default function ClientPaymentsPage() {
 
 function MobilePayments({
   billing,
-  payments,
   packagesLength,
   isLoading,
   isSubmitting,
   onOpenPaymentModal,
 }: {
   billing: ClientBillingSummary | null;
-  payments: ClientPayment[];
   packagesLength: number;
   isLoading: boolean;
   isSubmitting: boolean;
@@ -376,34 +343,65 @@ function MobilePayments({
         </Button>
       </section>
 
-      <section className="card-shell p-5">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-label text-on-surface-muted">Historia</p>
-            <h2 className="mt-2 font-display text-[1.55rem] font-semibold leading-none">
-              Ostatnie wpłaty
-            </h2>
-          </div>
-          <span className="text-sm text-on-surface-muted">
-            {payments.length}
-          </span>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-3">
-          {isLoading ? (
-            <PaymentSkeleton />
-          ) : payments.length ? (
-            payments.slice(0, 5).map((payment) => (
-              <PaymentCompactRow key={payment.id} payment={payment} />
-            ))
-          ) : (
-            <div className="rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest p-5 text-sm text-on-surface-variant">
-              Brak zapisanych wpłat.
-            </div>
-          )}
-        </div>
-      </section>
     </div>
+  );
+}
+
+function ClientPaymentHistory({
+  payments,
+  isLoading,
+}: {
+  payments: ClientPayment[];
+  isLoading: boolean;
+}) {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(payments.length / CLIENT_PAYMENTS_PER_PAGE),
+  );
+  const currentPage = Math.min(page, totalPages);
+  const visiblePayments = payments.slice(
+    (currentPage - 1) * CLIENT_PAYMENTS_PER_PAGE,
+    currentPage * CLIENT_PAYMENTS_PER_PAGE,
+  );
+
+  return (
+    <section className="overflow-hidden rounded-[var(--radius-xl)] bg-surface-container-low shadow-soft">
+      <div className="flex flex-col gap-2 px-4 py-5 sm:flex-row sm:items-end sm:justify-between md:px-5">
+        <div>
+          <p className="text-label text-on-surface-muted">Historia</p>
+          <h2 className="mt-2 font-display text-[1.55rem] font-semibold leading-none md:text-[1.85rem]">
+            Wpłaty klienta
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+            Kwota, sposób rozliczenia i status każdej wpłaty w jednym wierszu.
+          </p>
+        </div>
+        {!isLoading ? (
+          <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-muted">
+            {payments.length} {payments.length === 1 ? "płatność" : "płatności"}
+          </p>
+        ) : null}
+      </div>
+
+      <PaymentsList
+        payments={visiblePayments}
+        isLoading={isLoading}
+        processingId={null}
+        showClient={false}
+        emptyTitle="Brak zapisanych wpłat"
+        emptyMessage="Pierwsza zgłoszona wpłata pojawi się tutaj."
+      />
+
+      {!isLoading && payments.length > 0 ? (
+        <PaymentPagination
+          page={currentPage}
+          pageSize={CLIENT_PAYMENTS_PER_PAGE}
+          totalItems={payments.length}
+          onPageChange={setPage}
+        />
+      ) : null}
+    </section>
   );
 }
 
@@ -455,19 +453,6 @@ function SummaryCard({
       )}
       <p className="mt-3 text-sm leading-6 text-on-surface-variant">{note}</p>
     </div>
-  );
-}
-
-function PaymentSkeleton() {
-  return (
-    <>
-      {[1, 2, 3].map((item) => (
-        <div
-          key={item}
-          className="h-24 animate-pulse rounded-[var(--radius-lg)] bg-surface-container-lowest"
-        />
-      ))}
-    </>
   );
 }
 

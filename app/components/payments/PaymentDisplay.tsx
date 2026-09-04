@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  Banknote,
   CheckCircle2,
   ExternalLink,
   ReceiptText,
@@ -289,16 +290,28 @@ export function PaymentCompactRow({
   showStatus?: boolean;
 }) {
   const breakdown = getPaymentBreakdown(payment);
+  const tone = getPaymentStatusTone(payment);
+  const accentClass = {
+    neutral: "before:bg-on-surface-muted",
+    success: "before:bg-tertiary-light",
+    warning: "before:bg-warning-light",
+    danger: "before:bg-error-light",
+  }[tone];
 
   return (
-    <div className="rounded-[var(--radius-md)] border border-white/5 bg-surface-container-lowest px-3 py-3">
+    <article
+      className={[
+        "relative overflow-hidden rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-3 before:absolute before:inset-y-0 before:left-0 before:w-0.5",
+        accentClass,
+      ].join(" ")}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-on-surface">
-            {payment.packageName || "Wpłata klienta"}
-          </p>
-          <p className="mt-1 text-xs text-on-surface-muted">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-light">
             {formatPaymentDate(payment.paymentDate)}
+          </p>
+          <p className="mt-1 truncate text-sm font-semibold text-on-surface">
+            {payment.packageName || "Wpłata klienta"}
           </p>
         </div>
         <div className="shrink-0 text-right">
@@ -312,10 +325,18 @@ export function PaymentCompactRow({
           ) : null}
         </div>
       </div>
-      <div className="mt-3">
-        <PaymentSplitSummary payment={payment} compact />
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-on-surface-muted">
+        <span className="inline-flex items-center gap-1.5">
+          <Banknote size={13} className="text-primary-light" />
+          {getPaymentMethodLabel(payment.method)}
+        </span>
+        {breakdown.balanceCreditAmount > 0 ? (
+          <span className="font-semibold text-tertiary-light">
+            +{formatPaymentMoney(breakdown.balanceCreditAmount, payment.currency)} na saldo
+          </span>
+        ) : null}
       </div>
-    </div>
+    </article>
   );
 }
 

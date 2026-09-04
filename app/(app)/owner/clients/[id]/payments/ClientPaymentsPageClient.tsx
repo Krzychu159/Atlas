@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { PaymentActionConfirmModal } from "@/app/components/payments/PaymentActionConfirmModal";
 import { PaymentEntryModal } from "@/app/components/payments/PaymentEntryModal";
-import { PaymentOperationRow } from "@/app/components/payments/PaymentDisplay";
+import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
+import { PaymentsList } from "@/app/components/payments/PaymentsList";
 import { PaymentReasonModal } from "@/app/components/payments/PaymentReasonModal";
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
@@ -82,6 +83,8 @@ type ClientPaymentsPageClientProps = {
 
 type PaymentAction = "confirm" | "issueReceipt" | "cancelReceipt";
 
+const CLIENT_PAYMENTS_PER_PAGE = 6;
+
 type PackageDeleteTarget = {
   clientPackageId: number;
   packageName: string;
@@ -104,7 +107,7 @@ export default function ClientPaymentsPageClient({
     null,
   );
   const [clientPayments, setClientPayments] = useState<ClientPayment[]>([]);
-  const [hasMorePayments, setHasMorePayments] = useState(false);
+  const [paymentPage, setPaymentPage] = useState(1);
   const [packages, setPackages] = useState<Package[]>([]);
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const [selectedNextPackageId, setSelectedNextPackageId] = useState("");
@@ -174,7 +177,7 @@ export default function ClientPaymentsPageClient({
         getClientSubscription(id),
         getPackages(),
         getClientSubscriptionUsage(id).catch(() => null),
-        getClientPayments(id, { page: 1, pageSize: 3 }),
+        getClientPayments(id, { page: 1, pageSize: 1000 }),
         getClientActivePackage(id).catch(() => null),
         getClientCurrentCycle(id).catch(() => null),
       ]);
@@ -184,7 +187,7 @@ export default function ClientPaymentsPageClient({
       setSubscription(subscriptionData);
       setUsage(usageData);
       setClientPayments(paymentsData.items || []);
-      setHasMorePayments(paymentsData.page < paymentsData.totalPages);
+      setPaymentPage(1);
       setActivePackage(activePackageData);
       setCurrentCycle(currentCycleData);
       setPackages(
@@ -247,8 +250,8 @@ export default function ClientPaymentsPageClient({
     setBilling(billingData);
     setSubscription(subscriptionData);
     setUsage(usageData);
-    setClientPayments((billingData.payments || []).slice(0, 3));
-    setHasMorePayments((billingData.payments?.length || 0) > 3);
+    setClientPayments(billingData.payments || []);
+    setPaymentPage(1);
     setActivePackage(activePackageData);
     setCurrentCycle(subscriptionData.currentCycle || null);
     setPackages(
@@ -707,10 +710,15 @@ export default function ClientPaymentsPageClient({
       activePackageUsedSessions === 0,
   );
   const lastPayment = payments[0] || null;
-  const visiblePayments = payments.slice(0, 3);
-  const allClientPaymentsHref = clientId
-    ? `${basePath}/payments?clientId=${clientId}`
-    : `${basePath}/payments`;
+  const paymentTotalPages = Math.max(
+    1,
+    Math.ceil(payments.length / CLIENT_PAYMENTS_PER_PAGE),
+  );
+  const currentPaymentPage = Math.min(paymentPage, paymentTotalPages);
+  const visiblePayments = payments.slice(
+    (currentPaymentPage - 1) * CLIENT_PAYMENTS_PER_PAGE,
+    currentPaymentPage * CLIENT_PAYMENTS_PER_PAGE,
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
@@ -815,53 +823,50 @@ export default function ClientPaymentsPageClient({
               </Button>
             </div>
 
-            <div className="card-shell p-4 md:p-5">
-              <div className="mb-4">
+            <div className="overflow-hidden rounded-[var(--radius-xl)] bg-surface-container-low shadow-soft">
+              <div className="flex flex-col gap-2 px-4 py-5 sm:flex-row sm:items-end sm:justify-between md:px-5">
                 <div>
                   <p className="text-section-title">Historia wpłat</p>
                   <p className="mt-2 text-sm text-on-surface-variant">
-                    Historia pokazuje pełną kwotę wpłaty oraz podział na pakiet
-                    i saldo klienta.
+                    Kwota, sposób rozliczenia i najważniejsze akcje w jednym
+                    wierszu.
                   </p>
                 </div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-muted">
+                  {payments.length} {payments.length === 1 ? "płatność" : "płatności"}
+                </p>
               </div>
 
-              <div className="flex flex-col gap-3">
-                {visiblePayments.length > 0 ? (
-                  visiblePayments.map((payment) => (
-                    <PaymentOperationRow
-                      key={payment.id}
-                      payment={payment}
-                      processing={processingPaymentId === payment.id}
-                      showActions
-                      showClient={false}
-                      onConfirm={() =>
-                        setPaymentAction({ type: "confirm", payment })
-                      }
-                      onIssueReceipt={() =>
-                        setPaymentAction({ type: "issueReceipt", payment })
-                      }
-                      onCancelReceipt={() =>
-                        setPaymentAction({ type: "cancelReceipt", payment })
-                      }
-                      onReverse={() => {
-                        setPaymentToReverse(payment);
-                        setReversalReason("");
-                      }}
-                    />
-                  ))
-                ) : (
-                  <EmptyState label="Brak wpłat klienta." />
-                )}
-                {hasMorePayments ? (
-                  <Link
-                    href={allClientPaymentsHref}
-                    className="inline-flex h-12 items-center justify-center rounded-[var(--radius-lg)] border border-secondary px-4 text-sm font-semibold text-primary-light transition hover:border-primary-light hover:bg-surface-container-high"
-                  >
-                    Pokaż więcej w płatnościach
-                  </Link>
-                ) : null}
-              </div>
+              <PaymentsList
+                payments={visiblePayments}
+                isLoading={false}
+                processingId={processingPaymentId}
+                showClient={false}
+                emptyTitle="Brak wpłat klienta"
+                emptyMessage="Pierwsza wpłata pojawi się tutaj po jej dodaniu."
+                onConfirm={(payment) =>
+                  setPaymentAction({ type: "confirm", payment })
+                }
+                onIssueReceipt={(payment) =>
+                  setPaymentAction({ type: "issueReceipt", payment })
+                }
+                onCancelReceipt={(payment) =>
+                  setPaymentAction({ type: "cancelReceipt", payment })
+                }
+                onReverse={(payment) => {
+                  setPaymentToReverse(payment);
+                  setReversalReason("");
+                }}
+              />
+
+              {payments.length > 0 ? (
+                <PaymentPagination
+                  page={currentPaymentPage}
+                  pageSize={CLIENT_PAYMENTS_PER_PAGE}
+                  totalItems={payments.length}
+                  onPageChange={setPaymentPage}
+                />
+              ) : null}
             </div>
           </section>
 
