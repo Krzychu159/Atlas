@@ -93,6 +93,13 @@ export function trainerPortalClientToClient(
     id: client.id,
     trainerId: client.trainerId ?? me?.trainerId ?? null,
     activePackageId: client.activePackageId ?? null,
+    activeClientPackageId: client.activeClientPackageId ?? null,
+    activeClientPackageName: client.activeClientPackageName ?? null,
+    activePackageTotalSessions: client.activePackageTotalSessions ?? null,
+    activePackageUsedSessions: client.activePackageUsedSessions ?? null,
+    activePackageRemainingSessions:
+      client.activePackageRemainingSessions ?? null,
+    activePackagePaymentStatus: client.activePackagePaymentStatus ?? null,
     firstName: client.firstName || names.firstName,
     lastName: client.lastName || names.lastName,
     fullName:

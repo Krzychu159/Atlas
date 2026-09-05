@@ -32,8 +32,13 @@ export type CompanyExpense = {
   attachmentFileName: string | null;
   attachmentContentType: string | null;
   isRecurring: boolean;
-  recurringGroupId: number | null;
-  createdByUserId: number;
+  recurringGroupId: string | null;
+  recurrenceIntervalMonths: number | null;
+  recurrenceStartDate: string | null;
+  recurrenceEndDate: string | null;
+  recurrenceDayOfMonth: number | null;
+  recurrenceInstanceNumber: number | null;
+  createdByUserId: number | null;
   paidByUserId: number | null;
   isOverdue: boolean;
   createdAt: string;
@@ -60,7 +65,10 @@ export type ExpensePayload = {
   notes: string | null;
   attachmentUrl: string | null;
   isRecurring: boolean;
-  recurringGroupId: number | null;
+  recurringGroupId: string | null;
+  recurrenceEndDate: string | null;
+  recurringOccurrencesCount: number | null;
+  recurrenceEditScope?: number | null;
 };
 
 export type ExpenseQuery = {
@@ -76,6 +84,7 @@ export type ExpenseQuery = {
   paidTo?: string | null;
   search?: string | null;
   isRecurring?: boolean | null;
+  recurringGroupId?: string | null;
   isOverdue?: boolean | null;
   page?: number | null;
   pageSize?: number | null;
@@ -163,8 +172,8 @@ export function markExpenseAsPaid(id: number, paidAt?: string) {
   );
 }
 
-export function deleteExpense(id: number) {
-  return backendDelete<void>(`expenses/${id}`);
+export function deleteExpense(id: number, recurrenceEditScope?: number | null) {
+  return backendDelete<void>(`expenses/${id}`, { recurrenceEditScope });
 }
 
 export function getExpenseCategories() {
@@ -177,6 +186,10 @@ export function getExpensePaymentStatuses() {
   return backendGet<ExpenseDictionaryItem[] | Record<string, string | number>>(
     "expenses/payment-statuses",
   );
+}
+
+export function getExpenseRecurrenceEditScopes() {
+  return backendGet<ExpenseDictionaryItem[]>("expenses/recurrence-edit-scopes");
 }
 
 export function getExpenseStatistics(query: ExpenseQuery) {

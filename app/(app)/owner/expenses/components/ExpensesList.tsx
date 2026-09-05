@@ -11,6 +11,7 @@ import {
   MoreHorizontal,
   Paperclip,
   Plus,
+  Repeat2,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
@@ -20,6 +21,7 @@ import {
   formatExpenseDate,
   getDictionaryLabel,
   getExpenseStatusTone,
+  getRecurrenceLabel,
   type DictionaryOption,
 } from "../expense-config";
 
@@ -184,7 +186,7 @@ function ExpenseTable({
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-3">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-primary/12 text-primary-light">
-                      <FileText size={17} />
+                      {expense.isRecurring ? <Repeat2 size={17} /> : <FileText size={17} />}
                     </span>
                     <div className="min-w-0">
                       <p className="max-w-[230px] truncate text-sm font-semibold text-on-surface">
@@ -193,6 +195,15 @@ function ExpenseTable({
                       <p className="mt-1 max-w-[230px] truncate text-xs text-on-surface-muted">
                         {expense.invoiceNumber || expense.description || "Bez numeru"}
                       </p>
+                      {expense.isRecurring ? (
+                        <p className="mt-1 flex items-center gap-1 text-[0.68rem] font-semibold text-primary-light">
+                          <Repeat2 size={11} />
+                          {getRecurrenceLabel(expense)}
+                          {expense.recurrenceInstanceNumber
+                            ? ` · nr ${expense.recurrenceInstanceNumber}`
+                            : ""}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </td>
@@ -286,7 +297,7 @@ function ExpenseMobileCard({
     <article className={`rounded-[var(--radius-xl)] border bg-surface-container-low p-4 ${expense.isOverdue ? "border-error/30" : "border-white/5"}`}>
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-primary/15 text-primary-light">
-          <FileText size={17} />
+          {expense.isRecurring ? <Repeat2 size={17} /> : <FileText size={17} />}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
@@ -295,6 +306,15 @@ function ExpenseMobileCard({
               <p className="mt-1 truncate text-xs uppercase tracking-wide text-on-surface-muted">
                 {categoryLabel} · {expense.locationName || expense.legalEntityName}
               </p>
+              {expense.isRecurring ? (
+                <p className="mt-1.5 flex items-center gap-1 text-[0.68rem] font-semibold text-primary-light">
+                  <Repeat2 size={11} />
+                  {getRecurrenceLabel(expense)}
+                  {expense.recurrenceInstanceNumber
+                    ? ` · nr ${expense.recurrenceInstanceNumber}`
+                    : ""}
+                </p>
+              ) : null}
             </div>
             <button
               type="button"

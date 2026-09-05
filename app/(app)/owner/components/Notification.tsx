@@ -15,27 +15,16 @@ import {
   ReceiptText,
 } from "lucide-react";
 import {
-  getSafeNotificationUrl,
+  getNotificationDestination,
+  getNotificationKind,
+  type NotificationRole,
   type AppNotification,
 } from "@/app/lib/notifications";
-
-function getNotificationKind(item: AppNotification) {
-  const kind = (item.relatedEntityType || item.type).toLowerCase();
-
-  if (kind.includes("payment")) return "payment";
-  if (kind.includes("session")) return "session";
-  if (kind.includes("invitation")) return "invitation";
-  if (kind.includes("contract")) return "contract";
-  if (kind.includes("settlement")) return "settlement";
-  if (kind.includes("client")) return "client";
-  if (kind.includes("trainer")) return "trainer";
-  if (kind.includes("location")) return "location";
-  return "system";
-}
 
 function getIcon(item: AppNotification) {
   switch (getNotificationKind(item)) {
     case "payment":
+    case "subscription":
       return <CreditCard size={18} />;
     case "session":
       return <CalendarDays size={18} />;
@@ -44,6 +33,7 @@ function getIcon(item: AppNotification) {
     case "contract":
       return <FileSignature size={18} />;
     case "settlement":
+    case "expense":
       return <ReceiptText size={18} />;
     case "client":
       return <CircleUserRound size={18} />;
@@ -57,7 +47,7 @@ function getIcon(item: AppNotification) {
 }
 
 function getIconStyles(item: AppNotification) {
-  switch (item.severity.toLowerCase()) {
+  switch (item.severity?.toLowerCase()) {
     case "error":
       return "bg-error-container text-error-light";
     case "warning":
@@ -98,14 +88,18 @@ export default function NotificationItem({
   item,
   variant = "page",
   markingAsRead = false,
+  role,
+  onNavigate,
   onMarkAsRead,
 }: {
   item: AppNotification;
   variant?: "page" | "panel";
   markingAsRead?: boolean;
+  role: NotificationRole;
+  onNavigate?: () => void;
   onMarkAsRead?: (id: number) => void;
 }) {
-  const href = getSafeNotificationUrl(item.actionUrl);
+  const href = getNotificationDestination(item, role);
   const compact = variant === "panel";
 
   return (
@@ -153,6 +147,7 @@ export default function NotificationItem({
               {href ? (
                 <Link
                   href={href}
+                  onClick={onNavigate}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary-light transition hover:text-on-surface"
                 >
                   Przejdź do szczegółów

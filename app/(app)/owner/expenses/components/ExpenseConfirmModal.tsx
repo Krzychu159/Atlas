@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import {
@@ -14,6 +15,7 @@ export default function ExpenseConfirmModal({
   description,
   confirmLabel,
   isProcessing,
+  children,
   onClose,
   onConfirm,
 }: {
@@ -22,6 +24,7 @@ export default function ExpenseConfirmModal({
   description: string;
   confirmLabel: string;
   isProcessing: boolean;
+  children?: ReactNode;
   onClose: () => void;
   onConfirm: () => void;
 }) {
@@ -39,6 +42,7 @@ export default function ExpenseConfirmModal({
             iconTone="danger"
             onClose={onClose}
           />
+          {children ? <div className="mt-5">{children}</div> : null}
         </div>
         <ModalFooter>
           <Button

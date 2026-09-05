@@ -6,7 +6,6 @@ import { ArrowRight, Plus, UserPlus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import {
   getClients,
-  getClientSubscription,
   type Client,
 } from "@/app/lib/owner/clients";
 import {
@@ -61,34 +60,7 @@ export default function ClientsPage() {
     try {
       setIsLoading(true);
       const data = await getClients();
-      const subscriptions = await Promise.allSettled(
-        data.map((client) => getClientSubscription(client.id)),
-      );
-
-      setClients(
-        data.map((client, index) => {
-          const subscription = subscriptions[index];
-
-          if (subscription.status !== "fulfilled") return client;
-
-          const cycle = subscription.value.currentCycle;
-
-          return {
-            ...client,
-            subscriptionStatus: subscription.value.status,
-            hasActivePackage: Boolean(cycle?.isActive),
-            currentPackageName: cycle?.packageName ?? client.currentPackageName,
-            packageSessionsLimit:
-              cycle?.totalSessions ?? client.packageSessionsLimit,
-            packageSessionsUsed:
-              cycle?.usedSessions ?? client.packageSessionsUsed,
-            remainingSessions:
-              cycle?.remainingSessions ?? client.remainingSessions,
-            balance: subscription.value.carryOverBalance ?? client.balance,
-            currency: cycle?.currency ?? client.currency,
-          };
-        }),
-      );
+      setClients(data);
     } catch (err) {
       showOwnerError(err, "Błąd ładowania klientów", {
         id: "owner-clients-load-error",

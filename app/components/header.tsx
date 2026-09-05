@@ -443,6 +443,7 @@ export function Header({ role }: HeaderProps) {
           notificationsHref={notificationsHref}
           totalUnreadCount={unreadNotificationCount}
           onUnreadCountChange={setUnreadNotificationCount}
+          role={role}
         />
       ) : null}
     </>

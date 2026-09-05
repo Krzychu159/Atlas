@@ -17,14 +17,12 @@ import {
 } from "@/app/(app)/owner/clients/components/client-display";
 import { showOwnerError } from "@/app/(app)/owner/components/owner-toast";
 import {
-  getClients,
-  getClientSubscription,
+  getClientsByTrainer,
   type Client,
 } from "@/app/lib/owner/clients";
 import { isForbiddenError } from "@/app/lib/backend";
 import {
   getTrainerPortalClients,
-  getTrainerPortalClientSubscription,
   getTrainerPortalMe,
   type TrainerPortalMe,
 } from "@/app/lib/trainer/portal";
@@ -64,67 +62,14 @@ export default function TrainerClientsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const defaultFilterApplied = useRef(false);
 
-  const getClientsForTrainerView = useCallback(
-    async (meData: TrainerPortalMe | null) => {
-      try {
-        return {
-          clients: await getClients(),
-          canUseOwnerClientEndpoints: true,
-        };
-      } catch (err) {
-        if (!isForbiddenError(err)) throw err;
-
-        const portalClients = await getTrainerPortalClients();
-
-        return {
-          clients: trainerPortalClientsToClients(portalClients, meData),
-          canUseOwnerClientEndpoints: false,
-        };
-      }
-    },
-    [],
-  );
-
   const loadClients = useCallback(async () => {
     try {
       setIsLoading(true);
       const meData = await getTrainerPortalMe().catch(() => null);
-      const { clients: clientsData, canUseOwnerClientEndpoints } =
-        await getClientsForTrainerView(meData);
-      const subscriptionLoader = canUseOwnerClientEndpoints
-        ? getClientSubscription
-        : getTrainerPortalClientSubscription;
-      const subscriptions = await Promise.allSettled(
-        clientsData.map((client) => subscriptionLoader(client.id)),
-      );
+      const clientsData = await getClientsForTrainer(meData);
 
       setMe(meData);
-      setClients(
-        clientsData.map((client, index) => {
-          const subscription = subscriptions[index];
-
-          if (!subscription || subscription.status !== "fulfilled") {
-            return client;
-          }
-
-          const cycle = subscription.value.currentCycle;
-
-          return {
-            ...client,
-            subscriptionStatus: subscription.value.status,
-            hasActivePackage: Boolean(cycle?.isActive),
-            currentPackageName: cycle?.packageName ?? client.currentPackageName,
-            packageSessionsLimit:
-              cycle?.totalSessions ?? client.packageSessionsLimit,
-            packageSessionsUsed:
-              cycle?.usedSessions ?? client.packageSessionsUsed,
-            remainingSessions:
-              cycle?.remainingSessions ?? client.remainingSessions,
-            balance: subscription.value.carryOverBalance ?? client.balance,
-            currency: cycle?.currency ?? client.currency,
-          };
-        }),
-      );
+      setClients(clientsData);
 
       const trainerName = getTrainerDisplayName(meData);
 
@@ -140,7 +85,7 @@ export default function TrainerClientsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [getClientsForTrainerView]);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -356,4 +301,17 @@ export default function TrainerClientsPage() {
       </section>
     </div>
   );
+}
+
+async function getClientsForTrainer(me: TrainerPortalMe | null) {
+  if (me?.trainerId) {
+    try {
+      return await getClientsByTrainer(me.trainerId);
+    } catch (error) {
+      if (!isForbiddenError(error)) throw error;
+    }
+  }
+
+  const portalClients = await getTrainerPortalClients();
+  return trainerPortalClientsToClients(portalClients, me);
 }

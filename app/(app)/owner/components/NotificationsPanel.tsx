@@ -10,6 +10,7 @@ import {
   getNotifications,
   markAllNotificationsAsRead,
   markNotificationAsRead,
+  type NotificationRole,
   type AppNotification,
 } from "@/app/lib/notifications";
 
@@ -19,12 +20,14 @@ export default function NotificationsPanel({
   notificationsHref,
   totalUnreadCount,
   onUnreadCountChange,
+  role,
 }: {
   open: boolean;
   onClose: () => void;
   notificationsHref: string;
   totalUnreadCount: number;
   onUnreadCountChange?: (count: number) => void;
+  role: NotificationRole;
 }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -187,6 +190,8 @@ export default function NotificationsPanel({
                 <NotificationItem
                   key={item.id}
                   item={item}
+                  role={role}
+                  onNavigate={onClose}
                   variant="panel"
                   markingAsRead={markingIds.includes(item.id)}
                   onMarkAsRead={handleMarkAsRead}

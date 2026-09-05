@@ -37,6 +37,12 @@ export const fallbackPaymentStatuses: DictionaryOption[] = [
   { value: 3, label: "Anulowane" },
 ];
 
+export const fallbackRecurrenceEditScopes: DictionaryOption[] = [
+  { value: 0, label: "Tylko ten wydatek" },
+  { value: 1, label: "Ten i kolejne" },
+  { value: 2, label: "Cała seria" },
+];
+
 export function normalizeDictionary(
   raw: ExpenseDictionaryItem[] | Record<string, string | number> | null,
   fallback: DictionaryOption[],
@@ -146,6 +152,29 @@ export function formatExpenseDate(value?: string | null) {
     month: "short",
     year: "numeric",
   }).format(new Date(`${normalized}T00:00:00`));
+}
+
+export function getRecurrenceLabel(expense: CompanyExpense) {
+  if (!expense.isRecurring) return null;
+
+  const interval = expense.recurrenceIntervalMonths || 1;
+  const frequency =
+    interval === 1
+      ? "Co miesiąc"
+      : interval === 3
+        ? "Co kwartał"
+        : interval === 12
+          ? "Co rok"
+          : `Co ${interval} mies.`;
+  const day = expense.recurrenceDayOfMonth
+    ? ` · dzień ${expense.recurrenceDayOfMonth}`
+    : "";
+
+  const end = expense.recurrenceEndDate
+    ? ` · do ${formatExpenseDate(expense.recurrenceEndDate)}`
+    : "";
+
+  return `${frequency}${day}${end}`;
 }
 
 export function getCurrentMonthRange() {

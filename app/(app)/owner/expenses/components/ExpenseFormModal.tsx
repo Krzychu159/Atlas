@@ -12,6 +12,7 @@ import {
   Building2,
   Paperclip,
   ReceiptText,
+  Repeat2,
   Save,
   UploadCloud,
   WalletCards,
@@ -65,6 +66,11 @@ type ExpenseForm = {
   currency: string;
   description: string;
   notes: string;
+  isRecurring: boolean;
+  recurrenceEndMode: "unchanged" | "count" | "date";
+  recurrenceEndDate: string;
+  recurringOccurrencesCount: string;
+  recurrenceEditScope: string;
 };
 
 type ExpenseFormModalProps = {
@@ -72,8 +78,10 @@ type ExpenseFormModalProps = {
   expense: CompanyExpense | null;
   categories: DictionaryOption[];
   paymentStatuses: DictionaryOption[];
+  recurrenceEditScopes: DictionaryOption[];
   legalEntities: LegalEntityOption[];
   locations: Location[];
+  defaultRecurring?: boolean;
   onClose: () => void;
   onSaved: (expense: CompanyExpense) => void;
 };
@@ -85,8 +93,10 @@ export default function ExpenseFormModal({
   expense,
   categories,
   paymentStatuses,
+  recurrenceEditScopes,
   legalEntities,
   locations,
+  defaultRecurring = false,
   onClose,
   onSaved,
 }: ExpenseFormModalProps) {
@@ -99,10 +109,14 @@ export default function ExpenseFormModal({
     if (!open) return;
 
     void Promise.resolve().then(() => {
-      setForm(expense ? toExpenseForm(expense) : createEmptyForm(legalEntities));
+      setForm(
+        expense
+          ? toExpenseForm(expense)
+          : createEmptyForm(legalEntities, defaultRecurring),
+      );
       setAttachmentFile(null);
     });
-  }, [expense, legalEntities, open]);
+  }, [defaultRecurring, expense, legalEntities, open]);
 
   if (!open) return null;
 
@@ -457,6 +471,121 @@ export default function ExpenseFormModal({
             </div>
 
             <aside className="flex flex-col gap-4">
+              <div className="rounded-[var(--radius-xl)] bg-surface-container-low p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 text-primary-light">
+                      <Repeat2 size={16} />
+                      <p className="text-label">Płatność cykliczna</p>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-on-surface-muted">
+                      Automatycznie utwórz miesięczne wydatki na podstawie tego dokumentu.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={form.isRecurring}
+                    aria-label="Włącz płatność cykliczną"
+                    onClick={() =>
+                      setForm((current) => ({
+                        ...current,
+                        isRecurring: !current.isRecurring,
+                        recurrenceEndMode: !current.isRecurring
+                          ? current.recurrenceEndMode === "unchanged"
+                            ? "count"
+                            : current.recurrenceEndMode
+                          : current.recurrenceEndMode,
+                      }))
+                    }
+                    className={`relative h-7 w-12 shrink-0 rounded-full transition focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_30%,transparent)] ${
+                      form.isRecurring ? "bg-primary" : "bg-surface-bright"
+                    }`}
+                  >
+                    <span
+                      className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-soft transition-transform ${
+                        form.isRecurring ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {form.isRecurring ? (
+                  <div className="mt-4 space-y-4 border-t border-white/5 pt-4">
+                    <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest px-3 py-2.5">
+                      <p className="text-xs font-semibold text-on-surface">
+                        Co miesiąc, {formatRecurrenceDay(form.issueDate)}
+                      </p>
+                      <p className="mt-1 text-[0.7rem] leading-4 text-on-surface-muted">
+                        Każde wystąpienie będzie osobnym, edytowalnym wydatkiem.
+                      </p>
+                    </div>
+
+                    <SelectField
+                      label="Zakończenie serii"
+                      value={form.recurrenceEndMode}
+                      options={[
+                        ...(expense?.isRecurring
+                          ? [{ value: "unchanged", label: "Bez zmiany" }]
+                          : []),
+                        { value: "count", label: "Po określonej liczbie" },
+                        { value: "date", label: "W wybranym dniu" },
+                      ]}
+                      onChange={(recurrenceEndMode) =>
+                        updateForm(
+                          setForm,
+                          "recurrenceEndMode",
+                          recurrenceEndMode as ExpenseForm["recurrenceEndMode"],
+                        )
+                      }
+                    />
+
+                    {form.recurrenceEndMode === "count" ? (
+                      <TextField
+                        label="Liczba płatności"
+                        type="number"
+                        min={2}
+                        max={120}
+                        step={1}
+                        value={form.recurringOccurrencesCount}
+                        onChange={(recurringOccurrencesCount) =>
+                          updateForm(
+                            setForm,
+                            "recurringOccurrencesCount",
+                            recurringOccurrencesCount,
+                          )
+                        }
+                      />
+                    ) : null}
+
+                    {form.recurrenceEndMode === "date" ? (
+                      <DateInput
+                        label="Data zakończenia"
+                        min={form.issueDate}
+                        value={form.recurrenceEndDate}
+                        onChange={(recurrenceEndDate) =>
+                          updateForm(setForm, "recurrenceEndDate", recurrenceEndDate)
+                        }
+                      />
+                    ) : null}
+
+                    {expense?.isRecurring ? (
+                      <SelectField
+                        label="Zakres zmian"
+                        value={form.recurrenceEditScope}
+                        options={recurrenceEditScopes.map((scope) => ({
+                          value: String(scope.value),
+                          label: scope.label,
+                        }))}
+                        onChange={(recurrenceEditScope) =>
+                          updateForm(setForm, "recurrenceEditScope", recurrenceEditScope)
+                        }
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+
               <div>
                 <p className="text-label text-on-surface-muted">Załącznik</p>
                 <button
@@ -612,7 +741,10 @@ function AmountSummary({
   );
 }
 
-function createEmptyForm(legalEntities: LegalEntityOption[] = []): ExpenseForm {
+function createEmptyForm(
+  legalEntities: LegalEntityOption[] = [],
+  defaultRecurring = false,
+): ExpenseForm {
   const today = new Date().toISOString().slice(0, 10);
   return {
     legalEntityId: legalEntities[0] ? String(legalEntities[0].id) : "",
@@ -632,6 +764,11 @@ function createEmptyForm(legalEntities: LegalEntityOption[] = []): ExpenseForm {
     currency: "PLN",
     description: "",
     notes: "",
+    isRecurring: defaultRecurring,
+    recurrenceEndMode: "count",
+    recurrenceEndDate: "",
+    recurringOccurrencesCount: "12",
+    recurrenceEditScope: "0",
   };
 }
 
@@ -654,6 +791,11 @@ function toExpenseForm(expense: CompanyExpense): ExpenseForm {
     currency: expense.currency || "PLN",
     description: expense.description || "",
     notes: expense.notes || "",
+    isRecurring: expense.isRecurring,
+    recurrenceEndMode: expense.recurrenceEndDate ? "date" : "unchanged",
+    recurrenceEndDate: toDateValue(expense.recurrenceEndDate),
+    recurringOccurrencesCount: "12",
+    recurrenceEditScope: "0",
   };
 }
 
@@ -664,6 +806,7 @@ function toExpensePayload(
   const legalEntityId = Number(form.legalEntityId);
   const amount = Number(form.amount);
   const vatRate = Number(form.vatRate);
+  const occurrencesCount = Number(form.recurringOccurrencesCount);
   const amounts = calculateAmounts(form.amount, form.vatRate, form.amountMode);
 
   if (
@@ -678,7 +821,15 @@ function toExpensePayload(
     !form.vatRate.trim() ||
     !Number.isFinite(vatRate) ||
     vatRate < 0 ||
-    vatRate > 100
+    vatRate > 100 ||
+    (form.isRecurring &&
+      form.recurrenceEndMode === "count" &&
+      (!Number.isInteger(occurrencesCount) ||
+        occurrencesCount < 2 ||
+        occurrencesCount > 120)) ||
+    (form.isRecurring &&
+      form.recurrenceEndMode === "date" &&
+      (!form.recurrenceEndDate || form.recurrenceEndDate < form.issueDate))
   ) {
     return null;
   }
@@ -702,9 +853,31 @@ function toExpensePayload(
     description: nullableText(form.description),
     notes: nullableText(form.notes),
     attachmentUrl: expense?.attachmentUrl || null,
-    isRecurring: expense?.isRecurring ?? false,
+    isRecurring: form.isRecurring,
     recurringGroupId: expense?.recurringGroupId ?? null,
+    recurrenceEndDate:
+      form.isRecurring && form.recurrenceEndMode === "date"
+        ? form.recurrenceEndDate
+        : null,
+    recurringOccurrencesCount:
+      form.isRecurring && form.recurrenceEndMode === "count"
+        ? occurrencesCount
+        : null,
+    ...(expense
+      ? {
+          recurrenceEditScope: expense.isRecurring
+            ? Number(form.recurrenceEditScope)
+            : null,
+        }
+      : {}),
   };
+}
+
+function formatRecurrenceDay(issueDate: string) {
+  const day = Number(issueDate.slice(8, 10));
+  return Number.isFinite(day) && day > 0
+    ? `${day}. dnia miesiąca`
+    : "w dniu daty wystawienia";
 }
 
 function updateForm<K extends keyof ExpenseForm>(

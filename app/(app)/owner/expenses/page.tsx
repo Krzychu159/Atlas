@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw, Repeat2, ReceiptText } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import { CustomSelect } from "@/app/components/ui/custom-select";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
 import {
   deleteExpense,
@@ -11,6 +12,7 @@ import {
   getExpense,
   getExpenseCategories,
   getExpensePaymentStatuses,
+  getExpenseRecurrenceEditScopes,
   getExpenses,
   getExpenseStatistics,
   markExpenseAsPaid,
@@ -31,6 +33,7 @@ import {
   deriveLegalEntities,
   fallbackCategories,
   fallbackPaymentStatuses,
+  fallbackRecurrenceEditScopes,
   normalizeDictionary,
   type DictionaryOption,
   type LegalEntityOption,
@@ -65,6 +68,7 @@ const emptyStatistics: ExpenseStatistics = {
 };
 
 export default function OwnerExpensesPage() {
+  const [view, setView] = useState<"all" | "recurring">("all");
   const [filters, setFilters] = useState<ExpenseFiltersValue>(initialExpenseFilters);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(25);
@@ -72,6 +76,7 @@ export default function OwnerExpensesPage() {
   const [statistics, setStatistics] = useState<ExpenseStatistics>(emptyStatistics);
   const [categories, setCategories] = useState<DictionaryOption[]>(fallbackCategories);
   const [paymentStatuses, setPaymentStatuses] = useState<DictionaryOption[]>(fallbackPaymentStatuses);
+  const [recurrenceEditScopes, setRecurrenceEditScopes] = useState<DictionaryOption[]>(fallbackRecurrenceEditScopes);
   const [locations, setLocations] = useState<Location[]>([]);
   const [legalEntities, setLegalEntities] = useState<LegalEntityOption[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -84,6 +89,7 @@ export default function OwnerExpensesPage() {
   const [loadingExpenseId, setLoadingExpenseId] = useState<number | null>(null);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteRecurrenceScope, setDeleteRecurrenceScope] = useState("0");
 
   const query = useMemo<ExpenseQuery>(
     () => ({
@@ -98,11 +104,12 @@ export default function OwnerExpensesPage() {
       paidFrom: nullable(filters.paidFrom),
       paidTo: nullable(filters.paidTo),
       search: nullable(filters.search.trim()),
+      isRecurring: view === "recurring" ? true : null,
       isOverdue: booleanFilter(filters.isOverdue),
       page,
       pageSize,
     }),
-    [filters, page, pageSize],
+    [filters, page, pageSize, view],
   );
 
   const loadData = useCallback(
@@ -144,13 +151,19 @@ export default function OwnerExpensesPage() {
       Promise.allSettled([
         getExpenseCategories(),
         getExpensePaymentStatuses(),
+        getExpenseRecurrenceEditScopes(),
         getLocations(),
-      ]).then(([categoriesResult, statusesResult, locationsResult]) => {
+      ]).then(([categoriesResult, statusesResult, scopesResult, locationsResult]) => {
         if (categoriesResult.status === "fulfilled") {
           setCategories(normalizeDictionary(categoriesResult.value, fallbackCategories));
         }
         if (statusesResult.status === "fulfilled") {
           setPaymentStatuses(normalizeDictionary(statusesResult.value, fallbackPaymentStatuses));
+        }
+        if (scopesResult.status === "fulfilled") {
+          setRecurrenceEditScopes(
+            normalizeDictionary(scopesResult.value, fallbackRecurrenceEditScopes),
+          );
         }
         if (locationsResult.status === "fulfilled") {
           const activeLocations = locationsResult.value.filter((location) => location.isActive);
@@ -250,7 +263,10 @@ export default function OwnerExpensesPage() {
     try {
       setProcessingId(target.expense.id);
       if (target.type === "expense") {
-        await deleteExpense(target.expense.id);
+        await deleteExpense(
+          target.expense.id,
+          target.expense.isRecurring ? Number(deleteRecurrenceScope) : null,
+        );
         showOwnerSuccess("Wydatek został usunięty.", {
           id: `expense-delete-${target.expense.id}`,
         });
@@ -310,10 +326,34 @@ export default function OwnerExpensesPage() {
             }}
             className="flex-1 sm:flex-none"
           >
-            Dodaj wydatek
+            {view === "recurring" ? "Dodaj cykliczny" : "Dodaj wydatek"}
           </Button>
         </div>
       </header>
+
+      {/* Sekcja: Widok wydatków */}
+      <div className="inline-flex w-full rounded-[var(--radius-xl)] bg-surface-container-low p-1 sm:w-fit">
+        <ViewButton
+          active={view === "all"}
+          icon={<ReceiptText size={16} />}
+          onClick={() => {
+            setView("all");
+            setPage(1);
+          }}
+        >
+          Wydatki
+        </ViewButton>
+        <ViewButton
+          active={view === "recurring"}
+          icon={<Repeat2 size={16} />}
+          onClick={() => {
+            setView("recurring");
+            setPage(1);
+          }}
+        >
+          Cykliczne
+        </ViewButton>
+      </div>
 
       {/* Sekcja: Podsumowanie wydatków */}
       <ExpenseStats statistics={statistics} isLoading={isLoading} />
@@ -355,8 +395,14 @@ export default function OwnerExpensesPage() {
         onEdit={(expense) => void handleOpenEdit(expense)}
         onMarkPaid={(expense) => void handleMarkPaid(expense)}
         onDownload={(expense) => void handleDownload(expense)}
-        onDelete={(expense) => setDeleteTarget({ type: "expense", expense })}
-        onDeleteAttachment={(expense) => setDeleteTarget({ type: "attachment", expense })}
+        onDelete={(expense) => {
+          setDeleteRecurrenceScope("0");
+          setDeleteTarget({ type: "expense", expense });
+        }}
+        onDeleteAttachment={(expense) => {
+          setDeleteRecurrenceScope("0");
+          setDeleteTarget({ type: "attachment", expense });
+        }}
       />
 
       {/* Sekcja: Formularz i potwierdzenia */}
@@ -365,8 +411,10 @@ export default function OwnerExpensesPage() {
         expense={editingExpense}
         categories={categories}
         paymentStatuses={paymentStatuses}
+        recurrenceEditScopes={recurrenceEditScopes}
         legalEntities={legalEntities}
         locations={locations}
+        defaultRecurring={view === "recurring"}
         onClose={() => {
           setFormOpen(false);
           setEditingExpense(null);
@@ -385,8 +433,51 @@ export default function OwnerExpensesPage() {
         isProcessing={deleteTarget ? processingId === deleteTarget.expense.id : false}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => void handleConfirmDelete()}
-      />
+      >
+        {deleteTarget?.type === "expense" && deleteTarget.expense.isRecurring ? (
+          <div>
+            <p className="text-label text-on-surface-muted">Zakres usuwania</p>
+            <CustomSelect
+              value={deleteRecurrenceScope}
+              options={recurrenceEditScopes.map((scope) => ({
+                value: String(scope.value),
+                label: scope.label,
+              }))}
+              onChange={setDeleteRecurrenceScope}
+              className="mt-2"
+            />
+          </div>
+        ) : null}
+      </ExpenseConfirmModal>
     </div>
+  );
+}
+
+function ViewButton({
+  active,
+  icon,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  icon: React.ReactNode;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`flex min-h-10 flex-1 items-center justify-center gap-2 rounded-[var(--radius-lg)] px-5 text-sm font-semibold transition sm:flex-none ${
+        active
+          ? "bg-primary text-on-primary shadow-sm"
+          : "text-on-surface-muted hover:bg-white/5 hover:text-on-surface"
+      }`}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }
 

@@ -57,6 +57,12 @@ export type TrainerSessionPayload = {
 export type TrainerPortalClient = {
   clientId: number;
   activePackageId?: number | null;
+  activeClientPackageId?: number | null;
+  activeClientPackageName?: string | null;
+  activePackageTotalSessions?: number | null;
+  activePackageUsedSessions?: number | null;
+  activePackageRemainingSessions?: number | null;
+  activePackagePaymentStatus?: string | null;
   fullName: string | null;
   email: string | null;
   emailContactUrl: string | null;
@@ -93,6 +99,12 @@ export type TrainerPortalClientDetails = {
   id: number;
   trainerId: number | null;
   activePackageId: number | null;
+  activeClientPackageId?: number | null;
+  activeClientPackageName?: string | null;
+  activePackageTotalSessions?: number | null;
+  activePackageUsedSessions?: number | null;
+  activePackageRemainingSessions?: number | null;
+  activePackagePaymentStatus?: string | null;
   firstName: string | null;
   lastName: string | null;
   fullName: string | null;

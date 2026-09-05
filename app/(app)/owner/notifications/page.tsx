@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { BellOff, CheckCheck, LoaderCircle, RefreshCw } from "lucide-react";
 import NotificationItem from "../components/Notification";
 import { Button } from "@/app/components/ui/button";
@@ -11,6 +12,7 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
   type AppNotification,
+  type NotificationRole,
 } from "@/app/lib/notifications";
 
 type NotificationSection = {
@@ -30,11 +32,13 @@ function Section({
   items,
   markingIds,
   onMarkAsRead,
+  role,
 }: {
   title: string;
   items: AppNotification[];
   markingIds: number[];
   onMarkAsRead: (id: number) => void;
+  role: NotificationRole;
 }) {
   return (
     <section>
@@ -48,6 +52,7 @@ function Section({
           <NotificationItem
             key={item.id}
             item={item}
+            role={role}
             markingAsRead={markingIds.includes(item.id)}
             onMarkAsRead={onMarkAsRead}
           />
@@ -58,6 +63,12 @@ function Section({
 }
 
 export default function NotificationsPage() {
+  const pathname = usePathname();
+  const role: NotificationRole = pathname.startsWith("/trainer")
+    ? "trainer"
+    : pathname.startsWith("/client")
+      ? "client"
+      : "owner";
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -235,6 +246,7 @@ export default function NotificationsPage() {
                 items={section.items}
                 markingIds={markingIds}
                 onMarkAsRead={handleMarkAsRead}
+                role={role}
               />
             ))}
           </div>

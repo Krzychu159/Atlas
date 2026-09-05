@@ -16,10 +16,10 @@ export function getClientName(client: Client) {
 export function getClientBalance(client: Client) {
   return (
     firstNumber(
+      client.currentBalance,
       client.balance,
       client.balanceAmount,
       client.accountBalance,
-      client.currentBalance,
       client.billingBalance,
     ) ?? 0
   );
@@ -40,6 +40,10 @@ export function formatClientBalance(client: Client) {
 }
 
 export function hasActiveClientPackage(client: Client) {
+  if (typeof client.activeClientPackageId === "number") {
+    return client.activeClientPackageId > 0;
+  }
+
   if (typeof client.hasActivePackage === "boolean") {
     return client.hasActivePackage;
   }
@@ -65,13 +69,21 @@ export function hasActiveClientPackage(client: Client) {
 
 export function getClientPackageUsage(client: Client) {
   const hasPackage = hasActiveClientPackage(client);
-  const limit = firstNumber(client.packageSessionsLimit, client.sessionsLimit);
+  const limit = firstNumber(
+    client.activePackageTotalSessions,
+    client.packageSessionsLimit,
+    client.sessionsLimit,
+  );
   const directUsed = firstNumber(
+    client.activePackageUsedSessions,
     client.packageSessionsUsed,
     client.usedSessions,
     client.sessionsUsed,
   );
-  const remaining = firstNumber(client.remainingSessions);
+  const remaining = firstNumber(
+    client.activePackageRemainingSessions,
+    client.remainingSessions,
+  );
 
   const used =
     directUsed ??
@@ -89,6 +101,7 @@ export function getClientPackageUsage(client: Client) {
     : 0;
 
   const packageName =
+    client.activeClientPackageName ||
     client.currentPackageName ||
     client.activePackageName ||
     client.packageName ||
@@ -104,5 +117,6 @@ export function getClientPackageUsage(client: Client) {
       : hasPackage
         ? "Brak danych"
         : "Brak pakietu",
+    paymentStatus: client.activePackagePaymentStatus || client.billingStatus,
   };
 }

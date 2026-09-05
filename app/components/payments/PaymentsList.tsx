@@ -68,27 +68,29 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
     return (
       <div className="flex min-h-56 flex-col items-center justify-center bg-surface-container-lowest px-5 text-center">
         <CreditCard size={28} className="text-on-surface-muted" />
-        <p className="mt-4 text-sm font-semibold text-on-surface">{emptyTitle}</p>
-        <p className="mt-1 text-sm text-on-surface-muted">
-          {emptyMessage}
+        <p className="mt-4 text-sm font-semibold text-on-surface">
+          {emptyTitle}
         </p>
+        <p className="mt-1 text-sm text-on-surface-muted">{emptyMessage}</p>
       </div>
     );
   }
 
   const hasActions = Boolean(
     getDetailsHref ||
-      onConfirm ||
-      onReject ||
-      onIssueReceipt ||
-      onCancelReceipt ||
-      onReverse,
+    onConfirm ||
+    onReject ||
+    onIssueReceipt ||
+    onCancelReceipt ||
+    onReverse,
   );
   const gridClass = getGridClass(showClient, hasActions);
 
   return (
     <div className="bg-surface-container-lowest">
-      <div className={`hidden gap-3 bg-surface-container-low px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted xl:grid ${gridClass}`}>
+      <div
+        className={`hidden gap-3 bg-surface-container-low px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted xl:grid ${gridClass}`}
+      >
         <span>Data</span>
         {showClient ? <span>Klient</span> : null}
         <span>Pakiet</span>
@@ -110,8 +112,12 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
             detailsHref={getDetailsHref?.(payment)}
             onConfirm={onConfirm ? () => onConfirm(payment) : undefined}
             onReject={onReject ? () => onReject(payment) : undefined}
-            onIssueReceipt={onIssueReceipt ? () => onIssueReceipt(payment) : undefined}
-            onCancelReceipt={onCancelReceipt ? () => onCancelReceipt(payment) : undefined}
+            onIssueReceipt={
+              onIssueReceipt ? () => onIssueReceipt(payment) : undefined
+            }
+            onCancelReceipt={
+              onCancelReceipt ? () => onCancelReceipt(payment) : undefined
+            }
             onReverse={onReverse ? () => onReverse(payment) : undefined}
           />
         ))}
@@ -169,7 +175,9 @@ function PaymentListRow(props: PaymentListRowProps) {
             {payment.packageName || "Bez przypisanego pakietu"}
           </p>
           {payment.note ? (
-            <p className="mt-1 truncate text-xs text-on-surface-muted">{payment.note}</p>
+            <p className="mt-1 truncate text-xs text-on-surface-muted">
+              {payment.note}
+            </p>
           ) : null}
         </div>
         <div>
@@ -178,16 +186,21 @@ function PaymentListRow(props: PaymentListRowProps) {
           </p>
           {hasPaymentOverpayment(payment) ? (
             <p className="mt-1 text-xs text-tertiary-light">
-              +{formatMoney(breakdown.balanceCreditAmount, payment.currency)} na saldo
+              +{formatMoney(breakdown.balanceCreditAmount, payment.currency)} na
+              saldo
             </p>
           ) : (
-            <p className="mt-1 text-xs text-on-surface-muted">Rozliczono z pakietem</p>
+            <p className="mt-1 text-xs text-on-surface-muted">
+              Rozliczono z pakietem
+            </p>
           )}
         </div>
         <div className="min-w-0">
           <PaymentStatusBadge payment={payment} />
           {receiptIssued ? (
-            <p className="mt-1.5 truncate text-[10px] text-tertiary-light">Paragon wystawiony</p>
+            <p className="mt-1.5 truncate text-[10px] text-tertiary-light">
+              Paragon wystawiony
+            </p>
           ) : null}
         </div>
         <PaymentMethod method={payment.method} />
@@ -223,47 +236,94 @@ function PaymentListRow(props: PaymentListRowProps) {
           <PaymentMethod method={payment.method} />
           {hasPaymentOverpayment(payment) ? (
             <span className="text-tertiary-light">
-              +{formatMoney(breakdown.balanceCreditAmount, payment.currency)} na saldo
+              +{formatMoney(breakdown.balanceCreditAmount, payment.currency)} na
+              saldo
             </span>
           ) : null}
         </div>
 
-        {(payment.rejectionReason || payment.reversalReason) ? (
+        {payment.rejectionReason || payment.reversalReason ? (
           <p className="mt-3 rounded-[var(--radius-md)] bg-error-container/25 px-3 py-2 text-xs text-error-light">
             {payment.rejectionReason || payment.reversalReason}
           </p>
         ) : null}
 
         {props.showActions ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {pending && (props.onConfirm || props.onReject) ? (
-            <>
-              {props.onConfirm ? (
-                <Button size="sm" icon={<Check size={15} />} onClick={props.onConfirm} disabled={props.processing} className="flex-1">Potwierdź</Button>
-              ) : null}
-              {props.onReject ? (
-                <Button size="sm" variant="danger" icon={<CircleX size={15} />} onClick={props.onReject} disabled={props.processing} className="flex-1">Odrzuć</Button>
-              ) : null}
-            </>
-          ) : null}
-          {confirmed && !reversed && (props.onIssueReceipt || props.onCancelReceipt || props.onReverse) ? (
-            <>
-              {(receiptIssued ? props.onCancelReceipt : props.onIssueReceipt) ? (
-                <Button size="sm" variant="secondary" icon={<ReceiptText size={15} />} onClick={receiptIssued ? props.onCancelReceipt : props.onIssueReceipt} disabled={props.processing} className="flex-1">
-                  {receiptIssued ? "Cofnij paragon" : "Wystaw paragon"}
-                </Button>
-              ) : null}
-              {props.onReverse ? (
-                <Button size="sm" variant="outline" icon={<RotateCcw size={15} />} onClick={props.onReverse} disabled={props.processing} className="flex-1">Cofnij</Button>
-              ) : null}
-            </>
-          ) : null}
-          {props.detailsHref ? (
-            <Link href={props.detailsHref} className="inline-flex h-10 min-w-10 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container px-3 text-xs font-semibold text-primary-light transition hover:bg-surface-container-high">
-              Szczegóły <ChevronRight size={15} />
-            </Link>
-          ) : null}
-        </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {pending && (props.onConfirm || props.onReject) ? (
+              <>
+                {props.onConfirm ? (
+                  <Button
+                    size="sm"
+                    icon={<Check size={15} />}
+                    onClick={props.onConfirm}
+                    disabled={props.processing}
+                    className="flex-1"
+                  >
+                    Potwierdź
+                  </Button>
+                ) : null}
+                {props.onReject ? (
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    icon={<CircleX size={15} />}
+                    onClick={props.onReject}
+                    disabled={props.processing}
+                    className="flex-1"
+                  >
+                    Odrzuć
+                  </Button>
+                ) : null}
+              </>
+            ) : null}
+            {confirmed &&
+            !reversed &&
+            (props.onIssueReceipt ||
+              props.onCancelReceipt ||
+              props.onReverse) ? (
+              <>
+                {(
+                  receiptIssued ? props.onCancelReceipt : props.onIssueReceipt
+                ) ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={<ReceiptText size={15} />}
+                    onClick={
+                      receiptIssued
+                        ? props.onCancelReceipt
+                        : props.onIssueReceipt
+                    }
+                    disabled={props.processing}
+                    className="flex-1"
+                  >
+                    {receiptIssued ? "Cofnij paragon" : "Wystaw paragon"}
+                  </Button>
+                ) : null}
+                {props.onReverse ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    icon={<RotateCcw size={15} />}
+                    onClick={props.onReverse}
+                    disabled={props.processing}
+                    className="flex-1"
+                  >
+                    Cofnij
+                  </Button>
+                ) : null}
+              </>
+            ) : null}
+            {props.detailsHref ? (
+              <Link
+                href={props.detailsHref}
+                className="inline-flex h-10 min-w-10 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container px-3 text-xs font-semibold text-primary-light transition hover:bg-surface-container-high"
+              >
+                Szczegóły <ChevronRight size={15} />
+              </Link>
+            ) : null}
+          </div>
         ) : null}
       </div>
     </article>
@@ -280,20 +340,65 @@ function RowActions(props: PaymentListRowProps) {
     <div className="flex justify-end gap-1.5">
       {pending && (props.onConfirm || props.onReject) ? (
         <>
-          {props.onConfirm ? <IconAction label="Potwierdź wpłatę" onClick={props.onConfirm} disabled={props.processing} tone="success"><Check size={16} /></IconAction> : null}
-          {props.onReject ? <IconAction label="Odrzuć wpłatę" onClick={props.onReject} disabled={props.processing} tone="danger"><CircleX size={16} /></IconAction> : null}
+          {props.onConfirm ? (
+            <IconAction
+              label="Potwierdź wpłatę"
+              onClick={props.onConfirm}
+              disabled={props.processing}
+              tone="success"
+            >
+              <Check size={16} />
+            </IconAction>
+          ) : null}
+          {props.onReject ? (
+            <IconAction
+              label="Odrzuć wpłatę"
+              onClick={props.onReject}
+              disabled={props.processing}
+              tone="danger"
+            >
+              <CircleX size={16} />
+            </IconAction>
+          ) : null}
         </>
       ) : null}
-      {confirmed && !reversed && (props.onIssueReceipt || props.onCancelReceipt || props.onReverse) ? (
+      {confirmed &&
+      !reversed &&
+      (props.onIssueReceipt || props.onCancelReceipt || props.onReverse) ? (
         <>
           {(receiptIssued ? props.onCancelReceipt : props.onIssueReceipt) ? (
-            <IconAction label={receiptIssued ? "Cofnij paragon" : "Wystaw paragon"} onClick={(receiptIssued ? props.onCancelReceipt : props.onIssueReceipt)!} disabled={props.processing}><ReceiptText size={16} /></IconAction>
+            <IconAction
+              label={receiptIssued ? "Cofnij paragon" : "Wystaw paragon"}
+              onClick={
+                (receiptIssued ? props.onCancelReceipt : props.onIssueReceipt)!
+              }
+              disabled={props.processing}
+            >
+              {receiptIssued ? (
+                <CircleX size={16} />
+              ) : (
+                <ReceiptText size={16} />
+              )}
+            </IconAction>
           ) : null}
-          {props.onReverse ? <IconAction label="Cofnij wpłatę" onClick={props.onReverse} disabled={props.processing}><RotateCcw size={16} /></IconAction> : null}
+          {props.onReverse ? (
+            <IconAction
+              label="Cofnij wpłatę"
+              onClick={props.onReverse}
+              disabled={props.processing}
+            >
+              <RotateCcw size={16} />
+            </IconAction>
+          ) : null}
         </>
       ) : null}
       {props.detailsHref ? (
-        <Link href={props.detailsHref} aria-label="Zobacz szczegóły płatności" title="Szczegóły" className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-container text-on-surface-muted transition hover:bg-surface-container-high hover:text-primary-light">
+        <Link
+          href={props.detailsHref}
+          aria-label="Zobacz szczegóły płatności"
+          title="Szczegóły"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-container text-on-surface-muted transition hover:bg-surface-container-high hover:text-primary-light"
+        >
           <ChevronRight size={17} />
         </Link>
       ) : null}
@@ -315,9 +420,12 @@ function IconAction({
   children: React.ReactNode;
 }) {
   const toneClass = {
-    neutral: "bg-surface-container text-on-surface-muted hover:bg-surface-container-high hover:text-on-surface",
-    success: "bg-tertiary-container/35 text-tertiary-light hover:bg-tertiary-container/60",
-    danger: "bg-error-container/35 text-error-light hover:bg-error-container/60",
+    neutral:
+      "bg-surface-container text-on-surface-muted hover:bg-surface-container-high hover:text-on-surface",
+    success:
+      "bg-tertiary-container/35 text-tertiary-light hover:bg-tertiary-container/60",
+    danger:
+      "bg-error-container/35 text-error-light hover:bg-error-container/60",
   }[tone];
 
   return (

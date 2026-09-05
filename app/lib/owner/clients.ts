@@ -6,6 +6,12 @@ export type Client = {
   id: number;
   trainerId: number | null;
   activePackageId: number | null;
+  activeClientPackageId?: number | null;
+  activeClientPackageName?: string | null;
+  activePackageTotalSessions?: number | null;
+  activePackageUsedSessions?: number | null;
+  activePackageRemainingSessions?: number | null;
+  activePackagePaymentStatus?: string | null;
   firstName: string;
   lastName: string;
   fullName: string;
