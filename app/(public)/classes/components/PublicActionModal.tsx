@@ -7,7 +7,8 @@ import { Button } from "@/app/components/ui/button";
 import { TextField } from "@/app/components/ui/input";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
-import { ApiError, getErrorMessage } from "@/app/lib/backend";
+import { ApiError } from "@/app/lib/backend";
+import { publicErrorMessage } from "@/app/lib/public/errors";
 import { authenticatePublicClient, registerPublicClient, bookGroupClass, cancelGroupClassBooking, purchaseGroupPackage, reportGroupPayment, getPublicLocations, type PublicLocation, type PublicGroupClass, type PublicGroupPackage, type GroupPackagePurchase } from "@/app/lib/public/group-classes";
 import { publicMoney, studioNow, studioDay, studioTime } from "@/app/lib/public/studio-date";
 
@@ -39,7 +40,7 @@ export function PublicActionModal({ action, user, onUser, onClose, onRefresh }: 
   useEffect(() => {
     if (!register || action.type !== "auth") return;
     let active = true;
-    getPublicLocations().then((items) => { if (active) { setLocations(items); setLocationId((current) => current || String(items[0]?.id || "")); } }).catch((err) => { if (active) setError(getErrorMessage(err)); });
+    getPublicLocations().then((items) => { if (active) { setLocations(items); setLocationId((current) => current || String(items[0]?.id || "")); } }).catch((err) => { if (active) setError(publicErrorMessage(err)); });
     return () => { active = false; };
   }, [register, action.type]);
   async function authenticate(event: FormEvent) {
@@ -47,18 +48,19 @@ export function PublicActionModal({ action, user, onUser, onClose, onRefresh }: 
     try {
       const result = register ? await registerPublicClient({ email, password, firstName, lastName, phoneNumber: phone, locationId: Number(locationId) }) : await authenticatePublicClient({ email, password });
       onUser(result.user);
+      dialog.current?.focus();
       if (action.type === "auth") onClose();
-    } catch (err) { setError(getErrorMessage(err)); } finally { setBusy(false); }
+    } catch (err) { setError(publicErrorMessage(err)); } finally { setBusy(false); }
   }
   function handleError(err: unknown) {
     if (err instanceof ApiError && err.status === 401) onUser(null);
-    setError(getErrorMessage(err, "Nie udało się wykonać operacji. Spróbuj ponownie."));
+    setError(publicErrorMessage(err));
   }
   async function confirm() {
     if (action.type === "auth" || busy) return;
     setBusy(true); setError("");
     try {
-      if (action.type === "buy") { setPurchase(await purchaseGroupPackage(action.item.id)); onRefresh(); }
+      if (action.type === "buy") { setPurchase(await purchaseGroupPackage(action.item.id)); dialog.current?.focus(); onRefresh(); }
       else {
         if (action.type === "book") await bookGroupClass(action.item.id);
         else await cancelGroupClassBooking(action.item.id);
@@ -110,7 +112,7 @@ export function PublicActionModal({ action, user, onUser, onClose, onRefresh }: 
         <h3 className="text-xl font-semibold">{action.type === "buy" ? action.item.name : action.item.title}</h3>
         {action.type === "buy" ? <p className="text-on-surface-variant">{action.item.entriesCount} wejść • {action.item.durationDays} dni • {publicMoney(action.item.price, action.item.currency)}<br />Lokalizacja: {action.item.locationName}<br /><span className="mt-3 block text-sm">Utworzysz pakiet do opłacenia. Zapis na zajęcia będzie dostępny po potwierdzeniu płatności.</span></p> : <p className="text-on-surface-variant">{studioDay(action.item.startAt)}, {studioTime(action.item.startAt)}<br />{action.item.locationName}<span className="mt-3 block text-sm">{action.type === "book" ? "Do zapisu potrzebujesz opłaconego pakietu grupowego z wolnymi wejściami w tej lokalizacji." : "Potwierdź odwołanie swojej rezerwacji."}</span></p>}
         <Button className="w-full" disabled={busy} onClick={confirm}>{busy ? "Proszę czekać…" : action.type === "buy" ? "Potwierdź zakup" : action.type === "cancel" ? "Odwołaj zapis" : "Potwierdź zapis"}</Button>
-        {action.type === "book" && <Link onClick={onClose} className="block text-center text-sm text-primary-light" href={`/zajecia?locationId=${action.item.locationId}#pakiety`}>Nie masz pakietu? Zobacz pakiety</Link>}
+        {action.type === "book" && <Link onClick={onClose} className="block text-center text-sm text-primary-light" href={`/classes?locationId=${action.item.locationId}#packages`}>Nie masz pakietu? Zobacz pakiety</Link>}
       </div>}
     </div>
   </ModalOverlay>;

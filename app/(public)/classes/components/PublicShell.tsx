@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Dumbbell, MapPin, CalendarDays } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { PublicActionModal, type PublicAction } from "./PublicActionModal";
@@ -38,15 +39,32 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
     <PublicContext.Provider value={{ user, authReady, revision, act: setAction, refresh }}>
       <div lang="pl" className="flex min-h-screen flex-col">
         <header className="mx-auto flex min-h-20 w-full max-w-[1240px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <Link href="/zajecia" className="flex items-center gap-2.5 text-xl font-bold tracking-tight"><span className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-primary text-on-primary"><Dumbbell size={20} /></span>ATLAS</Link>
+          <Link href="/classes" className="flex items-center gap-2.5 text-xl font-bold tracking-tight"><span className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-primary text-on-primary"><Dumbbell size={20} /></span>ATLAS</Link>
           <span className="hidden items-center gap-1.5 rounded-full bg-surface-container-low px-3 py-1 text-xs text-on-surface-variant xl:flex"><MapPin size={13} />Studio Fitness</span>
-          <nav aria-label="Nawigacja publiczna" className="hidden flex-1 items-center justify-center gap-7 text-sm md:flex"><Link className="border-b border-primary-light pb-2 text-primary-light" href="/zajecia">Grafik</Link><Link href="/zajecia#pakiety">Karnety</Link><Link href="/zajecia#lokalizacje">Lokalizacje</Link></nav>
+          <nav aria-label="Nawigacja publiczna" className="hidden flex-1 items-center justify-center gap-7 text-sm md:flex"><Link className="border-b border-primary-light pb-2 text-primary-light" href="/classes">Grafik</Link><PublicSectionLink section="packages">Pakiety</PublicSectionLink><PublicSectionLink section="locations">Lokalizacje</PublicSectionLink></nav>
           {user ? <Link href={accountHref} className="flex min-h-11 items-center gap-2 text-sm"><CalendarDays size={17} />Moje konto</Link> : <Button size="sm" disabled={!authReady} className="rounded-full" onClick={() => setAction({ type: "auth" })}>Zaloguj się</Button>}
         </header>
         <main className="mx-auto w-full max-w-[1140px] flex-1 px-4 pb-24 pt-8 sm:px-6 md:pt-12 lg:px-8">{children}</main>
-        <footer className="bg-surface-container-lowest px-4 py-10 sm:px-6"><div className="mx-auto flex max-w-[1140px] flex-col gap-6 text-xs text-on-surface-variant sm:flex-row sm:items-center sm:justify-between"><Link href="/zajecia" className="text-lg font-bold text-on-surface">ATLAS <span className="text-xs font-normal">Fitness Studio</span></Link><span>ATLAS Fitness Studio</span><nav className="flex gap-6"><Link href="/zajecia">Grafik</Link><Link href="/zajecia#pakiety">Karnety</Link><Link href="/zajecia#lokalizacje">Lokalizacje</Link></nav></div></footer>
+        <footer className="bg-surface-container-lowest px-4 py-10 sm:px-6"><div className="mx-auto flex max-w-[1140px] flex-col gap-6 text-xs text-on-surface-variant sm:flex-row sm:items-center sm:justify-between"><Link href="/classes" className="text-lg font-bold text-on-surface">ATLAS <span className="text-xs font-normal">Fitness Studio</span></Link><span>ATLAS Fitness Studio</span><nav className="flex gap-6"><Link href="/classes">Grafik</Link><PublicSectionLink section="packages">Pakiety</PublicSectionLink><PublicSectionLink section="locations">Lokalizacje</PublicSectionLink></nav></div></footer>
         {action && <PublicActionModal action={action} user={user} onUser={(next) => { setUser(next); refresh(); }} onClose={() => setAction(null)} onRefresh={refresh} />}
       </div>
     </PublicContext.Provider>
   );
+}
+
+function PublicSectionLink({ section, children }: { section: "packages" | "locations"; children: React.ReactNode }) {
+  const pathname = usePathname();
+  return <a href={pathname === "/classes" ? `#${section}` : `/classes#${section}`}
+    title={section === "packages" ? "Przejdź do pakietów na stronie grafiku" : "Przejdź do wyboru lokalizacji"}
+    onClick={(event) => {
+      if (pathname !== "/classes" || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      const target = document.getElementById(section);
+      if (!target) return;
+      event.preventDefault();
+      const url = new URL(window.location.href);
+      url.hash = section;
+      window.history.replaceState(null, "", url);
+      target.focus({ preventScroll: true });
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }}>{children}</a>;
 }

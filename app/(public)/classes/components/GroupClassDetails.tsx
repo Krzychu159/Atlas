@@ -5,7 +5,8 @@ import Link from "next/link";
 import { ArrowLeft, CalendarDays, Clock3, Link2, MapPin, TextAlignStart, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
-import { ApiError, getErrorMessage } from "@/app/lib/backend";
+import { ApiError } from "@/app/lib/backend";
+import { publicErrorMessage } from "@/app/lib/public/errors";
 import { getPublicGroupClassBySlug, getPublicGroupClasses, getPublicPackages, getPublicLocations, type PublicGroupClass, type PublicGroupPackage, type PublicLocation } from "@/app/lib/public/group-classes";
 import { addStudioDays, durationMinutes, studioDay, studioTime, studioToday } from "@/app/lib/public/studio-date";
 import { AvailabilityBadge, BookingButton, GroupClassCard, PackageList, PublicError, PublicLoading, TrainerIdentity } from "./GroupCards";
@@ -39,13 +40,13 @@ export default function GroupClassDetails({ slug }: { slug: string }) {
         setLocation(results[1].status === "fulfilled" ? results[1].value.find((entry) => entry.id === session.locationId) ?? null : null);
         setRelated(results[2].status === "fulfilled" ? results[2].value.filter((entry) => entry.id !== session.id).sort((a, b) => a.startAt.localeCompare(b.startAt)).slice(0, 2) : []);
         if (results.some((result) => result.status === "rejected")) setExtraError("Nie udało się pobrać części dodatkowych informacji. Spróbuj ponownie.");
-      } catch (err) { if (active) setError(err instanceof ApiError && err.status === 404 ? "Nie znaleziono tych zajęć. Wróć do grafiku i wybierz inny termin." : getErrorMessage(err)); }
+      } catch (err) { if (active) setError(err instanceof ApiError && err.status === 404 ? "Nie znaleziono tych zajęć. Wróć do grafiku i wybierz inny termin." : publicErrorMessage(err)); }
       finally { if (active) setLoading(false); }
     }, 0);
     return () => { active = false; window.clearTimeout(timer); };
   }, [slug, revision, authReady, retry]);
   return <>
-    <Link href={item ? `/zajecia?locationId=${item.locationId}` : "/zajecia"} className="mb-7 inline-flex min-h-11 items-center gap-2 text-sm text-primary-light"><ArrowLeft size={17} />Wróć do grafiku</Link>
+    <Link href={item ? `/classes?locationId=${item.locationId}` : "/classes"} className="mb-7 inline-flex min-h-11 items-center gap-2 text-sm text-primary-light"><ArrowLeft size={17} />Wróć do grafiku</Link>
     {loading ? <PublicLoading /> : error ? <PublicError message={error} retry={() => setRetry((value) => value + 1)} /> : item && <>
       <p className="mb-6 flex flex-wrap items-center gap-2 text-xs text-on-surface-variant"><MapPin size={14} />Lokalizacja: {item.locationName}<span>•</span>{studioDay(item.startAt)}</p>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
