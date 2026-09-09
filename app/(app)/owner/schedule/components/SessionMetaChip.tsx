@@ -1,11 +1,13 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 export default function SessionMetaChip({
   icon,
   label,
   value,
   tone,
+  style,
 }: {
+  style?: CSSProperties;
   icon: ReactNode;
   label: string;
   value: string;
@@ -20,6 +22,7 @@ export default function SessionMetaChip({
 
   return (
     <span
+      style={style}
       className={[
         "flex min-w-0 items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2",
         toneClass,

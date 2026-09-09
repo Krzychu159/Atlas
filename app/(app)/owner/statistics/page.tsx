@@ -1,5 +1,7 @@
 "use client";
 
+import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CircleAlert, RefreshCw } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
@@ -50,6 +52,13 @@ import {
 } from "./statistics-config";
 
 export default function OwnerStatisticsPage() {
+  const { selectedLocationId } = useOwnerLocationFilter();
+  const locationId = selectedLocationId;
+  return <OwnerStatisticsPageContent key={locationId ?? "all"} locationId={locationId} />;
+}
+
+function OwnerStatisticsPageContent({ locationId }: { locationId: number | null }) {
+  const { setSelectedLocationValue } = useOwnerLocationFilter();
   const [filters, setFilters] = useState<StatisticsFiltersValue>(
     initialStatisticsFilters,
   );
@@ -84,12 +93,12 @@ export default function OwnerStatisticsPage() {
       from: filters.from || null,
       to: filters.to || null,
       legalEntityId: numberFilter(filters.legalEntityId),
-      locationId: numberFilter(filters.locationId),
+      locationId,
       trainerId: numberFilter(filters.trainerId),
       clientId: numberFilter(filters.clientId),
       clientPackageId: numberFilter(filters.clientPackageId),
     }),
-    [filters],
+    [filters, locationId],
   );
 
   const legalEntities = useMemo(
@@ -251,7 +260,8 @@ export default function OwnerStatisticsPage() {
     key: K,
     value: StatisticsFiltersValue[K],
   ) {
-    setFilters((current) => ({ ...current, [key]: value }));
+    if (key === "locationId") setSelectedLocationValue(value);
+    else setFilters((current) => ({ ...current, [key]: value }));
     setSessionsPage(1);
   }
 
@@ -289,7 +299,7 @@ export default function OwnerStatisticsPage() {
 
       {/* Sekcja: Filtry statystyk */}
       <StatisticsFilters
-        value={filters}
+        value={{ ...filters, locationId: locationId === null ? "all" : String(locationId) }}
         advancedOpen={advancedOpen}
         legalEntities={legalEntities}
         locations={locations}

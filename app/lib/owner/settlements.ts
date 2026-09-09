@@ -5,6 +5,7 @@ import {
   backendPut,
 } from "../backend";
 import { getTrainers, type Trainer } from "./trainers";
+import { getOwnerSessions } from "./sessions";
 
 export type TrainerRate = {
   id: number;
@@ -118,7 +119,14 @@ export function downloadTrainerWorkHoursDocument(
   );
 }
 
-export async function getOwnerTrainerSettlements(year: number, month: number) {
+export async function getOwnerTrainerSettlements(year: number, month: number, locationId: number | null = null) {
+  const sessionIds = locationId === null ? null : new Set(
+    (await getOwnerSessions({
+      locationId,
+      from: new Date(year, month - 1, 1).toISOString(),
+      to: new Date(year, month, 1).toISOString(),
+    })).filter((session) => session.locationId === locationId).map((session) => session.id),
+  );
   const trainers = await getTrainers();
   const results = await Promise.allSettled(
     trainers.map((trainer) => getTrainerSettlement(trainer.id, year, month)),
@@ -127,8 +135,18 @@ export async function getOwnerTrainerSettlements(year: number, month: number) {
   return trainers.map((trainer, index) => {
     const result = results[index];
 
-    if (result.status === "fulfilled") return result.value;
+    if (result.status === "fulfilled") {
+      if (!sessionIds) return result.value;
+      const items = (result.value.items || []).filter((item) => sessionIds.has(item.sessionId));
+      return {
+        ...result.value,
+        items,
+        totalSessions: items.length,
+        totalHours: items.reduce((sum, item) => sum + item.hours, 0),
+        totalAmount: items.reduce((sum, item) => sum + item.amount, 0),
+      };
+    }
 
     return emptySettlement(trainer, year, month);
-  });
+  }).filter((settlement) => !sessionIds || settlement.totalSessions > 0);
 }

@@ -6,6 +6,7 @@ import { Check, ChevronDown } from "lucide-react";
 export type SelectOption = {
   value: string;
   label: string;
+  color?: string;
 };
 
 type CustomSelectProps = {
@@ -93,6 +94,13 @@ export function CustomSelect({
                     : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface",
                 ].join(" ")}
               >
+                {option.color ? (
+                  <span
+                    aria-hidden="true"
+                    className="h-4 w-4 shrink-0 rounded-sm border border-white/15"
+                    style={{ backgroundColor: option.color }}
+                  />
+                ) : null}
                 <span className="min-w-0 flex-1 truncate font-semibold">
                   {option.label}
                 </span>

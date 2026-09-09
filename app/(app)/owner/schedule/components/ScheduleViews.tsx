@@ -1,6 +1,7 @@
 "use client";
 
 import { MapPin, Plus, UserRound } from "lucide-react";
+import { getSessionOutlookColor } from "@/app/lib/calendar/outlook-colors";
 import type { OwnerSession } from "@/app/lib/owner/sessions";
 import {
   dayNames,
@@ -151,6 +152,7 @@ function SessionCard({
   compact?: boolean;
   onSelect: (session: OwnerSession) => void;
 }) {
+  const color = getSessionOutlookColor(session);
   return (
     <button
       type="button"
@@ -188,6 +190,7 @@ function SessionCard({
           label="Trener"
           value={session.trainerFullName || "Brak"}
           tone="primary"
+          style={{ backgroundColor: color.bg, borderLeft: `4px solid ${color.border}`, color: color.text }}
         />
         <SessionMetaChip
           icon={<MapPin size={14} />}

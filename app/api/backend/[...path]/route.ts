@@ -17,17 +17,18 @@ async function handler(req: NextRequest, context: RouteContext) {
 
   const cookieStore = await cookies();
   const token = cookieStore.get("accessToken")?.value;
+  const { path } = await context.params;
+  const backendPath = path.join("/");
+  const publicRead = req.method === "GET" &&
+    /^public\/group-classes(?:\/(?:locations|packages|\d+|by-slug\/[^/]+|packages\/by-slug\/[^/]+))?$/.test(backendPath);
 
-  if (!token) {
+  if (!token && !publicRead) {
     const response = jsonError("Sesja wygasła.", 401);
 
     expireAuthCookies(response);
 
     return response;
   }
-
-  const { path } = await context.params;
-  const backendPath = path.join("/");
 
   const url = new URL(`${BACKEND_URL}/api/${backendPath}`);
 
@@ -53,13 +54,23 @@ async function handler(req: NextRequest, context: RouteContext) {
                 req.headers.get("content-type") || "application/json",
             }
           : {}),
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: body?.byteLength ? body : undefined,
       cache: "no-store",
     });
   } catch {
     return jsonError("Nie udało się połączyć z backendem.", 502);
+  }
+
+  // Public listings remain available when a previously valid session expires.
+  const expiredPublicSession = publicRead && response.status === 401 && Boolean(token);
+  if (expiredPublicSession) {
+    try {
+      response = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
+    } catch {
+      return jsonError("Nie udało się połączyć z backendem.", 502);
+    }
   }
 
   if ([204, 205, 304].includes(response.status)) {
@@ -93,7 +104,7 @@ async function handler(req: NextRequest, context: RouteContext) {
     nextResponse.headers.set("Content-Disposition", contentDisposition);
   }
 
-  if (response.status === 401) {
+  if (response.status === 401 || expiredPublicSession) {
     expireAuthCookies(nextResponse);
   }
 

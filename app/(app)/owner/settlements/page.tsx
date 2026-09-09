@@ -1,5 +1,7 @@
 "use client";
 
+import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
+
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Search } from "lucide-react";
 import {
@@ -62,6 +64,12 @@ function normalize(value: string) {
 }
 
 export default function OwnerSettlementsPage() {
+  const { selectedLocationId } = useOwnerLocationFilter();
+  const locationId = selectedLocationId;
+  return <OwnerSettlementsPageContent key={locationId ?? "all"} locationId={locationId} />;
+}
+
+function OwnerSettlementsPageContent({ locationId }: { locationId: number | null }) {
   const [monthValue, setMonthValue] = useState("");
   const [search, setSearch] = useState("");
   const [settlements, setSettlements] = useState<TrainerMonthlySettlement[]>(
@@ -83,7 +91,7 @@ export default function OwnerSettlementsPage() {
 
       try {
         setIsLoading(true);
-        const data = await getOwnerTrainerSettlements(year, month);
+        const data = await getOwnerTrainerSettlements(year, month, locationId);
         setSettlements(data);
       } catch (err) {
         showOwnerError(err, "Nie udało się pobrać rozliczeń.", {
@@ -95,7 +103,7 @@ export default function OwnerSettlementsPage() {
     }
 
     loadSettlements();
-  }, [monthValue]);
+  }, [monthValue, locationId]);
 
   const filteredSettlements = useMemo(() => {
     const query = normalize(search);

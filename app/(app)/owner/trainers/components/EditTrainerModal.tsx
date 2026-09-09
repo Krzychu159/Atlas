@@ -14,11 +14,12 @@ import {
   OwnerTextField,
 } from "../../components/OwnerFormControls";
 import { showOwnerError, showOwnerSuccess } from "../../components/owner-toast";
-import { CustomSelect } from "@/app/components/ui/custom-select";
 import {
-  deleteTrainerAvatar,
-  uploadTrainerAvatar,
-} from "@/app/lib/avatars";
+  OUTLOOK_COLORS,
+  getOutlookColor,
+} from "@/app/lib/calendar/outlook-colors";
+import { CustomSelect } from "@/app/components/ui/custom-select";
+import { deleteTrainerAvatar, uploadTrainerAvatar } from "@/app/lib/avatars";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
 import {
   updateTrainerRates,
@@ -88,6 +89,7 @@ export default function EditTrainerModal({
   const [status, setStatus] = useState("");
   const [experienceYears, setExperienceYears] = useState("0");
   const [outlookCategory, setOutlookCategory] = useState("");
+  const [outlookColor, setOutlookColor] = useState("preset7");
   const [locationIds, setLocationIds] = useState<string[]>([]);
   const [hourlyRate, setHourlyRate] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -112,6 +114,7 @@ export default function EditTrainerModal({
       setStatus(normalizeTrainerStatus(trainer.status));
       setExperienceYears(String(trainer.experienceYears ?? 0));
       setOutlookCategory(trainer.outlookCategoryName || "");
+      setOutlookColor(trainer.outlookCategoryColor || "preset7");
       setLocationIds(toLocationValues(trainer.locationIds));
       setHourlyRate(String(activeRate?.rate ?? trainer.hourlyRate ?? 0));
     });
@@ -133,6 +136,7 @@ export default function EditTrainerModal({
       status: status || null,
       experienceYears: Number(experienceYears) || 0,
       outlookCategoryName: outlookCategory.trim() || null,
+      outlookCategoryColor: outlookColor,
       locationIds: parseLocationIds(locationIds),
     };
 
@@ -229,12 +233,43 @@ export default function EditTrainerModal({
               value={outlookCategory}
               onChange={setOutlookCategory}
             />
+
             <OwnerTextField
               label="Stawka godzinowa"
               value={hourlyRate}
               onChange={setHourlyRate}
               type="number"
             />
+            <div>
+              <CustomSelect
+                label="Kolor kategorii Outlook"
+                value={outlookColor}
+                onChange={setOutlookColor}
+                options={Object.keys(OUTLOOK_COLORS).map((value) => ({
+                  value,
+                  label: value.replace("preset", "kolor"),
+                  color: getOutlookColor(value).border,
+                }))}
+                icon={
+                  <span
+                    className="h-4 w-4 shrink-0 rounded-sm border border-white/15"
+                    style={{
+                      backgroundColor: getOutlookColor(outlookColor).border,
+                    }}
+                  />
+                }
+              />
+              {/* <div
+                className="mt-2 rounded-[var(--radius-md)] px-3 py-2 text-xs font-semibold"
+                style={{
+                  backgroundColor: getOutlookColor(outlookColor).bg,
+                  color: getOutlookColor(outlookColor).text,
+                  borderLeft: `4px solid ${getOutlookColor(outlookColor).border}`,
+                }}
+              >
+                {firstName} {lastName} — podgląd koloru
+              </div> */}
+            </div>
             <AvatarFilePicker
               label="Zdjęcie trenera"
               value={avatarUrl}

@@ -201,8 +201,10 @@ export function trainerPortalSessionsToOwnerSessions({
       locationParticipantsCount: 0,
       locationLimit: 0,
       isLocationLimitExceeded: false,
-      outlookCategories: null,
-      primaryOutlookCategory: null,
+      outlookCategories: session.outlookCategories ?? null,
+      primaryOutlookCategory: session.primaryOutlookCategory ?? null,
+      primaryOutlookCategoryColor: session.primaryOutlookCategoryColor ?? null,
+      outlookCategoryColors: session.outlookCategoryColors ?? null,
     };
   });
 }

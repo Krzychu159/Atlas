@@ -1,5 +1,7 @@
 "use client";
 
+import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
+
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
@@ -8,11 +10,14 @@ import { PaymentReasonModal } from "@/app/components/payments/PaymentReasonModal
 import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { PaymentsList } from "@/app/components/payments/PaymentsList";
 import { Button } from "@/app/components/ui/button";
+import { getClients } from "@/app/lib/owner/clients";
+import { matchesOwnerLocationId } from "@/app/lib/owner/location-filter";
 import { getPaymentBreakdown } from "@/app/lib/payments/display";
 import {
   cancelPaymentReceipt,
   confirmClientPayment,
   getOwnerPayments,
+  getClientBilling,
   issuePaymentReceipt,
   isPendingPayment,
   rejectClientPayment,
@@ -45,6 +50,13 @@ type PaymentAction =
 const PAYMENTS_PER_PAGE = 8;
 
 export default function OwnerPaymentsPage() {
+  const { selectedLocationId } = useOwnerLocationFilter();
+  const pathname = usePathname();
+  const locationId = pathname.startsWith("/trainer") ? null : selectedLocationId;
+  return <OwnerPaymentsPageContent key={locationId ?? "all"} locationId={locationId} />;
+}
+
+function OwnerPaymentsPageContent({ locationId }: { locationId: number | null }) {
   const pathname = usePathname();
   const basePath = pathname.startsWith("/trainer") ? "/trainer" : "/owner";
   const eyebrow = basePath === "/trainer" ? "Panel trenera" : "Panel ownera";
@@ -88,6 +100,7 @@ export default function OwnerPaymentsPage() {
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    locationId,
     filters.amountMax,
     filters.amountMin,
     filters.client,
@@ -103,7 +116,22 @@ export default function OwnerPaymentsPage() {
       setIsLoading(true);
       try {
         const data = await getOwnerPayments(buildBackendPaymentQuery());
-        setPayments(data.items || []);
+        const items = data.items || [];
+        if (locationId === null) {
+          setPayments(items);
+        } else {
+          const [clients, billing] = await Promise.all([
+            getClients(),
+            Promise.all([...new Set(items.map((payment) => payment.clientId))].map(getClientBilling)),
+          ]);
+          const packageIds = new Set(billing.flatMap((summary) =>
+            (summary.packages || []).filter((pkg) => pkg.locationId === locationId).map((pkg) => pkg.clientPackageId),
+          ));
+          const clientIds = new Set(clients.filter((client) => matchesOwnerLocationId(client, locationId)).map((client) => client.id));
+          setPayments(items.filter((payment) => payment.clientPackageId !== null
+            ? packageIds.has(payment.clientPackageId)
+            : clientIds.has(payment.clientId)));
+        }
       } catch (err) {
         if (basePath !== "/trainer" || !isForbiddenError(err)) throw err;
 

@@ -45,6 +45,8 @@ export type OwnerSession = {
   isLocationLimitExceeded?: boolean;
   outlookCategories?: string[] | null;
   primaryOutlookCategory?: string | null;
+  primaryOutlookCategoryColor?: string | null;
+  outlookCategoryColors?: { name: string; color: string | null }[] | null;
 };
 
 type SessionFilterParams = {

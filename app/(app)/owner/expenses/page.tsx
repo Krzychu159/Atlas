@@ -1,5 +1,7 @@
 "use client";
 
+import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, RefreshCw, Repeat2, ReceiptText } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
@@ -68,6 +70,13 @@ const emptyStatistics: ExpenseStatistics = {
 };
 
 export default function OwnerExpensesPage() {
+  const { selectedLocationId } = useOwnerLocationFilter();
+  const locationId = selectedLocationId;
+  return <OwnerExpensesPageContent key={locationId ?? "all"} locationId={locationId} />;
+}
+
+function OwnerExpensesPageContent({ locationId }: { locationId: number | null }) {
+  const { setSelectedLocationValue } = useOwnerLocationFilter();
   const [view, setView] = useState<"all" | "recurring">("all");
   const [filters, setFilters] = useState<ExpenseFiltersValue>(initialExpenseFilters);
   const [page, setPage] = useState(1);
@@ -94,7 +103,7 @@ export default function OwnerExpensesPage() {
   const query = useMemo<ExpenseQuery>(
     () => ({
       legalEntityId: numberFilter(filters.legalEntityId),
-      locationId: numberFilter(filters.locationId),
+      locationId,
       category: numberFilter(filters.category),
       paymentStatus: numberFilter(filters.paymentStatus),
       from: nullable(filters.from),
@@ -109,7 +118,7 @@ export default function OwnerExpensesPage() {
       page,
       pageSize,
     }),
-    [filters, page, pageSize, view],
+    [filters, locationId, page, pageSize, view],
   );
 
   const loadData = useCallback(
@@ -187,7 +196,8 @@ export default function OwnerExpensesPage() {
     key: K,
     value: ExpenseFiltersValue[K],
   ) {
-    setFilters((current) => ({ ...current, [key]: value }));
+    if (key === "locationId") setSelectedLocationValue(value);
+    else setFilters((current) => ({ ...current, [key]: value }));
     setPage(1);
   }
 
@@ -360,7 +370,7 @@ export default function OwnerExpensesPage() {
 
       {/* Sekcja: Filtry wydatków */}
       <ExpenseFilters
-        value={filters}
+        value={{ ...filters, locationId: locationId === null ? "all" : String(locationId) }}
         categories={categories}
         paymentStatuses={paymentStatuses}
         legalEntities={legalEntities}

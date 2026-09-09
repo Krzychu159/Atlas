@@ -7,6 +7,7 @@ import type {
 } from "../owner/clients";
 import type { ClientBillingSummary, ClientPayment, CreateClientPaymentPayload } from "../owner/billing";
 import type { OwnerSession } from "../owner/sessions";
+import type { OutlookSessionColors } from "../calendar/outlook-colors";
 
 export type TrainerPortalMe = {
   trainerId: number;
@@ -23,7 +24,8 @@ export type TrainerPortalMe = {
   outlookCategoryName?: string | null;
 };
 
-export type TrainerPortalSession = {
+export type TrainerPortalSession = OutlookSessionColors & {
+  outlookCategories?: string[] | null;
   sessionId: number;
   title: string | null;
   note: string | null;

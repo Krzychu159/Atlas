@@ -1,3 +1,4 @@
+import { getOutlookColor } from "@/app/lib/calendar/outlook-colors";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -62,7 +63,7 @@ export default function TrainerProfileHeader({
       <div className="grid gap-7 lg:grid-cols-[190px_1fr_190px] lg:items-start">
         <div className="flex justify-center lg:justify-start">
           <div className="relative shrink-0">
-            <div className="flex h-40 w-40 items-center justify-center overflow-hidden rounded-[28px] bg-surface-container-lowest outline outline-4 outline-secondary">
+            <div style={{ outlineColor: getOutlookColor(trainer.outlookCategoryColor).border }} className="flex h-40 w-40 items-center justify-center overflow-hidden rounded-[28px] bg-surface-container-lowest outline outline-4 outline-secondary">
               {trainer.avatarUrl ? (
                 <img
                   src={trainer.avatarUrl}

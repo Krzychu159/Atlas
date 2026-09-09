@@ -1,3 +1,4 @@
+import { getOutlookColor } from "@/app/lib/calendar/outlook-colors";
 import Link from "next/link";
 import { ChevronRight, Clock3, Dumbbell } from "lucide-react";
 import type { Trainer } from "@/app/lib/owner/trainers";
@@ -20,7 +21,7 @@ export default function TrainerCard({ trainer }: { trainer: Trainer }) {
   return (
     <div className="rounded-[var(--radius-lg)] bg-surface-container p-5">
       <div className="flex items-start gap-4">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-md)] bg-surface-container-low">
+        <div style={{ border: `3px solid ${getOutlookColor(trainer.outlookCategoryColor).border}` }} className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-md)] bg-surface-container-low">
           {trainer.avatarUrl ? (
             <img
               src={trainer.avatarUrl}
