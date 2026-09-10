@@ -7,21 +7,16 @@ import { TextArea, TextField } from "@/app/components/ui/input";
 import {
   updatePackage,
   type Package,
-  type UpdatePackagePayload,
 } from "@/app/lib/owner/packages";
 import {
   showOwnerError,
   showOwnerSuccess,
 } from "../../../components/owner-toast";
 
-type FormState = {
-  name: string;
-  description: string;
-  price: string;
-  sessionsLimit: string;
-  durationDays: string;
-  isActive: boolean;
-};
+import { CustomSelect } from "@/app/components/ui/custom-select";
+import { getLocations, type Location } from "@/app/lib/owner/locations";
+import { createPackageForm, changePackageField, packageFormPayload, type PackageForm } from "../../package-form";
+import PackagePublicationFields from "../../components/PackagePublicationFields";
 
 export default function PackageEditCard({
   item,
@@ -30,50 +25,40 @@ export default function PackageEditCard({
   item: Package;
   onUpdated: (item: Package) => void;
 }) {
-  const [form, setForm] = useState<FormState>({
-    name: item.name,
-    description: item.description || "",
-    price: String(item.price),
-    sessionsLimit: String(item.sessionsLimit),
-    durationDays: String(item.durationDays),
-    isActive: item.isActive,
-  });
-
+  const [form, setForm] = useState(() => createPackageForm(item));
+  const [locations, setLocations] = useState<Location[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    void Promise.resolve().then(() => {
-      setForm({
-        name: item.name,
-        description: item.description || "",
-        price: String(item.price),
-        sessionsLimit: String(item.sessionsLimit),
-        durationDays: String(item.durationDays),
-        isActive: item.isActive,
-      });
-    });
+    let active = true;
+    getLocations().then((result) => { if (active) setLocations(result); })
+      .catch((error) => { if (active) showOwnerError(error, "Nie udało się pobrać lokalizacji."); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve().then(() => { if (active) setForm(createPackageForm(item)); });
+    return () => { active = false; };
   }, [item]);
 
-  function updateField(field: keyof FormState, value: string | boolean) {
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
+  function updateField<K extends keyof PackageForm>(field: K, value: PackageForm[K]) {
+    setForm((current) => changePackageField(current, field, value));
+  }
+
+  const locationOptions = [
+    { value: "", label: "Bez przypisania" },
+    ...locations.map((location) => ({ value: String(location.id), label: location.name || location.city || `Lokalizacja ${location.id}` })),
+  ];
+  if (form.locationId && !locationOptions.some((option) => option.value === form.locationId)) {
+    locationOptions.push({ value: form.locationId, label: item.locationName || `Lokalizacja ${form.locationId}` });
   }
 
   async function handleSave() {
     try {
       setIsSaving(true);
 
-      const payload: UpdatePackagePayload = {
-        name: form.name,
-        description: form.description,
-        price: Number(form.price || 0),
-        currency: item.currency || "PLN",
-        sessionsLimit: Number(form.sessionsLimit || 0),
-        durationDays: Number(form.durationDays || 0),
-        isActive: form.isActive,
-      };
+      const payload = packageFormPayload(form);
 
       const updated = await updatePackage(item.id, payload);
       onUpdated(updated);
@@ -119,7 +104,7 @@ export default function PackageEditCard({
       <div className="mt-4 grid grid-cols-2 gap-4">
         <div>
           <TextField
-            label={`Cena (${item.currency || "PLN"})`}
+            label={`Cena (${form.currency || "PLN"})`}
             value={form.price}
             onChange={(value) => updateField("price", value)}
             type="number"
@@ -128,7 +113,7 @@ export default function PackageEditCard({
 
         <div>
           <TextField
-            label="Sesje"
+            label={form.billingType === "5" ? "Liczba wejść" : "Sesje"}
             value={form.sessionsLimit}
             onChange={(value) => updateField("sessionsLimit", value)}
             type="number"
@@ -136,18 +121,20 @@ export default function PackageEditCard({
         </div>
       </div>
 
-      <div className="mt-4">
-        <label className="text-label text-on-surface-variant">
-          Ważność pakietu: {form.durationDays || 0} dni
+      <div className="mt-4 grid gap-4">
+        <TextField label="Ważność w dniach" type="number" value={form.durationDays}
+          onChange={(value) => updateField("durationDays", value)} />
+        <TextField label="Waluta" value={form.currency} onChange={(value) => updateField("currency", value)} />
+        <TextField label="Sesje / tydzień" type="number" value={form.sessionsPerWeek}
+          onChange={(value) => updateField("sessionsPerWeek", value)} />
+        <TextField label="Uczestnicy" type="number" value={form.participantsCount}
+          onChange={(value) => updateField("participantsCount", value)} />
+        <label>
+          <span className="text-label text-on-surface-muted">Lokalizacja</span>
+          <CustomSelect className="mt-2" value={form.locationId} options={locationOptions}
+            onChange={(value) => updateField("locationId", value)} />
         </label>
-        <input
-          value={form.durationDays}
-          onChange={(event) => updateField("durationDays", event.target.value)}
-          type="range"
-          min={7}
-          max={120}
-          className="mt-4 w-full accent-blue-600"
-        />
+        <PackagePublicationFields form={form} onChange={updateField} />
       </div>
 
       <label className="mt-5 flex items-center gap-3 cursor-pointer">

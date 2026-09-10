@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { NativeDateInput } from "./native-date-input";
 import { CalendarDays, Check, ChevronDown, X } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 
@@ -180,16 +181,14 @@ function DateInput({
         {label}
       </span>
       <span className="relative mt-2 block">
-        <input
+        <NativeDateInput
           ref={inputRef}
           type="date"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           className="h-12 w-full cursor-pointer rounded-[var(--radius-lg)] border border-white/10 bg-surface-container-lowest px-3 pr-11 text-sm font-semibold text-on-surface outline-none [color-scheme:dark] hover:border-white/20 focus:border-primary-light/50 focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_18%,transparent)]"
         />
-        <span className="pointer-events-none absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-[var(--radius-md)] bg-primary/15 text-primary-light">
-          <CalendarDays size={17} strokeWidth={2.2} />
-        </span>
+
       </span>
     </label>
   );

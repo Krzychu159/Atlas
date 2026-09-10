@@ -160,10 +160,12 @@ export default function PackagesPage() {
       showOwnerSuccess("Pakiet został dodany.", {
         id: "owner-package-create-success",
       });
+      return true;
     } catch (err) {
       showOwnerError(err, "Nie udało się dodać pakietu", {
         id: "owner-package-create-error",
       });
+      return false;
     } finally {
       setIsSubmitting(false);
     }

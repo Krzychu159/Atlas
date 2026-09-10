@@ -362,6 +362,7 @@ export default function SchedulePage() {
       </div>
 
       <SessionEditorModal
+        allowPublicSessions
         key={
           isSessionModalOpen
             ? selectedSession

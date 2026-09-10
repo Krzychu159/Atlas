@@ -20,6 +20,8 @@ export type Package = {
   locationIds?: number[] | null;
   locationName?: string | null;
   isActive: boolean;
+  isPubliclyAvailable?: boolean;
+  publicSlug?: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy: number | null;
@@ -38,6 +40,8 @@ export type CreatePackagePayload = {
   locationId?: number | null;
   isActive: boolean;
   createdBy: number;
+  isPubliclyAvailable?: boolean;
+  publicSlug?: string | null;
 };
 
 export type UpdatePackagePayload = {
@@ -48,6 +52,12 @@ export type UpdatePackagePayload = {
   sessionsLimit: number;
   durationDays: number;
   isActive: boolean;
+  billingType?: number;
+  sessionsPerWeek?: number;
+  participantsCount?: number | null;
+  locationId?: number | null;
+  isPubliclyAvailable?: boolean;
+  publicSlug?: string | null;
 };
 
 export type PackageClient = {

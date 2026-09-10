@@ -1,9 +1,11 @@
 "use client";
 
+import { NativeDateInput } from "@/app/components/ui/native-date-input";
+
 import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import {
   getOwnerTrainerSettlements,
   type TrainerMonthlySettlement,
@@ -37,16 +39,7 @@ function parseMonth(value: string) {
   return { year, month };
 }
 
-function formatMonth(value: string) {
-  const { year, month } = parseMonth(value);
 
-  if (!year || !month) return "Wybierz miesiąc";
-
-  return new Intl.DateTimeFormat("pl-PL", {
-    month: "long",
-    year: "numeric",
-  }).format(new Date(year, month - 1, 1));
-}
 
 function updateUrlMonth(value: string) {
   const { year, month } = parseMonth(value);
@@ -129,20 +122,9 @@ function OwnerSettlementsPageContent({ locationId }: { locationId: number | null
         </div>
 
         <div className="grid gap-3 sm:grid-cols-[220px_260px]">
-          <label className="relative flex min-h-[68px] cursor-pointer items-center rounded-[var(--radius-lg)] bg-surface-container px-4 py-2.5 shadow-soft transition hover:bg-surface-container-high">
-            <span className="min-w-0 flex-1 pr-10">
-              <span className="block text-label text-primary-light">
-                Miesiąc rozliczenia
-              </span>
-              <span className="mt-1 block truncate text-sm font-semibold text-on-surface">
-                {formatMonth(monthValue)}
-              </span>
-            </span>
-            <CalendarDays
-              size={19}
-              className="pointer-events-none absolute right-4 text-primary-light"
-            />
-            <input
+          <label className="relative block min-h-[68px] cursor-pointer rounded-[var(--radius-lg)] bg-surface-container px-4 py-2.5 shadow-soft transition hover:bg-surface-container-high">
+            <span className="block text-label text-primary-light">Miesiąc rozliczenia</span>
+            <NativeDateInput
               type="month"
               value={monthValue}
               aria-label="Wybierz miesiąc rozliczenia"
@@ -150,8 +132,7 @@ function OwnerSettlementsPageContent({ locationId }: { locationId: number | null
                 setMonthValue(event.target.value);
                 updateUrlMonth(event.target.value);
               }}
-              onClick={(event) => event.currentTarget.showPicker?.()}
-              className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+              className="h-8 w-full bg-transparent text-sm font-semibold"
             />
           </label>
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { NativeDateInput } from "@/app/components/ui/native-date-input";
+
 import { useState, type ReactNode } from "react";
 import {
   MapPin,
@@ -27,6 +29,7 @@ import { toDateTimeLocalValue } from "../date-utils";
 import { statusOptions } from "../options";
 import {
   getDefaultFormValues,
+  generatePublicSessionSlug,
   getSessionPackageName,
   getSessionStatusLabel,
   getSessionTitle,
@@ -42,6 +45,7 @@ export default function SessionEditorModal({
   locations,
   clients,
   defaultTrainerId,
+  allowPublicSessions = false,
   isSaving,
   onClose,
   onSubmit,
@@ -53,6 +57,7 @@ export default function SessionEditorModal({
   locations: Location[];
   clients: Client[];
   defaultTrainerId?: number | null;
+  allowPublicSessions?: boolean;
   isSaving: boolean;
   onClose: () => void;
   onSubmit: (values: SessionFormValues) => void;
@@ -67,6 +72,10 @@ export default function SessionEditorModal({
     }),
   );
   const [clientSearch, setClientSearch] = useState("");
+  const [isSlugEdited, setIsSlugEdited] = useState(
+    Boolean(session?.publicSlug),
+  );
+  const [privateSessionType] = useState(session?.plannedSessionType || "");
   const [isTitleEdited, setIsTitleEdited] = useState(() =>
     Boolean(session?.title),
   );
@@ -119,7 +128,10 @@ export default function SessionEditorModal({
   );
 
   function updateValue(
-    key: Exclude<keyof SessionFormValues, "participantIds">,
+    key: Exclude<
+      keyof SessionFormValues,
+      "participantIds" | "isPubliclyBookable" | "participantsEdited"
+    >,
     value: string,
   ) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -130,12 +142,36 @@ export default function SessionEditorModal({
       ...current,
       startAt: value,
       endAt: getOneHourLaterDateTimeLocal(value) || current.endAt,
+      publicSlug:
+        current.isPubliclyBookable && !isSlugEdited
+          ? generatePublicSessionSlug(current.title, value)
+          : current.publicSlug,
     }));
   }
 
   function updateTitle(value: string) {
     setIsTitleEdited(true);
-    updateValue("title", value);
+    setValues((current) => ({
+      ...current,
+      title: value,
+      publicSlug:
+        current.isPubliclyBookable && !isSlugEdited
+          ? generatePublicSessionSlug(value, current.startAt)
+          : current.publicSlug,
+    }));
+  }
+
+  function togglePublicSession(checked: boolean) {
+    setValues((current) => ({
+      ...current,
+      isPubliclyBookable: checked,
+      plannedSessionType: checked ? "Group" : privateSessionType,
+      status: checked ? current.status || "Planned" : current.status,
+      publicSlug:
+        checked && !isSlugEdited
+          ? generatePublicSessionSlug(current.title, current.startAt)
+          : current.publicSlug,
+    }));
   }
 
   function toggleParticipant(clientId: string) {
@@ -148,7 +184,11 @@ export default function SessionEditorModal({
       return {
         ...current,
         participantIds,
-        title: !session && !isTitleEdited ? suggestedTitle : current.title,
+        participantsEdited: true,
+        title:
+          !session && !isTitleEdited && !current.isPubliclyBookable
+            ? suggestedTitle
+            : current.title,
       };
     });
   }
@@ -219,21 +259,78 @@ export default function SessionEditorModal({
           ) : null}
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
+            {allowPublicSessions && (
+              <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4 md:col-span-2">
+                <label className="flex cursor-pointer items-center justify-between gap-4">
+                  <span>
+                    <span className="block font-semibold">
+                      Zajęcia publiczne
+                    </span>
+                    <span className="mt-1 block text-xs text-on-surface-variant">
+                      Widoczne w publicznym grafiku. Klienci mogą zapisywać się
+                      samodzielnie.
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={values.isPubliclyBookable}
+                    onChange={(event) =>
+                      togglePublicSession(event.target.checked)
+                    }
+                    className="h-6 w-6 shrink-0 accent-primary"
+                  />
+                </label>
+              </div>
+            )}
             <Field label="Tytuł" className="md:col-span-2">
               <input
                 value={values.title}
+                required={values.isPubliclyBookable}
                 onChange={(event) => updateTitle(event.target.value)}
                 placeholder={
-                  values.participantIds.length
-                    ? getSuggestedSessionTitle(values.participantIds, clients)
-                    : "Np. Anna N + Dominik S"
+                  values.isPubliclyBookable
+                    ? "Np. Full Body"
+                    : values.participantIds.length
+                      ? getSuggestedSessionTitle(values.participantIds, clients)
+                      : "Np. Anna N + Dominik S"
                 }
                 className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
               />
             </Field>
 
+            {allowPublicSessions && values.isPubliclyBookable && (
+              <>
+                <Field label="Limit miejsc">
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    required
+                    value={values.publicCapacity}
+                    onChange={(event) =>
+                      updateValue("publicCapacity", event.target.value)
+                    }
+                    className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
+                  />
+                </Field>
+                <Field label="Publiczny link">
+                  <input
+                    required
+                    value={values.publicSlug}
+                    onChange={(event) => {
+                      setIsSlugEdited(true);
+                      updateValue("publicSlug", event.target.value);
+                    }}
+                    placeholder="full-body-2026-09-10-18-00"
+                    className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
+                  />
+                </Field>
+              </>
+            )}
+
             <Field label="Start">
-              <input
+              <NativeDateInput
                 type="datetime-local"
                 value={values.startAt}
                 onChange={(event) => updateStartAt(event.target.value)}
@@ -242,7 +339,7 @@ export default function SessionEditorModal({
             </Field>
 
             <Field label="Koniec">
-              <input
+              <NativeDateInput
                 type="datetime-local"
                 value={values.endAt}
                 onChange={(event) => updateValue("endAt", event.target.value)}
@@ -274,7 +371,21 @@ export default function SessionEditorModal({
               />
             </Field>
 
-            <Field label="Klienci sesji" className="md:col-span-2">
+            <Field
+              label={
+                values.isPubliclyBookable
+                  ? "Klienci sesji (opcjonalnie)"
+                  : "Klienci sesji"
+              }
+              className="md:col-span-2"
+            >
+              {values.isPubliclyBookable && (
+                <span className="mb-3 block text-xs text-on-surface-variant">
+                  Możesz zapisać zajęcia bez klientów. Przy edycji istniejące
+                  zapisy pozostaną bez zmian, dopóki nie zmienisz wyboru
+                  uczestników.
+                </span>
+              )}
               <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-2">
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                   <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-md)] bg-surface-container px-3">
@@ -376,7 +487,10 @@ export default function SessionEditorModal({
               />
             </Field>
 
-            <Field label="Notatka" className="md:col-span-2">
+            <Field
+              label={values.isPubliclyBookable ? "Opis publiczny" : "Notatka"}
+              className="md:col-span-2"
+            >
               <textarea
                 value={values.note}
                 onChange={(event) => updateValue("note", event.target.value)}

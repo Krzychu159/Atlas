@@ -10,6 +10,10 @@ export function studioFormat(value: string, options: Intl.DateTimeFormatOptions)
 }
 export const studioTime = (value: string) => studioFormat(value, { hour: "2-digit", minute: "2-digit" });
 export const studioDay = (value: string) => studioFormat(value, { weekday: "long", day: "numeric", month: "long" });
+export function studioDateKey(value: string) {
+  const { date, timeZone } = dateAndZone(value);
+  return new Intl.DateTimeFormat("sv-SE", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+}
 export function studioNow() {
   const parts = new Intl.DateTimeFormat("sv-SE", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(new Date());
   return parts.replace(" ", "T");

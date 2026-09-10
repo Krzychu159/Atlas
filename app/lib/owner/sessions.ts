@@ -20,6 +20,9 @@ export type OwnerSessionParticipant = {
 };
 
 export type OwnerSession = {
+  isPubliclyBookable?: boolean;
+  publicSlug?: string | null;
+  publicCapacity?: number | null;
   id: number;
   title: string | null;
   note: string | null;
@@ -66,6 +69,9 @@ export type SessionParticipantPayload = {
 };
 
 export type SessionPayload = {
+  isPubliclyBookable?: boolean;
+  publicSlug?: string | null;
+  publicCapacity?: number | null;
   title?: string | null;
   note?: string | null;
   startAt: string;

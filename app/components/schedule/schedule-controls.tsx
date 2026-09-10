@@ -1,8 +1,9 @@
 "use client";
 
+import { NativeDateInput } from "@/app/components/ui/native-date-input";
+
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import {
-  formatDateControlLabel,
   toDateInputValue,
 } from "@/app/components/schedule/date-utils";
 import type { ScheduleView } from "@/app/components/schedule/types";
@@ -66,21 +67,10 @@ export function DateNavigator({
         ].join(" ")}
       >
         {view === "day" ? (
-          <label className="relative flex h-full w-full cursor-pointer items-center justify-center gap-2 px-3">
-            <CalendarDays size={16} className="text-primary-light" />
-            <span className="min-w-[92px] text-center tabular-nums">
-              {formatDateControlLabel(anchorDate)}
-            </span>
-            <input
-              type="date"
-              aria-label="Wybierz dzień"
-              value={toDateInputValue(anchorDate)}
-              onChange={(event) =>
-                onDateChange(new Date(`${event.target.value}T12:00:00`))
-              }
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            />
-          </label>
+          <NativeDateInput type="date" aria-label="Wybierz dzień"
+            value={toDateInputValue(anchorDate)}
+            onChange={(event) => { if (event.target.value) onDateChange(new Date(`${event.target.value}T12:00:00`)); }}
+            className="h-10 w-full rounded-[10px] bg-transparent px-3 text-sm font-semibold" />
         ) : (
           <>
             <CalendarDays size={16} className="text-primary-light" />

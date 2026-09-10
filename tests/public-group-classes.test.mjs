@@ -17,6 +17,29 @@ test('Warsaw wall-clock dates stay unchanged and explicit offsets are respected'
   assert.equal(dates.addStudioDays('2026-03-28', 1), '2026-03-29');
   assert.equal(dates.durationMinutes('2026-09-10T18:00:00', '2026-09-10T19:00:00'), 60);
 });
+
+test('empty day suggests at most three future available classes in the same location', () => {
+  const dates = load('app/lib/public/studio-date.ts');
+  const listing = load('app/lib/public/class-listing.ts', { require: () => dates });
+  const session = (id, startAt, extra = {}) => ({ id, startAt, locationId: 4, availableSeats: 3, isFullyBooked: false, ...extra });
+  const items = [session(1, '2099-09-12T12:00:00'), session(2, '2099-09-11T18:00:00'),
+    session(3, '2099-09-11T09:00:00', { availableSeats: 0 }), session(4, '2099-09-11T08:00:00', { locationId: 5 }),
+    session(5, '2020-09-10T12:00:00'), session(6, '2099-09-13T12:00:00'), session(7, '2099-09-14T12:00:00')];
+  const result = listing.classesForDay(items, '2099-09-10', 4);
+  assert.equal(result.selected.length, 0);
+  assert.equal(result.upcoming.map(item => item.id).join(','), '2,1,6');
+  assert.equal(listing.classesForDay(items, '2099-09-14', 4).upcoming.length, 0);
+  assert.equal(listing.classesForDay(items, '2020-09-09', 4).upcoming.some(item => item.id === 5), false);
+});
+
+test('day filtering respects Warsaw midnight for offset timestamps', () => {
+  const dates = load('app/lib/public/studio-date.ts');
+  const listing = load('app/lib/public/class-listing.ts', { require: () => dates });
+  assert.equal(dates.studioDateKey('2099-09-10T23:00:00Z'), '2099-09-11');
+  const item = { id: 1, startAt: '2099-09-10T23:00:00Z', locationId: 4, availableSeats: 1 };
+  assert.equal(listing.classesForDay([item], '2099-09-10', 4).selected.length, 0);
+  assert.equal(listing.classesForDay([item], '2099-09-11', 4).selected.length, 1);
+});
 test('backend wrapper handles empty 204 cancellation and opt-out from auth redirects', async () => {
   let redirects = 0;
   const api = load('app/lib/backend.ts', { fetch: async () => new Response(null, { status: 204 }), window: { location: { assign: () => redirects++ } } });

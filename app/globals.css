@@ -288,6 +288,24 @@ input[type="time"]::-webkit-calendar-picker-indicator {
    przydatne do stylu systemowego
 ========================= */
 
+.atlas-date-control .atlas-date-input {
+  padding-right: 3rem;
+  min-width: 0;
+  color-scheme: dark;
+}
+.atlas-date-input::-webkit-calendar-picker-indicator {
+  opacity: 0 !important;
+  position: absolute;
+  right: 0;
+  pointer-events: none;
+}
+.atlas-date-input[data-native-picker-fallback]::-webkit-calendar-picker-indicator {
+  pointer-events: auto;
+  width: 2.75rem;
+  height: 100%;
+  z-index: 2;
+}
+
 @layer utilities {
   .bg-primary-gradient {
     background-image: linear-gradient(

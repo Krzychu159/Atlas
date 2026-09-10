@@ -1,11 +1,12 @@
 "use client";
 
+import { NativeDateInput } from "@/app/components/ui/native-date-input";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   ArrowLeft,
-  CalendarDays,
   CheckCircle2,
   Clock3,
   Dumbbell,
@@ -273,8 +274,7 @@ export default function TrainerSettlementPage() {
         </div>
 
         <label className="flex w-full max-w-[220px] items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3">
-          <CalendarDays size={18} className="text-primary-light" />
-          <input
+          <NativeDateInput
             type="month"
             value={monthValue}
             onChange={(event) => {

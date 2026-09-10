@@ -9,6 +9,20 @@ import { getOwnerSessionPackageName } from "../components/session-display";
 import { toDateTimeLocalValue } from "./date-utils";
 import type { SessionFormValues, SessionStatusFilter } from "./types";
 
+export function generatePublicSessionSlug(title: string, startAt: string) {
+  const name = title.toLowerCase().replace(/ł/g, "l").normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return name && startAt ? `${name}-${startAt.slice(0, 16).replace(/[T:]/g, "-")}` : "";
+}
+
+function publicDateTime(value: string) {
+  if (!/(?:Z|[+-]\d{2}:?\d{2})$/i.test(value)) return value.slice(0, 16);
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(new Date(value)).replace(" ", "T");
+}
+
 export function sortSessions(sessions: OwnerSession[]) {
   return [...sessions].sort(
     (first, second) =>
@@ -122,9 +136,13 @@ export function getDefaultFormValues({
 }): SessionFormValues {
   if (session) {
     return {
+      isPubliclyBookable: session.isPubliclyBookable ?? false,
+      publicCapacity: session.publicCapacity == null ? "" : String(session.publicCapacity),
+      publicSlug: session.publicSlug || "",
+      participantsEdited: false,
       title: session.title || "",
-      startAt: toDateTimeLocalValue(new Date(session.startAt)),
-      endAt: toDateTimeLocalValue(new Date(session.endAt)),
+      startAt: session.isPubliclyBookable ? publicDateTime(session.startAt) : toDateTimeLocalValue(new Date(session.startAt)),
+      endAt: session.isPubliclyBookable ? publicDateTime(session.endAt) : toDateTimeLocalValue(new Date(session.endAt)),
       trainerId: String(session.trainerId || ""),
       locationId: String(session.locationId || ""),
       status: session.status || "",
@@ -147,6 +165,10 @@ export function getDefaultFormValues({
   );
 
   return {
+    isPubliclyBookable: false,
+    publicCapacity: "",
+    publicSlug: "",
+    participantsEdited: false,
     title: "",
     startAt: toDateTimeLocalValue(start),
     endAt: toDateTimeLocalValue(end),
@@ -177,12 +199,17 @@ export function toSessionPayload(
     throw new Error("Uzupełnij czas sesji.");
   }
 
-  if (!values.participantIds.length) {
+  const preservePublicParticipants = Boolean(session &&
+    (session.isPubliclyBookable || values.isPubliclyBookable) && !values.participantsEdited);
+  if (!values.isPubliclyBookable && !preservePublicParticipants && !values.participantIds.length) {
     throw new Error("Wybierz przynajmniej jednego klienta.");
   }
 
-  const startAt = new Date(values.startAt).toISOString();
-  const endAt = new Date(values.endAt).toISOString();
+  if (!Number.isFinite(new Date(values.startAt).getTime()) || !Number.isFinite(new Date(values.endAt).getTime())) {
+    throw new Error("Podaj poprawną datę i godzinę sesji.");
+  }
+  const startAt = values.isPubliclyBookable ? `${values.startAt.slice(0, 16)}:00` : new Date(values.startAt).toISOString();
+  const endAt = values.isPubliclyBookable ? `${values.endAt.slice(0, 16)}:00` : new Date(values.endAt).toISOString();
 
   if (new Date(endAt).getTime() <= new Date(startAt).getTime()) {
     throw new Error("Koniec sesji musi być później niż start.");
@@ -205,18 +232,36 @@ export function toSessionPayload(
     payload.plannedSessionType = values.plannedSessionType;
   }
 
+  if (values.isPubliclyBookable) {
+    if (!values.title.trim()) throw new Error("Podaj tytuł publicznych zajęć.");
+    const capacity = Number(values.publicCapacity);
+    if (!Number.isInteger(capacity) || capacity <= 0) throw new Error("Limit miejsc musi być dodatnią liczbą całkowitą.");
+    const slug = values.publicSlug.trim();
+    if (!slug) throw new Error("Podaj publiczny slug.");
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) throw new Error("Slug może zawierać małe litery a–z, cyfry i pojedyncze myślniki.");
+    payload.isPubliclyBookable = true;
+    payload.plannedSessionType = "Group";
+    payload.status = values.status || "Planned";
+    payload.publicCapacity = capacity;
+    payload.publicSlug = slug;
+  } else if (session?.isPubliclyBookable) {
+    payload.isPubliclyBookable = false;
+  }
+
   const outlookCategories = values.outlookCategories
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 
-  if (outlookCategories.length > 0) {
+  if (outlookCategories.length > 0 || values.isPubliclyBookable) {
     payload.outlookCategories = outlookCategories;
   }
 
-  payload.participants = values.participantIds.map((clientId) =>
-    getParticipantPayload(Number(clientId), session),
-  );
+  if (!preservePublicParticipants) {
+    payload.participants = values.participantIds.map((clientId) =>
+      getParticipantPayload(Number(clientId), session),
+    );
+  }
 
   return payload;
 }

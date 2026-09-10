@@ -1,4 +1,5 @@
 import * as React from "react";
+import { NativeDateInput } from "./native-date-input";
 
 type FormFieldProps = {
   label: string;
@@ -22,24 +23,26 @@ type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, icon, wrapperClassName, ...props }, ref) => {
+    const isDate = ["date", "datetime-local", "month"].includes(props.type || "");
+    const Control = isDate ? NativeDateInput : "input";
     return (
       <div
         className={["relative w-full", wrapperClassName]
           .filter(Boolean)
           .join(" ")}
       >
-        {icon && (
+        {icon && !isDate && (
           <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-muted">
             {icon}
           </div>
         )}
 
-        <input
+        <Control
           ref={ref}
           className={[
             "w-full rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest py-3 text-sm text-on-surface placeholder:text-on-surface-muted transition-all",
             "hover:border-white/10 hover:bg-surface-container-low focus:border-primary-light/40 focus:outline-none focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_22%,transparent)]",
-            icon ? "pl-10 pr-4" : "px-4",
+            icon && !isDate ? "pl-10 pr-4" : "px-4",
             className,
           ].join(" ")}
           {...props}
@@ -76,7 +79,8 @@ export function TextField({
         value={value}
         icon={icon}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-12"
+        wrapperClassName="mt-2"
+        className="h-12"
       />
     </FormField>
   );

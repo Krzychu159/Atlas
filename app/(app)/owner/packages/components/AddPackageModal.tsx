@@ -12,35 +12,18 @@ import {
 import type { CreatePackagePayload } from "@/app/lib/owner/packages";
 import type { Location } from "@/app/lib/owner/locations";
 
+import { createPackageForm, changePackageField, packageFormPayload, type PackageForm } from "../package-form";
+import PackagePublicationFields from "./PackagePublicationFields";
+import { showOwnerError } from "../../components/owner-toast";
+
 type AddPackageModalProps = {
   open: boolean;
   isSubmitting: boolean;
   locations: Location[];
   defaultLocationId: number | null;
   onClose: () => void;
-  onSubmit: (payload: CreatePackagePayload) => Promise<void>;
+  onSubmit: (payload: CreatePackagePayload) => Promise<boolean>;
 };
-
-const initialForm = {
-  name: "",
-  description: "",
-  price: "",
-  currency: "PLN",
-  sessionsLimit: "",
-  sessionsPerWeek: "1",
-  durationDays: "",
-  participantsCount: "1",
-  billingType: "1",
-  locationId: "",
-  isActive: true,
-};
-
-function createInitialForm(defaultLocationId: number | null) {
-  return {
-    ...initialForm,
-    locationId: defaultLocationId ? String(defaultLocationId) : "",
-  };
-}
 
 export default function AddPackageModal({
   open,
@@ -50,7 +33,7 @@ export default function AddPackageModal({
   onClose,
   onSubmit,
 }: AddPackageModalProps) {
-  const [form, setForm] = useState(() => createInitialForm(defaultLocationId));
+  const [form, setForm] = useState(() => createPackageForm(undefined, defaultLocationId));
 
   const locationOptions = useMemo(() => {
     const options = [
@@ -77,30 +60,21 @@ export default function AddPackageModal({
 
   if (!open) return null;
 
-  const updateField = (
-    field: keyof typeof initialForm,
-    value: string | boolean,
-  ) => {
-    setForm((current) => ({ ...current, [field]: value }));
-  };
+  function updateField<K extends keyof PackageForm>(field: K, value: PackageForm[K]) {
+    setForm((current) => changePackageField(current, field, value));
+  }
 
   const handleSubmit = async () => {
-    await onSubmit({
-      name: form.name,
-      description: form.description,
-      price: Number(form.price || 0),
-      currency: form.currency || "PLN",
-      sessionsLimit: Number(form.sessionsLimit || 0),
-      sessionsPerWeek: Number(form.sessionsPerWeek || 0),
-      durationDays: Number(form.durationDays || 0),
-      billingType: Number(form.billingType || 1),
-      participantsCount: Number(form.participantsCount || 1),
-      locationId: form.locationId ? Number(form.locationId) : null,
-      isActive: form.isActive,
-      createdBy: 0,
-    });
-
-    setForm(createInitialForm(defaultLocationId));
+    let payload: CreatePackagePayload;
+    try {
+      payload = { ...packageFormPayload(form), createdBy: 0 };
+    } catch (error) {
+      showOwnerError(error, "Sprawdź dane pakietu.");
+      return;
+    }
+    if (await onSubmit(payload)) {
+      setForm(createPackageForm(undefined, defaultLocationId));
+    }
   };
 
   return (
@@ -129,14 +103,14 @@ export default function AddPackageModal({
             placeholder="1200"
           />
           <OwnerTextField
-            label="Limit sesji"
+            label={form.billingType === "5" ? "Liczba wejść" : "Limit sesji"}
             value={form.sessionsLimit}
             onChange={(value) => updateField("sessionsLimit", value)}
             type="number"
             placeholder="12"
           />
           <OwnerTextField
-            label="Czas trwania"
+            label="Ważność w dniach"
             value={form.durationDays}
             onChange={(value) => updateField("durationDays", value)}
             type="number"
@@ -160,12 +134,7 @@ export default function AddPackageModal({
             value={form.currency}
             onChange={(value) => updateField("currency", value)}
           />
-          <OwnerTextField
-            label="Typ rozliczenia"
-            value={form.billingType}
-            onChange={(value) => updateField("billingType", value)}
-            type="number"
-          />
+          <PackagePublicationFields form={form} onChange={updateField} />
           <label>
             <span className="text-label text-on-surface-muted">
               Lokalizacja
