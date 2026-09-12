@@ -29,8 +29,10 @@ export function SidebarNav({ items, onNavigate }: SidebarNavProps) {
             key={item.href}
             href={item.href}
             onClick={onNavigate}
+            aria-current={isActive ? "page" : undefined}
             className={[
               "group flex items-center px-3 py-3 transition-all duration-200",
+              item.mobileOnly ? "md:hidden" : "",
               isActive
                 ? "border-l-4 border-primary bg-surface-container text-primary-light shadow-soft"
                 : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface",

@@ -28,13 +28,12 @@ import {
 } from "@/app/lib/owner/location-filter";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
-import {
-  getUnreadNotificationCount,
-  NOTIFICATIONS_CHANGED_EVENT,
-} from "@/app/lib/notifications";
+
 
 type HeaderProps = {
   role: AppRole;
+  unreadNotificationCount: number;
+  onUnreadCountChange: (count: number) => void;
 };
 
 type SearchResult = {
@@ -74,7 +73,7 @@ function getRoleLabel(role: string) {
   }
 }
 
-export function Header({ role }: HeaderProps) {
+export function Header({ role, unreadNotificationCount, onUnreadCountChange }: HeaderProps) {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const {
@@ -89,7 +88,7 @@ export function Header({ role }: HeaderProps) {
   const [locations, setLocations] = useState<Location[]>([]);
   const [locationsLoaded, setLocationsLoaded] = useState(false);
   const [directoriesLoaded, setDirectoriesLoaded] = useState(false);
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
   const notificationsHref = `/${role}/notifications`;
 
   useEffect(() => {
@@ -114,32 +113,7 @@ export function Header({ role }: HeaderProps) {
     };
   }, []);
 
-  useEffect(() => {
-    if (role === "client") return;
 
-    let active = true;
-
-    const refreshUnreadCount = () => {
-      getUnreadNotificationCount()
-        .then(({ unreadCount }) => {
-          if (active) setUnreadNotificationCount(unreadCount);
-        })
-        .catch(() => {
-          if (active) setUnreadNotificationCount(0);
-        });
-    };
-
-    refreshUnreadCount();
-    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshUnreadCount);
-
-    return () => {
-      active = false;
-      window.removeEventListener(
-        NOTIFICATIONS_CHANGED_EVENT,
-        refreshUnreadCount,
-      );
-    };
-  }, [role]);
 
   useEffect(() => {
     if (role !== "owner") return;
@@ -442,7 +416,7 @@ export function Header({ role }: HeaderProps) {
           onClose={() => setIsNotificationsOpen(false)}
           notificationsHref={notificationsHref}
           totalUnreadCount={unreadNotificationCount}
-          onUnreadCountChange={setUnreadNotificationCount}
+          onUnreadCountChange={onUnreadCountChange}
           role={role}
         />
       ) : null}
