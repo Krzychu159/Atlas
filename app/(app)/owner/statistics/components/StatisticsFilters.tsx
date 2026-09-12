@@ -120,6 +120,18 @@ export default function StatisticsFilters({
           onChange={({ from, to }) => onDateRangeChange(from, to)}
         />
         <CustomSelect
+          label="Status kosztu"
+          value={value.expensePaymentStatus}
+          options={[
+            { value: "all", label: "Wszystkie" },
+            ...paymentStatuses.map((item) => ({
+              value: String(item.value),
+              label: item.label,
+            })),
+          ]}
+          onChange={(nextValue) => onChange("expensePaymentStatus", nextValue)}
+        />
+        {/* <CustomSelect
           label="Działalność"
           value={value.legalEntityId}
           icon={<Building2 size={16} />}
@@ -144,7 +156,7 @@ export default function StatisticsFilters({
             })),
           ]}
           onChange={(nextValue) => onChange("locationId", nextValue)}
-        />
+        /> */}
         <CustomSelect
           label="Trener"
           value={value.trainerId}
@@ -157,6 +169,19 @@ export default function StatisticsFilters({
             })),
           ]}
           onChange={(nextValue) => onChange("trainerId", nextValue)}
+        />
+        <CustomSelect
+          label="Klient"
+          value={value.clientId}
+          icon={<UsersRound size={16} />}
+          options={[
+            { value: "all", label: "Wszyscy" },
+            ...clients.map((item) => ({
+              value: String(item.id),
+              label: item.fullName,
+            })),
+          ]}
+          onChange={(nextValue) => onChange("clientId", nextValue)}
         />
         <Button
           type="button"
@@ -171,20 +196,6 @@ export default function StatisticsFilters({
       {/* Sekcja: Filtry szczegółowe */}
       {advancedOpen ? (
         <div className="mt-4 grid gap-3 border-t border-white/5 pt-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          <CustomSelect
-            label="Klient"
-            value={value.clientId}
-            icon={<UsersRound size={16} />}
-            options={[
-              { value: "all", label: "Wszyscy" },
-              ...clients.map((item) => ({
-                value: String(item.id),
-                label: item.fullName,
-              })),
-            ]}
-            onChange={(nextValue) => onChange("clientId", nextValue)}
-          />
-
           {/*  
            <TextField
             label="ID pakietu klienta"
@@ -254,20 +265,7 @@ export default function StatisticsFilters({
             ]}
             onChange={(nextValue) => onChange("expenseCategory", nextValue)}
           />
-          <CustomSelect
-            label="Status kosztu"
-            value={value.expensePaymentStatus}
-            options={[
-              { value: "all", label: "Wszystkie" },
-              ...paymentStatuses.map((item) => ({
-                value: String(item.value),
-                label: item.label,
-              })),
-            ]}
-            onChange={(nextValue) =>
-              onChange("expensePaymentStatus", nextValue)
-            }
-          />
+
           <CustomSelect
             label="Umowa trenera"
             value={value.isCoveredByContract}

@@ -1,24 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { BellOff, CheckCheck, ExternalLink, LoaderCircle, X } from "lucide-react";
 import NotificationItem from "./Notification";
 import { Button } from "@/app/components/ui/button";
-import { getErrorMessage } from "@/app/lib/backend";
-import {
-  getNotifications,
-  markAllNotificationsAsRead,
-  markNotificationAsRead,
-  type NotificationRole,
-  type AppNotification,
-} from "@/app/lib/notifications";
+import { type NotificationRole } from "@/app/lib/notifications";
+import { useNotifications } from "@/app/lib/use-notifications";
+
 
 export default function NotificationsPanel({
   open,
   onClose,
   notificationsHref,
-  totalUnreadCount,
   onUnreadCountChange,
   role,
 }: {
@@ -29,98 +23,23 @@ export default function NotificationsPanel({
   onUnreadCountChange?: (count: number) => void;
   role: NotificationRole;
 }) {
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [markingIds, setMarkingIds] = useState<number[]>([]);
-  const [markingAll, setMarkingAll] = useState(false);
-
+  const state = useNotifications(open, "", "", true);
+  const { notifications, loading, error, markingIds, markingAll, unreadCount, handleMarkAsRead, handleMarkAllAsRead } = state;
   useEffect(() => {
-    if (!open) return;
-
-    let active = true;
-    getNotifications(20)
-      .then((data) => {
-        if (!active) return;
-        setError(null);
-        setNotifications(data);
-      })
-      .catch((fetchError: unknown) => {
-        if (active) {
-          setError(
-            getErrorMessage(fetchError, "Nie udało się pobrać powiadomień."),
-          );
-        }
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [open, onUnreadCountChange]);
-
-  const unreadCount = totalUnreadCount;
-
-  async function handleMarkAsRead(id: number) {
-    if (markingIds.includes(id)) return;
-
-    setMarkingIds((current) => [...current, id]);
-    setError(null);
-
-    try {
-      await markNotificationAsRead(id);
-      setNotifications((current) =>
-        current.map((item) =>
-          item.id === id
-            ? { ...item, isRead: true, readAt: new Date().toISOString() }
-            : item,
-        ),
-      );
-      onUnreadCountChange?.(Math.max(0, unreadCount - 1));
-    } catch (markError) {
-      setError(
-        getErrorMessage(markError, "Nie udało się oznaczyć powiadomienia."),
-      );
-    } finally {
-      setMarkingIds((current) => current.filter((itemId) => itemId !== id));
-    }
-  }
-
-  async function handleMarkAllAsRead() {
-    if (markingAll || unreadCount === 0) return;
-
-    setMarkingAll(true);
-    setError(null);
-
-    try {
-      await markAllNotificationsAsRead();
-      const readAt = new Date().toISOString();
-      setNotifications((current) =>
-        current.map((item) => ({ ...item, isRead: true, readAt })),
-      );
-      onUnreadCountChange?.(0);
-    } catch (markError) {
-      setError(
-        getErrorMessage(markError, "Nie udało się oznaczyć powiadomień."),
-      );
-    } finally {
-      setMarkingAll(false);
-    }
-  }
+    if (open && !loading && !error) onUnreadCountChange?.(state.counts.unreadCount);
+  }, [open, loading, error, state.counts.unreadCount, onUnreadCountChange]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 hidden md:block">
+    <div className="fixed inset-0 z-50">
       <button
         aria-label="Zamknij powiadomienia"
         onClick={onClose}
         className="absolute inset-0 bg-black/65 backdrop-blur-[6px]"
       />
 
-      <aside className="absolute bottom-5 right-5 top-5 flex w-[410px] flex-col overflow-hidden rounded-[28px] bg-surface-container-low shadow-ambient">
+      <aside className="absolute bottom-3 right-3 top-3 flex w-[calc(100%-1.5rem)] max-w-[460px] md:bottom-5 md:right-5 md:top-5 flex-col overflow-hidden rounded-[28px] bg-surface-container-low shadow-ambient">
         <div className="flex items-start justify-between gap-4 px-5 pb-3 pt-5">
           <div>
             <p className="text-[1.35rem] font-semibold">Powiadomienia</p>
@@ -156,7 +75,7 @@ export default function NotificationsPanel({
             }
             disabled={markingAll || unreadCount === 0 || loading}
             onClick={handleMarkAllAsRead}
-            className="w-full bg-primary/15 text-primary-light hover:bg-primary/25"
+            className="h-auto min-h-10 w-full whitespace-normal bg-primary/15 py-2 text-primary-light hover:bg-primary/25"
           >
             {markingAll ? "Oznaczanie…" : "Oznacz wszystkie jako przeczytane"}
           </Button>
@@ -166,10 +85,12 @@ export default function NotificationsPanel({
           {error ? (
             <div className="mb-3 rounded-[var(--radius-lg)] bg-error-container/45 px-4 py-3 text-xs leading-5 text-error-light">
               {error}
+              <button type="button" onClick={state.loadNotifications} className="ml-2 min-h-10 font-semibold underline">Spróbuj ponownie</button>
             </div>
           ) : null}
 
-          {loading ? (
+          {loading && <p role="status" className="py-2 text-xs text-on-surface-muted">Odświeżanie…</p>}
+          {loading && notifications.length === 0 ? (
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-on-surface-muted">
               <LoaderCircle size={17} className="animate-spin" />
               Pobieranie powiadomień…
@@ -193,6 +114,7 @@ export default function NotificationsPanel({
                   role={role}
                   onNavigate={onClose}
                   variant="panel"
+                  notificationsHref={notificationsHref}
                   markingAsRead={markingIds.includes(item.id)}
                   onMarkAsRead={handleMarkAsRead}
                 />

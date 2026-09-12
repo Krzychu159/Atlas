@@ -11,6 +11,7 @@ export type AppNotification = {
   id: number;
   userId: number;
   type: string | null;
+  category: string;
   severity: NotificationSeverity | null;
   title: string | null;
   message: string | null;
@@ -24,7 +25,15 @@ export type AppNotification = {
 
 export type UnreadCountResponse = {
   unreadCount: number;
+  unreadByCategory: Record<string, number>;
 };
+
+export type NotificationCategory = { key: string; label: string };
+export type NotificationParams = { limit?: number; category?: string; isRead?: boolean };
+
+export function getNotificationCategories() {
+  return backendGet<NotificationCategory[]>("Notifications/categories");
+}
 
 export type ReadAllResponse = {
   markedAsRead: number;
@@ -34,22 +43,31 @@ export type NotificationRole = "owner" | "trainer" | "client";
 
 export const NOTIFICATIONS_CHANGED_EVENT = "atlas:notifications-changed";
 
-export function getNotifications(limit = 50) {
-  return backendGet<AppNotification[]>("notifications", { limit });
+export function getNotifications(params: NotificationParams = {}) {
+  return backendGet<AppNotification[]>("Notifications", { ...params, limit: params.limit ?? 50 });
 }
 
-export function getUnreadNotificationCount() {
-  return backendGet<UnreadCountResponse>("notifications/unread-count");
+export function getUnreadNotificationCount(category?: string) {
+  return backendGet<UnreadCountResponse>("Notifications/unread-count", { category });
 }
 
-export async function markNotificationAsRead(id: number) {
-  const result = await backendPost<void>(`notifications/${id}/read`);
-  notifyNotificationsChanged();
-  return result;
+const pendingReads = new Map<number, Promise<void>>();
+
+export function markNotificationAsRead(id: number) {
+  const pending = pendingReads.get(id);
+  if (pending) return pending;
+  const request = backendPost<void>(`Notifications/${id}/read`)
+    .then(result => {
+      notifyNotificationsChanged();
+      return result;
+    })
+    .finally(() => pendingReads.delete(id));
+  pendingReads.set(id, request);
+  return request;
 }
 
-export async function markAllNotificationsAsRead() {
-  const result = await backendPost<ReadAllResponse>("notifications/read-all");
+export async function markAllNotificationsAsRead(category?: string) {
+  const result = await backendPost<ReadAllResponse | null>("Notifications/read-all", undefined, { category });
   notifyNotificationsChanged();
   return result;
 }
@@ -61,73 +79,51 @@ export function notifyNotificationsChanged() {
 }
 
 export function getSafeNotificationUrl(actionUrl: string | null) {
-  if (!actionUrl?.startsWith("/") || actionUrl.startsWith("//")) {
+  if (!actionUrl?.startsWith("/") || actionUrl.startsWith("//") || /[\\\s]/.test(actionUrl)) {
     return null;
   }
 
   return actionUrl;
 }
 
-export function getNotificationDestination(
-  notification: AppNotification,
-  role: NotificationRole,
-) {
-  const kind = getNotificationKind(notification);
-  const entityId = notification.relatedEntityId;
-  const action = parseNotificationAction(notification.actionUrl);
+// Normalize only known legacy app routes; never infer a destination from event text.
+export function getNotificationDestination(notification: AppNotification, role: NotificationRole) {
+  const raw = notification.actionUrl?.trim();
+  if (!raw || raw.startsWith("//") || /[\\\\\s]/.test(raw) || /^[a-z][a-z0-9+.-]*:/i.test(raw)) return null;
+  const path = raw.startsWith("/") ? raw : "/" + raw;
+  const section = path.split(/[/?#]/)[1];
+  if (["owner", "trainer", "client"].includes(section)) return path;
+  const sections: Record<NotificationRole, string[]> = {
+    owner: ["clients", "schedule", "trainers", "payments", "packages", "settings", "notifications", "settlements", "expenses", "statistics"],
+    trainer: ["clients", "schedule", "payments", "packages", "settings", "notifications"],
+    client: ["schedule", "payments", "settings", "rewards"],
+  };
+  return sections[role].includes(section) ? "/" + role + path : getSafeNotificationUrl(raw);
+}
 
-  if (kind === "client") {
-    return role === "client"
-      ? "/client"
-      : buildClientPath(role, entityId || action.clientId);
-  }
+// Keep the clicked preview available across client-side navigation if marking it
+// read moves it beyond the backend's first page. Never persist notification data.
+let preview: { item: AppNotification; expires: number } | null = null;
+export function rememberNotificationPreview(item: AppNotification) {
+  preview = { item, expires: Date.now() + 60_000 };
+}
+export function getNotificationPreview(id: number) {
+  return preview?.item.id === id && preview.expires > Date.now() ? preview.item : null;
+}
 
-  if (kind === "trainer") {
-    if (role === "owner" && entityId) return `/owner/trainers/${entityId}`;
-    return role === "client" ? "/client" : `/${role}/settings`;
+// The contract has no GET-by-id endpoint. Increase the supported list limit for
+// an older deep link, stopping if the list is exhausted or the server caps it.
+export async function findNotificationInList(id: number, isActive = () => true) {
+  let previousCount = 0;
+  for (let limit = 100; isActive(); limit *= 2) {
+    const items = await getNotifications({ limit });
+    if (!isActive()) return null;
+    const item = items.find(notification => notification.id === id);
+    if (item) return item;
+    if (items.length < limit || items.length <= previousCount) return null;
+    previousCount = items.length;
   }
-
-  if (kind === "payment" || kind === "subscription") {
-    if (role === "client") return "/client/payments";
-    if (action.clientId) return buildClientPath(role, action.clientId, true);
-
-    const query = action.searchParams.get("clientId");
-    return query && /^\d+$/.test(query)
-      ? `/${role}/payments?clientId=${query}`
-      : `/${role}/payments`;
-  }
-
-  if (kind === "session") return `/${role}/schedule`;
-  if (kind === "package") {
-    if (role === "owner" && action.packageId) {
-      return `/owner/packages/${action.packageId}`;
-    }
-    return `/${role}/packages`;
-  }
-  if (kind === "settlement") {
-    return role === "owner" ? "/owner/settlements" : `/${role}/payments`;
-  }
-  if (kind === "expense") {
-    return role === "owner" ? "/owner/expenses" : `/${role}/payments`;
-  }
-  if (kind === "contract") {
-    const actionDestination = getDestinationFromAction(action, role);
-    if (actionDestination) return actionDestination;
-    if (role === "owner" && entityId) return `/owner/trainers/${entityId}`;
-    return role === "client" ? "/client" : `/${role}/settings`;
-  }
-  if (kind === "location") {
-    return `/${role}/settings`;
-  }
-  if (kind === "invitation") {
-    return (
-      getDestinationFromAction(action, role) ||
-      (role === "owner" ? "/owner/clients" : getNotificationsPath(role))
-    );
-  }
-
-  if (!getSafeNotificationUrl(notification.actionUrl)) return null;
-  return getDestinationFromAction(action, role) || getNotificationsPath(role);
+  return null;
 }
 
 export function getNotificationKind(item: AppNotification) {
@@ -145,116 +141,4 @@ export function getNotificationKind(item: AppNotification) {
   if (kind.includes("trainer")) return "trainer";
   if (kind.includes("location")) return "location";
   return "system";
-}
-
-function buildClientPath(
-  role: Exclude<NotificationRole, "client">,
-  clientId?: number | null,
-  payments = false,
-) {
-  if (!clientId) return `/${role}/clients`;
-  return `/${role}/clients/${clientId}${payments ? "/payments" : ""}`;
-}
-
-function parseNotificationAction(actionUrl: string | null) {
-  const safeUrl = getSafeNotificationUrl(actionUrl);
-  const empty = {
-    clientId: null as number | null,
-    packageId: null as number | null,
-    segments: [] as string[],
-    searchParams: new URLSearchParams(),
-  };
-
-  if (!safeUrl) return empty;
-
-  const url = new URL(safeUrl, "https://atlas.local");
-  const segments = url.pathname.split("/").filter(Boolean);
-  const clientIndex = segments.findIndex((segment) =>
-    ["client", "clients"].includes(segment.toLowerCase()),
-  );
-  const packageIndex = segments.findIndex((segment) =>
-    ["package", "packages"].includes(segment.toLowerCase()),
-  );
-  const clientId =
-    clientIndex >= 0 ? getNumericSegment(segments[clientIndex + 1]) : null;
-  const packageId =
-    packageIndex >= 0 ? getNumericSegment(segments[packageIndex + 1]) : null;
-  const normalizedSegments = [...segments];
-  if (normalizedSegments[0]?.toLowerCase() === "api") normalizedSegments.shift();
-  if (
-    ["owner", "trainer", "client"].includes(
-      normalizedSegments[0]?.toLowerCase(),
-    )
-  ) {
-    normalizedSegments.shift();
-  }
-
-  return {
-    clientId,
-    packageId,
-    segments: normalizedSegments,
-    searchParams: url.searchParams,
-  };
-}
-
-function getNumericSegment(value?: string) {
-  return value && /^\d+$/.test(value) ? Number(value) : null;
-}
-
-function getDestinationFromAction(
-  action: ReturnType<typeof parseNotificationAction>,
-  role: NotificationRole,
-) {
-  const section = action.segments[0]?.toLowerCase();
-
-  if (["client", "clients"].includes(section)) {
-    if (role === "client") return "/client";
-    return buildClientPath(
-      role,
-      action.clientId,
-      action.segments.some((segment) =>
-        ["payment", "payments", "billing", "subscription"].includes(
-          segment.toLowerCase(),
-        ),
-      ),
-    );
-  }
-  if (["trainer", "trainers"].includes(section)) {
-    if (role === "owner") {
-      return action.segments[1]
-        ? `/owner/trainers/${action.segments[1]}`
-        : "/owner/trainers";
-    }
-    return role === "client" ? "/client" : `/${role}/settings`;
-  }
-  if (["payment", "payments", "billing", "subscription"].includes(section)) {
-    const clientId = action.searchParams.get("clientId");
-    if (role !== "client" && clientId && /^\d+$/.test(clientId)) {
-      return `/${role}/payments?clientId=${clientId}`;
-    }
-    return `/${role}/payments`;
-  }
-  if (["session", "sessions", "schedule", "calendar"].includes(section)) {
-    return `/${role}/schedule`;
-  }
-  if (["package", "packages"].includes(section)) {
-    return role === "owner" && action.packageId
-      ? `/owner/packages/${action.packageId}`
-      : `/${role}/packages`;
-  }
-  if (["setting", "settings", "location", "locations"].includes(section)) {
-    return `/${role}/settings`;
-  }
-  if (["notification", "notifications"].includes(section)) {
-    return getNotificationsPath(role);
-  }
-  if (section === "expenses" && role === "owner") return "/owner/expenses";
-  if (section === "settlements" && role === "owner") return "/owner/settlements";
-  if (["dashboard", "home"].includes(section)) return `/${role}`;
-
-  return null;
-}
-
-function getNotificationsPath(role: NotificationRole) {
-  return role === "client" ? "/client" : `/${role}/notifications`;
 }

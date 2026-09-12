@@ -5,7 +5,11 @@ import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { DateRangeFilter } from "@/app/components/ui/date-range-filter";
 import type { Location } from "@/app/lib/owner/locations";
-import { getCurrentMonthRange, type DictionaryOption, type LegalEntityOption } from "../expense-config";
+import {
+  getCurrentMonthRange,
+  type DictionaryOption,
+  type LegalEntityOption,
+} from "../expense-config";
 
 export type ExpenseFiltersValue = {
   legalEntityId: string;
@@ -47,7 +51,10 @@ type ExpenseFiltersProps = {
   locations: Location[];
   advancedOpen: boolean;
   hasActiveFilters: boolean;
-  onChange: <K extends keyof ExpenseFiltersValue>(key: K, value: ExpenseFiltersValue[K]) => void;
+  onChange: <K extends keyof ExpenseFiltersValue>(
+    key: K,
+    value: ExpenseFiltersValue[K],
+  ) => void;
   onIssueDateChange: (range: { from: string; to: string }) => void;
   onDueDateChange: (range: { from: string; to: string }) => void;
   onPaidDateChange: (range: { from: string; to: string }) => void;
@@ -76,7 +83,10 @@ export default function ExpenseFilters({
       {/* Podstawowe filtry listy */}
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
         <label className="relative min-w-0 flex-1">
-          <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-muted" />
+          <Search
+            size={17}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-muted"
+          />
           <input
             value={value.search}
             onChange={(event) => onChange("search", event.target.value)}
@@ -126,7 +136,7 @@ export default function ExpenseFilters({
       {/* Filtry działalności, lokalizacji i terminów */}
       {advancedOpen ? (
         <div className="mt-4 grid gap-3 border-t border-white/5 pt-4 sm:grid-cols-2 xl:grid-cols-4">
-          <CustomSelect
+          {/* <CustomSelect
             label="Działalność"
             value={value.legalEntityId}
             icon={<Building2 size={16} />}
@@ -148,7 +158,7 @@ export default function ExpenseFilters({
               })),
             ]}
             onChange={(nextValue) => onChange("locationId", nextValue)}
-          />
+          /> */}
           <DateRangeFilter
             label="Termin płatności"
             value={{ from: value.dueFrom, to: value.dueTo }}
@@ -169,25 +179,30 @@ export default function ExpenseFilters({
             ]}
             onChange={(nextValue) => onChange("isOverdue", nextValue)}
           />
-          <div className="flex items-end sm:col-span-2">
-            <Button
-              type="button"
-              variant="ghost"
-              icon={<X size={15} />}
-              onClick={onClear}
-              disabled={!hasActiveFilters}
-              className="w-full sm:w-auto"
-            >
-              Wyczyść filtry
-            </Button>
-          </div>
+
+          <Button
+            type="button"
+            variant="ghost"
+            icon={<X size={15} />}
+            onClick={onClear}
+            disabled={!hasActiveFilters}
+            className="w-full sm:w-auto"
+          >
+            Wyczyść filtry
+          </Button>
         </div>
       ) : null}
     </section>
   );
 }
 
-function MobileQuickFilters({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function MobileQuickFilters({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
   const options = [
     { value: "all", label: "Wszystkie" },
     { value: "0", label: "Nieopłacone" },
@@ -217,6 +232,9 @@ function MobileQuickFilters({ value, onChange }: { value: string; onChange: (val
 function dictionaryOptions(options: DictionaryOption[]) {
   return [
     { value: "all", label: "Wszystkie" },
-    ...options.map((option) => ({ value: String(option.value), label: option.label })),
+    ...options.map((option) => ({
+      value: String(option.value),
+      label: option.label,
+    })),
   ];
 }

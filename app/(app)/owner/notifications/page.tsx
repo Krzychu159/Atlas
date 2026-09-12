@@ -1,176 +1,60 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { BellOff, CheckCheck, LoaderCircle, RefreshCw } from "lucide-react";
 import NotificationItem from "../components/Notification";
 import { Button } from "@/app/components/ui/button";
+import { findNotificationInList, getNotificationPreview, type AppNotification, type NotificationRole } from "@/app/lib/notifications";
 import { getErrorMessage } from "@/app/lib/backend";
-import {
-  getNotifications,
-  getUnreadNotificationCount,
-  markAllNotificationsAsRead,
-  markNotificationAsRead,
-  type AppNotification,
-  type NotificationRole,
-} from "@/app/lib/notifications";
-
-type NotificationSection = {
-  title: string;
-  items: AppNotification[];
-};
-
-function groupNotifications(items: AppNotification[]): NotificationSection[] {
-  return [
-    { title: "Nieprzeczytane", items: items.filter((item) => !item.isRead) },
-    { title: "Wcześniejsze", items: items.filter((item) => item.isRead) },
-  ].filter((group) => group.items.length > 0);
-}
-
-function Section({
-  title,
-  items,
-  markingIds,
-  onMarkAsRead,
-  role,
-}: {
-  title: string;
-  items: AppNotification[];
-  markingIds: number[];
-  onMarkAsRead: (id: number) => void;
-  role: NotificationRole;
-}) {
-  return (
-    <section>
-      <div className="flex items-center gap-4">
-        <p className="text-label text-primary-light shrink-0">{title}</p>
-        <div className="h-px bg-white/10 flex-1" />
-      </div>
-
-      <div className="mt-3 flex flex-col gap-2.5">
-        {items.map((item) => (
-          <NotificationItem
-            key={item.id}
-            item={item}
-            role={role}
-            markingAsRead={markingIds.includes(item.id)}
-            onMarkAsRead={onMarkAsRead}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
+import { useNotifications } from "@/app/lib/use-notifications";
+import NotificationFilters, { markAllLabel } from "../components/NotificationFilters";
 
 export default function NotificationsPage() {
+  return <Suspense fallback={<p role="status">Pobieranie powiadomień…</p>}><NotificationsContent /></Suspense>;
+}
+
+function NotificationsContent() {
+  const searchParams = useSearchParams();
+  const id = Number(searchParams.get("notificationId"));
+  return <NotificationsList key={searchParams.toString()} notificationId={Number.isSafeInteger(id) && id > 0 ? id : null} initialCategory={searchParams.get("category") ?? ""} initialRead={searchParams.get("isRead") ?? ""} />;
+}
+
+function NotificationsList({ initialCategory, initialRead, notificationId }: { initialCategory: string; initialRead: string; notificationId: number | null }) {
   const pathname = usePathname();
   const role: NotificationRole = pathname.startsWith("/trainer")
     ? "trainer"
     : pathname.startsWith("/client")
       ? "client"
       : "owner";
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [markingIds, setMarkingIds] = useState<number[]>([]);
-  const [markingAll, setMarkingAll] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  const loadNotifications = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const [items, count] = await Promise.all([
-        getNotifications(200),
-        getUnreadNotificationCount(),
-      ]);
-      setNotifications(items);
-      setUnreadCount(count.unreadCount);
-    } catch (fetchError) {
-      setError(
-        getErrorMessage(fetchError, "Nie udało się pobrać powiadomień."),
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    Promise.all([getNotifications(200), getUnreadNotificationCount()])
-      .then(([data, count]) => {
-        if (!active) return;
-        setNotifications(data);
-        setUnreadCount(count.unreadCount);
-        setError(null);
-      })
-      .catch((fetchError: unknown) => {
-        if (active) {
-          setError(
-            getErrorMessage(fetchError, "Nie udało się pobrać powiadomień."),
-          );
-        }
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const sections = useMemo(
-    () => groupNotifications(notifications),
-    [notifications],
-  );
-  async function handleMarkAsRead(id: number) {
-    if (markingIds.includes(id)) return;
-
-    setMarkingIds((current) => [...current, id]);
-    setError(null);
-
-    try {
-      await markNotificationAsRead(id);
-      setNotifications((current) =>
-        current.map((item) =>
-          item.id === id
-            ? { ...item, isRead: true, readAt: new Date().toISOString() }
-            : item,
-        ),
-      );
-      setUnreadCount((current) => Math.max(0, current - 1));
-    } catch (markError) {
-      setError(
-        getErrorMessage(markError, "Nie udało się oznaczyć powiadomienia."),
-      );
-    } finally {
-      setMarkingIds((current) => current.filter((itemId) => itemId !== id));
-    }
+  const state = useNotifications(true, initialCategory, initialRead);
+  const { notifications, loading, error, markingIds, markingAll, unreadCount, handleMarkAsRead, handleMarkAllAsRead, loadNotifications } = state;
+  const [expandedId, setExpandedId] = useState<number | null>(notificationId);
+  const [retained, setRetained] = useState<AppNotification | null>(() => notificationId ? getNotificationPreview(notificationId) : null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const selected = notifications.find(item => item.id === expandedId) ?? (retained?.id === expandedId ? retained : null);
+  const items = selected && !notifications.some(item => item.id === selected.id) ? [selected, ...notifications] : notifications;
+  function toggle(item: AppNotification) {
+    setExpandedId(expandedId === item.id ? null : item.id);
+    setRetained(item);
   }
+  useEffect(() => {
+    if (loading || !expandedId || selected) return;
+    let active = true;
+    findNotificationInList(expandedId, () => active).then(item => {
+      if (!active) return;
+      setRetained(item);
+      setLookupError(item ? null : "Nie znaleziono wybranego powiadomienia w dostępnej historii.");
+    }).catch(error => {
+      if (active) setLookupError(getErrorMessage(error, "Nie udało się pobrać wybranego powiadomienia."));
+    });
+    return () => { active = false; };
+  }, [loading, expandedId, selected]);
 
-  async function handleMarkAllAsRead() {
-    if (markingAll || unreadCount === 0) return;
-
-    setMarkingAll(true);
-    setError(null);
-
-    try {
-      await markAllNotificationsAsRead();
-      const readAt = new Date().toISOString();
-      setNotifications((current) =>
-        current.map((item) => ({ ...item, isRead: true, readAt })),
-      );
-      setUnreadCount(0);
-    } catch (markError) {
-      setError(
-        getErrorMessage(markError, "Nie udało się oznaczyć powiadomień."),
-      );
-    } finally {
-      setMarkingAll(false);
-    }
+  function resetSelection() {
+    setExpandedId(null);
+    setRetained(null);
+    setLookupError(null);
   }
 
   return (
@@ -196,16 +80,20 @@ export default function NotificationsPage() {
               )
             }
             disabled={markingAll || unreadCount === 0 || loading}
-            onClick={handleMarkAllAsRead}
-            className="bg-primary/15 text-primary-light hover:bg-primary/25"
+            onClick={async () => {
+              const success = await handleMarkAllAsRead();
+              if (success) setRetained(current => current && (!state.category || current.category === state.category) ? { ...current, isRead: true } : current);
+            }}
+            className="h-auto min-h-10 max-w-full whitespace-normal bg-primary/15 py-2 text-primary-light hover:bg-primary/25 sm:max-w-[50%]"
           >
-            {markingAll
-              ? "Oznaczanie…"
-              : unreadCount > 0
-                ? `Oznacz wszystkie jako przeczytane (${unreadCount})`
-                : "Wszystko przeczytane"}
+            {markingAll ? "Oznaczanie…" : markAllLabel(state.category, state.categories)}
           </Button>
         </div>
+
+        <NotificationFilters {...state}
+          setCategory={value => { resetSelection(); state.setCategory(value); }}
+          setReadFilter={value => { resetSelection(); state.setReadFilter(value); }}
+        />
 
         {error ? (
           <div className="mt-6 flex items-center justify-between gap-4 rounded-[var(--radius-lg)] bg-error-container/45 px-4 py-3 text-sm text-error-light">
@@ -221,12 +109,14 @@ export default function NotificationsPage() {
           </div>
         ) : null}
 
-        {loading ? (
+        {!loading && expandedId && !selected && <p role="status" className="mt-4 text-sm text-on-surface-muted">{lookupError ?? "Pobieranie wybranego powiadomienia…"}</p>}
+        {loading && <p role="status" className="py-2 text-xs text-on-surface-muted">Odświeżanie…</p>}
+        {loading && notifications.length === 0 ? (
           <div className="flex items-center justify-center gap-2 py-24 text-sm text-on-surface-muted">
             <LoaderCircle size={18} className="animate-spin" />
             Pobieranie powiadomień…
           </div>
-        ) : sections.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="mt-12 flex flex-col items-center rounded-[var(--radius-xl)] bg-surface-container px-6 py-16 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-container-high text-on-surface-muted">
               <BellOff size={22} />
@@ -238,15 +128,16 @@ export default function NotificationsPage() {
             </p>
           </div>
         ) : (
-          <div className="mt-8 flex flex-col gap-8">
-            {sections.map((section) => (
-              <Section
-                key={section.title}
-                title={section.title}
-                items={section.items}
-                markingIds={markingIds}
-                onMarkAsRead={handleMarkAsRead}
-                role={role}
+          <div className="mt-5 flex flex-col gap-2">
+            {items.map(item => (
+              <NotificationItem key={item.id} item={item} role={role}
+                expanded={expandedId === item.id} onToggle={() => toggle(item)}
+                markingAsRead={markingIds.includes(item.id)}
+                onMarkAsRead={async id => {
+                  const success = await handleMarkAsRead(id);
+                  if (success) setRetained(current => current?.id === id ? { ...current, isRead: true } : current);
+                  return success;
+                }}
               />
             ))}
           </div>
