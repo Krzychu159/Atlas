@@ -2,7 +2,7 @@
 import type { NotificationCategory, UnreadCountResponse } from "@/app/lib/notifications";
 
 export function markAllLabel(category: string, categories: NotificationCategory[]) {
-  const names: Record<string, string> = { payments: "Płatnościach", packages: "Pakietach", schedule: "Grafiku", invitations: "Zaproszeniach", trainers: "Trenerach", system: "Systemie" };
+  const names: Record<string, string> = { payments: "Płatnościach", packages: "Pakietach", schedule: "Grafiku", invitations: "Zaproszeniach", trainers: "Trenerach", group_classes: "Zajęciach grupowych", registrations: "Rejestracjach", system: "Systemie" };
   return category ? `Oznacz wszystkie w ${names[category] ?? categories.find(item => item.key === category)?.label ?? category} jako przeczytane` : "Oznacz wszystkie jako przeczytane";
 }
 

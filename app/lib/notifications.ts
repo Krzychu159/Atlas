@@ -1,6 +1,8 @@
 import { backendGet, backendPost } from "@/app/lib/backend";
 
 export type NotificationSeverity =
+  | "Info"
+  | "Critical"
   | "Information"
   | "Success"
   | "Warning"
@@ -86,19 +88,8 @@ export function getSafeNotificationUrl(actionUrl: string | null) {
   return actionUrl;
 }
 
-// Normalize only known legacy app routes; never infer a destination from event text.
-export function getNotificationDestination(notification: AppNotification, role: NotificationRole) {
-  const raw = notification.actionUrl?.trim();
-  if (!raw || raw.startsWith("//") || /[\\\\\s]/.test(raw) || /^[a-z][a-z0-9+.-]*:/i.test(raw)) return null;
-  const path = raw.startsWith("/") ? raw : "/" + raw;
-  const section = path.split(/[/?#]/)[1];
-  if (["owner", "trainer", "client"].includes(section)) return path;
-  const sections: Record<NotificationRole, string[]> = {
-    owner: ["clients", "schedule", "trainers", "payments", "packages", "settings", "notifications", "settlements", "expenses", "statistics"],
-    trainer: ["clients", "schedule", "payments", "packages", "settings", "notifications"],
-    client: ["schedule", "payments", "settings", "rewards"],
-  };
-  return sections[role].includes(section) ? "/" + role + path : getSafeNotificationUrl(raw);
+export function getNotificationDestination(notification: AppNotification) {
+  return getSafeNotificationUrl(notification.actionUrl);
 }
 
 // Keep the clicked preview available across client-side navigation if marking it

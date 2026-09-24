@@ -9,42 +9,37 @@ import {
   Check,
   ChevronRight,
   ChevronDown,
-  CircleUserRound,
   CreditCard,
   ExternalLink,
-  FileSignature,
   MailPlus,
-  MapPin,
-  ReceiptText,
+  Package,
+  Users,
+  UserPlus,
 } from "lucide-react";
 import {
   getNotificationDestination,
   rememberNotificationPreview,
-  getNotificationKind,
   type NotificationRole,
   type AppNotification,
 } from "@/app/lib/notifications";
 
 function getIcon(item: AppNotification) {
-  switch (getNotificationKind(item)) {
-    case "payment":
-    case "subscription":
+  switch (item.category) {
+    case "payments":
       return <CreditCard size={18} />;
-    case "session":
+    case "packages":
+      return <Package size={18} />;
+    case "schedule":
       return <CalendarDays size={18} />;
-    case "invitation":
+    case "invitations":
       return <MailPlus size={18} />;
-    case "contract":
-      return <FileSignature size={18} />;
-    case "settlement":
-    case "expense":
-      return <ReceiptText size={18} />;
-    case "client":
-      return <CircleUserRound size={18} />;
-    case "trainer":
+    case "trainers":
       return <Building2 size={18} />;
-    case "location":
-      return <MapPin size={18} />;
+    case "group_classes":
+      return <Users size={18} />;
+    case "registrations":
+      return <UserPlus size={18} />;
+    case "system":
     default:
       return <BellRing size={18} />;
   }
@@ -52,6 +47,7 @@ function getIcon(item: AppNotification) {
 
 function getIconStyles(item: AppNotification) {
   switch (item.severity?.toLowerCase()) {
+    case "critical":
     case "error":
       return "bg-error-container text-error-light";
     case "warning":
@@ -103,7 +99,7 @@ export default function NotificationItem({
   onToggle?: () => void;
 }) {
   const compact = variant === "panel";
-  const href = getNotificationDestination(item, role);
+  const href = getNotificationDestination(item);
   const router = useRouter();
   const activating = useRef(false);
   const element = useRef<HTMLElement>(null);
