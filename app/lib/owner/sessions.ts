@@ -99,6 +99,26 @@ export function createSession(payload: SessionPayload) {
   return backendPost<OwnerSession>("sessions", payload);
 }
 
+export type SessionRecurrence = {
+  frequency: "Daily" | "Weekly";
+  interval: number;
+  daysOfWeek: string[];
+  occurrencesCount: number | null;
+  endDate: string | null;
+};
+
+export function createSessionSeries(session: SessionPayload, recurrence: SessionRecurrence) {
+  return backendPost<{
+    recurringGroupId: string;
+    frequency: SessionRecurrence["frequency"];
+    interval: number;
+    occurrencesCount: number;
+    outlookSeriesSynced: boolean;
+    outlookSyncWarning: string | null;
+    sessions: OwnerSession[];
+  }>("sessions/series", { session, recurrence });
+}
+
 export function updateSession(id: number, payload: SessionPayload) {
   return backendPut<OwnerSession>(`sessions/${id}`, payload);
 }

@@ -13,9 +13,11 @@ import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { getOutlookStatus, type OutlookStatus } from "@/app/lib/owner/outlook";
 import {
   createSession,
+  createSessionSeries,
   getOwnerSessions,
   updateSession,
   type OwnerSession,
+  type SessionRecurrence,
 } from "@/app/lib/owner/sessions";
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
 import { DateNavigator, ViewSwitch } from "./components/ScheduleControls";
@@ -39,7 +41,7 @@ import type {
   SessionFormValues,
   SessionStatusFilter,
 } from "./types";
-import { showOwnerError, showOwnerSuccess } from "../components/owner-toast";
+import { showOwnerError, showOwnerInfo, showOwnerSuccess } from "../components/owner-toast";
 
 export default function SchedulePage() {
   const [view, setView] = useState<ScheduleView>("week");
@@ -244,7 +246,8 @@ export default function SchedulePage() {
     setIsSessionModalOpen(true);
   }
 
-  async function handleSaveSession(values: SessionFormValues) {
+  async function handleSaveSession(values: SessionFormValues, recurrence?: SessionRecurrence) {
+    if (isSavingSession) return;
     try {
       setIsSavingSession(true);
       const payload = toSessionPayload(values, selectedSession);
@@ -254,6 +257,17 @@ export default function SchedulePage() {
         showOwnerSuccess("Sesja została zaktualizowana.", {
           id: "owner-session-updated",
         });
+      } else if (recurrence) {
+        const result = await createSessionSeries(payload, recurrence);
+        if (result.outlookSeriesSynced === false) {
+          showOwnerInfo(result.outlookSyncWarning || "Seria została utworzona w CRM, ale nie udało się zsynchronizować jej z Outlookiem.", {
+            id: "owner-session-series-warning",
+          });
+        } else {
+          showOwnerSuccess("Seria sesji została dodana.", {
+            id: "owner-session-series-created",
+          });
+        }
       } else {
         await createSession(payload);
         showOwnerSuccess("Sesja została dodana.", {
@@ -362,6 +376,7 @@ export default function SchedulePage() {
       </div>
 
       <SessionEditorModal
+        allowRecurringSessions
         allowPublicSessions
         key={
           isSessionModalOpen

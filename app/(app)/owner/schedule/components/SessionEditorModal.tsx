@@ -16,7 +16,7 @@ import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import type { Client } from "@/app/lib/owner/clients";
 import type { Location } from "@/app/lib/owner/locations";
-import type { OwnerSession } from "@/app/lib/owner/sessions";
+import type { OwnerSession, SessionRecurrence } from "@/app/lib/owner/sessions";
 import type { Trainer } from "@/app/lib/owner/trainers";
 import {
   getClientDisplayName,
@@ -46,6 +46,7 @@ export default function SessionEditorModal({
   clients,
   defaultTrainerId,
   allowPublicSessions = false,
+  allowRecurringSessions = false,
   isSaving,
   onClose,
   onSubmit,
@@ -58,9 +59,10 @@ export default function SessionEditorModal({
   clients: Client[];
   defaultTrainerId?: number | null;
   allowPublicSessions?: boolean;
+  allowRecurringSessions?: boolean;
   isSaving: boolean;
   onClose: () => void;
-  onSubmit: (values: SessionFormValues) => void;
+  onSubmit: (values: SessionFormValues, recurrence?: SessionRecurrence) => void;
 }) {
   const [values, setValues] = useState<SessionFormValues>(() =>
     getDefaultFormValues({
@@ -71,6 +73,13 @@ export default function SessionEditorModal({
       defaultTrainerId,
     }),
   );
+  const [repeat, setRepeat] = useState(false);
+  const [frequency, setFrequency] = useState<SessionRecurrence["frequency"]>("Weekly");
+  const [interval, setInterval] = useState("1");
+  const [daysOfWeek, setDaysOfWeek] = useState<string[]>([]);
+  const [ending, setEnding] = useState("count");
+  const [occurrencesCount, setOccurrencesCount] = useState("12");
+  const [endDate, setEndDate] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [isSlugEdited, setIsSlugEdited] = useState(
     Boolean(session?.publicSlug),
@@ -205,7 +214,14 @@ export default function SessionEditorModal({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          onSubmit(values);
+          if (isSaving) return;
+          onSubmit(values, allowRecurringSessions && !session && repeat ? {
+            frequency,
+            interval: Number(interval),
+            daysOfWeek: frequency === "Weekly" ? daysOfWeek : [],
+            occurrencesCount: ending === "count" ? Number(occurrencesCount) : null,
+            endDate: ending === "date" ? endDate : null,
+          } : undefined);
         }}
         className="relative z-10 flex max-h-[92vh] w-full max-w-[980px] flex-col overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient"
       >
@@ -259,30 +275,6 @@ export default function SessionEditorModal({
           ) : null}
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
-            {allowPublicSessions && (
-              <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4 md:col-span-2">
-                <label className="flex cursor-pointer items-center justify-between gap-4">
-                  <span>
-                    <span className="block font-semibold">
-                      Zajęcia publiczne
-                    </span>
-                    <span className="mt-1 block text-xs text-on-surface-variant">
-                      Widoczne w publicznym grafiku. Klienci mogą zapisywać się
-                      samodzielnie.
-                    </span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    role="switch"
-                    checked={values.isPubliclyBookable}
-                    onChange={(event) =>
-                      togglePublicSession(event.target.checked)
-                    }
-                    className="h-6 w-6 shrink-0 accent-primary"
-                  />
-                </label>
-              </div>
-            )}
             <Field label="Tytuł" className="md:col-span-2">
               <input
                 value={values.title}
@@ -500,6 +492,64 @@ export default function SessionEditorModal({
             </Field>
           </div>
 
+          {allowRecurringSessions && !session && (
+            <div className="mt-4 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
+              <label className="flex cursor-pointer items-center justify-between gap-4 font-semibold">
+                Powtarzaj
+                <input type="checkbox" role="switch" checked={repeat}
+                  onChange={(event) => setRepeat(event.target.checked)}
+                  className="h-6 w-6 shrink-0 accent-primary" />
+              </label>
+              {repeat && (
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <Field label="Częstotliwość">
+                    <CustomSelect value={frequency}
+                      options={[{ value: "Daily", label: "Codziennie (Daily)" }, { value: "Weekly", label: "Co tydzień (Weekly)" }]}
+                      onChange={(value) => setFrequency(value as SessionRecurrence["frequency"])} />
+                  </Field>
+                  <Field label={frequency === "Weekly" ? "Co ile tygodni" : "Co ile dni"}>
+                    <input type="number" min="1" max="12" step="1" required value={interval}
+                      onChange={(event) => setInterval(event.target.value)}
+                      className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container px-4 text-sm outline-none" />
+                  </Field>
+                  {frequency === "Weekly" && (
+                    <fieldset className="min-w-0 md:col-span-2">
+                      <legend className="mb-2 text-label text-on-surface-muted">Dni tygodnia</legend>
+                      <div className="flex flex-wrap gap-2">
+                        {[["Monday", "Pon"], ["Tuesday", "Wt"], ["Wednesday", "Śr"], ["Thursday", "Czw"], ["Friday", "Pt"], ["Saturday", "Sob"], ["Sunday", "Niedz"]].map(([day, label]) => (
+                          <label key={day} className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-md)] bg-surface-container px-3 py-3 text-sm">
+                            <input type="checkbox" checked={daysOfWeek.includes(day)} className="accent-primary"
+                              onChange={(event) => setDaysOfWeek((current) => event.target.checked ? [...current, day] : current.filter((item) => item !== day))} />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-xs text-on-surface-variant">Bez wyboru: dzień tygodnia daty rozpoczęcia.</p>
+                    </fieldset>
+                  )}
+                  <Field label="Zakończenie">
+                    <CustomSelect value={ending}
+                      options={[{ value: "count", label: "Liczba wystąpień" }, { value: "date", label: "Data końcowa" }]}
+                      onChange={setEnding} />
+                  </Field>
+                  {ending === "count" ? (
+                    <Field label="Liczba wystąpień">
+                      <input type="number" min="2" max="104" step="1" required value={occurrencesCount}
+                        onChange={(event) => setOccurrencesCount(event.target.value)}
+                        className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container px-4 text-sm outline-none" />
+                    </Field>
+                  ) : (
+                    <Field label="Data końcowa (włącznie)">
+                      <NativeDateInput type="date" required min={values.startAt.slice(0, 10)} value={endDate}
+                        onChange={(event) => setEndDate(event.target.value)}
+                        className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container px-4 text-sm outline-none" />
+                    </Field>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {session?.participants?.length ? (
             <div className="mt-6 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
               <p className="text-label text-on-surface-muted">Uczestnicy</p>
@@ -522,6 +572,32 @@ export default function SessionEditorModal({
               </div>
             </div>
           ) : null}
+          <div className="mt-4">
+            {allowPublicSessions && (
+              <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4 md:col-span-2">
+                <label className="flex cursor-pointer items-center justify-between gap-4">
+                  <span>
+                    <span className="block font-semibold">
+                      Zajęcia publiczne
+                    </span>
+                    <span className="mt-1 block text-xs text-on-surface-variant">
+                      Widoczne w publicznym grafiku. Klienci mogą zapisywać się
+                      samodzielnie.
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={values.isPubliclyBookable}
+                    onChange={(event) =>
+                      togglePublicSession(event.target.checked)
+                    }
+                    className="h-6 w-6 shrink-0 accent-primary"
+                  />
+                </label>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-col-reverse gap-3 border-t border-white/5 bg-surface-container px-5 py-4 sm:flex-row sm:justify-end md:px-6">
@@ -537,7 +613,9 @@ export default function SessionEditorModal({
               ? "Zapisywanie..."
               : session
                 ? "Zapisz zmiany"
-                : "Dodaj sesję"}
+                : repeat && allowRecurringSessions
+                  ? "Dodaj serię"
+                  : "Dodaj sesję"}
           </Button>
         </div>
       </form>
