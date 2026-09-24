@@ -26,3 +26,28 @@ export function disconnectOutlook() {
 export function syncOutlookClients() {
   return backendPost<unknown>("outlook/contacts/sync-clients");
 }
+
+export type OutlookSeriesAttention = string | {
+  recurringGroupId: string;
+  outlookSeriesSynced?: boolean;
+  outlookSyncWarning?: string | null;
+};
+
+export type OutlookReconcileResult = {
+  integrationsProcessed: number;
+  outlookEventsFound: number;
+  importedOrUpdatedEvents: number;
+  missingOutlookEventsMarkedDeleted: number;
+  crmSessionsSyncedToOutlook: number;
+  errors?: unknown[] | null;
+  seriesRequiringAttention?: OutlookSeriesAttention[] | null;
+  outlookSeriesSynced?: boolean;
+  outlookSyncWarning?: string | null;
+};
+
+export function reconcileOutlook() {
+  return backendPost<OutlookReconcileResult>("outlook/reconcile", {
+    pastDays: 30,
+    futureDays: 180,
+  });
+}

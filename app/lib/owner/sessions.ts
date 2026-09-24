@@ -1,4 +1,4 @@
-import { backendGet, backendPost, backendPut } from "../backend";
+import { backendDelete, backendGet, backendPost, backendPut } from "../backend";
 
 export type OwnerSessionParticipant = {
   id: number;
@@ -20,6 +20,9 @@ export type OwnerSessionParticipant = {
 };
 
 export type OwnerSession = {
+  isRecurring?: boolean;
+  recurringGroupId?: string | null;
+  recurrenceInstanceNumber?: number | null;
   isPubliclyBookable?: boolean;
   publicSlug?: string | null;
   publicCapacity?: number | null;
@@ -122,6 +125,17 @@ export function createSessionSeries(session: SessionPayload, recurrence: Session
 
 export function updateSession(id: number, payload: SessionPayload) {
   return backendPut<OwnerSession>(`sessions/${id}`, payload);
+}
+
+export function syncSessionSeriesOutlook(recurringGroupId: string) {
+  return backendPost<{
+    outlookSeriesSynced: boolean;
+    outlookSyncWarning?: string | null;
+  }>(`sessions/series/${encodeURIComponent(recurringGroupId)}/sync-outlook`);
+}
+
+export function deleteSessionSeries(recurringGroupId: string) {
+  return backendDelete<unknown>(`sessions/series/${encodeURIComponent(recurringGroupId)}`);
 }
 
 export function getSession(id: number) {

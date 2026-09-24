@@ -26,7 +26,7 @@ import ScheduleFilters from "./components/ScheduleFilters";
 import { OutlookRequiredState } from "./components/ScheduleStates";
 import { DaySchedule, WeekSchedule } from "./components/ScheduleViews";
 import { correctCompletedSession } from "@/app/(app)/owner/schedule/session-utils";
-import { notifySessionCorrected } from "@/app/lib/session-corrections";
+import { notifySessionCorrected, useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 import SessionEditorModal from "./components/SessionEditorModal";
 import {
   addDays,
@@ -70,6 +70,7 @@ export default function SchedulePage() {
   const [isSessionsLoading, setIsSessionsLoading] = useState(false);
   const [isResourcesLoading, setIsResourcesLoading] = useState(false);
   const [isSavingSession, setIsSavingSession] = useState(false);
+  const calendarRevision = useSessionCorrectionRevision();
   const [sessionRevision, setSessionRevision] = useState(0);
 
   const period = useMemo(() => getPeriod(view, anchorDate), [anchorDate, view]);
@@ -219,6 +220,7 @@ export default function SchedulePage() {
     selectedLocationId,
     trainerFilter,
     statusFilter,
+    calendarRevision,
   ]);
 
   useEffect(() => {

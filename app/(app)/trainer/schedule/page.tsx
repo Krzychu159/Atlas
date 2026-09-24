@@ -42,7 +42,7 @@ import {
   WeekSchedule,
 } from "@/app/(app)/owner/schedule/components/ScheduleViews";
 import { correctCompletedSession } from "@/app/(app)/owner/schedule/session-utils";
-import { notifySessionCorrected } from "@/app/lib/session-corrections";
+import { notifySessionCorrected, useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 import SessionEditorModal from "@/app/(app)/owner/schedule/components/SessionEditorModal";
 import {
   addDays,
@@ -84,6 +84,7 @@ export default function TrainerSchedulePage() {
   const [isSessionsLoading, setIsSessionsLoading] = useState(false);
   const [isResourcesLoading, setIsResourcesLoading] = useState(false);
   const [isSavingSession, setIsSavingSession] = useState(false);
+  const calendarRevision = useSessionCorrectionRevision();
   const [sessionRevision, setSessionRevision] = useState(0);
   const [isTrainerFilterReady, setIsTrainerFilterReady] = useState(false);
   const defaultTrainerApplied = useRef(false);
@@ -250,6 +251,7 @@ export default function TrainerSchedulePage() {
     period.toIso,
     trainerFilter,
     statusFilter,
+    calendarRevision,
   ]);
 
   function movePeriod(direction: -1 | 1) {

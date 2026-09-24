@@ -7,9 +7,13 @@ import {
   ExternalLink,
   Loader2,
   RefreshCw,
+  Trash2,
   Unplug,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import { ModalOverlay, ModalHeader, ModalFooter } from "@/app/components/ui/modal";
+import { deleteSessionSeries, syncSessionSeriesOutlook } from "@/app/lib/owner/sessions";
+import { notifySessionCorrected } from "@/app/lib/session-corrections";
 import {
   showAppError,
   showAppInfo,
@@ -20,6 +24,9 @@ import {
   getOutlookConnectUrl,
   getOutlookStatus,
   syncOutlookClients,
+  reconcileOutlook,
+  type OutlookReconcileResult,
+  type OutlookSeriesAttention,
   type OutlookStatus,
 } from "@/app/lib/calendar/outlook";
 
@@ -41,6 +48,13 @@ export default function OutlookIntegrationCard() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isReconciling, setIsReconciling] = useState(false);
+  const [result, setResult] = useState<OutlookReconcileResult | null>(null);
+  const [series, setSeries] = useState<OutlookSeriesAttention[]>([]);
+  const [seriesAction, setSeriesAction] = useState<{ id: string; action: "retry" | "delete" } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
+  const syncLock = useRef(false);
   const authWindowRef = useRef<Window | null>(null);
   const pollingRef = useRef<number | null>(null);
 
@@ -206,6 +220,67 @@ export default function OutlookIntegrationCard() {
   }
 
   const connected = Boolean(status?.isConnected);
+  const busy = isReconciling || seriesAction !== null;
+
+  function showSyncWarning(data: { outlookSeriesSynced?: boolean; outlookSyncWarning?: string | null }) {
+    const warning = data.outlookSyncWarning || (data.outlookSeriesSynced === false
+      ? "Seria istnieje w CRM, ale nie została zsynchronizowana z Outlookiem."
+      : null);
+    setSyncWarning(warning);
+    if (warning) showAppInfo(warning);
+  }
+
+  async function handleReconcile() {
+    if (syncLock.current) return;
+    syncLock.current = true;
+    setIsReconciling(true);
+    setSyncWarning(null);
+    try {
+      const data = await reconcileOutlook();
+      setResult(data);
+      setSeries(data.seriesRequiringAttention ?? []);
+      showSyncWarning(data);
+    } catch (err) {
+      showAppError(err, "Nie udało się zsynchronizować Outlook.");
+    } finally {
+      notifySessionCorrected();
+      await loadStatus();
+      setIsReconciling(false);
+      syncLock.current = false;
+    }
+  }
+
+  async function handleSeriesAction(id: string, action: "retry" | "delete") {
+    if (syncLock.current) return;
+    syncLock.current = true;
+    setSeriesAction({ id, action });
+    setSyncWarning(null);
+    try {
+      if (action === "delete") {
+        await deleteSessionSeries(id);
+        setSeries((current) => current.filter((item) => getSeriesId(item) !== id));
+        setDeleteTarget(null);
+        showAppSuccess("Seria została usunięta.");
+      } else {
+        const data = await syncSessionSeriesOutlook(id);
+        showSyncWarning(data);
+        if (data.outlookSeriesSynced === true) {
+          setSeries((current) => current.filter((item) => getSeriesId(item) !== id));
+          showAppSuccess("Seria została zsynchronizowana z Outlookiem.");
+        } else {
+          setSeries((current) => current.map((item) => getSeriesId(item) === id
+            ? { recurringGroupId: id, ...data } : item));
+        }
+      }
+    } catch (err) {
+      showAppError(err, action === "delete" ? "Nie udało się usunąć serii." : "Nie udało się zsynchronizować serii.");
+    } finally {
+      notifySessionCorrected();
+      await loadStatus();
+      setSeriesAction(null);
+      syncLock.current = false;
+    }
+  }
 
   return (
     <section className="card-shell overflow-hidden p-6 md:p-8">
@@ -237,7 +312,15 @@ export default function OutlookIntegrationCard() {
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap lg:max-w-[440px]">
+          <Button
+            icon={<RefreshCw size={16} className={isReconciling ? "animate-spin" : ""} />}
+            onClick={handleReconcile}
+            disabled={!connected || isLoading || isConnecting || isDisconnecting || isSyncing || busy}
+            className="w-full sm:w-auto"
+          >
+            {isReconciling ? "Synchronizowanie..." : "Synchronizuj teraz"}
+          </Button>
           <Button
             variant="secondary"
             icon={
@@ -252,18 +335,18 @@ export default function OutlookIntegrationCard() {
               isLoading ||
               isConnecting ||
               isDisconnecting ||
-              isSyncing
+              isSyncing || busy
             }
             className="w-full sm:w-auto"
           >
-            {isSyncing ? "Synchronizowanie..." : "Synchronizuj"}
+            {isSyncing ? "Synchronizowanie kontaktów..." : "Synchronizuj kontakty"}
           </Button>
           {connected ? (
             <Button
               variant="outline"
               icon={<Unplug size={16} />}
               onClick={handleDisconnect}
-              disabled={isDisconnecting || isSyncing}
+              disabled={isDisconnecting || isSyncing || busy}
               className="w-full sm:w-auto"
             >
               {isDisconnecting ? "Odłączanie..." : "Odłącz"}
@@ -272,7 +355,7 @@ export default function OutlookIntegrationCard() {
             <Button
               icon={<ExternalLink size={16} />}
               onClick={handleConnect}
-              disabled={isLoading || isConnecting || isSyncing}
+              disabled={isLoading || isConnecting || isSyncing || busy}
               className="w-full sm:w-auto"
             >
               {isConnecting ? "Przekierowanie..." : "Połącz Microsoft"}
@@ -312,6 +395,90 @@ export default function OutlookIntegrationCard() {
           </p>
         </div>
       </div>
+      {syncWarning && (
+        <p role="status" className="mt-5 rounded-[var(--radius-lg)] bg-warning-container p-4 text-sm text-warning-light">{syncWarning}</p>
+      )}
+
+      {result && (
+        <div className="mt-6 space-y-4" aria-live="polite">
+          <h3 className="font-semibold">Wynik synchronizacji</h3>
+          <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {[
+              ["Przetworzone integracje", result.integrationsProcessed],
+              ["Znalezione wydarzenia Outlook", result.outlookEventsFound],
+              ["Zaimportowane lub zaktualizowane", result.importedOrUpdatedEvents],
+              ["Brakujące wydarzenia oznaczone jako usunięte", result.missingOutlookEventsMarkedDeleted],
+              ["Sesje CRM zsynchronizowane z Outlook", result.crmSessionsSyncedToOutlook],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">
+                <dt className="text-sm text-on-surface-variant">{label}</dt>
+                <dd className="mt-2 text-xl font-semibold">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          {!!result.errors?.length && (
+            <details className="rounded-[var(--radius-lg)] bg-error-container p-4">
+              <summary className="cursor-pointer font-semibold text-error-light">Błędy synchronizacji ({result.errors.length})</summary>
+              <ul className="mt-3 space-y-2 text-sm">
+                {result.errors.map((error, index) => (
+                  <li key={index} className="whitespace-pre-wrap break-words">{typeof error === "string" ? error : JSON.stringify(error, null, 2)}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+
+      {series.length > 0 && (
+        <div className="mt-6 space-y-3">
+          <h3 className="font-semibold">Serie wymagające uwagi</h3>
+          {series.map((item) => {
+            const id = getSeriesId(item);
+            const warning = typeof item === "string" ? null : item.outlookSyncWarning ||
+              (item.outlookSeriesSynced === false ? "Seria nie została zsynchronizowana z Outlookiem." : null);
+            return (
+              <div key={id} className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">
+                <p className="break-all text-sm font-semibold">Seria {id}</p>
+                {warning && <p className="mt-2 text-sm text-warning-light">{warning}</p>}
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  <Button variant="secondary" disabled={busy || isLoading || isSyncing || isDisconnecting}
+                    icon={<RefreshCw size={16} className={seriesAction?.id === id && seriesAction.action === "retry" ? "animate-spin" : ""} />}
+                    onClick={() => void handleSeriesAction(id, "retry")}>
+                    {seriesAction?.id === id && seriesAction.action === "retry" ? "Synchronizowanie..." : "Ponów synchronizację"}
+                  </Button>
+                  <Button variant="danger" icon={<Trash2 size={16} />} disabled={busy || isLoading || isSyncing || isDisconnecting}
+                    onClick={() => setDeleteTarget(id)}>Usuń błędną serię</Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {deleteTarget && (
+        <ModalOverlay onClose={() => { if (!busy) setDeleteTarget(null); }}>
+          <div role="dialog" aria-modal="true" aria-label="Usunięcie błędnej serii"
+            className="relative z-10 w-full max-w-lg overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient">
+            <div className="p-5 md:p-6">
+              <ModalHeader title="Usunąć błędną serię?" icon={<Trash2 size={20} />} iconTone="danger"
+                description="Operacja dotyczy całej wskazanej serii, a nie pojedynczego wystąpienia."
+                onClose={() => { if (!busy) setDeleteTarget(null); }} />
+              <p className="mt-3 break-all text-sm text-on-surface-variant">{deleteTarget}</p>
+            </div>
+            <ModalFooter>
+              <Button variant="secondary" disabled={busy} onClick={() => setDeleteTarget(null)}>Anuluj</Button>
+              <Button variant="danger" disabled={busy} icon={busy ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                onClick={() => void handleSeriesAction(deleteTarget, "delete")}>
+                {busy ? "Usuwanie..." : "Usuń serię"}
+              </Button>
+            </ModalFooter>
+          </div>
+        </ModalOverlay>
+      )}
     </section>
   );
+}
+
+function getSeriesId(item: OutlookSeriesAttention) {
+  return typeof item === "string" ? item : item.recurringGroupId;
 }
