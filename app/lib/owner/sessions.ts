@@ -69,6 +69,7 @@ export type SessionParticipantPayload = {
 };
 
 export type SessionPayload = {
+  correctionReason?: string;
   isPubliclyBookable?: boolean;
   publicSlug?: string | null;
   publicCapacity?: number | null;
@@ -121,6 +122,34 @@ export function createSessionSeries(session: SessionPayload, recurrence: Session
 
 export function updateSession(id: number, payload: SessionPayload) {
   return backendPut<OwnerSession>(`sessions/${id}`, payload);
+}
+
+export function getSession(id: number) {
+  return backendGet<OwnerSession>(`sessions/${id}`);
+}
+
+export function completeSession(id: number, payload: {
+  actualSessionType: string;
+  correctionReason: string;
+  participants: (SessionParticipantPayload & { attendanceStatus: string })[];
+}) {
+  return backendPost<OwnerSession>(`sessions/${id}/complete`, payload);
+}
+
+export type SessionCorrection = {
+  id: number;
+  sessionId: number | null;
+  originalSessionId: number;
+  changeType: string;
+  reason: string;
+  beforeState: unknown;
+  afterState: unknown;
+  changedByUserId: number | null;
+  createdAt: string;
+};
+
+export function getSessionCorrections(id: number) {
+  return backendGet<SessionCorrection[]>(`sessions/${id}/corrections`);
 }
 
 export function getClientSessions(clientId: number) {

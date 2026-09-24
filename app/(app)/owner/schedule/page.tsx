@@ -13,6 +13,7 @@ import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { getOutlookStatus, type OutlookStatus } from "@/app/lib/owner/outlook";
 import {
   createSession,
+  getSession,
   createSessionSeries,
   getOwnerSessions,
   updateSession,
@@ -24,6 +25,8 @@ import { DateNavigator, ViewSwitch } from "./components/ScheduleControls";
 import ScheduleFilters from "./components/ScheduleFilters";
 import { OutlookRequiredState } from "./components/ScheduleStates";
 import { DaySchedule, WeekSchedule } from "./components/ScheduleViews";
+import { correctCompletedSession } from "@/app/(app)/owner/schedule/session-utils";
+import { notifySessionCorrected } from "@/app/lib/session-corrections";
 import SessionEditorModal from "./components/SessionEditorModal";
 import {
   addDays,
@@ -67,6 +70,7 @@ export default function SchedulePage() {
   const [isSessionsLoading, setIsSessionsLoading] = useState(false);
   const [isResourcesLoading, setIsResourcesLoading] = useState(false);
   const [isSavingSession, setIsSavingSession] = useState(false);
+  const [sessionRevision, setSessionRevision] = useState(0);
 
   const period = useMemo(() => getPeriod(view, anchorDate), [anchorDate, view]);
   const scopedTrainers = useMemo(
@@ -241,15 +245,42 @@ export default function SchedulePage() {
     setIsSessionModalOpen(true);
   }
 
-  function openEditModal(session: OwnerSession) {
-    setSelectedSession(session);
-    setIsSessionModalOpen(true);
+  async function openEditModal(session: OwnerSession) {
+    if (session.status !== "Completed") {
+      setSelectedSession(session);
+      setIsSessionModalOpen(true);
+      return;
+    }
+    try {
+      const detailed = await getSession(session.id);
+      setSelectedSession(detailed);
+      setIsSessionModalOpen(true);
+    } catch (err) {
+      showOwnerError(err, "Nie udało się pobrać szczegółów sesji.");
+    }
   }
 
   async function handleSaveSession(values: SessionFormValues, recurrence?: SessionRecurrence) {
     if (isSavingSession) return;
     try {
       setIsSavingSession(true);
+      if (selectedSession?.status === "Completed") {
+        await correctCompletedSession(selectedSession, values);
+        showOwnerSuccess("Korekta została zapisana.");
+        notifySessionCorrected();
+        // A refresh failure must not turn a successful correction into a retry.
+        try {
+          const refreshed = await getSession(selectedSession.id);
+          setSelectedSession(refreshed);
+          setSessionRevision((current) => current + 1);
+        } catch (err) {
+          setIsSessionModalOpen(false);
+          setSelectedSession(null);
+          showOwnerError(err, "Korekta zapisana, ale nie udało się odświeżyć szczegółów.");
+        }
+        await loadSessions();
+        return;
+      }
       const payload = toSessionPayload(values, selectedSession);
 
       if (selectedSession) {
@@ -376,12 +407,13 @@ export default function SchedulePage() {
       </div>
 
       <SessionEditorModal
+        allowCorrectionHistory
         allowRecurringSessions
         allowPublicSessions
         key={
           isSessionModalOpen
             ? selectedSession
-              ? `session-${selectedSession.id}`
+              ? `session-${selectedSession.id}-${sessionRevision}`
               : `new-${toDateInputValue(createSessionDate)}`
             : "closed"
         }

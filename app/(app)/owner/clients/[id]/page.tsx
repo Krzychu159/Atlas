@@ -1,5 +1,7 @@
 "use client";
 
+import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
+
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
@@ -22,6 +24,7 @@ import EditClientModal from "./components/EditClientModal";
 import { showOwnerError } from "../../components/owner-toast";
 
 export default function OwnerClientDetailsPage() {
+  const correctionRevision = useSessionCorrectionRevision();
   const params = useParams<{ id: string }>();
   const [client, setClient] = useState<Client | null>(null);
   const [subscription, setSubscription] = useState<ClientSubscription | null>(
@@ -102,7 +105,7 @@ export default function OwnerClientDetailsPage() {
     }
 
     loadClientDetails();
-  }, [params.id]);
+  }, [params.id, correctionRevision]);
 
   async function handleOpenTrainingPlan() {
     if (!client) return;

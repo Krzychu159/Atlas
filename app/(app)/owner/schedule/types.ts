@@ -9,6 +9,8 @@ export type SessionStatusFilter =
   | "Cancelled";
 
 export type SessionFormValues = {
+  correctionReason?: string;
+  actualSessionType?: string;
   isPubliclyBookable: boolean;
   publicCapacity: string;
   publicSlug: string;

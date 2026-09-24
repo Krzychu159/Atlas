@@ -35,6 +35,7 @@ import {
   getSessionTitle,
 } from "../session-utils";
 import type { SessionFormValues } from "../types";
+import SessionCorrectionHistory from "./SessionCorrectionHistory";
 import SessionMetaChip from "./SessionMetaChip";
 
 export default function SessionEditorModal({
@@ -47,6 +48,7 @@ export default function SessionEditorModal({
   defaultTrainerId,
   allowPublicSessions = false,
   allowRecurringSessions = false,
+  allowCorrectionHistory = false,
   isSaving,
   onClose,
   onSubmit,
@@ -60,6 +62,7 @@ export default function SessionEditorModal({
   defaultTrainerId?: number | null;
   allowPublicSessions?: boolean;
   allowRecurringSessions?: boolean;
+  allowCorrectionHistory?: boolean;
   isSaving: boolean;
   onClose: () => void;
   onSubmit: (values: SessionFormValues, recurrence?: SessionRecurrence) => void;
@@ -371,6 +374,11 @@ export default function SessionEditorModal({
               }
               className="md:col-span-2"
             >
+              {session?.status === "Completed" && (
+                <span className="mb-3 block text-xs text-on-surface-variant">
+                  Zmianę uczestników lub typu rozliczenia zapisz osobno od pozostałych danych sesji.
+                </span>
+              )}
               {values.isPubliclyBookable && (
                 <span className="mb-3 block text-xs text-on-surface-variant">
                   Możesz zapisać zajęcia bez klientów. Przy edycji istniejące
@@ -453,10 +461,29 @@ export default function SessionEditorModal({
             <Field label="Status" className="md:col-span-2">
               <CustomSelect
                 value={values.status}
-                options={statusOptions}
+                options={session?.status === "Completed" ? statusOptions.filter((option) => ["Completed", "Planned", "Cancelled"].includes(option.value)) : statusOptions}
                 onChange={(value) => updateValue("status", value)}
               />
             </Field>
+
+            {session?.status === "Completed" && (
+              <>
+                <Field label="Powód korekty" className="md:col-span-2">
+                  <textarea required value={values.correctionReason || ""} rows={2}
+                    onChange={(event) => updateValue("correctionReason", event.target.value)}
+                    className="w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3 text-sm outline-none" />
+                  <span className="mt-2 block text-xs text-on-surface-variant">Korekta dotyczy tylko tego wystąpienia sesji. Rozliczenie zostanie przeliczone przez system.</span>
+                </Field>
+                {values.status === "Completed" && (
+                  <Field label="Typ rozliczenia" className="md:col-span-2">
+                    <input value={values.actualSessionType ?? session.actualSessionType ?? session.plannedSessionType ?? ""}
+                      onChange={(event) => updateValue("actualSessionType", event.target.value)}
+                      placeholder="Np. TwoToOne"
+                      className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none" />
+                  </Field>
+                )}
+              </>
+            )}
 
             {/*
           <Field label="Typ sesji">
@@ -572,6 +599,7 @@ export default function SessionEditorModal({
               </div>
             </div>
           ) : null}
+          {allowCorrectionHistory && session && <SessionCorrectionHistory sessionId={session.id} />}
           <div className="mt-4">
             {allowPublicSessions && (
               <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4 md:col-span-2">

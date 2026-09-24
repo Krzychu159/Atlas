@@ -1,5 +1,7 @@
 "use client";
 
+import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
+
 import { NativeDateInput } from "@/app/components/ui/native-date-input";
 
 import { useEffect, useMemo, useState } from "react";
@@ -93,6 +95,7 @@ function formatSessionType(value: string | null) {
 }
 
 export default function TrainerSettlementPage() {
+  const correctionRevision = useSessionCorrectionRevision();
   const params = useParams<{ id: string }>();
   const trainerId = Number(params.id);
   const [monthValue, setMonthValue] = useState("");
@@ -156,7 +159,7 @@ export default function TrainerSettlementPage() {
     }
 
     loadSettlement();
-  }, [monthValue, trainerId]);
+  }, [monthValue, trainerId, correctionRevision]);
 
   const activeRates = useMemo(
     () => rates.filter((rate) => rate.isActive),

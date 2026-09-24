@@ -1,5 +1,7 @@
 "use client";
 
+import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
+
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import ClientMetricCards from "@/app/(app)/owner/clients/[id]/components/ClientMetricCards";
@@ -33,6 +35,7 @@ import {
 import { trainerPortalClientToClient } from "@/app/lib/trainer/portal-mappers";
 
 export default function TrainerClientDetailsPage() {
+  const correctionRevision = useSessionCorrectionRevision();
   const params = useParams<{ id: string }>();
   const [client, setClient] = useState<Client | null>(null);
   const [subscription, setSubscription] = useState<ClientSubscription | null>(
@@ -185,7 +188,7 @@ export default function TrainerClientDetailsPage() {
 
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id]);
+  }, [params.id, correctionRevision]);
 
   async function handleOpenTrainingPlan() {
     if (!client) return;

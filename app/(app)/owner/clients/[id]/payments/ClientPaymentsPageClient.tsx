@@ -1,5 +1,7 @@
 "use client";
 
+import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
+
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -94,6 +96,7 @@ export default function ClientPaymentsPageClient({
   clientIdParam,
   basePath = "/owner",
 }: ClientPaymentsPageClientProps) {
+  const correctionRevision = useSessionCorrectionRevision();
   const [clientId, setClientId] = useState<number | null>(null);
   const [client, setClient] = useState<Client | null>(null);
   const [billing, setBilling] = useState<ClientBillingSummary | null>(null);
@@ -150,7 +153,7 @@ export default function ClientPaymentsPageClient({
 
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientIdParam]);
+  }, [clientIdParam, correctionRevision]);
 
   async function loadClientPayments(id = clientId) {
     if (!id) return;

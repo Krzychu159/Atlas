@@ -9,6 +9,7 @@ import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { getOutlookStatus, type OutlookStatus } from "@/app/lib/owner/outlook";
 import {
   createSession,
+  getSession,
   getOwnerSessions,
   updateSession,
   type OwnerSession,
@@ -40,6 +41,8 @@ import {
   DaySchedule,
   WeekSchedule,
 } from "@/app/(app)/owner/schedule/components/ScheduleViews";
+import { correctCompletedSession } from "@/app/(app)/owner/schedule/session-utils";
+import { notifySessionCorrected } from "@/app/lib/session-corrections";
 import SessionEditorModal from "@/app/(app)/owner/schedule/components/SessionEditorModal";
 import {
   addDays,
@@ -81,6 +84,7 @@ export default function TrainerSchedulePage() {
   const [isSessionsLoading, setIsSessionsLoading] = useState(false);
   const [isResourcesLoading, setIsResourcesLoading] = useState(false);
   const [isSavingSession, setIsSavingSession] = useState(false);
+  const [sessionRevision, setSessionRevision] = useState(0);
   const [isTrainerFilterReady, setIsTrainerFilterReady] = useState(false);
   const defaultTrainerApplied = useRef(false);
 
@@ -261,7 +265,7 @@ export default function TrainerSchedulePage() {
   }
 
   async function openEditModal(session: OwnerSession) {
-    if (session.participants?.length) {
+    if (session.status !== "Completed" && session.participants?.length) {
       setSelectedSession(session);
       setIsSessionModalOpen(true);
       return;
@@ -271,7 +275,11 @@ export default function TrainerSchedulePage() {
       const detailedSession = await getTrainerPortalSession(session.id);
 
       setSelectedSession(detailedSession);
-    } catch {
+    } catch (err) {
+      if (session.status === "Completed") {
+        showOwnerError(err, "Nie udało się pobrać szczegółów sesji.");
+        return;
+      }
       setSelectedSession(session);
     }
 
@@ -279,8 +287,26 @@ export default function TrainerSchedulePage() {
   }
 
   async function handleSaveSession(values: SessionFormValues) {
+    if (isSavingSession) return;
     try {
       setIsSavingSession(true);
+      if (selectedSession?.status === "Completed") {
+        await correctCompletedSession(selectedSession, values);
+        showOwnerSuccess("Korekta została zapisana.");
+        notifySessionCorrected();
+        // A refresh failure must not turn a successful correction into a retry.
+        try {
+          const refreshed = await getSession(selectedSession.id).catch((err) => { if (!isForbiddenError(err)) throw err; return getTrainerPortalSession(selectedSession.id); });
+          setSelectedSession(refreshed);
+          setSessionRevision((current) => current + 1);
+        } catch (err) {
+          setIsSessionModalOpen(false);
+          setSelectedSession(null);
+          showOwnerError(err, "Korekta zapisana, ale nie udało się odświeżyć szczegółów.");
+        }
+        await loadSessions();
+        return;
+      }
       const payload = toSessionPayload(values, selectedSession);
 
       if (selectedSession) {
@@ -412,7 +438,7 @@ export default function TrainerSchedulePage() {
         key={
           isSessionModalOpen
             ? selectedSession
-              ? `session-${selectedSession.id}`
+              ? `session-${selectedSession.id}-${sessionRevision}`
               : `new-${toDateInputValue(createSessionDate)}-${trainerFilter}`
             : "closed"
         }

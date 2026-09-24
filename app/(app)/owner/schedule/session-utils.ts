@@ -5,6 +5,7 @@ import type {
   SessionPayload,
 } from "@/app/lib/owner/sessions";
 import type { Trainer } from "@/app/lib/owner/trainers";
+import { completeSession, updateSession } from "@/app/lib/owner/sessions";
 import { getOwnerSessionPackageName } from "../components/session-display";
 import { toDateTimeLocalValue } from "./date-utils";
 import type { SessionFormValues, SessionStatusFilter } from "./types";
@@ -201,7 +202,7 @@ export function toSessionPayload(
 
   const preservePublicParticipants = Boolean(session &&
     (session.isPubliclyBookable || values.isPubliclyBookable) && !values.participantsEdited);
-  if (!values.isPubliclyBookable && !preservePublicParticipants && !values.participantIds.length) {
+  if (session?.status !== "Completed" && !values.isPubliclyBookable && !preservePublicParticipants && !values.participantIds.length) {
     throw new Error("Wybierz przynajmniej jednego klienta.");
   }
 
@@ -264,6 +265,45 @@ export function toSessionPayload(
   }
 
   return payload;
+}
+
+export async function correctCompletedSession(session: OwnerSession, values: SessionFormValues) {
+  const correctionReason = values.correctionReason?.trim();
+  if (!correctionReason) throw new Error("Podaj powód korekty.");
+  if (!["Completed", "Planned", "Cancelled"].includes(values.status)) {
+    throw new Error("Wybierz status: Zrealizowana, Zaplanowana lub Anulowana.");
+  }
+  if (!session.participants) throw new Error("Odśwież szczegóły sesji przed korektą uczestników.");
+  const payload = toSessionPayload(values, session);
+  const participantsChanged = values.participantIds.length !== session.participants.length ||
+    session.participants.some((participant) => !values.participantIds.includes(String(participant.clientId)));
+  const actualSessionType = (values.actualSessionType ?? session.actualSessionType ?? session.plannedSessionType ?? "").trim();
+  const typeChanged = actualSessionType !== (session.actualSessionType || session.plannedSessionType || "");
+  if (values.status === "Completed" && (participantsChanged || typeChanged)) {
+    const initial = getDefaultFormValues({ session, date: new Date(session.startAt), trainers: [], locations: [] });
+    const initialPayload = toSessionPayload(initial, session);
+    const metadataKeys = [...new Set([...Object.keys(payload), ...Object.keys(initialPayload)])]
+      .filter((key) => key !== "participants") as (keyof SessionPayload)[];
+    if (metadataKeys.some((key) => JSON.stringify(payload[key]) !== JSON.stringify(initialPayload[key]))) {
+      throw new Error("Zapisz korektę uczestników lub typu rozliczenia osobno od zmian pozostałych danych sesji.");
+    }
+    if (!actualSessionType) throw new Error("Podaj typ rozliczenia sesji.");
+    await completeSession(session.id, {
+      actualSessionType,
+      correctionReason,
+      participants: values.participantIds.map((id) => {
+        const existing = session.participants!.find((participant) => participant.clientId === Number(id));
+        return {
+          ...getParticipantPayload(Number(id), session),
+          attendanceStatus: existing?.attendanceStatus || "Present",
+        };
+      }),
+    });
+  } else {
+    // Completed metadata edits must never replace the billed participant list.
+    if (values.status === "Completed") delete payload.participants;
+    await updateSession(session.id, { ...payload, correctionReason });
+  }
 }
 
 function getParticipantPayload(
