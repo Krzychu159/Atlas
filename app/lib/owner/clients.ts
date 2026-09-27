@@ -129,11 +129,10 @@ export type ClientTrainingPlan = {
 };
 
 export type ClientLegalConsent = {
-  legalEntityId: number;
   legalEntityName: string;
   documentType: string;
-  termsVersion: string;
-  termsUrl: string | null;
+  documentVersion: string;
+  documentUrl: string | null;
   source: string;
   acceptedAt: string;
   isCurrent: boolean;

@@ -6,7 +6,7 @@ export type InvitationDetails = {
   trainerId: number | null;
   trainerName: string | null;
   expiresAt: string;
-  legalEntityName?: string | null;
+  legalEntityName: string;
   termsAcceptanceRequired: boolean;
   termsVersion: string | null;
   termsUrl: string | null;

@@ -290,11 +290,7 @@ export default function AcceptInvitationForm({
                     <div className="mt-5">
                       <TermsAcceptance
                         id="invitation-terms"
-                        companyName={
-                          validation.invitation.legalEntityName ||
-                          validation.invitation.locationName ||
-                          "Firma"
-                        }
+                        companyName={validation.invitation.legalEntityName}
                         termsVersion={validation.invitation.termsVersion}
                         termsUrl={validation.invitation.termsUrl}
                         checked={termsAccepted}

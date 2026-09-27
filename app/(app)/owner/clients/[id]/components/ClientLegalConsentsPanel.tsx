@@ -36,9 +36,9 @@ export default function ClientLegalConsentsPanel({
             </thead>
             <tbody className="divide-y divide-white/5">
               {consents.map((consent, index) => (
-                <tr key={`${consent.legalEntityId}-${consent.termsVersion}-${consent.acceptedAt}-${index}`}>
+                <tr key={`${consent.legalEntityName}-${consent.documentVersion}-${consent.acceptedAt}-${index}`}>
                   <td className="py-3 pr-4 font-semibold text-on-surface">{consent.legalEntityName}</td>
-                  <td className="py-3 pr-4 text-on-surface-variant">{consent.termsVersion}</td>
+                  <td className="py-3 pr-4 text-on-surface-variant">{consent.documentVersion}</td>
                   <td className="py-3 pr-4 text-on-surface-variant">{formatConsentDate(consent.acceptedAt)}</td>
                   <td className="py-3 pr-4 text-on-surface-variant">{consent.source}</td>
                   <td className="py-3">
