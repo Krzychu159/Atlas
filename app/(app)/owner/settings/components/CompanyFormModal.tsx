@@ -4,7 +4,11 @@ import { useState, type FormEvent } from "react";
 import { Building2, Info, Plus, Save } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { TextArea, TextField } from "@/app/components/ui/input";
-import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
+import {
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
+} from "@/app/components/ui/modal";
 import { showAppError, showAppSuccess } from "@/app/components/ui/app-toast";
 import {
   createLegalEntity,
@@ -34,6 +38,8 @@ const emptyForm: CompanyForm = {
   blikPhoneNumber: "",
   transferTitleTemplate: "Pakiet {PackageName} - {ClientFullName}",
   paymentDescription: "",
+  termsVersion: "",
+  termsUrl: "",
   isActive: true,
 };
 
@@ -51,7 +57,10 @@ export default function CompanyFormModal({
     if (!isSaving) onClose();
   }
 
-  function updateField<K extends keyof CompanyForm>(key: K, value: CompanyForm[K]) {
+  function updateField<K extends keyof CompanyForm>(
+    key: K,
+    value: CompanyForm[K],
+  ) {
     setForm((current) => ({ ...current, [key]: value }));
     setErrors((current) => {
       if (!current[key]) return current;
@@ -86,8 +95,14 @@ export default function CompanyFormModal({
     } catch (error) {
       showAppError(
         error,
-        entity ? "Nie udało się zapisać danych firmy." : "Nie udało się dodać firmy.",
-        { id: entity ? `company-update-error-${entity.id}` : "company-create-error" },
+        entity
+          ? "Nie udało się zapisać danych firmy."
+          : "Nie udało się dodać firmy.",
+        {
+          id: entity
+            ? `company-update-error-${entity.id}`
+            : "company-create-error",
+        },
       );
     } finally {
       setIsSaving(false);
@@ -95,7 +110,10 @@ export default function CompanyFormModal({
   }
 
   return (
-    <ModalOverlay onClose={isSaving ? undefined : handleClose} className="items-start overflow-y-auto py-5 md:py-8">
+    <ModalOverlay
+      onClose={isSaving ? undefined : handleClose}
+      className="items-start overflow-y-auto py-5 md:py-8"
+    >
       <form
         onSubmit={handleSubmit}
         noValidate
@@ -112,8 +130,10 @@ export default function CompanyFormModal({
 
           {/* Sekcja: Podstawowe dane firmy */}
           <fieldset className="mt-7 border-t border-white/5 pt-6">
-            <legend className="pr-3 text-label text-primary-light">Dane podstawowe</legend>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <legend className="pr-3 text-label text-primary-light">
+              Dane podstawowe
+            </legend>
+            <div className="mt-2 grid gap-4 md:grid-cols-2">
               <FieldWithError error={errors.name} className="md:col-span-2">
                 <TextField
                   label="Nazwa firmy"
@@ -128,7 +148,9 @@ export default function CompanyFormModal({
                 <TextField
                   label="NIP"
                   value={form.nip}
-                  onChange={(value) => updateField("nip", onlyDigits(value).slice(0, 10))}
+                  onChange={(value) =>
+                    updateField("nip", onlyDigits(value).slice(0, 10))
+                  }
                   placeholder="10 cyfr"
                   inputMode="numeric"
                   maxLength={10}
@@ -151,7 +173,9 @@ export default function CompanyFormModal({
                 <TextField
                   label="Telefon"
                   value={form.phone}
-                  onChange={(value) => updateField("phone", sanitizePhone(value))}
+                  onChange={(value) =>
+                    updateField("phone", sanitizePhone(value))
+                  }
                   placeholder="+48 500 000 000"
                   type="tel"
                   autoComplete="tel"
@@ -172,8 +196,10 @@ export default function CompanyFormModal({
 
           {/* Sekcja: Dane płatności firmy */}
           <fieldset className="mt-7 border-t border-white/5 pt-6">
-            <legend className="pr-3 text-label text-primary-light">Dane płatności</legend>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <legend className="pr-3 text-label text-primary-light">
+              Dane płatności
+            </legend>
+            <div className="mt-2 grid gap-4 md:grid-cols-2">
               <TextField
                 label="Odbiorca płatności"
                 value={form.paymentRecipientName}
@@ -184,7 +210,9 @@ export default function CompanyFormModal({
                 <TextField
                   label="Numer rachunku bankowego"
                   value={form.bankAccountNumber}
-                  onChange={(value) => updateField("bankAccountNumber", formatBankAccount(value))}
+                  onChange={(value) =>
+                    updateField("bankAccountNumber", formatBankAccount(value))
+                  }
                   placeholder="26 cyfr, spacje są dozwolone"
                   inputMode="numeric"
                   aria-invalid={Boolean(errors.bankAccountNumber)}
@@ -194,7 +222,12 @@ export default function CompanyFormModal({
                 <TextField
                   label="Telefon BLIK"
                   value={form.blikPhoneNumber}
-                  onChange={(value) => updateField("blikPhoneNumber", onlyDigits(value).slice(0, 9))}
+                  onChange={(value) =>
+                    updateField(
+                      "blikPhoneNumber",
+                      onlyDigits(value).slice(0, 9),
+                    )
+                  }
                   placeholder="9 cyfr"
                   inputMode="numeric"
                   maxLength={9}
@@ -205,14 +238,24 @@ export default function CompanyFormModal({
                 <TextField
                   label="Szablon tytułu przelewu"
                   value={form.transferTitleTemplate}
-                  onChange={(value) => updateField("transferTitleTemplate", value)}
+                  onChange={(value) =>
+                    updateField("transferTitleTemplate", value)
+                  }
                   placeholder="Pakiet {PackageName} - {ClientFullName}"
                 />
                 <p className="mt-2 flex items-start gap-1.5 text-xs leading-5 text-on-surface-muted">
-                  <Info size={14} className="mt-0.5 shrink-0 text-primary-light" />
+                  <Info
+                    size={14}
+                    className="mt-0.5 shrink-0 text-primary-light"
+                  />
                   <span>
-                    <code className="text-primary-light">{"{PackageName}"}</code> wstawia nazwę
-                    pakietu, a <code className="text-primary-light">{"{ClientFullName}"}</code>{" "}
+                    <code className="text-primary-light">
+                      {"{PackageName}"}
+                    </code>{" "}
+                    wstawia nazwę pakietu, a{" "}
+                    <code className="text-primary-light">
+                      {"{ClientFullName}"}
+                    </code>{" "}
                     pełne imię i nazwisko klienta.
                   </span>
                 </p>
@@ -227,13 +270,45 @@ export default function CompanyFormModal({
               />
             </div>
           </fieldset>
+          <fieldset className="mt-7 border-t border-white/5 pt-6">
+            <legend className="pr-3 text-label text-primary-light">
+              Regulamin
+            </legend>
+            <div className="mt-2 grid gap-4 md:grid-cols-2">
+              <FieldWithError error={errors.termsVersion}>
+                <TextField
+                  label="Wersja regulaminu"
+                  value={form.termsVersion}
+                  onChange={(value) => updateField("termsVersion", value)}
+                  placeholder="np. 2026-09"
+                  inputMode="text"
+                  maxLength={9}
+                  aria-invalid={Boolean(errors.termsVersion)}
+                />
+              </FieldWithError>
+              <FieldWithError error={errors.termsUrl}>
+                <TextField
+                  label="Adres regulaminu"
+                  value={form.termsUrl}
+                  onChange={(value) => updateField("termsUrl", value)}
+                  placeholder="https://example.com/regulamin.pdf"
+                  type="url"
+                  inputMode="url"
+                  aria-invalid={Boolean(errors.termsUrl)}
+                />
+              </FieldWithError>
+            </div>
+          </fieldset>
 
           {/* Sekcja: Status firmy */}
-          <div className="mt-6 flex items-center justify-between gap-4 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
+          <div className="mt-8 flex items-center justify-between gap-4 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
             <div>
-              <p className="text-sm font-semibold text-on-surface">Aktywna firma</p>
+              <p className="text-sm font-semibold text-on-surface">
+                Aktywna firma
+              </p>
               <p className="mt-1 text-xs leading-5 text-on-surface-muted">
-                Nieaktywna firma pozostaje w konfiguracji, ale nie powinna być używana dla nowych danych.
+                Nieaktywna firma pozostaje w konfiguracji, ale nie powinna być
+                używana dla nowych danych.
               </p>
             </div>
             <button
@@ -256,11 +331,20 @@ export default function CompanyFormModal({
         </div>
 
         <ModalFooter>
-          <Button type="button" variant="ghost" onClick={handleClose} disabled={isSaving}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleClose}
+            disabled={isSaving}
+          >
             Anuluj
           </Button>
           <Button type="submit" icon={<Save size={16} />} disabled={isSaving}>
-            {isSaving ? "Zapisywanie..." : isEditing ? "Zapisz zmiany" : "Dodaj firmę"}
+            {isSaving
+              ? "Zapisywanie..."
+              : isEditing
+                ? "Zapisz zmiany"
+                : "Dodaj firmę"}
           </Button>
         </ModalFooter>
       </form>
@@ -280,7 +364,9 @@ function FieldWithError({
   return (
     <div className={className}>
       {children}
-      {error ? <p className="mt-2 text-xs font-semibold text-error-light">{error}</p> : null}
+      {error ? (
+        <p className="mt-2 text-xs font-semibold text-error-light">{error}</p>
+      ) : null}
     </div>
   );
 }
@@ -299,6 +385,8 @@ function toForm(entity: LegalEntity | null): CompanyForm {
     blikPhoneNumber: onlyDigits(entity.blikPhoneNumber || "").slice(0, 9),
     transferTitleTemplate: entity.transferTitleTemplate || "",
     paymentDescription: entity.paymentDescription || "",
+    termsVersion: entity.termsVersion || "",
+    termsUrl: entity.termsUrl || "",
     isActive: entity.isActive,
   };
 }
@@ -315,6 +403,8 @@ function toPayload(form: CompanyForm): LegalEntityPayload {
     blikPhoneNumber: onlyDigits(form.blikPhoneNumber),
     transferTitleTemplate: form.transferTitleTemplate.trim(),
     paymentDescription: form.paymentDescription.trim(),
+    termsVersion: form.termsVersion.trim(),
+    termsUrl: form.termsUrl.trim(),
     isActive: form.isActive,
   };
 }
@@ -325,6 +415,8 @@ function validateForm(form: CompanyForm) {
   const bankAccount = onlyDigits(form.bankAccountNumber);
   const phone = onlyDigits(form.phone);
   const blikPhone = onlyDigits(form.blikPhoneNumber);
+  const termsVersion = form.termsVersion.trim();
+  const termsUrl = form.termsUrl.trim();
 
   if (!form.name.trim()) errors.name = "Podaj nazwę firmy.";
   if (nip.length !== 10) errors.nip = "NIP musi zawierać dokładnie 10 cyfr.";
@@ -340,8 +432,24 @@ function validateForm(form: CompanyForm) {
   if (blikPhone && blikPhone.length !== 9) {
     errors.blikPhoneNumber = "Numer telefonu BLIK musi zawierać 9 cyfr.";
   }
+  if (Boolean(termsVersion) !== Boolean(termsUrl)) {
+    const message = "Wersja i adres regulaminu muszą być ustawione razem.";
+    if (!termsVersion) errors.termsVersion = message;
+    if (!termsUrl) errors.termsUrl = message;
+  }
+  if (termsUrl && !isHttpsUrl(termsUrl)) {
+    errors.termsUrl = "Adres regulaminu musi używać protokołu HTTPS.";
+  }
 
   return errors;
+}
+
+function isHttpsUrl(value: string) {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function onlyDigits(value: string) {

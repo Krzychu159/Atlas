@@ -11,14 +11,20 @@ export async function POST(request: Request) {
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
       body: JSON.stringify({ email: body.email, password: body.password, firstName: body.firstName,
-        lastName: body.lastName, phoneNumber: body.phoneNumber, locationId: body.locationId }),
+        lastName: body.lastName, phoneNumber: body.phoneNumber, locationId: body.locationId,
+        acceptTerms: body.acceptTerms, termsVersion: body.termsVersion }),
     });
     const data = await response.json().catch(() => null);
     if (!response.ok) return NextResponse.json({ message: typeof data?.message === "string" ? data.message : "Nie udało się utworzyć konta. Sprawdź dane i spróbuj ponownie." }, { status: response.status });
     if (!data?.token || !data.refreshToken || !data.userId || String(data.role).toLowerCase() !== "client") {
       return NextResponse.json({ message: "Backend zwrócił niekompletne dane logowania." }, { status: 502 });
     }
-    const result = NextResponse.json({ ok: true, user: { userId: data.userId, email: data.email, role: "client" } });
+    const result = NextResponse.json({
+      ok: true,
+      emailVerified: data.emailVerified,
+      emailVerificationRequired: data.emailVerificationRequired,
+      user: { userId: data.userId, email: data.email, role: "client" },
+    });
     result.headers.set("Cache-Control", "no-store");
     const options = getAuthCookieOptions();
     result.cookies.set("accessToken", data.token, options);

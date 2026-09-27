@@ -95,7 +95,11 @@ export default function CompanySettingsSection() {
         ) : (
           <div className="grid gap-4 xl:grid-cols-2">
             {entities.map((entity) => (
-              <CompanyCard key={entity.id} entity={entity} onEdit={() => openEditForm(entity)} />
+              <CompanyCard
+                key={entity.id}
+                entity={entity}
+                onEdit={() => openEditForm(entity)}
+              />
             ))}
           </div>
         )}
@@ -121,7 +125,9 @@ function CompanyCard({
   onEdit: () => void;
 }) {
   const hasPaymentDetails = Boolean(
-    entity.paymentRecipientName || entity.bankAccountNumber || entity.blikPhoneNumber,
+    entity.paymentRecipientName ||
+    entity.bankAccountNumber ||
+    entity.blikPhoneNumber,
   );
 
   return (
@@ -133,7 +139,9 @@ function CompanyCard({
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="truncate text-base font-semibold text-on-surface">{entity.name}</h3>
+              <h3 className="truncate text-base font-semibold text-on-surface">
+                {entity.name}
+              </h3>
               <span
                 className={`rounded-full px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide ${
                   entity.isActive
@@ -144,7 +152,9 @@ function CompanyCard({
                 {entity.isActive ? "Aktywna" : "Nieaktywna"}
               </span>
             </div>
-            <p className="mt-1 text-xs text-on-surface-muted">NIP {entity.nip || "nie podano"}</p>
+            <p className="mt-1 text-xs text-on-surface-muted">
+              NIP {entity.nip || "nie podano"}
+            </p>
           </div>
         </div>
         <Button
@@ -158,26 +168,88 @@ function CompanyCard({
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <CompanyDetail icon={<MapPin size={15} />} label="Adres" value={entity.address} />
-        <CompanyDetail icon={<Mail size={15} />} label="E-mail" value={entity.email} />
-        <CompanyDetail icon={<Phone size={15} />} label="Telefon" value={entity.phone} />
+        <CompanyDetail
+          icon={<MapPin size={15} />}
+          label="Adres"
+          value={entity.address}
+        />
+        <CompanyDetail
+          icon={<Mail size={15} />}
+          label="E-mail"
+          value={entity.email}
+        />
+        <CompanyDetail
+          icon={<Phone size={15} />}
+          label="Telefon"
+          value={entity.phone}
+        />
         <CompanyDetail
           icon={<CreditCard size={15} />}
           label="Płatności"
-          value={hasPaymentDetails ? entity.paymentRecipientName || "Skonfigurowane" : null}
+          value={
+            hasPaymentDetails
+              ? entity.paymentRecipientName || "Skonfigurowane"
+              : null
+          }
         />
       </div>
 
-      {entity.bankAccountNumber ? (
-        <div className="mt-4 rounded-[var(--radius-lg)] bg-surface-container-lowest p-3">
-          <p className="text-label text-on-surface-muted">Rachunek bankowy</p>
-          <p className="mt-2 break-all font-mono text-xs font-semibold tracking-wide text-on-surface-variant">
-            {entity.bankAccountNumber}
-          </p>
+      {entity.bankAccountNumber || entity.termsUrl ? (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {entity.bankAccountNumber ? (
+            <div
+              className={`rounded-[var(--radius-lg)] bg-surface-container-lowest p-3 ${
+                !entity.termsUrl ? "sm:col-span-2" : ""
+              }`}
+            >
+              <p className="text-label text-on-surface-muted">
+                Rachunek bankowy
+              </p>
+              <p className="mt-2 break-all font-mono text-xs font-semibold tracking-wide text-on-surface-variant">
+                {entity.bankAccountNumber}
+              </p>
+            </div>
+          ) : null}
+
+          {entity.termsUrl ? (
+            <div
+              className={`rounded-[var(--radius-lg)] bg-surface-container-lowest p-3 ${
+                !entity.bankAccountNumber ? "sm:col-span-2" : ""
+              }`}
+            >
+              <p className="text-label text-on-surface-muted">
+                Regulamin {entity.termsVersion ? `• ${entity.termsVersion}` : ""}
+              </p>
+              <a
+                href={entity.termsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 block break-all text-xs font-semibold text-primary-light"
+              >
+                {entity.termsUrl}
+              </a>
+              {entity.termsPublishedAt ? (
+                <p className="mt-2 text-[11px] text-on-surface-muted">
+                  Opublikowano: {formatPublishedAt(entity.termsPublishedAt)}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </article>
   );
+}
+
+function formatPublishedAt(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("pl-PL", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 
 function CompanyDetail({
@@ -193,7 +265,9 @@ function CompanyDetail({
     <div className="flex min-w-0 gap-2.5 rounded-[var(--radius-lg)] bg-surface-container-lowest p-3">
       <span className="mt-0.5 shrink-0 text-primary-light">{icon}</span>
       <div className="min-w-0">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-on-surface-muted">{label}</p>
+        <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-on-surface-muted">
+          {label}
+        </p>
         <p className="mt-1 truncate text-xs font-semibold text-on-surface-variant">
           {value || "Nie podano"}
         </p>
@@ -214,8 +288,12 @@ function LoadingCompanies() {
 function LoadError({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center rounded-[var(--radius-xl)] bg-surface-container-low px-5 py-10 text-center">
-      <p className="text-sm font-semibold text-on-surface">Nie udało się wyświetlić firm</p>
-      <p className="mt-2 text-xs text-on-surface-muted">Sprawdź połączenie i spróbuj ponownie.</p>
+      <p className="text-sm font-semibold text-on-surface">
+        Nie udało się wyświetlić firm
+      </p>
+      <p className="mt-2 text-xs text-on-surface-muted">
+        Sprawdź połączenie i spróbuj ponownie.
+      </p>
       <Button
         type="button"
         size="sm"
@@ -236,11 +314,19 @@ function EmptyCompanies({ onAdd }: { onAdd: () => void }) {
       <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary-light">
         <Building2 size={20} />
       </span>
-      <p className="mt-4 text-sm font-semibold text-on-surface">Brak skonfigurowanej firmy</p>
+      <p className="mt-4 text-sm font-semibold text-on-surface">
+        Brak skonfigurowanej firmy
+      </p>
       <p className="mt-2 max-w-md text-xs leading-5 text-on-surface-muted">
         Dodaj pierwszą firmę i uzupełnij jej dane rozliczeniowe.
       </p>
-      <Button type="button" size="sm" icon={<Plus size={15} />} onClick={onAdd} className="mt-5">
+      <Button
+        type="button"
+        size="sm"
+        icon={<Plus size={15} />}
+        onClick={onAdd}
+        className="mt-5"
+      >
         Dodaj pierwszą firmę
       </Button>
     </div>

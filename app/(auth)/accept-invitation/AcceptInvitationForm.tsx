@@ -17,6 +17,7 @@ import {
   TriangleAlert,
   UserRound,
 } from "lucide-react";
+import TermsAcceptance from "@/app/components/legal/TermsAcceptance";
 import {
   acceptInvitation,
   type InvitationDetails,
@@ -47,6 +48,7 @@ export default function AcceptInvitationForm({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -87,6 +89,16 @@ export default function AcceptInvitationForm({
 
     if (validation.status !== "valid") return;
 
+    if (
+      validation.invitation.termsAcceptanceRequired &&
+      (!validation.invitation.termsVersion ||
+        !validation.invitation.termsUrl ||
+        !termsAccepted)
+    ) {
+      setFormError("Zaakceptuj aktualny regulamin, aby utworzyć konto.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -95,6 +107,13 @@ export default function AcceptInvitationForm({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         password,
+        ...(validation.invitation.termsAcceptanceRequired &&
+        validation.invitation.termsVersion
+          ? {
+              acceptTerms: true as const,
+              termsVersion: validation.invitation.termsVersion,
+            }
+          : {}),
       });
 
       const params = new URLSearchParams({
@@ -265,6 +284,26 @@ export default function AcceptInvitationForm({
                     </Field>
                   </div>
 
+                  {validation.invitation.termsAcceptanceRequired &&
+                  validation.invitation.termsVersion &&
+                  validation.invitation.termsUrl ? (
+                    <div className="mt-5">
+                      <TermsAcceptance
+                        id="invitation-terms"
+                        companyName={
+                          validation.invitation.legalEntityName ||
+                          validation.invitation.locationName ||
+                          "Firma"
+                        }
+                        termsVersion={validation.invitation.termsVersion}
+                        termsUrl={validation.invitation.termsUrl}
+                        checked={termsAccepted}
+                        onCheckedChange={setTermsAccepted}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  ) : null}
+
                   {formError ? (
                     <div
                       className="mt-4 flex items-start gap-3 rounded-[var(--radius-lg)] border border-error/30 bg-error/10 px-4 py-3 text-sm leading-5 text-error-light"
@@ -277,7 +316,11 @@ export default function AcceptInvitationForm({
 
                   <button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={
+                      isSubmitting ||
+                      (validation.invitation.termsAcceptanceRequired &&
+                        !termsAccepted)
+                    }
                     className="mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primary-gradient px-6 text-sm font-bold text-white shadow-ambient transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting ? (

@@ -13,9 +13,15 @@ export type PublicGroupClass = {
 };
 export type PublicRegistrationPayload = {
   email: string; password: string; firstName: string; lastName: string; phoneNumber: string; locationId: number;
+  acceptTerms?: true; termsVersion?: string;
 };
 // Tokens are deliberately consumed only by the BFF and never returned to the browser.
-export type PublicRegistrationResponse = { ok: boolean; user: { userId: number | string; email?: string; role: string } };
+export type PublicRegistrationResponse = {
+  ok: boolean;
+  emailVerified?: boolean;
+  emailVerificationRequired?: boolean;
+  user: { userId: number | string; email?: string; role: string };
+};
 export type GroupPackagePurchase = {
   clientPackageId: number; packageId: number; packageName: string; amountDue: number; currency: string;
   paymentStatus: string; entriesCount: number; remainingEntries: number; validUntil: string | null; message?: string;

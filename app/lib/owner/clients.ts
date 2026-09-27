@@ -128,6 +128,17 @@ export type ClientTrainingPlan = {
   url: string | null;
 };
 
+export type ClientLegalConsent = {
+  legalEntityId: number;
+  legalEntityName: string;
+  documentType: string;
+  termsVersion: string;
+  termsUrl: string | null;
+  source: string;
+  acceptedAt: string;
+  isCurrent: boolean;
+};
+
 export type UpdateClientTrainingPlanPayload = {
   googleDriveFolderId: string;
   fileId: string;
@@ -214,6 +225,10 @@ export function getClientCurrentCycle(id: number) {
 
 export function getClientTrainingPlan(id: number) {
   return backendGet<ClientTrainingPlan>(`clients/${id}/training-plan`);
+}
+
+export function getClientLegalConsents(id: number) {
+  return backendGet<ClientLegalConsent[]>(`clients/${id}/legal-consents`);
 }
 
 export function createClient(payload: CreateClientPayload) {

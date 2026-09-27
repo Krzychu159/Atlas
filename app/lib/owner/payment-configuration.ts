@@ -12,6 +12,9 @@ export type LegalEntity = {
   blikPhoneNumber: string | null;
   transferTitleTemplate: string | null;
   paymentDescription: string | null;
+  termsVersion: string | null;
+  termsUrl: string | null;
+  termsPublishedAt: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string | null;
@@ -28,6 +31,8 @@ export type LegalEntityPayload = {
   blikPhoneNumber: string;
   transferTitleTemplate: string;
   paymentDescription: string;
+  termsVersion: string;
+  termsUrl: string;
   isActive: boolean;
 };
 

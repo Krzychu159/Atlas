@@ -6,5 +6,7 @@ export async function POST(request: Request) {
     firstName: body.firstName,
     lastName: body.lastName,
     password: body.password,
+    acceptTerms: body.acceptTerms,
+    termsVersion: body.termsVersion,
   }));
 }

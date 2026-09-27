@@ -20,7 +20,7 @@ async function handler(req: NextRequest, context: RouteContext) {
   const { path } = await context.params;
   const backendPath = path.join("/");
   const publicRead = req.method === "GET" &&
-    /^public\/group-classes(?:\/(?:locations|packages|\d+|by-slug\/[^/]+|packages\/by-slug\/[^/]+))?$/.test(backendPath);
+    /^public\/group-classes(?:\/(?:locations|legal-requirements|packages|\d+|by-slug\/[^/]+|packages\/by-slug\/[^/]+))?$/.test(backendPath);
 
   if (!token && !publicRead) {
     const response = jsonError("Sesja wygasła.", 401);

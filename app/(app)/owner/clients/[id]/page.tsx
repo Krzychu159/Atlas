@@ -6,10 +6,12 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   getClient,
+  getClientLegalConsents,
   getClientSubscription,
   getClientSubscriptionUsage,
   getClientTrainingPlan,
   type Client,
+  type ClientLegalConsent,
   type ClientSubscription,
   type ClientTrainingPlan,
   type SubscriptionUsage,
@@ -20,6 +22,7 @@ import ClientMetricCards from "./components/ClientMetricCards";
 import ClientNotesPanel from "./components/ClientNotesPanel";
 import ClientProfileHero from "./components/ClientProfileHero";
 import ClientSessionsPanel from "./components/ClientSessionsPanel";
+import ClientLegalConsentsPanel from "./components/ClientLegalConsentsPanel";
 import EditClientModal from "./components/EditClientModal";
 import { showOwnerError } from "../../components/owner-toast";
 
@@ -36,6 +39,7 @@ export default function OwnerClientDetailsPage() {
   );
   const [sessions, setSessions] = useState<OwnerSession[]>([]);
   const [payments, setPayments] = useState<ClientPayment[]>([]);
+  const [legalConsents, setLegalConsents] = useState<ClientLegalConsent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
@@ -61,6 +65,7 @@ export default function OwnerClientDetailsPage() {
           sessionsResult,
           trainingPlanResult,
           paymentsResult,
+          legalConsentsResult,
         ] = await Promise.allSettled([
           getClient(clientId),
           getClientSubscription(clientId),
@@ -68,6 +73,7 @@ export default function OwnerClientDetailsPage() {
           getClientSessions(clientId),
           getClientTrainingPlan(clientId),
           getClientPayments(clientId, { page: 1, pageSize: 3 }),
+          getClientLegalConsents(clientId),
         ]);
 
         if (clientResult.status !== "fulfilled") {
@@ -94,6 +100,10 @@ export default function OwnerClientDetailsPage() {
 
         if (paymentsResult.status === "fulfilled") {
           setPayments(paymentsResult.value.items || []);
+        }
+
+        if (legalConsentsResult.status === "fulfilled") {
+          setLegalConsents(legalConsentsResult.value || []);
         }
       } catch (err) {
         showOwnerError(err, "Nie udało się pobrać klienta.", {
@@ -178,6 +188,8 @@ export default function OwnerClientDetailsPage() {
               onClientChange={setClient}
             />
           </div>
+
+          <ClientLegalConsentsPanel consents={legalConsents} />
 
           <EditClientModal
             open={isEditOpen}

@@ -4,11 +4,14 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
+import TermsAcceptance from "@/app/components/legal/TermsAcceptance";
 import { TextField } from "@/app/components/ui/input";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
 import { ApiError } from "@/app/lib/backend";
 import { publicErrorMessage } from "@/app/lib/public/errors";
+import { resendEmailVerification } from "@/app/lib/email-verification";
+import { acceptLegalTerms, getLegalRequirements, type LegalRequirements } from "@/app/lib/legal";
 import { authenticatePublicClient, registerPublicClient, bookGroupClass, cancelGroupClassBooking, purchaseGroupPackage, reportGroupPayment, getPublicLocations, type PublicLocation, type PublicGroupClass, type PublicGroupPackage, type GroupPackagePurchase } from "@/app/lib/public/group-classes";
 import { publicMoney, studioNow, studioDay, studioTime } from "@/app/lib/public/studio-date";
 
@@ -25,6 +28,14 @@ export function PublicActionModal({ action, user, onUser, onClose, onRefresh }: 
   const [phone, setPhone] = useState("");
   const [locationId, setLocationId] = useState(action.type === "auth" ? "" : String(action.item.locationId));
   const [locations, setLocations] = useState<PublicLocation[]>([]);
+  const [registrationLegal, setRegistrationLegal] = useState<LegalRequirements | null>(null);
+  const [registrationLegalLoading, setRegistrationLegalLoading] = useState(false);
+  const [registrationTermsAccepted, setRegistrationTermsAccepted] = useState(false);
+  const [purchaseLegal, setPurchaseLegal] = useState<LegalRequirements | null>(null);
+  const [purchaseLegalLoading, setPurchaseLegalLoading] = useState(false);
+  const [purchaseTermsAccepted, setPurchaseTermsAccepted] = useState(false);
+  const [verificationPending, setVerificationPending] = useState(false);
+  const [resendSent, setResendSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [purchase, setPurchase] = useState<GroupPackagePurchase | null>(null);
@@ -43,13 +54,97 @@ export function PublicActionModal({ action, user, onUser, onClose, onRefresh }: 
     getPublicLocations().then((items) => { if (active) { setLocations(items); setLocationId((current) => current || String(items[0]?.id || "")); } }).catch((err) => { if (active) setError(publicErrorMessage(err)); });
     return () => { active = false; };
   }, [register, action.type]);
+  useEffect(() => {
+    const selectedLocationId = Number(locationId);
+
+    if (!register || !selectedLocationId) return;
+
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      setRegistrationLegalLoading(true);
+      getLegalRequirements(selectedLocationId)
+        .then((requirements) => {
+          if (active) setRegistrationLegal(requirements);
+        })
+        .catch((err) => {
+          if (active) {
+            setRegistrationLegal(null);
+            setError(publicErrorMessage(err));
+          }
+        })
+        .finally(() => {
+          if (active) setRegistrationLegalLoading(false);
+        });
+      });
+
+    return () => { active = false; };
+  }, [register, locationId]);
+  useEffect(() => {
+    if (action.type !== "buy" || user?.role.toLowerCase() !== "client") return;
+
+    let active = true;
+    const packageLocationId = action.item.locationId;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      setPurchaseLegalLoading(true);
+      getLegalRequirements(packageLocationId)
+        .then((requirements) => {
+          if (active) setPurchaseLegal(requirements);
+        })
+        .catch((err) => {
+          if (active) {
+            setPurchaseLegal(null);
+            setError(publicErrorMessage(err));
+          }
+        })
+        .finally(() => {
+          if (active) setPurchaseLegalLoading(false);
+        });
+      });
+
+    return () => { active = false; };
+  }, [action, user]);
+  const selectedRegistrationLegal =
+    registrationLegal?.locationId === Number(locationId)
+      ? registrationLegal
+      : null;
   async function authenticate(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
-      const result = register ? await registerPublicClient({ email, password, firstName, lastName, phoneNumber: phone, locationId: Number(locationId) }) : await authenticatePublicClient({ email, password });
+      if (register && !selectedRegistrationLegal) {
+        throw new Error("Nie udało się pobrać wymagań regulaminowych dla lokalizacji.");
+      }
+      if (register && selectedRegistrationLegal?.acceptanceRequired && (!selectedRegistrationLegal.termsVersion || (!selectedRegistrationLegal.isAccepted && !registrationTermsAccepted))) {
+        throw new Error("Zaakceptuj aktualny regulamin, aby utworzyć konto.");
+      }
+      const result = register ? await registerPublicClient({
+        email,
+        password,
+        firstName,
+        lastName,
+        phoneNumber: phone,
+        locationId: Number(locationId),
+        ...(selectedRegistrationLegal?.acceptanceRequired && selectedRegistrationLegal.termsVersion
+          ? { acceptTerms: true as const, termsVersion: selectedRegistrationLegal.termsVersion }
+          : {}),
+      }) : await authenticatePublicClient({ email, password });
       onUser(result.user);
       dialog.current?.focus();
-      if (action.type === "auth") onClose();
+      if (
+        register &&
+        (result.emailVerificationRequired || result.emailVerified === false)
+      ) {
+        setVerificationPending(true);
+      } else if (action.type === "auth") onClose();
+    } catch (err) { setError(publicErrorMessage(err)); } finally { setBusy(false); }
+  }
+  async function resendVerification() {
+    if (busy) return;
+    setBusy(true); setError("");
+    try {
+      await resendEmailVerification(email);
+      setResendSent(true);
     } catch (err) { setError(publicErrorMessage(err)); } finally { setBusy(false); }
   }
   function handleError(err: unknown) {
@@ -60,7 +155,17 @@ export function PublicActionModal({ action, user, onUser, onClose, onRefresh }: 
     if (action.type === "auth" || busy) return;
     setBusy(true); setError("");
     try {
-      if (action.type === "buy") { setPurchase(await purchaseGroupPackage(action.item.id)); dialog.current?.focus(); onRefresh(); }
+      if (action.type === "buy") {
+        if (!purchaseLegal) throw new Error("Nie udało się pobrać wymagań regulaminowych dla pakietu.");
+        if (purchaseLegal.acceptanceRequired && !purchaseLegal.isAccepted) {
+          if (!purchaseLegal.termsVersion || !purchaseTermsAccepted) {
+            throw new Error("Zaakceptuj aktualny regulamin, aby kupić pakiet.");
+          }
+          await acceptLegalTerms({ locationId: action.item.locationId, acceptTerms: true, termsVersion: purchaseLegal.termsVersion });
+          setPurchaseLegal({ ...purchaseLegal, isAccepted: true });
+        }
+        setPurchase(await purchaseGroupPackage(action.item.id)); dialog.current?.focus(); onRefresh();
+      }
       else {
         if (action.type === "book") await bookGroupClass(action.item.id);
         else await cancelGroupClassBooking(action.item.id);
@@ -77,7 +182,7 @@ export function PublicActionModal({ action, user, onUser, onClose, onRefresh }: 
       setPaymentSent(true); onRefresh();
     } catch (err) { handleError(err); } finally { setBusy(false); }
   }
-  const title = !user ? (register ? "Utwórz konto" : "Zaloguj się") : purchase ? "Twój pakiet" : action.type === "buy" ? "Kup pakiet" : action.type === "cancel" ? "Odwołać zapis?" : "Zarezerwuj miejsce";
+  const title = verificationPending ? "Potwierdź adres e-mail" : !user ? (register ? "Utwórz konto" : "Zaloguj się") : purchase ? "Twój pakiet" : action.type === "buy" ? "Kup pakiet" : action.type === "cancel" ? "Odwołać zapis?" : "Zarezerwuj miejsce";
   return <ModalOverlay onClose={busy ? undefined : onClose}>
     <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onKeyDown={(event) => {
       if (event.key === "Escape" && !busy) onClose();
@@ -89,12 +194,17 @@ export function PublicActionModal({ action, user, onUser, onClose, onRefresh }: 
     }} className="relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-[var(--radius-xl)] bg-surface-container p-5 shadow-ambient outline-none sm:p-7">
       <ModalHeader title={title} eyebrow="ATLAS • zajęcia grupowe" onClose={() => { if (!busy) onClose(); }} />
       {error && <p role="alert" className="mt-4 rounded-[var(--radius-md)] bg-error-container/30 p-3 text-sm text-error-light">{error}</p>}
-      {!user ? <form onSubmit={authenticate} className="mt-5 grid gap-4">
+      {verificationPending ? <div className="mt-6 space-y-4">
+        <p className="text-sm leading-6 text-on-surface-variant">Wysłaliśmy link weryfikacyjny na <strong className="text-on-surface">{email}</strong>. Potwierdź adres przed zakupem pakietu lub zapisem na zajęcia.</p>
+        {resendSent ? <p role="status" className="rounded-[var(--radius-md)] bg-tertiary-container/30 p-3 text-sm text-tertiary-light">Jeśli konto wymaga weryfikacji, wysłaliśmy nowy link. Ponowną wiadomość można wygenerować najwcześniej za minutę.</p> : null}
+        <Button className="w-full" variant="secondary" disabled={busy} onClick={resendVerification}>{busy ? "Wysyłanie…" : "Wyślij link ponownie"}</Button>
+        <Button className="w-full" variant="ghost" disabled={busy} onClick={onClose}>Wróć do strony</Button>
+      </div> : !user ? <form onSubmit={authenticate} className="mt-5 grid gap-4">
         <p className="text-sm text-on-surface-variant">Zaloguj się lub utwórz konto, aby kontynuować {action.type === "buy" ? "zakup pakietu" : "rezerwację"}.</p>
         <TextField label="E-mail" type="email" autoComplete="email" value={email} onChange={setEmail} required />
         <TextField label="Hasło" type="password" autoComplete={register ? "new-password" : "current-password"} value={password} onChange={setPassword} required />
-        {register && <><div className="grid gap-4 sm:grid-cols-2"><TextField label="Imię" autoComplete="given-name" value={firstName} onChange={setFirstName} required /><TextField label="Nazwisko" autoComplete="family-name" value={lastName} onChange={setLastName} required /></div><TextField label="Telefon" type="tel" autoComplete="tel" value={phone} onChange={setPhone} required />{action.type === "auth" && <CustomSelect label="Lokalizacja" value={locationId} onChange={setLocationId} options={locations.map((item) => ({ value: String(item.id), label: item.name }))} />}</>}
-        <Button type="submit" disabled={busy || (register && !locationId)}>{busy ? "Proszę czekać…" : register ? "Utwórz konto" : "Zaloguj się"}</Button>
+        {register && <><div className="grid gap-4 sm:grid-cols-2"><TextField label="Imię" autoComplete="given-name" value={firstName} onChange={setFirstName} required /><TextField label="Nazwisko" autoComplete="family-name" value={lastName} onChange={setLastName} required /></div><TextField label="Telefon" type="tel" autoComplete="tel" value={phone} onChange={setPhone} required />{action.type === "auth" && <CustomSelect label="Lokalizacja" value={locationId} onChange={(value) => { setLocationId(value); setRegistrationTermsAccepted(false); }} options={locations.map((item) => ({ value: String(item.id), label: item.name }))} />}{registrationLegalLoading || (locationId && !selectedRegistrationLegal) ? <p className="text-xs text-on-surface-muted">Sprawdzamy wymagania regulaminowe…</p> : selectedRegistrationLegal?.acceptanceRequired && selectedRegistrationLegal.termsVersion && selectedRegistrationLegal.termsUrl ? <TermsAcceptance id="registration-terms" companyName={selectedRegistrationLegal.legalEntityName} termsVersion={selectedRegistrationLegal.termsVersion} termsUrl={selectedRegistrationLegal.termsUrl} isAccepted={selectedRegistrationLegal.isAccepted} checked={selectedRegistrationLegal.isAccepted || registrationTermsAccepted} onCheckedChange={setRegistrationTermsAccepted} disabled={busy} /> : null}</>}
+        <Button type="submit" disabled={busy || (register && (!locationId || registrationLegalLoading || !selectedRegistrationLegal || (selectedRegistrationLegal.acceptanceRequired && !selectedRegistrationLegal.isAccepted && !registrationTermsAccepted)))}>{busy ? "Proszę czekać…" : register ? "Utwórz konto" : "Zaloguj się"}</Button>
         <Button type="button" variant="ghost" disabled={busy} onClick={() => { setRegister(!register); setError(""); }}>{register ? "Mam już konto — zaloguj się" : "Nie masz konta? Zarejestruj się"}</Button>
         {!register && <Link className="text-center text-xs text-primary-light" href="/login">Nie pamiętasz hasła?</Link>}
       </form> : user.role.toLowerCase() !== "client" ? <p className="mt-6 text-sm text-on-surface-variant">Zapisy i zakup pakietów są dostępne dla kont klientów. Jesteś zalogowany na konto obsługi studia.</p> : purchase ? <div className="mt-6 space-y-4">
@@ -111,7 +221,8 @@ export function PublicActionModal({ action, user, onUser, onClose, onRefresh }: 
       </div> : action.type !== "auth" && <div className="mt-6 space-y-5">
         <h3 className="text-xl font-semibold">{action.type === "buy" ? action.item.name : action.item.title}</h3>
         {action.type === "buy" ? <p className="text-on-surface-variant">{action.item.entriesCount} wejść • {action.item.durationDays} dni • {publicMoney(action.item.price, action.item.currency)}<br />Lokalizacja: {action.item.locationName}<br /><span className="mt-3 block text-sm">Utworzysz pakiet do opłacenia. Zapis na zajęcia będzie dostępny po potwierdzeniu płatności.</span></p> : <p className="text-on-surface-variant">{studioDay(action.item.startAt)}, {studioTime(action.item.startAt)}<br />{action.item.locationName}<span className="mt-3 block text-sm">{action.type === "book" ? "Do zapisu potrzebujesz opłaconego pakietu grupowego z wolnymi wejściami w tej lokalizacji." : "Potwierdź odwołanie swojej rezerwacji."}</span></p>}
-        <Button className="w-full" disabled={busy} onClick={confirm}>{busy ? "Proszę czekać…" : action.type === "buy" ? "Potwierdź zakup" : action.type === "cancel" ? "Odwołaj zapis" : "Potwierdź zapis"}</Button>
+        {action.type === "buy" && purchaseLegalLoading ? <p className="text-xs text-on-surface-muted">Sprawdzamy wymagania regulaminowe…</p> : action.type === "buy" && purchaseLegal?.acceptanceRequired && purchaseLegal.termsVersion && purchaseLegal.termsUrl ? <TermsAcceptance id="purchase-terms" companyName={purchaseLegal.legalEntityName} termsVersion={purchaseLegal.termsVersion} termsUrl={purchaseLegal.termsUrl} isAccepted={purchaseLegal.isAccepted} checked={purchaseLegal.isAccepted || purchaseTermsAccepted} onCheckedChange={setPurchaseTermsAccepted} disabled={busy} /> : null}
+        <Button className="w-full" disabled={busy || (action.type === "buy" && (purchaseLegalLoading || !purchaseLegal || (purchaseLegal.acceptanceRequired && !purchaseLegal.isAccepted && !purchaseTermsAccepted)))} onClick={confirm}>{busy ? "Proszę czekać…" : action.type === "buy" ? "Potwierdź zakup" : action.type === "cancel" ? "Odwołaj zapis" : "Potwierdź zapis"}</Button>
         {action.type === "book" && <Link onClick={onClose} className="block text-center text-sm text-primary-light" href={`/classes?locationId=${action.item.locationId}#packages`}>Nie masz pakietu? Zobacz pakiety</Link>}
       </div>}
     </div>

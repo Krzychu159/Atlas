@@ -6,6 +6,10 @@ export type InvitationDetails = {
   trainerId: number | null;
   trainerName: string | null;
   expiresAt: string;
+  legalEntityName?: string | null;
+  termsAcceptanceRequired: boolean;
+  termsVersion: string | null;
+  termsUrl: string | null;
 };
 
 export type AcceptInvitationPayload = {
@@ -13,6 +17,8 @@ export type AcceptInvitationPayload = {
   firstName: string;
   lastName: string;
   password: string;
+  acceptTerms?: true;
+  termsVersion?: string;
 };
 
 export async function validateInvitation(
