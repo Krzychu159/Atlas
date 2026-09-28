@@ -11,6 +11,7 @@ import {
   getClientLegalConsents,
   getClientSubscription,
   getClientTrainingPlan,
+  restoreClient,
   setClientPortalAccess,
   type Client,
   type ClientArchiveCheck,
@@ -53,12 +54,16 @@ export default function OwnerClientDetailsPage() {
   const [sessions, setSessions] = useState<OwnerSession[]>([]);
   const [payments, setPayments] = useState<ClientPayment[]>([]);
   const [legalConsents, setLegalConsents] = useState<ClientLegalConsent[]>([]);
+  const [sessionsAvailable, setSessionsAvailable] = useState(false);
+  const [paymentsAvailable, setPaymentsAvailable] = useState(false);
+  const [legalConsentsAvailable, setLegalConsentsAvailable] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [archiveCheck, setArchiveCheck] = useState<ClientArchiveCheck | null>(null);
   const [isPortalActionPending, setIsPortalActionPending] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const groupLocationNames = getClientGroupLocationNames(
     billing?.packages,
     client?.locationName,
@@ -137,6 +142,27 @@ export default function OwnerClientDetailsPage() {
     }
   }
 
+  async function handleRestore() {
+    if (!client) return;
+
+    try {
+      setIsRestoring(true);
+      await restoreClient(client.id);
+      const restoredClient = await getClient(client.id);
+      setClient(restoredClient);
+      showOwnerSuccess("Klient został przywrócony.", {
+        id: "owner-client-restore-success",
+      });
+      router.replace("/owner/clients");
+    } catch (err) {
+      showOwnerError(err, "Nie udało się przywrócić klienta.", {
+        id: "owner-client-restore-error",
+      });
+    } finally {
+      setIsRestoring(false);
+    }
+  }
+
   useEffect(() => {
     async function loadClientDetails() {
       const clientId = Number(params.id);
@@ -151,6 +177,9 @@ export default function OwnerClientDetailsPage() {
 
       try {
         setIsLoading(true);
+        setSessionsAvailable(false);
+        setPaymentsAvailable(false);
+        setLegalConsentsAvailable(false);
 
         const [
           clientResult,
@@ -186,6 +215,7 @@ export default function OwnerClientDetailsPage() {
 
         if (sessionsResult.status === "fulfilled") {
           setSessions(sessionsResult.value);
+          setSessionsAvailable(true);
         }
 
         if (trainingPlanResult.status === "fulfilled") {
@@ -194,10 +224,12 @@ export default function OwnerClientDetailsPage() {
 
         if (paymentsResult.status === "fulfilled") {
           setPayments(paymentsResult.value.items || []);
+          setPaymentsAvailable(true);
         }
 
         if (legalConsentsResult.status === "fulfilled") {
           setLegalConsents(legalConsentsResult.value || []);
+          setLegalConsentsAvailable(true);
         }
       } catch (err) {
         showOwnerError(err, "Nie udało się pobrać klienta.", {
@@ -266,11 +298,14 @@ export default function OwnerClientDetailsPage() {
           <ClientProfileHero
             client={client}
             groupLocationNames={groupLocationNames}
-            onEdit={() => setIsEditOpen(true)}
-            onFiles={handleOpenTrainingPlan}
-            onPortalAction={handlePortalAction}
-            onArchive={handleArchiveCheck}
+            backHref={client.isArchived ? "/owner/clients/archived" : "/owner/clients"}
+            onEdit={client.isArchived ? undefined : () => setIsEditOpen(true)}
+            onFiles={client.isArchived ? undefined : handleOpenTrainingPlan}
+            onPortalAction={client.isArchived ? undefined : handlePortalAction}
+            onArchive={client.isArchived ? undefined : handleArchiveCheck}
+            onRestore={client.isArchived ? handleRestore : undefined}
             isPortalActionPending={isPortalActionPending}
+            isRestorePending={isRestoring}
           />
           <ClientMetricCards
             client={client}
@@ -278,43 +313,63 @@ export default function OwnerClientDetailsPage() {
           />
           <ClientPackagesSection packages={billing?.packages} />
 
+          {client.isArchived &&
+          (!sessionsAvailable ||
+            !paymentsAvailable ||
+            !legalConsentsAvailable) ? (
+            <div className="card-shell p-5 text-sm text-on-surface-variant">
+              Część historii archiwalnego klienta jest niedostępna w API i nie
+              została pokazana.
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_330px]">
-            <ClientSessionsPanel sessions={sessions} />
+            {!client.isArchived || sessionsAvailable ? (
+              <ClientSessionsPanel sessions={sessions} />
+            ) : null}
             <ClientNotesPanel
               client={client}
               payments={payments}
               onClientChange={setClient}
+              readOnly={client.isArchived}
+              showPayments={!client.isArchived || paymentsAvailable}
             />
           </div>
 
-          <ClientLegalConsentsPanel consents={legalConsents} />
+          {!client.isArchived || legalConsentsAvailable ? (
+            <ClientLegalConsentsPanel consents={legalConsents} />
+          ) : null}
 
-          <EditClientModal
-            open={isEditOpen}
-            client={client}
-            groupLocationNames={groupLocationNames}
-            groupLocationsAvailable={billing !== null}
-            onClose={() => setIsEditOpen(false)}
-            onSaved={setClient}
-            onAvatarChanged={(avatarUrl) =>
-              setClient((current) =>
-                current ? { ...current, avatarUrl } : current,
-              )
-            }
-            onTrainingPlanSaved={setTrainingPlan}
-          />
-          <InviteClientPortalModal
-            client={client}
-            open={isInviteOpen}
-            onClose={() => setIsInviteOpen(false)}
-            onInvited={refreshClient}
-          />
-          <ArchiveClientModal
-            check={archiveCheck}
-            isArchiving={isArchiving}
-            onClose={() => setArchiveCheck(null)}
-            onConfirm={handleArchive}
-          />
+          {!client.isArchived ? (
+            <>
+              <EditClientModal
+                open={isEditOpen}
+                client={client}
+                groupLocationNames={groupLocationNames}
+                groupLocationsAvailable={billing !== null}
+                onClose={() => setIsEditOpen(false)}
+                onSaved={setClient}
+                onAvatarChanged={(avatarUrl) =>
+                  setClient((current) =>
+                    current ? { ...current, avatarUrl } : current,
+                  )
+                }
+                onTrainingPlanSaved={setTrainingPlan}
+              />
+              <InviteClientPortalModal
+                client={client}
+                open={isInviteOpen}
+                onClose={() => setIsInviteOpen(false)}
+                onInvited={refreshClient}
+              />
+              <ArchiveClientModal
+                check={archiveCheck}
+                isArchiving={isArchiving}
+                onClose={() => setArchiveCheck(null)}
+                onConfirm={handleArchive}
+              />
+            </>
+          ) : null}
         </>
       ) : null}
     </div>

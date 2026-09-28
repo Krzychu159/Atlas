@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Plus, UserPlus } from "lucide-react";
+import { Archive, ArrowRight, Plus, UserPlus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import {
   getClients,
@@ -77,8 +77,10 @@ export default function ClientsPage() {
 
   const scopedClients = useMemo(
     () =>
-      clients.filter((client) =>
-        matchesOwnerLocationId(client, selectedLocationId),
+      clients.filter(
+        (client) =>
+          !client.isArchived &&
+          matchesOwnerLocationId(client, selectedLocationId),
       ),
     [clients, selectedLocationId],
   );
@@ -182,14 +184,23 @@ export default function ClientsPage() {
                 </p>
               </div>
 
-              <Button
-                variant="primary"
-                icon={<UserPlus size={16} />}
-                className="h-16"
-                onClick={() => setIsModalOpen(true)}
-              >
-                Dodaj klienta
-              </Button>
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/owner/clients/archived"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-on-surface transition hover:bg-surface-container-high"
+                >
+                  <Archive size={16} />
+                  Archiwum
+                </Link>
+                <Button
+                  variant="primary"
+                  icon={<UserPlus size={16} />}
+                  className="h-16"
+                  onClick={() => setIsModalOpen(true)}
+                >
+                  Dodaj klienta
+                </Button>
+              </div>
             </div>
 
             <ClientFilters
@@ -291,6 +302,14 @@ export default function ClientsPage() {
               onTrainerFilterChange={setTrainerFilter}
               onSortChange={setSort}
             />
+
+            <Link
+              href="/owner/clients/archived"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low text-sm font-semibold text-primary-light"
+            >
+              <Archive size={16} />
+              Archiwum klientów
+            </Link>
 
             <div className="flex flex-col gap-4">
               {isLoading ? (

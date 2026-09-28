@@ -23,12 +23,16 @@ export default function ClientNotesPanel({
   access = "owner",
   trainerMe,
   onClientChange,
+  readOnly = false,
+  showPayments = true,
 }: {
   client: Client;
   payments: ClientPayment[];
   access?: "owner" | "trainer";
   trainerMe?: TrainerPortalMe | null;
   onClientChange: (client: Client) => void;
+  readOnly?: boolean;
+  showPayments?: boolean;
 }) {
   const [draft, setDraft] = useState({
     clientId: client.id,
@@ -73,27 +77,30 @@ export default function ClientNotesPanel({
     <aside className="card-shell p-5 md:p-6">
       <div className="flex items-center justify-between gap-3">
         <p className="text-section-title">Szybkie notatki</p>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={handleSaveNotes}
-          disabled={isSaving || notes === (client.notes || "")}
-        >
-          {isSaving ? "Zapis..." : "Zapisz"}
-        </Button>
+        {!readOnly ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleSaveNotes}
+            disabled={isSaving || notes === (client.notes || "")}
+          >
+            {isSaving ? "Zapis..." : "Zapisz"}
+          </Button>
+        ) : null}
       </div>
 
       <textarea
         value={notes}
+        readOnly={readOnly}
         onChange={(event) =>
           setDraft({ clientId: client.id, notes: event.target.value })
         }
         rows={4}
         placeholder="Dodaj notatkę o kliencie..."
-        className="mt-5 w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 text-sm leading-7 text-on-surface-variant outline-none placeholder:text-on-surface-muted"
+        className="mt-5 w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 text-sm leading-7 text-on-surface-variant outline-none placeholder:text-on-surface-muted read-only:cursor-default"
       />
 
-      <PaymentHistory payments={payments} />
+      {showPayments ? <PaymentHistory payments={payments} /> : null}
     </aside>
   );
 }

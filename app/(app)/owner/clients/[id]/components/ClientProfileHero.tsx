@@ -8,6 +8,7 @@ import {
   Pencil,
   Phone,
   ReceiptText,
+  RotateCcw,
   ShieldCheck,
   Unlock,
   UserPlus,
@@ -38,18 +39,22 @@ export default function ClientProfileHero({
   milestoneAccess = "owner",
   onPortalAction,
   onArchive,
+  onRestore,
   isPortalActionPending = false,
+  isRestorePending = false,
   groupLocationNames,
 }: {
   client: Client;
-  onEdit: () => void;
-  onFiles: () => void;
+  onEdit?: () => void;
+  onFiles?: () => void;
   backHref?: string;
   paymentsHref?: string;
   milestoneAccess?: Exclude<MilestoneAccess, "client">;
   onPortalAction?: () => void;
   onArchive?: () => void;
+  onRestore?: () => void;
   isPortalActionPending?: boolean;
+  isRestorePending?: boolean;
   groupLocationNames?: string[];
 }) {
   const fullName = getClientName(client);
@@ -72,7 +77,9 @@ export default function ClientProfileHero({
         <div className="flex justify-center lg:justify-start">
           <div className="relative shrink-0">
             <div className="flex h-40 w-40 items-center justify-center overflow-hidden rounded-[28px] bg-surface-container-lowest outline outline-4 outline-secondary">
-              {client.avatarUrl ? (
+              {client.isArchived ? (
+                <Archive size={44} className="text-on-surface-muted" />
+              ) : client.avatarUrl ? (
                 <img
                   src={client.avatarUrl}
                   alt={fullName}
@@ -85,9 +92,11 @@ export default function ClientProfileHero({
               )}
             </div>
 
-            <div className="absolute -right-2 bottom-4 flex h-11 w-11 items-center justify-center rounded-full bg-tertiary-light text-on-tertiary shadow-soft">
-              <ShieldCheck size={18} />
-            </div>
+            {!client.isArchived ? (
+              <div className="absolute -right-2 bottom-4 flex h-11 w-11 items-center justify-center rounded-full bg-tertiary-light text-on-tertiary shadow-soft">
+                <ShieldCheck size={18} />
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -95,7 +104,18 @@ export default function ClientProfileHero({
           <p className="text-label text-primary-light">
             {client.status || "Profil klienta"}
           </p>
-          {onPortalAction ? (
+          {client.isArchived ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="inline-flex rounded-full bg-error-container/40 px-3 py-1.5 text-xs font-semibold text-error-light">
+                Archiwalny
+              </span>
+              {client.portalAccessStatus ? (
+                <span className="inline-flex rounded-full bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-primary-light">
+                  {getPortalAccessLabel(client.portalAccessStatus)}
+                </span>
+              ) : null}
+            </div>
+          ) : onPortalAction ? (
             <span className="mt-3 inline-flex rounded-full bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-primary-light">
               {getPortalAccessLabel(client.portalAccessStatus)}
             </span>
@@ -139,11 +159,18 @@ export default function ClientProfileHero({
                 </div>
               }
             />
-            <ClientRewardProgress
-              access={milestoneAccess}
-              clientId={client.id}
-              trainingStartDate={client.trainingStartDate}
-            />
+            {client.isArchived ? (
+              <HeroStat
+                label="Data archiwizacji"
+                value={formatArchivedAt(client.archivedAt)}
+              />
+            ) : (
+              <ClientRewardProgress
+                access={milestoneAccess}
+                clientId={client.id}
+                trainingStartDate={client.trainingStartDate}
+              />
+            )}
           </div>
         </div>
 
@@ -159,29 +186,46 @@ export default function ClientProfileHero({
               {isPortalActionPending ? "Zapisywanie..." : getPortalActionLabel(client.portalAccessStatus)}
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={onEdit}
-            className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primary px-5 text-sm font-semibold text-on-primary shadow-soft transition hover:bg-primary-container"
-          >
-            <Pencil size={16} />
-            Edytuj dane
-          </button>
-          <button
-            type="button"
-            onClick={onFiles}
-            className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-primary-light transition hover:bg-surface-container-high"
-          >
-            <Files size={16} />
-            Pliki
-          </button>
-          <Link
-            href={resolvedPaymentsHref}
-            className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-primary-light transition hover:bg-surface-container-high"
-          >
-            <ReceiptText size={16} />
-            Płatności
-          </Link>
+          {onRestore ? (
+            <button
+              type="button"
+              onClick={onRestore}
+              disabled={isRestorePending}
+              className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primary px-5 text-sm font-semibold text-on-primary shadow-soft transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RotateCcw size={16} />
+              {isRestorePending ? "Przywracanie..." : "Przywróć klienta"}
+            </button>
+          ) : null}
+          {onEdit ? (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primary px-5 text-sm font-semibold text-on-primary shadow-soft transition hover:bg-primary-container"
+            >
+              <Pencil size={16} />
+              Edytuj dane
+            </button>
+          ) : null}
+          {onFiles ? (
+            <button
+              type="button"
+              onClick={onFiles}
+              className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-primary-light transition hover:bg-surface-container-high"
+            >
+              <Files size={16} />
+              Pliki
+            </button>
+          ) : null}
+          {!client.isArchived ? (
+            <Link
+              href={resolvedPaymentsHref}
+              className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-primary-light transition hover:bg-surface-container-high"
+            >
+              <ReceiptText size={16} />
+              Płatności
+            </Link>
+          ) : null}
           {onArchive ? (
             <button
               type="button"
@@ -196,6 +240,16 @@ export default function ClientProfileHero({
       </div>
     </section>
   );
+}
+
+function formatArchivedAt(value?: string | null) {
+  if (!value) return "Brak daty";
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat("pl-PL", { dateStyle: "medium" }).format(date);
 }
 
 function getPortalActionLabel(status: string) {
