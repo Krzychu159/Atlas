@@ -91,6 +91,7 @@ export function trainerPortalClientToClient(
 
   return {
     id: client.id,
+    userId: null,
     trainerId: client.trainerId ?? me?.trainerId ?? null,
     activePackageId: client.activePackageId ?? null,
     activeClientPackageId: client.activeClientPackageId ?? null,
@@ -139,6 +140,10 @@ export function trainerPortalClientToClient(
     trainerFullName: client.trainerFullName || me?.fullName || "",
     locationId: client.locationId || resolveLocationId(client.locationName, me),
     locationName: client.locationName || "",
+    portalAccessStatus: "Active",
+    isArchived: false,
+    archivedAt: null,
+    emailContactUrl: client.email ? `mailto:${client.email}` : "",
   };
 }
 

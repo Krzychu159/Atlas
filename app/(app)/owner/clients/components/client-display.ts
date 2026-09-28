@@ -13,6 +13,17 @@ export function getClientName(client: Client) {
   return name.trim() || "Klient bez nazwy";
 }
 
+export function getPortalAccessLabel(status: string) {
+  const labels: Record<string, string> = {
+    NoAccount: "Bez dostępu do panelu",
+    Invited: "Zaproszony",
+    Active: "Konto aktywne",
+    Blocked: "Dostęp zablokowany",
+  };
+
+  return labels[status] || status || "Bez dostępu do panelu";
+}
+
 export function getClientBalance(client: Client) {
   return (
     firstNumber(

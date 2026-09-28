@@ -23,6 +23,7 @@ import {
   getClientBalance,
   getClientName,
   getClientPackageUsage,
+  getPortalAccessLabel,
   hasActiveClientPackage,
 } from "@/app/(app)/owner/clients/components/client-display";
 import { showOwnerError } from "@/app/(app)/owner/components/owner-toast";
@@ -309,8 +310,11 @@ export default function ClientsPage() {
                             {fullName}
                           </p>
                           <p className="mt-2 text-sm text-on-surface-variant truncate">
-                            {client.email || "Brak adresu e-mail"}
+                            {client.email || "Brak adresu email"}
                           </p>
+                          <span className="mt-2 inline-flex rounded-full bg-surface-container-lowest px-2 py-1 text-[10px] font-semibold text-primary-light">
+                            {getPortalAccessLabel(client.portalAccessStatus)}
+                          </span>
                           <p className="mt-4 text-label text-primary-light">
                             Trener: {client.trainerFullName || "Nie przypisano"}
                           </p>
@@ -379,6 +383,7 @@ export default function ClientsPage() {
       <AddClientModal
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onCreated={loadClients}
       />
     </>
   );

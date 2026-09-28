@@ -214,7 +214,10 @@ export default function ClientPaymentsPage() {
               </p>
             ) : null}
           </div>
-          <Button
+         
+         <div className="flex flex-col gap-3 md:flex-row">
+           <Button
+           variant="outline"
             size="lg"
             disabled={isSubmitting || !packages.length}
             onClick={() => setIsPaymentModalOpen(true)}
@@ -222,6 +225,19 @@ export default function ClientPaymentsPage() {
           >
             Zgłoś wpłatę
           </Button>
+           <Button
+            size="lg"
+            disabled={isSubmitting || !packages.length}
+            onClick={() => setIsPaymentModalOpen(true)}
+            className="w-full md:w-auto"
+          >
+            Zapłać wygodnie online
+          </Button>
+
+         </div>
+
+
+          
         </div>
 
       </section>

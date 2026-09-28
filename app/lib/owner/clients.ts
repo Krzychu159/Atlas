@@ -1,9 +1,16 @@
-import { backendGet, backendPatch, backendPost, backendPut } from "../backend";
+import {
+  backendDelete,
+  backendGet,
+  backendPatch,
+  backendPost,
+  backendPut,
+} from "../backend";
 
 export type ClientStatus = "active" | "suspended" | "new" | string;
 
 export type Client = {
   id: number;
+  userId: number | null;
   trainerId: number | null;
   activePackageId: number | null;
   activeClientPackageId?: number | null;
@@ -50,6 +57,10 @@ export type Client = {
   trainerFullName: string;
   locationId: number;
   locationName: string;
+  portalAccessStatus: string;
+  isArchived: boolean;
+  archivedAt: string | null;
+  emailContactUrl: string;
 };
 
 export type SubscriptionCycle = {
@@ -146,21 +157,18 @@ export type UpdateClientTrainingPlanPayload = {
 };
 
 export type CreateClientPayload = {
-  trainerId: number;
-  activePackageId: number;
   firstName: string;
   lastName: string;
-  email: string;
-  phoneNumber: string;
-  avatarUrl: string;
-  goal: string;
-  notes: string;
-  progressPercent: number;
-  billingStatus: string;
-  status: string;
-  nextSessionAt: string | null;
-  createdBy: number;
   locationId: number;
+  trainerId?: number | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+};
+
+export type ClientArchiveCheck = {
+  clientId: number;
+  canArchive: boolean;
+  blockers: string[];
 };
 
 export type UpdateClientPayload = {
@@ -231,7 +239,7 @@ export function getClientLegalConsents(id: number) {
 }
 
 export function createClient(payload: CreateClientPayload) {
-  return backendPost<Client>("Clients", payload);
+  return backendPost<Client>("clients", payload);
 }
 
 export function updateClient(id: number, payload: UpdateClientPayload) {
@@ -243,4 +251,28 @@ export function updateClientTrainingPlan(
   payload: UpdateClientTrainingPlanPayload,
 ) {
   return backendPut<ClientTrainingPlan>(`clients/${id}/training-plan`, payload);
+}
+
+export function setClientPortalAccess(clientId: number, blocked: boolean) {
+  return backendPut<void>(`clients/${clientId}/portal-access`, { blocked });
+}
+
+export function getArchivedClients() {
+  return backendGet<Client[]>("clients/archived");
+}
+
+export function getClientArchiveCheck(id: number) {
+  return backendGet<ClientArchiveCheck>(`clients/${id}/archive-check`);
+}
+
+export function archiveClient(id: number) {
+  return backendPost<void>(`clients/${id}/archive`);
+}
+
+export function restoreClient(id: number) {
+  return backendPost<void>(`clients/${id}/restore`);
+}
+
+export function permanentlyDeleteClient(id: number) {
+  return backendDelete<void>(`clients/${id}/permanent`);
 }

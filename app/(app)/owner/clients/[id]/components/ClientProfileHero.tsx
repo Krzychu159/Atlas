@@ -1,17 +1,24 @@
 import Link from "next/link";
 import {
   ArrowLeft,
+  Archive,
   Files,
+  Lock,
   Mail,
   Pencil,
   Phone,
   ReceiptText,
   ShieldCheck,
+  Unlock,
+  UserPlus,
 } from "lucide-react";
 import type { Client } from "@/app/lib/owner/clients";
 import ClientRewardProgress from "@/app/components/clients/ClientRewardProgress";
 import type { MilestoneAccess } from "@/app/lib/milestones";
-import { getClientName } from "../../components/client-display";
+import {
+  getClientName,
+  getPortalAccessLabel,
+} from "../../components/client-display";
 
 function getInitials(client: Client) {
   return getClientName(client)
@@ -29,6 +36,9 @@ export default function ClientProfileHero({
   backHref = "/owner/clients",
   paymentsHref,
   milestoneAccess = "owner",
+  onPortalAction,
+  onArchive,
+  isPortalActionPending = false,
 }: {
   client: Client;
   onEdit: () => void;
@@ -36,6 +46,9 @@ export default function ClientProfileHero({
   backHref?: string;
   paymentsHref?: string;
   milestoneAccess?: Exclude<MilestoneAccess, "client">;
+  onPortalAction?: () => void;
+  onArchive?: () => void;
+  isPortalActionPending?: boolean;
 }) {
   const fullName = getClientName(client);
   const resolvedPaymentsHref = paymentsHref || `/owner/clients/${client.id}/payments`;
@@ -80,6 +93,11 @@ export default function ClientProfileHero({
           <p className="text-label text-primary-light">
             {client.status || "Profil klienta"}
           </p>
+          {onPortalAction ? (
+            <span className="mt-3 inline-flex rounded-full bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-primary-light">
+              {getPortalAccessLabel(client.portalAccessStatus)}
+            </span>
+          ) : null}
 
           <h1 className="mt-3 font-display text-[2.7rem] font-semibold leading-[0.92] tracking-tight md:text-[4rem]">
             {fullName}
@@ -112,6 +130,17 @@ export default function ClientProfileHero({
         </div>
 
         <div className="flex flex-col gap-3">
+          {onPortalAction ? (
+            <button
+              type="button"
+              onClick={onPortalAction}
+              disabled={isPortalActionPending || client.portalAccessStatus === "Invited"}
+              className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-primary-light transition hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <PortalActionIcon status={client.portalAccessStatus} />
+              {isPortalActionPending ? "Zapisywanie..." : getPortalActionLabel(client.portalAccessStatus)}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onEdit}
@@ -135,10 +164,33 @@ export default function ClientProfileHero({
             <ReceiptText size={16} />
             Płatności
           </Link>
+          {onArchive ? (
+            <button
+              type="button"
+              onClick={onArchive}
+              className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-error-light transition hover:bg-surface-container-high"
+            >
+              <Archive size={16} />
+              Archiwizuj klienta
+            </button>
+          ) : null}
         </div>
       </div>
     </section>
   );
+}
+
+function getPortalActionLabel(status: string) {
+  if (status === "NoAccount") return "Zaproś do panelu";
+  if (status === "Invited") return "Zaproszony";
+  if (status === "Blocked") return "Odblokuj dostęp";
+  return "Zablokuj dostęp";
+}
+
+function PortalActionIcon({ status }: { status: string }) {
+  if (status === "NoAccount") return <UserPlus size={16} />;
+  if (status === "Blocked") return <Unlock size={16} />;
+  return <Lock size={16} />;
 }
 
 function HeroStat({ label, value }: { label: string; value: React.ReactNode }) {

@@ -3,14 +3,18 @@
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
+  archiveClient,
   getClient,
+  getClientArchiveCheck,
   getClientLegalConsents,
   getClientSubscription,
   getClientSubscriptionUsage,
   getClientTrainingPlan,
+  setClientPortalAccess,
   type Client,
+  type ClientArchiveCheck,
   type ClientLegalConsent,
   type ClientSubscription,
   type ClientTrainingPlan,
@@ -24,11 +28,14 @@ import ClientProfileHero from "./components/ClientProfileHero";
 import ClientSessionsPanel from "./components/ClientSessionsPanel";
 import ClientLegalConsentsPanel from "./components/ClientLegalConsentsPanel";
 import EditClientModal from "./components/EditClientModal";
-import { showOwnerError } from "../../components/owner-toast";
+import ArchiveClientModal from "./components/ArchiveClientModal";
+import InviteClientPortalModal from "./components/InviteClientPortalModal";
+import { showOwnerError, showOwnerSuccess } from "../../components/owner-toast";
 
 export default function OwnerClientDetailsPage() {
   const correctionRevision = useSessionCorrectionRevision();
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [client, setClient] = useState<Client | null>(null);
   const [subscription, setSubscription] = useState<ClientSubscription | null>(
     null,
@@ -42,6 +49,82 @@ export default function OwnerClientDetailsPage() {
   const [legalConsents, setLegalConsents] = useState<ClientLegalConsent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [archiveCheck, setArchiveCheck] = useState<ClientArchiveCheck | null>(null);
+  const [isPortalActionPending, setIsPortalActionPending] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
+
+  async function refreshClient() {
+    if (!client) return;
+
+    try {
+      setClient(await getClient(client.id));
+    } catch (err) {
+      showOwnerError(err, "Nie udało się odświeżyć danych klienta.", {
+        id: "owner-client-refresh-error",
+      });
+    }
+  }
+
+  async function handlePortalAction() {
+    if (!client) return;
+
+    if (client.portalAccessStatus === "NoAccount") {
+      setIsInviteOpen(true);
+      return;
+    }
+
+    if (client.portalAccessStatus === "Invited") return;
+
+    const blocked = client.portalAccessStatus !== "Blocked";
+
+    try {
+      setIsPortalActionPending(true);
+      await setClientPortalAccess(client.id, blocked);
+      showOwnerSuccess(blocked ? "Dostęp do panelu został zablokowany." : "Dostęp do panelu został odblokowany.", {
+        id: "owner-client-portal-access-success",
+      });
+      await refreshClient();
+    } catch (err) {
+      showOwnerError(err, "Nie udało się zmienić dostępu do panelu.", {
+        id: "owner-client-portal-access-error",
+      });
+    } finally {
+      setIsPortalActionPending(false);
+    }
+  }
+
+  async function handleArchiveCheck() {
+    if (!client) return;
+
+    try {
+      setArchiveCheck(await getClientArchiveCheck(client.id));
+    } catch (err) {
+      showOwnerError(err, "Nie udało się sprawdzić możliwości archiwizacji.", {
+        id: "owner-client-archive-check-error",
+      });
+    }
+  }
+
+  async function handleArchive() {
+    if (!client) return;
+
+    try {
+      setIsArchiving(true);
+      await archiveClient(client.id);
+      showOwnerSuccess("Klient został zarchiwizowany.", {
+        id: "owner-client-archive-success",
+      });
+      setArchiveCheck(null);
+      router.push("/owner/clients");
+    } catch (err) {
+      showOwnerError(err, "Nie udało się zarchiwizować klienta.", {
+        id: "owner-client-archive-error",
+      });
+    } finally {
+      setIsArchiving(false);
+    }
+  }
 
   useEffect(() => {
     async function loadClientDetails() {
@@ -173,6 +256,9 @@ export default function OwnerClientDetailsPage() {
             client={client}
             onEdit={() => setIsEditOpen(true)}
             onFiles={handleOpenTrainingPlan}
+            onPortalAction={handlePortalAction}
+            onArchive={handleArchiveCheck}
+            isPortalActionPending={isPortalActionPending}
           />
           <ClientMetricCards
             client={client}
@@ -202,6 +288,18 @@ export default function OwnerClientDetailsPage() {
               )
             }
             onTrainingPlanSaved={setTrainingPlan}
+          />
+          <InviteClientPortalModal
+            client={client}
+            open={isInviteOpen}
+            onClose={() => setIsInviteOpen(false)}
+            onInvited={refreshClient}
+          />
+          <ArchiveClientModal
+            check={archiveCheck}
+            isArchiving={isArchiving}
+            onClose={() => setArchiveCheck(null)}
+            onConfirm={handleArchive}
           />
         </>
       ) : null}

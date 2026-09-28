@@ -161,6 +161,7 @@ export default function EditClientModal({
       email: email.trim() || null,
       phoneNumber: phoneNumber.trim() || null,
       goal: goal.trim() || null,
+      notes: client.notes || null,
       locationId: resolvedLocationId,
       progressPercent: client.progressPercent ?? 0,
       billingStatus: client.billingStatus || null,
@@ -308,15 +309,26 @@ export default function EditClientModal({
             value={phoneNumber}
             onChange={setPhoneNumber}
           />
-          <AvatarFilePicker
-            label="Zdjęcie klienta"
-            value={avatarUrl}
-            onChange={setAvatarUrl}
-            onUpload={handleAvatarUpload}
-            onRemove={handleAvatarRemove}
-            fallbackText={avatarFallback}
-            className="md:col-span-2"
-          />
+          {client.userId !== null ? (
+            <AvatarFilePicker
+              label="Zdjęcie klienta"
+              value={avatarUrl}
+              onChange={setAvatarUrl}
+              onUpload={handleAvatarUpload}
+              onRemove={handleAvatarRemove}
+              fallbackText={avatarFallback}
+              className="md:col-span-2"
+            />
+          ) : (
+            <div className="flex items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 md:col-span-2">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 font-semibold text-primary-light">
+                {avatarFallback}
+              </div>
+              <p className="text-sm text-on-surface-variant">
+                Zdjęcie będzie dostępne po utworzeniu konta klienta.
+              </p>
+            </div>
+          )}
 
           <div>
             <span className="text-label text-on-surface-muted">Trener</span>

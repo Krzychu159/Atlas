@@ -18,13 +18,16 @@ export type Invitation = {
   cancelledAt: string | null;
   createdAt: string;
   status: string;
+  lastSentAt?: string | null;
+  lastSendError?: string | null;
 };
 
 export type CreateInvitationPayload = {
   email: string;
   role: InvitationRole;
-  locationId: number;
+  locationId?: number;
   trainerId?: number | null;
+  clientId?: number;
 };
 
 export type GetInvitationsParams = {

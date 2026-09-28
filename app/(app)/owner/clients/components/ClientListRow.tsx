@@ -5,6 +5,7 @@ import {
   formatClientBalance,
   getClientName,
   getClientPackageUsage,
+  getPortalAccessLabel,
 } from "./client-display";
 
 function getInitials(client: Client) {
@@ -67,8 +68,11 @@ export default function ClientListRow({
       <div className="min-w-0">
         <p className="text-base font-semibold truncate">{fullName}</p>
         <p className="text-label text-on-surface-variant mt-1 truncate">
-          {client.email || "Brak adresu e-mail"}
+          {client.email || "Brak adresu email"}
         </p>
+        <span className="mt-1.5 inline-flex rounded-full bg-surface-container-low px-2 py-1 text-[10px] font-semibold text-primary-light">
+          {getPortalAccessLabel(client.portalAccessStatus)}
+        </span>
       </div>
 
       <div className="min-w-0">
