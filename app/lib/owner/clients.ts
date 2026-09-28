@@ -7,6 +7,11 @@ import {
 } from "../backend";
 
 export type ClientStatus = "active" | "suspended" | "new" | string;
+export type PortalAccessStatus =
+  | "NoAccount"
+  | "Invited"
+  | "Active"
+  | "Blocked";
 
 export type Client = {
   id: number;
@@ -22,9 +27,9 @@ export type Client = {
   firstName: string;
   lastName: string;
   fullName: string;
-  email: string;
-  phoneNumber: string;
-  avatarUrl: string;
+  email: string | null;
+  phoneNumber: string | null;
+  avatarUrl: string | null;
   goal: string;
   notes: string;
   progressPercent: number;
@@ -57,7 +62,7 @@ export type Client = {
   trainerFullName: string;
   locationId: number;
   locationName: string;
-  portalAccessStatus: string;
+  portalAccessStatus: PortalAccessStatus;
   isArchived: boolean;
   archivedAt: string | null;
   emailContactUrl: string;

@@ -79,12 +79,13 @@ export default function OwnerClientDetailsPage() {
   async function handlePortalAction() {
     if (!client) return;
 
-    if (client.portalAccessStatus === "NoAccount") {
+    if (
+      client.portalAccessStatus === "NoAccount" ||
+      client.portalAccessStatus === "Invited"
+    ) {
       setIsInviteOpen(true);
       return;
     }
-
-    if (client.portalAccessStatus === "Invited") return;
 
     const blocked = client.portalAccessStatus !== "Blocked";
 

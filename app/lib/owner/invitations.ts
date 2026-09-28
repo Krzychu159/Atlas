@@ -4,6 +4,7 @@ export type InvitationRole = "Client" | "Trainer";
 
 export type Invitation = {
   id: number;
+  clientId?: number | null;
   email: string;
   role: string;
   locationId: number;

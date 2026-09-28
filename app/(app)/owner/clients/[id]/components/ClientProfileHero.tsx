@@ -152,7 +152,7 @@ export default function ClientProfileHero({
             <button
               type="button"
               onClick={onPortalAction}
-              disabled={isPortalActionPending || client.portalAccessStatus === "Invited"}
+              disabled={isPortalActionPending}
               className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-primary-light transition hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
             >
               <PortalActionIcon status={client.portalAccessStatus} />
@@ -200,13 +200,14 @@ export default function ClientProfileHero({
 
 function getPortalActionLabel(status: string) {
   if (status === "NoAccount") return "Zaproś do panelu";
-  if (status === "Invited") return "Zaproszony";
+  if (status === "Invited") return "Zarządzaj zaproszeniem";
   if (status === "Blocked") return "Odblokuj dostęp";
   return "Zablokuj dostęp";
 }
 
 function PortalActionIcon({ status }: { status: string }) {
   if (status === "NoAccount") return <UserPlus size={16} />;
+  if (status === "Invited") return <Mail size={16} />;
   if (status === "Blocked") return <Unlock size={16} />;
   return <Lock size={16} />;
 }

@@ -264,6 +264,10 @@ export default function EditClientModal({
   const avatarFallback = `${firstName[0] || ""}${lastName[0] || ""}` || "K";
 
   async function handleAvatarUpload(file: File) {
+    if (client.userId === null) {
+      throw new Error("Avatar wymaga konta użytkownika klienta.");
+    }
+
     const uploadedUrl =
       access === "trainer"
         ? await uploadTrainerClientAvatar(clientId, file)
@@ -276,6 +280,8 @@ export default function EditClientModal({
   }
 
   async function handleAvatarRemove() {
+    if (client.userId === null) return;
+
     if (access === "trainer") {
       await deleteTrainerClientAvatar(clientId);
     } else {
