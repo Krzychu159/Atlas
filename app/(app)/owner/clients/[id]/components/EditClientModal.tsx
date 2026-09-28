@@ -61,6 +61,8 @@ type EditClientModalProps = {
   onSaved: (client: Client) => void;
   onAvatarChanged?: (avatarUrl: string) => void;
   onTrainingPlanSaved?: (plan: ClientTrainingPlan) => void;
+  groupLocationNames?: string[];
+  groupLocationsAvailable?: boolean;
 };
 
 export default function EditClientModal({
@@ -72,6 +74,8 @@ export default function EditClientModal({
   onSaved,
   onAvatarChanged,
   onTrainingPlanSaved,
+  groupLocationNames = [],
+  groupLocationsAvailable = true,
 }: EditClientModalProps) {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -342,7 +346,7 @@ export default function EditClientModal({
 
           <div>
             <span className="text-label text-on-surface-muted">
-              Lokalizacja
+              {access === "owner" ? "Lokalizacja główna" : "Lokalizacja"}
             </span>
             <CustomSelect
               value={locationId}
@@ -352,6 +356,38 @@ export default function EditClientModal({
               options={locationOptions}
             />
           </div>
+
+          {access === "owner" ? (
+            <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 md:col-span-2">
+              <p className="text-label text-on-surface-muted">
+                Lokalizacje zajęć grupowych
+              </p>
+              {!groupLocationsAvailable ? (
+                <p className="mt-2 text-sm text-on-surface-variant">
+                  Dane dodatkowych lokalizacji są obecnie niedostępne.
+                </p>
+              ) : groupLocationNames.length ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {groupLocationNames.map((locationName) => (
+                    <span
+                      key={locationName}
+                      className="rounded-full bg-surface-container-low px-3 py-1.5 text-xs font-semibold text-primary-light"
+                    >
+                      {locationName}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-on-surface-variant">
+                  Brak dodatkowych lokalizacji
+                </p>
+              )}
+              <p className="mt-3 text-xs text-on-surface-muted">
+                Lokalizacje wynikają z aktywnych pakietów grupowych i są tylko
+                do odczytu.
+              </p>
+            </div>
+          ) : null}
 
           <DateInput
             label="Data rozpoczęcia treningów"

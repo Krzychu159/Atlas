@@ -41,6 +41,9 @@ export type ClientPortalPackage = {
   remainingSessionsCount: number;
   progressPercent: number;
   durationDays: number | null;
+  billingType?: string | number | null;
+  packageType?: string | null;
+  participantsCount?: number | null;
 };
 
 export type ClientPortalPaymentSummary = {
@@ -120,7 +123,9 @@ export type ClientPackageBilling = {
   amountPaid: number;
   amountDue: number;
   currency: string | null;
-  expectedBillingType: string | null;
+  expectedBillingType: string | number | null;
+  packageType?: string | null;
+  participantsCount?: number | null;
   locationId: number | null;
   locationName: string | null;
   paymentStatus: string | null;
@@ -158,7 +163,9 @@ export type SubscriptionCycle = {
   amountPaid: number;
   amountDue: number;
   currency: string | null;
-  expectedBillingType: string | null;
+  expectedBillingType: string | number | null;
+  packageType?: string | null;
+  participantsCount?: number | null;
   paymentStatus: string | null;
   purchaseDate: string;
   validUntil: string | null;

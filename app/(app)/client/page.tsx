@@ -11,6 +11,7 @@ import {
   FileText,
   MapPin,
   Phone,
+  Ticket,
   UserRound,
 } from "lucide-react";
 import { Button, ButtonLink } from "@/app/components/ui/button";
@@ -25,11 +26,13 @@ import {
   getClientPortalSubscription,
   getClientPortalTrainingPlan,
   type ClientBillingSummary,
+  type ClientPackageBilling,
   type ClientPortalMe,
   type ClientSubscription,
   type ClientTrainingPlan,
   type ClientPortalDashboard,
   type ClientPortalSession,
+  type SubscriptionCycle,
 } from "@/app/lib/client/portal";
 
 export default function ClientDashboardPage() {
@@ -106,9 +109,10 @@ export default function ClientDashboardPage() {
 
   const me = dashboard?.me ?? profile;
   const trainer = dashboard?.trainer;
-  const packageData = dashboard?.package;
   const payment = dashboard?.payment;
   const currentCycle = subscription?.currentCycle;
+  const mainPackage = getMainPackage(currentCycle, billing?.packages);
+  const groupPackages = getGroupPackages(billing?.packages);
   const nextSession = dashboard?.nextSession;
   const upcomingSessions = useMemo(
     () => [...(dashboard?.upcomingSessions || [])].sort(sortSessions).slice(0, 3),
@@ -123,21 +127,16 @@ export default function ClientDashboardPage() {
     me?.firstName ||
     getFirstName(me?.fullName) ||
     "Kliencie";
-  const usedSessions =
-    currentCycle?.usedSessions ?? packageData?.usedSessionsCount ?? 0;
-  const totalSessions =
-    currentCycle?.totalSessions ?? packageData?.sessionsLimit ?? 0;
-  const remainingSessions =
-    currentCycle?.remainingSessions ?? packageData?.remainingSessionsCount ?? 0;
+  const usedSessions = mainPackage?.usedSessions ?? 0;
+  const totalSessions = mainPackage?.totalSessions ?? 0;
+  const remainingSessions = mainPackage?.remainingSessions ?? 0;
   const progress = totalSessions
     ? Math.min(100, Math.round((usedSessions / totalSessions) * 100))
-    : packageData?.progressPercent ?? 0;
+    : 0;
   const amountDue =
-    billing?.activePackageAmountDue ?? currentCycle?.amountDue ?? payment?.amountDue ?? 0;
+    mainPackage?.amountDue ?? 0;
   const currency =
-    billing?.packages?.find((item) => item.clientPackageId === billing.activeClientPackageId)
-      ?.currency ||
-    currentCycle?.currency ||
+    mainPackage?.currency ||
     payment?.currency ||
     "PLN";
 
@@ -167,13 +166,11 @@ export default function ClientDashboardPage() {
           me?.trainerFullName ||
           "Nie przypisano"
         }
-        packageName={currentCycle?.packageName || packageData?.name || "Brak pakietu"}
+        mainPackage={mainPackage}
+        groupPackages={groupPackages}
         amountDue={amountDue}
         currency={currency}
-        usedSessions={usedSessions}
-        totalSessions={totalSessions}
         remainingSessions={remainingSessions}
-        progress={progress}
         upcomingSessions={upcomingSessions}
         isLoading={isLoading}
         onOpenTrainingPlan={openTrainingPlan}
@@ -310,22 +307,17 @@ export default function ClientDashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        <MetricCard
-          icon={<Dumbbell size={20} />}
-          label="Aktualny pakiet"
-          value={currentCycle?.packageName || packageData?.name || "Brak pakietu"}
-          note={
-            totalSessions
-              ? `${usedSessions}/${totalSessions} wykorzystanych`
-              : "Brak aktywnego cyklu"
-          }
-        />
+      <section className="grid gap-4 lg:grid-cols-2">
+        <ClientPackageCard packageData={mainPackage} />
+        <GroupPackagesCard packages={groupPackages} />
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
         <MetricCard
           icon={<CreditCard size={20} />}
           label="Do zapłaty"
           value={formatMoney(amountDue, currency)}
-          note={payment?.paymentDueDate ? `Termin: ${formatDateTime(payment.paymentDueDate)}` : "Saldo z aktywnego pakietu"}
+          note={mainPackage?.paymentDueDate ? `Termin: ${formatDateTime(mainPackage.paymentDueDate)}` : "Saldo z głównego pakietu"}
           accent={amountDue > 0 ? "warning" : "success"}
         />
         <MetricCard
@@ -333,7 +325,9 @@ export default function ClientDashboardPage() {
           label="Pozostałe treningi"
           value={String(remainingSessions)}
           note={
-            subscription?.autoRenewEnabled
+            !mainPackage
+              ? "Brak aktywnego pakietu"
+              : subscription?.autoRenewEnabled
               ? "Auto-przedłużanie aktywne"
               : "Auto-przedłużanie wyłączone"
           }
@@ -428,13 +422,11 @@ function MobileDashboard({
   greetingMessage,
   nextSession,
   trainerName,
-  packageName,
+  mainPackage,
+  groupPackages,
   amountDue,
   currency,
-  usedSessions,
-  totalSessions,
   remainingSessions,
-  progress,
   upcomingSessions,
   isLoading,
   onOpenTrainingPlan,
@@ -443,13 +435,11 @@ function MobileDashboard({
   greetingMessage?: string | null;
   nextSession?: ClientPortalSession | null;
   trainerName: string;
-  packageName: string;
+  mainPackage: PackageDisplayData | null;
+  groupPackages: ClientPackageBilling[];
   amountDue: number;
   currency: string;
-  usedSessions: number;
-  totalSessions: number;
   remainingSessions: number;
-  progress: number;
   upcomingSessions: ClientPortalSession[];
   isLoading: boolean;
   onOpenTrainingPlan: () => void;
@@ -533,28 +523,8 @@ function MobileDashboard({
         />
       </section>
 
-      <section className="card-shell p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-label text-on-surface-muted">Pakiet</p>
-            <h2 className="mt-2 truncate text-[1.45rem] font-semibold">
-              {packageName}
-            </h2>
-            <p className="mt-2 text-sm text-on-surface-variant">
-              {usedSessions}/{totalSessions || 0} wykorzystanych treningów
-            </p>
-          </div>
-          <span className="rounded-full bg-primary/15 px-3 py-1.5 text-sm font-semibold text-primary-light">
-            {progress}%
-          </span>
-        </div>
-        <div className="mt-5 h-3 overflow-hidden rounded-full bg-surface-container-lowest">
-          <div
-            className="h-full rounded-full bg-primary-gradient"
-            style={{ width: `${Math.max(0, Math.min(progress, 100))}%` }}
-          />
-        </div>
-      </section>
+      <ClientPackageCard packageData={mainPackage} compact />
+      <GroupPackagesCard packages={groupPackages} compact />
 
       <section className="card-shell p-5">
         <div className="flex items-center justify-between gap-4">
@@ -580,6 +550,116 @@ function MobileDashboard({
         </div>
       </section>
     </div>
+  );
+}
+
+type PackageDisplayData = {
+  clientPackageId: number;
+  packageName: string | null;
+  totalSessions: number;
+  usedSessions: number;
+  remainingSessions: number;
+  amountDue: number;
+  currency: string | null;
+  paymentStatus: string | null;
+  paymentDueDate: string | null;
+};
+
+function ClientPackageCard({
+  packageData,
+  compact = false,
+}: {
+  packageData: PackageDisplayData | null;
+  compact?: boolean;
+}) {
+  const totalSessions = packageData?.totalSessions ?? 0;
+  const usedSessions = packageData?.usedSessions ?? 0;
+  const progress = totalSessions
+    ? Math.min(100, Math.round((usedSessions / totalSessions) * 100))
+    : 0;
+
+  return (
+    <section className={`card-shell ${compact ? "p-5" : "p-5 md:p-6"}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-label text-on-surface-muted">Aktualny pakiet</p>
+          <h2 className="mt-3 text-[1.35rem] font-semibold leading-tight">
+            {packageData?.packageName || "Brak aktywnego pakietu"}
+          </h2>
+        </div>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
+          <Dumbbell size={20} />
+        </div>
+      </div>
+
+      {packageData ? (
+        <>
+          <div className="mt-5 flex items-center justify-between gap-3 text-sm text-on-surface-variant">
+            <span>{usedSessions}/{totalSessions} wykorzystanych</span>
+            <span>{packageData.remainingSessions} pozostało</span>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-container-lowest">
+            <div className="h-full rounded-full bg-primary-gradient" style={{ width: `${progress}%` }} />
+          </div>
+          {packageData.paymentStatus ? (
+            <p className="mt-4 text-xs font-semibold text-primary-light">
+              Płatność: {getPackagePaymentStatusLabel(packageData.paymentStatus)}
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <p className="mt-4 text-sm text-on-surface-variant">
+          Brak aktywnego cyklu indywidualnego lub semipersonalnego.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function GroupPackagesCard({
+  packages,
+  compact = false,
+}: {
+  packages: ClientPackageBilling[];
+  compact?: boolean;
+}) {
+  return (
+    <section className={`card-shell ${compact ? "p-5" : "p-5 md:p-6"}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-label text-on-surface-muted">Zajęcia grupowe</p>
+          <h2 className="mt-3 text-[1.35rem] font-semibold leading-tight">
+            {packages.length
+              ? packages.length === 1
+                ? "1 aktywna wejściówka"
+                : `${packages.length} aktywne pakiety`
+              : "Brak aktywnych zajęć grupowych"}
+          </h2>
+        </div>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-tertiary-container/45 text-tertiary-light">
+          <Ticket size={20} />
+        </div>
+      </div>
+
+      {packages.length ? (
+        <div className="mt-5 flex flex-col gap-2">
+          {packages.map((item) => (
+            <div key={item.clientPackageId} className="flex items-center justify-between gap-4 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3">
+              <p className="min-w-0 truncate text-sm font-semibold">
+                {item.packageName || "Pakiet grupowy"}
+              </p>
+              <p className="shrink-0 text-xs text-on-surface-variant">
+                {item.usedSessions}/{item.totalSessions} wejść
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-4 text-sm text-on-surface-variant">
+          Aktywne wejściówki pojawią się tutaj po zakupie.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -784,6 +864,100 @@ function SkeletonBlock({ className }: { className: string }) {
       className={`animate-pulse rounded-[var(--radius-lg)] bg-surface-container-lowest ${className}`}
     />
   );
+}
+
+type PackageKindSource = {
+  expectedBillingType?: string | number | null;
+  packageType?: string | null;
+};
+
+function getPackageKind(source: PackageKindSource) {
+  const packageType = source.packageType?.trim().toLowerCase();
+
+  if (packageType) {
+    return packageType.includes("group") ? "group" : "main";
+  }
+
+  if (
+    source.expectedBillingType === null ||
+    source.expectedBillingType === undefined ||
+    source.expectedBillingType === ""
+  ) {
+    return null;
+  }
+
+  const billingType = String(source.expectedBillingType).trim().toLowerCase();
+
+  return billingType === "5" || billingType.includes("group")
+    ? "group"
+    : "main";
+}
+
+function getMainPackage(
+  currentCycle: SubscriptionCycle | null | undefined,
+  packages: ClientPackageBilling[] | null | undefined,
+): PackageDisplayData | null {
+  const activePackages = packages?.filter((item) => item.isActive) || [];
+  const cycleIsMain =
+    currentCycle?.isActive && getPackageKind(currentCycle) === "main";
+
+  if (cycleIsMain) {
+    const billingDetails = activePackages.find(
+      (item) => item.clientPackageId === currentCycle.clientPackageId,
+    );
+
+    return {
+      clientPackageId: currentCycle.clientPackageId,
+      packageName: currentCycle.packageName,
+      totalSessions: currentCycle.totalSessions,
+      usedSessions: currentCycle.usedSessions,
+      remainingSessions: currentCycle.remainingSessions,
+      amountDue: currentCycle.amountDue,
+      currency: currentCycle.currency,
+      paymentStatus: currentCycle.paymentStatus,
+      paymentDueDate: billingDetails?.paymentDueDate || null,
+    };
+  }
+
+  const mainPackage = activePackages.find(
+    (item) => getPackageKind(item) === "main",
+  );
+
+  return mainPackage
+    ? {
+        clientPackageId: mainPackage.clientPackageId,
+        packageName: mainPackage.packageName,
+        totalSessions: mainPackage.totalSessions,
+        usedSessions: mainPackage.usedSessions,
+        remainingSessions: mainPackage.remainingSessions,
+        amountDue: mainPackage.amountDue,
+        currency: mainPackage.currency,
+        paymentStatus: mainPackage.paymentStatus,
+        paymentDueDate: mainPackage.paymentDueDate,
+      }
+    : null;
+}
+
+function getGroupPackages(
+  packages: ClientPackageBilling[] | null | undefined,
+) {
+  return (packages || [])
+    .filter(
+      (item) => item.isActive && getPackageKind(item) === "group",
+    )
+    .slice(0, 3);
+}
+
+function getPackagePaymentStatusLabel(status: string) {
+  const normalized = status.trim().toLowerCase();
+
+  if (normalized.includes("paid") && !normalized.includes("unpaid")) {
+    return "opłacony";
+  }
+  if (normalized.includes("pending")) return "oczekuje na potwierdzenie";
+  if (normalized.includes("unpaid")) return "nieopłacony";
+
+  return status;
 }
 
 function sortSessions(first: ClientPortalSession, second: ClientPortalSession) {

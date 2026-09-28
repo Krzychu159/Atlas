@@ -39,6 +39,7 @@ export default function ClientProfileHero({
   onPortalAction,
   onArchive,
   isPortalActionPending = false,
+  groupLocationNames,
 }: {
   client: Client;
   onEdit: () => void;
@@ -49,6 +50,7 @@ export default function ClientProfileHero({
   onPortalAction?: () => void;
   onArchive?: () => void;
   isPortalActionPending?: boolean;
+  groupLocationNames?: string[];
 }) {
   const fullName = getClientName(client);
   const resolvedPaymentsHref = paymentsHref || `/owner/clients/${client.id}/payments`;
@@ -118,8 +120,24 @@ export default function ClientProfileHero({
           <div className="mt-7 grid grid-cols-2 gap-4 border-t border-secondary/30 pt-6 md:grid-cols-3">
             <HeroStat label="Trener" value={client.trainerFullName || "Brak"} />
             <HeroStat
-              label="Lokalizacja"
-              value={client.locationName || "Brak"}
+              label={groupLocationNames ? "Lokalizacja główna" : "Lokalizacja"}
+              value={
+                <div>
+                  <span>{client.locationName || "Brak"}</span>
+                  {groupLocationNames?.length ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {groupLocationNames.map((locationName) => (
+                        <span
+                          key={locationName}
+                          className="rounded-full bg-surface-container-lowest px-2 py-1 text-[10px] font-semibold text-primary-light"
+                        >
+                          Zajęcia grupowe: {locationName}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              }
             />
             <ClientRewardProgress
               access={milestoneAccess}

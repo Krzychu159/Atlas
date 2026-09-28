@@ -10,7 +10,6 @@ import {
   getClientArchiveCheck,
   getClientLegalConsents,
   getClientSubscription,
-  getClientSubscriptionUsage,
   getClientTrainingPlan,
   setClientPortalAccess,
   type Client,
@@ -18,10 +17,14 @@ import {
   type ClientLegalConsent,
   type ClientSubscription,
   type ClientTrainingPlan,
-  type SubscriptionUsage,
 } from "@/app/lib/owner/clients";
 import { getClientSessions, type OwnerSession } from "@/app/lib/owner/sessions";
-import { getClientPayments, type ClientPayment } from "@/app/lib/owner/billing";
+import {
+  getClientBilling,
+  getClientPayments,
+  type ClientBillingSummary,
+  type ClientPayment,
+} from "@/app/lib/owner/billing";
 import ClientMetricCards from "./components/ClientMetricCards";
 import ClientNotesPanel from "./components/ClientNotesPanel";
 import ClientProfileHero from "./components/ClientProfileHero";
@@ -30,6 +33,9 @@ import ClientLegalConsentsPanel from "./components/ClientLegalConsentsPanel";
 import EditClientModal from "./components/EditClientModal";
 import ArchiveClientModal from "./components/ArchiveClientModal";
 import InviteClientPortalModal from "./components/InviteClientPortalModal";
+import ClientPackagesSection, {
+  getClientGroupLocationNames,
+} from "./components/ClientPackagesSection";
 import { showOwnerError, showOwnerSuccess } from "../../components/owner-toast";
 
 export default function OwnerClientDetailsPage() {
@@ -40,7 +46,7 @@ export default function OwnerClientDetailsPage() {
   const [subscription, setSubscription] = useState<ClientSubscription | null>(
     null,
   );
-  const [usage, setUsage] = useState<SubscriptionUsage | null>(null);
+  const [billing, setBilling] = useState<ClientBillingSummary | null>(null);
   const [trainingPlan, setTrainingPlan] = useState<ClientTrainingPlan | null>(
     null,
   );
@@ -53,6 +59,10 @@ export default function OwnerClientDetailsPage() {
   const [archiveCheck, setArchiveCheck] = useState<ClientArchiveCheck | null>(null);
   const [isPortalActionPending, setIsPortalActionPending] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+  const groupLocationNames = getClientGroupLocationNames(
+    billing?.packages,
+    client?.locationName,
+  );
 
   async function refreshClient() {
     if (!client) return;
@@ -144,7 +154,7 @@ export default function OwnerClientDetailsPage() {
         const [
           clientResult,
           subscriptionResult,
-          usageResult,
+          billingResult,
           sessionsResult,
           trainingPlanResult,
           paymentsResult,
@@ -152,7 +162,7 @@ export default function OwnerClientDetailsPage() {
         ] = await Promise.allSettled([
           getClient(clientId),
           getClientSubscription(clientId),
-          getClientSubscriptionUsage(clientId),
+          getClientBilling(clientId),
           getClientSessions(clientId),
           getClientTrainingPlan(clientId),
           getClientPayments(clientId, { page: 1, pageSize: 3 }),
@@ -169,8 +179,8 @@ export default function OwnerClientDetailsPage() {
           setSubscription(subscriptionResult.value);
         }
 
-        if (usageResult.status === "fulfilled") {
-          setUsage(usageResult.value);
+        if (billingResult.status === "fulfilled") {
+          setBilling(billingResult.value);
         }
 
         if (sessionsResult.status === "fulfilled") {
@@ -254,6 +264,7 @@ export default function OwnerClientDetailsPage() {
         <>
           <ClientProfileHero
             client={client}
+            groupLocationNames={groupLocationNames}
             onEdit={() => setIsEditOpen(true)}
             onFiles={handleOpenTrainingPlan}
             onPortalAction={handlePortalAction}
@@ -263,8 +274,8 @@ export default function OwnerClientDetailsPage() {
           <ClientMetricCards
             client={client}
             subscription={subscription}
-            usage={usage}
           />
+          <ClientPackagesSection packages={billing?.packages} />
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_330px]">
             <ClientSessionsPanel sessions={sessions} />
@@ -280,6 +291,8 @@ export default function OwnerClientDetailsPage() {
           <EditClientModal
             open={isEditOpen}
             client={client}
+            groupLocationNames={groupLocationNames}
+            groupLocationsAvailable={billing !== null}
             onClose={() => setIsEditOpen(false)}
             onSaved={setClient}
             onAvatarChanged={(avatarUrl) =>

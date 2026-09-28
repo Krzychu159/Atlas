@@ -1,12 +1,9 @@
-import { CreditCard, Dumbbell, Repeat2, UserRound } from "lucide-react";
+import { CreditCard, Repeat2, UserRound } from "lucide-react";
 import type {
   Client,
   ClientSubscription,
   SubscriptionUsage,
 } from "@/app/lib/owner/clients";
-import {
-  getClientPackageUsage,
-} from "../../components/client-display";
 
 function formatMoney(value: number, currency = "PLN") {
   return new Intl.NumberFormat("pl-PL", {
@@ -52,40 +49,23 @@ function MetricCard({
 export default function ClientMetricCards({
   client,
   subscription,
-  usage,
 }: {
   client: Client;
   subscription: ClientSubscription | null;
-  usage: SubscriptionUsage | null;
+  usage?: SubscriptionUsage | null;
 }) {
   const cycle = subscription?.currentCycle;
-  const packageUsage = getClientPackageUsage({
-    ...client,
-    packageName: cycle?.packageName ?? client.packageName,
-    packageSessionsLimit:
-      usage?.totalSessions ??
-      cycle?.totalSessions ??
-      client.packageSessionsLimit,
-    packageSessionsUsed:
-      usage?.usedSessions ?? cycle?.usedSessions ?? client.packageSessionsUsed,
-  });
   const currency = cycle?.currency || client.currency || "PLN";
   const amountDue = formatMoney(cycle?.amountDue ?? 0, currency);
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
       <MetricCard
         label="Do zapłaty"
         value={amountDue}
         note={cycle?.packageName || "Aktualny cykl"}
         icon={<CreditCard size={22} />}
         highlight={(cycle?.amountDue ?? 0) > 0}
-      />
-      <MetricCard
-        label="Aktywny pakiet"
-        value={packageUsage.label}
-        note={packageUsage.packageName}
-        icon={<Dumbbell size={22} />}
       />
       <MetricCard
         label="Trener opiekun"
