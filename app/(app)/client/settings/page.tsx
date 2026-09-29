@@ -1,4 +1,5 @@
 import ProfileSettingsCard from "@/app/components/settings/profile-settings-card";
+import ClientLegalSettingsSection from "./ClientLegalSettingsSection";
 
 export default function ClientSettingsPage() {
   return (
@@ -14,6 +15,7 @@ export default function ClientSettingsPage() {
       </section>
 
       <ProfileSettingsCard fallbackLabel="Klient" />
+      <ClientLegalSettingsSection />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Unlock,
   UserPlus,
+  UserRoundX,
 } from "lucide-react";
 import type { Client } from "@/app/lib/owner/clients";
 import ClientRewardProgress from "@/app/components/clients/ClientRewardProgress";
@@ -39,6 +40,7 @@ export default function ClientProfileHero({
   milestoneAccess = "owner",
   onPortalAction,
   onArchive,
+  onEndCooperation,
   onRestore,
   isPortalActionPending = false,
   isRestorePending = false,
@@ -52,6 +54,7 @@ export default function ClientProfileHero({
   milestoneAccess?: Exclude<MilestoneAccess, "client">;
   onPortalAction?: () => void;
   onArchive?: () => void;
+  onEndCooperation?: () => void;
   onRestore?: () => void;
   isPortalActionPending?: boolean;
   isRestorePending?: boolean;
@@ -234,6 +237,16 @@ export default function ClientProfileHero({
             >
               <Archive size={16} />
               Archiwizuj klienta
+            </button>
+          ) : null}
+          {onEndCooperation ? (
+            <button
+              type="button"
+              onClick={onEndCooperation}
+              className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] border border-error-light/35 bg-transparent px-5 text-sm font-semibold text-error-light transition hover:bg-error-container/25"
+            >
+              <UserRoundX size={16} />
+              Zakończ współpracę
             </button>
           ) : null}
         </div>

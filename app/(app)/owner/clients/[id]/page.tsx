@@ -29,7 +29,7 @@ import {
 import ClientMetricCards from "./components/ClientMetricCards";
 import ClientNotesPanel from "./components/ClientNotesPanel";
 import ClientProfileHero from "./components/ClientProfileHero";
-import ClientSessionsPanel from "./components/ClientSessionsPanel";
+import ClientSessionHistory from "./components/ClientSessionHistory";
 import ClientLegalConsentsPanel from "./components/ClientLegalConsentsPanel";
 import EditClientModal from "./components/EditClientModal";
 import ArchiveClientModal from "./components/ArchiveClientModal";
@@ -37,6 +37,7 @@ import InviteClientPortalModal from "./components/InviteClientPortalModal";
 import ClientPackagesSection, {
   getClientGroupLocationNames,
 } from "./components/ClientPackagesSection";
+import EndCooperationModal from "./components/EndCooperationModal";
 import { showOwnerError, showOwnerSuccess } from "../../components/owner-toast";
 
 export default function OwnerClientDetailsPage() {
@@ -64,6 +65,8 @@ export default function OwnerClientDetailsPage() {
   const [isPortalActionPending, setIsPortalActionPending] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isEndCooperationOpen, setIsEndCooperationOpen] = useState(false);
+  const [isEndCooperationLoading, setIsEndCooperationLoading] = useState(false);
   const groupLocationNames = getClientGroupLocationNames(
     billing?.packages,
     client?.locationName,
@@ -161,6 +164,47 @@ export default function OwnerClientDetailsPage() {
     } finally {
       setIsRestoring(false);
     }
+  }
+
+  async function handleOpenEndCooperation() {
+    if (!client) return;
+
+    setIsEndCooperationOpen(true);
+    setIsEndCooperationLoading(true);
+
+    const [subscriptionResult, billingResult, sessionsResult] =
+      await Promise.allSettled([
+        getClientSubscription(client.id),
+        getClientBilling(client.id),
+        getClientSessions(client.id),
+      ]);
+
+    if (subscriptionResult.status === "fulfilled") {
+      setSubscription(subscriptionResult.value);
+    }
+    if (billingResult.status === "fulfilled") {
+      setBilling(billingResult.value);
+    }
+    if (sessionsResult.status === "fulfilled") {
+      setSessions(sessionsResult.value);
+      setSessionsAvailable(true);
+    }
+
+    const failedResult = [
+      subscriptionResult,
+      billingResult,
+      sessionsResult,
+    ].find((result) => result.status === "rejected");
+
+    if (failedResult?.status === "rejected") {
+      showOwnerError(
+        failedResult.reason,
+        "Nie udało się pobrać wszystkich danych rozliczenia.",
+        { id: "owner-client-end-cooperation-load-error" },
+      );
+    }
+
+    setIsEndCooperationLoading(false);
   }
 
   useEffect(() => {
@@ -303,6 +347,9 @@ export default function OwnerClientDetailsPage() {
             onFiles={client.isArchived ? undefined : handleOpenTrainingPlan}
             onPortalAction={client.isArchived ? undefined : handlePortalAction}
             onArchive={client.isArchived ? undefined : handleArchiveCheck}
+            onEndCooperation={
+              client.isArchived ? undefined : handleOpenEndCooperation
+            }
             onRestore={client.isArchived ? handleRestore : undefined}
             isPortalActionPending={isPortalActionPending}
             isRestorePending={isRestoring}
@@ -324,9 +371,13 @@ export default function OwnerClientDetailsPage() {
           ) : null}
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_330px]">
-            {!client.isArchived || sessionsAvailable ? (
-              <ClientSessionsPanel sessions={sessions} />
-            ) : null}
+            {sessionsAvailable ? (
+              <ClientSessionHistory clientId={client.id} sessions={sessions} />
+            ) : (
+              <div className="card-shell p-5 text-sm text-on-surface-variant">
+                Historia sesji jest obecnie niedostępna w API.
+              </div>
+            )}
             <ClientNotesPanel
               client={client}
               payments={payments}
@@ -367,6 +418,14 @@ export default function OwnerClientDetailsPage() {
                 isArchiving={isArchiving}
                 onClose={() => setArchiveCheck(null)}
                 onConfirm={handleArchive}
+              />
+              <EndCooperationModal
+                open={isEndCooperationOpen}
+                loading={isEndCooperationLoading}
+                subscription={subscription}
+                billing={billing}
+                sessions={sessions}
+                onClose={() => setIsEndCooperationOpen(false)}
               />
             </>
           ) : null}

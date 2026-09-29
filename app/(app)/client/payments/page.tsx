@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  CalendarDays,
-  CreditCard,
-  Dumbbell,
-  Wallet,
-} from "lucide-react";
+import { CalendarDays, CreditCard, Dumbbell, Wallet } from "lucide-react";
+import LegalTermsConsentCard from "@/app/components/legal/LegalTermsConsentCard";
 import { PaymentEntryModal } from "@/app/components/payments/PaymentEntryModal";
 import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { PaymentsList } from "@/app/components/payments/PaymentsList";
 import { Button } from "@/app/components/ui/button";
-import { showAppError, showAppSuccess } from "@/app/components/ui/app-toast";
+import {
+  showAppError,
+  showAppInfo,
+  showAppSuccess,
+} from "@/app/components/ui/app-toast";
 import { isNotFoundLikeError } from "@/app/lib/backend";
 import { formatMoney } from "@/app/lib/formatters/money";
 import { getPaymentStatusLabel } from "@/app/lib/payments/display";
@@ -22,6 +22,15 @@ import {
   type ClientPayment,
   type PaymentMethod,
 } from "@/app/lib/client/portal";
+import {
+  ClientPaymentStatus,
+  getTpayErrorMessage,
+  startTpayCheckout,
+} from "@/app/lib/payments/tpay";
+import {
+  getLegalRequirements,
+  type LegalRequirements,
+} from "@/app/lib/legal";
 
 const methodOptions = [
   { value: "1", label: "Blik" },
@@ -32,15 +41,22 @@ const methodOptions = [
 
 const CLIENT_PAYMENTS_PER_PAGE = 6;
 
+type CheckoutTerms = {
+  requirements: LegalRequirements;
+  locationName: string | null;
+};
+
 export default function ClientPaymentsPage() {
   const [billing, setBilling] = useState<ClientBillingSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTpayLoading, setIsTpayLoading] = useState(false);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("2");
   const [note, setNote] = useState("");
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [checkoutTerms, setCheckoutTerms] = useState<CheckoutTerms | null>(null);
 
   async function loadBilling() {
     try {
@@ -135,6 +151,124 @@ export default function ClientPaymentsPage() {
     }
   }
 
+  async function handleTpayCheckout(selectedPackageId: string) {
+    const clientPackageId = Number(selectedPackageId);
+
+    if (!Number.isInteger(clientPackageId) || clientPackageId <= 0) {
+      showAppError(
+        new Error("Wybierz pakiet do opłacenia."),
+        "Wybierz pakiet do opłacenia.",
+        { id: "client-payment-tpay-no-package" },
+      );
+      return;
+    }
+
+    const selectedPackage = packages.find(
+      (clientPackage) => clientPackage.clientPackageId === clientPackageId,
+    );
+
+    if (!selectedPackage) {
+      showAppError(
+        new Error("Nie znaleziono wybranego pakietu klienta."),
+        "Nie znaleziono wybranego pakietu klienta.",
+        { id: "client-payment-tpay-package-not-found" },
+      );
+      return;
+    }
+
+    if (selectedPackage.locationId === null) {
+      showAppError(
+        new Error(
+          "Pakiet nie ma przypisanej lokalizacji. Skontaktuj się ze studiem.",
+        ),
+        "Nie można sprawdzić regulaminu dla tego pakietu.",
+        { id: "client-payment-tpay-package-location" },
+      );
+      return;
+    }
+
+    try {
+      setIsTpayLoading(true);
+
+      const legalRequirements = await getLegalRequirements(
+        selectedPackage.locationId,
+      );
+
+      if (
+        legalRequirements.acceptanceRequired &&
+        !legalRequirements.isAccepted
+      ) {
+        setCheckoutTerms({
+          requirements: legalRequirements,
+          locationName: selectedPackage.locationName,
+        });
+        showAppInfo(
+          "Przed rozpoczęciem płatności zaakceptuj aktualny regulamin studia.",
+          { id: "client-payment-tpay-terms-required" },
+        );
+        return;
+      }
+
+      setCheckoutTerms(null);
+
+      const payment = await startTpayCheckout(clientPackageId);
+
+      if (payment.checkoutUrl) {
+        window.location.assign(payment.checkoutUrl);
+        return;
+      }
+
+      switch (payment.status) {
+        case ClientPaymentStatus.PendingConfirmation:
+          throw new Error(
+            "Płatność została rozpoczęta i oczekuje na potwierdzenie. Nie uruchamiaj kolejnej płatności. Sprawdź status ponownie za chwilę.",
+          );
+
+        case ClientPaymentStatus.Rejected:
+          throw new Error(
+            "Nie udało się utworzyć płatności w Tpay. Możesz spróbować ponownie.",
+          );
+
+        case ClientPaymentStatus.Confirmed:
+          showAppSuccess("Płatność została już potwierdzona.", {
+            id: "client-payment-tpay-confirmed",
+          });
+          await loadBilling();
+          return;
+
+        case ClientPaymentStatus.Cancelled:
+          throw new Error(
+            "Płatność została anulowana. Możesz rozpocząć nową płatność.",
+          );
+
+        case ClientPaymentStatus.Reversed:
+          throw new Error(
+            "Płatność została cofnięta. Sprawdź historię płatności lub skontaktuj się ze studiem.",
+          );
+
+        default:
+          throw new Error(
+            "Nie udało się pobrać adresu do płatności. Spróbuj ponownie później.",
+          );
+      }
+    } catch (err) {
+      showAppError(
+        new Error(
+          getTpayErrorMessage(
+            err,
+            "Nie udało się rozpocząć płatności online.",
+          ),
+        ),
+        "Nie udało się rozpocząć płatności online.",
+        {
+          id: "client-payment-tpay-error",
+        },
+      );
+    } finally {
+      setIsTpayLoading(false);
+    }
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
       <MobilePayments
@@ -142,106 +276,140 @@ export default function ClientPaymentsPage() {
         packagesLength={packages.length}
         isLoading={isLoading}
         isSubmitting={isSubmitting}
+        isTpayLoading={isTpayLoading}
         onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
+        onTpayCheckout={() => handleTpayCheckout(selectedPackageId)}
       />
 
       <div className="hidden flex-col gap-5 md:flex">
-      <section className="flex flex-col gap-3">
-        <p className="text-label text-primary-light">Płatności</p>
-        <h1 className="font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
-          Rozliczenia pakietu
-        </h1>
-        <p className="max-w-[760px] text-sm leading-6 text-on-surface-variant">
-          Tu sprawdzasz kwoty z aktywnego pakietu i zgłaszasz wpłatę do
-          potwierdzenia przez studio.
-        </p>
-      </section>
+        <section className="flex flex-col gap-3">
+          <p className="text-label text-primary-light">Płatności</p>
+          <h1 className="font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
+            Rozliczenia pakietu
+          </h1>
+          <p className="max-w-[760px] text-sm leading-6 text-on-surface-variant">
+            Tu sprawdzasz kwoty z aktywnego pakietu i zgłaszasz wpłatę do
+            potwierdzenia przez studio.
+          </p>
+        </section>
 
-      <section className="grid gap-4 lg:grid-cols-4">
-        <SummaryCard
-          icon={<CreditCard size={20} />}
-          label="Do zapłaty"
-          value={formatMoney(billing?.activePackageAmountDue ?? 0, getCurrency(billing))}
-          note={billing?.activePackageName || "Aktywny pakiet"}
-          loading={isLoading}
-          accent={(billing?.activePackageAmountDue ?? 0) > 0 ? "warning" : "success"}
-        />
-        <SummaryCard
-          icon={<Dumbbell size={20} />}
-          label="Aktywny pakiet"
-          value={billing?.activePackageName || "Brak pakietu"}
-          note={getPaymentStatusLabel(billing?.activePackagePaymentStatus)}
-          loading={isLoading}
-        />
-        <SummaryCard
-          icon={<Wallet size={20} />}
-          label="Saldo"
-          value={formatMoney(billing?.currentBalance ?? 0, getCurrency(billing))}
-          note={
-            (billing?.currentBalance ?? 0) > 0
-              ? "Zostanie odjęte od kolejnego pakietu"
-              : "Brak nadpłaty"
-          }
-          loading={isLoading}
-          accent={(billing?.currentBalance ?? 0) > 0 ? "success" : "primary"}
-        />
-        <SummaryCard
-          icon={<CalendarDays size={20} />}
-          label="Zapłacono"
-          value={formatMoney(billing?.activePackageAmountPaid ?? 0, getCurrency(billing))}
-          note={`Cena pakietu: ${formatMoney(
-            billing?.activePackageTotalPrice ?? 0,
-            getCurrency(billing),
-          )}`}
-          loading={isLoading}
-        />
-      </section>
+        <section className="grid gap-4 lg:grid-cols-4">
+          <SummaryCard
+            icon={<CreditCard size={20} />}
+            label="Do zapłaty"
+            value={formatMoney(
+              billing?.activePackageAmountDue ?? 0,
+              getCurrency(billing),
+            )}
+            note={billing?.activePackageName || "Aktywny pakiet"}
+            loading={isLoading}
+            accent={
+              (billing?.activePackageAmountDue ?? 0) > 0 ? "warning" : "success"
+            }
+          />
+          <SummaryCard
+            icon={<Dumbbell size={20} />}
+            label="Aktywny pakiet"
+            value={billing?.activePackageName || "Brak pakietu"}
+            note={getPaymentStatusLabel(billing?.activePackagePaymentStatus)}
+            loading={isLoading}
+          />
+          <SummaryCard
+            icon={<Wallet size={20} />}
+            label="Saldo"
+            value={formatMoney(
+              billing?.currentBalance ?? 0,
+              getCurrency(billing),
+            )}
+            note={
+              (billing?.currentBalance ?? 0) > 0
+                ? "Zostanie odjęte od kolejnego pakietu"
+                : "Brak nadpłaty"
+            }
+            loading={isLoading}
+            accent={(billing?.currentBalance ?? 0) > 0 ? "success" : "primary"}
+          />
+          <SummaryCard
+            icon={<CalendarDays size={20} />}
+            label="Zapłacono"
+            value={formatMoney(
+              billing?.activePackageAmountPaid ?? 0,
+              getCurrency(billing),
+            )}
+            note={`Cena pakietu: ${formatMoney(
+              billing?.activePackageTotalPrice ?? 0,
+              getCurrency(billing),
+            )}`}
+            loading={isLoading}
+          />
+        </section>
 
-      <section className="grid gap-4">
-        <div className="card-shell flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between md:p-6">
-          <div>
-            <p className="text-label text-on-surface-muted">Nowa wpłata</p>
-            <h2 className="mt-3 font-display text-[1.85rem] font-semibold leading-none">
-              Zgłoś płatność
-            </h2>
-            <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
-              Wybierz pakiet, wpisz kwotę i metodę. Wpłata trafi do
-              potwierdzenia w studiu.
-            </p>
-            {!packages.length && !isLoading ? (
-              <p className="mt-3 text-sm font-semibold text-warning-light">
-                Nie masz aktywnego pakietu do opłacenia.
+        <section className="grid gap-4">
+          <div className="card-shell flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between md:p-6">
+            <div>
+              <p className="text-label text-on-surface-muted">Nowa wpłata</p>
+              <h2 className="mt-3 font-display text-[1.85rem] font-semibold leading-none">
+                Zgłoś płatność
+              </h2>
+              <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
+                Wybierz pakiet, wpisz kwotę i metodę. Wpłata trafi do
+                potwierdzenia w studiu.
               </p>
-            ) : null}
+              {!packages.length && !isLoading ? (
+                <p className="mt-3 text-sm font-semibold text-warning-light">
+                  Nie masz aktywnego pakietu do opłacenia.
+                </p>
+              ) : null}
+            </div>
+
+            <div className="flex flex-col gap-3 md:flex-row">
+              <Button
+                variant="outline"
+                size="lg"
+                disabled={isSubmitting || !packages.length}
+                onClick={() => setIsPaymentModalOpen(true)}
+                className="w-full md:w-auto"
+              >
+                Zgłoś wpłatę
+              </Button>
+              <Button
+                size="lg"
+                disabled={isTpayLoading || !packages.length}
+                onClick={() => handleTpayCheckout(selectedPackageId)}
+                className="w-full md:w-auto"
+              >
+                {isTpayLoading
+                  ? "Przygotowywanie płatności..."
+                  : "Zapłać wygodnie online"}
+              </Button>
+            </div>
           </div>
-         
-         <div className="flex flex-col gap-3 md:flex-row">
-           <Button
-           variant="outline"
-            size="lg"
-            disabled={isSubmitting || !packages.length}
-            onClick={() => setIsPaymentModalOpen(true)}
-            className="w-full md:w-auto"
-          >
-            Zgłoś wpłatę
-          </Button>
-           <Button
-            size="lg"
-            disabled={isSubmitting || !packages.length}
-            onClick={() => setIsPaymentModalOpen(true)}
-            className="w-full md:w-auto"
-          >
-            Zapłać wygodnie online
-          </Button>
-
-         </div>
-
-
-          
-        </div>
-
-      </section>
+        </section>
       </div>
+
+      {checkoutTerms && !checkoutTerms.requirements.isAccepted ? (
+        <section className="card-shell p-5 md:p-6">
+          <p className="text-label text-warning-light">Wymagana akceptacja</p>
+          <h2 className="mt-2 font-display text-[1.55rem] font-semibold leading-none">
+            Regulamin przed płatnością
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+            Zaakceptuj aktualny regulamin studia, a następnie ponownie rozpocznij
+            płatność online.
+          </p>
+          <div className="mt-5">
+            <LegalTermsConsentCard
+              requirements={checkoutTerms.requirements}
+              locationName={checkoutTerms.locationName}
+              onAccepted={(requirements) =>
+                setCheckoutTerms((current) =>
+                  current ? { ...current, requirements } : current,
+                )
+              }
+            />
+          </div>
+        </section>
+      ) : null}
 
       <ClientPaymentHistory payments={payments} isLoading={isLoading} />
 
@@ -261,7 +429,10 @@ export default function ClientPaymentsPage() {
         submittingLabel="Zgłaszanie..."
         emptyPackagesMessage="Nie masz aktywnego pakietu do opłacenia. Skontaktuj się z trenerem lub obsługą studia."
         onAmountChange={setAmount}
-        onPackageChange={setSelectedPackageId}
+        onPackageChange={(value) => {
+          setSelectedPackageId(value);
+          setCheckoutTerms(null);
+        }}
         onMethodChange={setMethod}
         onNoteChange={setNote}
         onClose={() => setIsPaymentModalOpen(false)}
@@ -276,13 +447,17 @@ function MobilePayments({
   packagesLength,
   isLoading,
   isSubmitting,
+  isTpayLoading,
   onOpenPaymentModal,
+  onTpayCheckout,
 }: {
   billing: ClientBillingSummary | null;
   packagesLength: number;
   isLoading: boolean;
   isSubmitting: boolean;
+  isTpayLoading: boolean;
   onOpenPaymentModal: () => void;
+  onTpayCheckout: () => void;
 }) {
   const currency = getCurrency(billing);
   const due = billing?.activePackageAmountDue ?? 0;
@@ -357,8 +532,17 @@ function MobilePayments({
         >
           Zgłoś wpłatę
         </Button>
+        <Button
+          size="lg"
+          disabled={isTpayLoading || !packagesLength}
+          onClick={onTpayCheckout}
+          className="mt-3 w-full"
+        >
+          {isTpayLoading
+            ? "Przygotowywanie płatności..."
+            : "Zapłać wygodnie online"}
+        </Button>
       </section>
-
     </div>
   );
 }
@@ -456,7 +640,9 @@ function SummaryCard({
 
   return (
     <div className="card-shell p-5">
-      <div className={`flex h-11 w-11 items-center justify-center rounded-[var(--radius-lg)] ${accentClass}`}>
+      <div
+        className={`flex h-11 w-11 items-center justify-center rounded-[var(--radius-lg)] ${accentClass}`}
+      >
         {icon}
       </div>
       <p className="mt-5 text-label text-on-surface-muted">{label}</p>

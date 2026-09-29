@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
-import { Link2, MapPin, Save } from "lucide-react";
+import { AlertTriangle, Link2, MapPin, Save } from "lucide-react";
 
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
@@ -193,6 +193,19 @@ export default function EditClientModal({
 
   const avatarFallback =
     `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase() || "K";
+  const selectedTrainer = trainers.find(
+    (trainer) => String(trainer.id) === trainerId,
+  );
+  const trainerChanged =
+    (currentClient.trainerId ? String(currentClient.trainerId) : "") !==
+    trainerId;
+  const selectedLocationId = Number(locationId);
+  const trainerLocationMismatch = Boolean(
+    selectedTrainer &&
+      selectedLocationId &&
+      selectedTrainer.locationIds.length > 0 &&
+      !selectedTrainer.locationIds.includes(selectedLocationId),
+  );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -445,6 +458,29 @@ export default function EditClientModal({
                 options={locationOptions}
               />
             </div>
+
+            {trainerChanged ? (
+              <div className="flex gap-3 rounded-[var(--radius-lg)] bg-warning-container/25 p-4 text-sm text-on-surface-variant md:col-span-2">
+                <AlertTriangle
+                  size={18}
+                  className="mt-0.5 shrink-0 text-warning-light"
+                />
+                <p>
+                  Zmiana opiekuna nie zmieni trenera w już zaplanowanych
+                  sesjach.
+                </p>
+              </div>
+            ) : null}
+
+            {trainerLocationMismatch ? (
+              <div className="flex gap-3 rounded-[var(--radius-lg)] bg-error-container/30 p-4 text-sm text-error-light md:col-span-2">
+                <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+                <p>
+                  Wybrany trener nie jest przypisany do lokalizacji głównej
+                  klienta. Backend może odrzucić tę zmianę.
+                </p>
+              </div>
+            ) : null}
 
             {access === "owner" ? (
               <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 md:col-span-2">

@@ -1,4 +1,8 @@
-import { backendGet, backendPost } from "@/app/lib/backend";
+import {
+  backendGet,
+  backendPost,
+  getErrorMessage,
+} from "@/app/lib/backend";
 
 export enum ClientPaymentStatus {
   PendingConfirmation = 1,
@@ -46,4 +50,32 @@ export async function getTpayPayment(
   paymentId: number,
 ): Promise<ClientPaymentDto> {
   return backendGet<ClientPaymentDto>(`payments/tpay/payments/${paymentId}`);
+}
+
+const knownTpayErrors: Record<string, string> = {
+  "current terms for this location must be accepted before continuing":
+    "Przed rozpoczęciem płatności zaakceptuj aktualny regulamin studia.",
+  "online payments are not configured for this location":
+    "Płatności online nie są skonfigurowane dla tej lokalizacji.",
+  "tpay is not configured for this location":
+    "Płatności Tpay nie są skonfigurowane dla tej lokalizacji.",
+  "client package was not found": "Nie znaleziono wybranego pakietu klienta.",
+  "payment was not found": "Nie znaleziono płatności.",
+  "there is no amount due for this package":
+    "Ten pakiet nie ma kwoty pozostałej do zapłaty.",
+  "a pending payment already exists for this package":
+    "Dla tego pakietu istnieje już płatność oczekująca na potwierdzenie.",
+};
+
+export function getTpayErrorMessage(
+  error: unknown,
+  fallback = "Nie udało się wykonać operacji płatniczej.",
+) {
+  const message =
+    typeof error === "string" && error.trim()
+      ? error
+      : getErrorMessage(error, fallback);
+  const normalized = message.trim().replace(/[.!]+$/, "").toLowerCase();
+
+  return knownTpayErrors[normalized] || message;
 }

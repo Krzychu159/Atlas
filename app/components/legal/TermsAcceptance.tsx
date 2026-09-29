@@ -6,6 +6,7 @@ type TermsAcceptanceProps = {
   companyName: string;
   termsVersion: string;
   termsUrl: string;
+  acceptanceRequired?: boolean;
   isAccepted?: boolean;
   checked?: boolean;
   onCheckedChange?: (checked: boolean) => void;
@@ -17,6 +18,7 @@ export default function TermsAcceptance({
   companyName,
   termsVersion,
   termsUrl,
+  acceptanceRequired = true,
   isAccepted = false,
   checked = false,
   onCheckedChange,
@@ -54,20 +56,32 @@ export default function TermsAcceptance({
           <CheckCircle2 size={17} />
           Ta wersja regulaminu jest już zaakceptowana.
         </p>
+      ) : !acceptanceRequired ? (
+        <p className="mt-4 text-sm font-semibold text-on-surface-variant">
+          Akceptacja tej wersji regulaminu nie jest wymagana.
+        </p>
       ) : (
-        <label htmlFor={id} className="mt-4 flex cursor-pointer items-start gap-3 text-sm leading-6 text-on-surface-variant">
-          <input
-            id={id}
-            type="checkbox"
-            checked={checked}
-            onChange={(event) => onCheckedChange?.(event.target.checked)}
-            disabled={disabled}
-            className="mt-1 h-5 w-5 shrink-0 rounded border border-white/10 bg-surface-container-lowest"
-          />
-          <span>
-            Zapoznałem/am się z regulaminem firmy {companyName} w wersji {termsVersion} i akceptuję jego treść.
-          </span>
-        </label>
+        <div className="mt-4">
+          <p className="text-sm font-semibold text-warning-light">
+            Ta wersja regulaminu nie została jeszcze zaakceptowana.
+          </p>
+          <label
+            htmlFor={id}
+            className="mt-3 flex cursor-pointer items-start gap-3 text-sm leading-6 text-on-surface-variant"
+          >
+            <input
+              id={id}
+              type="checkbox"
+              checked={checked}
+              onChange={(event) => onCheckedChange?.(event.target.checked)}
+              disabled={disabled}
+              className="mt-1 h-5 w-5 shrink-0 rounded border border-white/10 bg-surface-container-lowest"
+            />
+            <span>
+              Zapoznałem/am się z regulaminem firmy {companyName} w wersji {termsVersion} i akceptuję jego treść.
+            </span>
+          </label>
+        </div>
       )}
     </section>
   );
