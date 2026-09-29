@@ -2,10 +2,16 @@
 
 import { type FormEvent, useEffect, useState } from "react";
 import { Link2, MapPin, Save } from "lucide-react";
+
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { DateInput } from "@/app/components/ui/date-input";
-import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
+import {
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
+} from "@/app/components/ui/modal";
+
 import AvatarFilePicker from "../../../components/AvatarFilePicker";
 import {
   OwnerTextArea,
@@ -15,6 +21,7 @@ import {
   showOwnerError,
   showOwnerSuccess,
 } from "../../../components/owner-toast";
+
 import {
   getClient,
   getClientTrainingPlan,
@@ -25,19 +32,24 @@ import {
   type UpdateClientTrainingPlanPayload,
   type UpdateClientPayload,
 } from "@/app/lib/owner/clients";
+
 import { isForbiddenError } from "@/app/lib/backend";
+
 import {
   deleteClientAvatar,
   deleteTrainerClientAvatar,
   uploadClientAvatar,
   uploadTrainerClientAvatar,
 } from "@/app/lib/avatars";
+
 import {
   dateInputToIsoDateTime,
   toDateInputValue,
 } from "@/app/lib/formatters/date";
+
 import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
+
 import {
   getTrainerPortalClient,
   getTrainerPortalClientTrainingPlan,
@@ -46,6 +58,7 @@ import {
   updateTrainerPortalClientTrainingPlan,
   type TrainerPortalMe,
 } from "@/app/lib/trainer/portal";
+
 import {
   trainerPortalClientToClient,
   trainerPortalMeToLocations,
@@ -79,6 +92,7 @@ export default function EditClientModal({
 }: EditClientModalProps) {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -88,9 +102,10 @@ export default function EditClientModal({
   const [locationId, setLocationId] = useState("");
   const [goal, setGoal] = useState("");
   const [trainingStartDate, setTrainingStartDate] = useState("");
-  const [trainingPlan, setTrainingPlan] = useState<ClientTrainingPlan | null>(
-    null,
-  );
+
+  const [trainingPlan, setTrainingPlan] =
+    useState<ClientTrainingPlan | null>(null);
+
   const [trainingPlanUrl, setTrainingPlanUrl] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -112,20 +127,24 @@ export default function EditClientModal({
   }, [access, open, trainerMe]);
 
   useEffect(() => {
-    if (!client || !open) return;
+  if (!client || !open) return;
 
-    void Promise.resolve().then(() => {
-      setFirstName(client.firstName || "");
-      setLastName(client.lastName || "");
-      setEmail(client.email || "");
-      setPhoneNumber(client.phoneNumber || "");
-      setAvatarUrl(client.avatarUrl || "");
-      setTrainerId(client.trainerId ? String(client.trainerId) : "");
-      setLocationId(resolveClientLocationId(client, locations));
-      setGoal(client.goal || "");
-      setTrainingStartDate(toDateInputValue(client.trainingStartDate));
-    });
-  }, [client, locations, open]);
+  const currentClient = client;
+
+  void Promise.resolve().then(() => {
+    setFirstName(currentClient.firstName || "");
+    setLastName(currentClient.lastName || "");
+    setEmail(currentClient.email || "");
+    setPhoneNumber(currentClient.phoneNumber || "");
+    setAvatarUrl(currentClient.avatarUrl || "");
+    setTrainerId(
+      currentClient.trainerId ? String(currentClient.trainerId) : "",
+    );
+    setLocationId(resolveClientLocationId(currentClient, locations));
+    setGoal(currentClient.goal || "");
+    setTrainingStartDate(toDateInputValue(currentClient.trainingStartDate));
+  });
+}, [client, locations, open]);
 
   useEffect(() => {
     if (!client || !open) return;
@@ -142,12 +161,41 @@ export default function EditClientModal({
   }, [access, client, open]);
 
   if (!open || !client) return null;
-  const clientId = client.id;
+
+  const currentClient = client;
+  const clientId = currentClient.id;
+  const hasUserAccount = currentClient.userId !== null;
+
+  const trainerOptions = [
+    {
+      value: "",
+      label: "Brak przypisania",
+    },
+    ...trainers.map((trainer) => ({
+      value: String(trainer.id),
+      label:
+        trainer.fullName ||
+        `${trainer.firstName} ${trainer.lastName}`.trim(),
+    })),
+  ];
+
+  const locationOptions = locations.length
+    ? locations.map((location) => ({
+        value: String(location.id),
+        label: formatLocationLabel(location),
+      }))
+    : [
+        {
+          value: locationId,
+          label: currentClient.locationName || "Brak lokalizacji",
+        },
+      ];
+
+  const avatarFallback =
+    `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase() || "K";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!client) return;
 
     const resolvedLocationId = Number(locationId);
 
@@ -155,6 +203,7 @@ export default function EditClientModal({
       showOwnerError(new Error("Wybierz lokalizację klienta."), "", {
         id: "owner-client-location-required",
       });
+
       return;
     }
 
@@ -165,37 +214,51 @@ export default function EditClientModal({
       email: email.trim() || null,
       phoneNumber: phoneNumber.trim() || null,
       goal: goal.trim() || null,
-      notes: client.notes || null,
+      notes: currentClient.notes || null,
       locationId: resolvedLocationId,
-      progressPercent: client.progressPercent ?? 0,
-      billingStatus: client.billingStatus || null,
-      status: client.status || null,
+      progressPercent: currentClient.progressPercent ?? 0,
+      billingStatus: currentClient.billingStatus || null,
+      status: currentClient.status || null,
       trainingStartDate: dateInputToIsoDateTime(trainingStartDate),
-      nextSessionAt: client.nextSessionAt || null,
+      nextSessionAt: currentClient.nextSessionAt || null,
     };
+
     const cleanTrainingPlanUrl = trainingPlanUrl.trim();
+
     const originalTrainingPlanUrl = normalizeText(
       trainingPlan?.url || trainingPlan?.googleDriveFolderUrl,
     );
+
     const shouldSaveTrainingPlan =
       cleanTrainingPlanUrl !== originalTrainingPlanUrl;
 
     if (cleanTrainingPlanUrl && !isValidUrl(cleanTrainingPlanUrl)) {
-      showOwnerError(new Error("Wklej poprawny link do pliku klienta."), "", {
-        id: "owner-client-training-plan-url-invalid",
-      });
+      showOwnerError(
+        new Error("Wklej poprawny link do pliku klienta."),
+        "",
+        {
+          id: "owner-client-training-plan-url-invalid",
+        },
+      );
+
       return;
     }
 
     try {
       setIsSaving(true);
-      await updateClientForEditModal(client.id, payload, access);
+
+      await updateClientForEditModal(clientId, payload, access);
+
       const confirmedClient = await getConfirmedClientForEditModal(
-        client.id,
+        clientId,
         access,
         trainerMe,
       );
-      const failedFields = getClientUpdateFailedFields(confirmedClient, payload);
+
+      const failedFields = getClientUpdateFailedFields(
+        confirmedClient,
+        payload,
+      );
 
       if (failedFields.length) {
         throw new Error(
@@ -205,18 +268,25 @@ export default function EditClientModal({
 
       if (shouldSaveTrainingPlan) {
         const driveMeta = parseGoogleDriveLink(cleanTrainingPlanUrl);
+
         const savedPlan = await updateTrainingPlanForEditModal(
-          client.id,
+          clientId,
           {
-          googleDriveFolderId:
-            driveMeta.folderId || trainingPlan?.googleDriveFolderId || "",
-          fileId: driveMeta.fileId || trainingPlan?.fileId || "",
-          fileName: cleanTrainingPlanUrl ? "Folder klienta" : "",
-          url: cleanTrainingPlanUrl,
+            googleDriveFolderId:
+              driveMeta.folderId ||
+              trainingPlan?.googleDriveFolderId ||
+              "",
+            fileId:
+              driveMeta.fileId ||
+              trainingPlan?.fileId ||
+              "",
+            fileName: cleanTrainingPlanUrl ? "Folder klienta" : "",
+            url: cleanTrainingPlanUrl,
           },
           access,
         );
-        const normalizedPlan = {
+
+        const normalizedPlan: ClientTrainingPlan = {
           ...savedPlan,
           fileName: savedPlan.fileName || "Folder klienta",
           url: savedPlan.url || cleanTrainingPlanUrl,
@@ -224,15 +294,20 @@ export default function EditClientModal({
 
         setTrainingPlan(normalizedPlan);
         setTrainingPlanUrl(
-          normalizedPlan.url || normalizedPlan.googleDriveFolderUrl || "",
+          normalizedPlan.url ||
+            normalizedPlan.googleDriveFolderUrl ||
+            "",
         );
+
         onTrainingPlanSaved?.(normalizedPlan);
       }
 
       onSaved(confirmedClient);
+
       showOwnerSuccess("Dane klienta zostały zaktualizowane.", {
         id: "owner-client-edit-success",
       });
+
       onClose();
     } catch (err) {
       showOwnerError(err, "Nie udało się zaktualizować klienta.", {
@@ -243,51 +318,40 @@ export default function EditClientModal({
     }
   }
 
-  const trainerOptions = [
-    { value: "", label: "Brak przypisania" },
-    ...trainers.map((trainer) => ({
-      value: String(trainer.id),
-      label: trainer.fullName || `${trainer.firstName} ${trainer.lastName}`,
-    })),
-  ];
-  const locationOptions = locations.length
-    ? locations.map((location) => ({
-        value: String(location.id),
-        label: formatLocationLabel(location),
-      }))
-    : [
-        {
-          value: locationId,
-          label: client.locationName || "Brak lokalizacji",
-        },
-      ];
-  const avatarFallback = `${firstName[0] || ""}${lastName[0] || ""}` || "K";
-
   async function handleAvatarUpload(file: File) {
-    if (client.userId === null) {
-      throw new Error("Avatar wymaga konta użytkownika klienta.");
+    if (!hasUserAccount) {
+      throw new Error(
+        "Avatar wymaga konta użytkownika klienta.",
+      );
     }
 
     const uploadedUrl =
       access === "trainer"
         ? await uploadTrainerClientAvatar(clientId, file)
         : await uploadClientAvatar(clientId, file);
+
+    setAvatarUrl(uploadedUrl);
     onAvatarChanged?.(uploadedUrl);
+
     showOwnerSuccess("Avatar klienta został zmieniony.", {
       id: "client-avatar-upload-success",
     });
+
     return uploadedUrl;
   }
 
   async function handleAvatarRemove() {
-    if (client.userId === null) return;
+    if (!hasUserAccount) return;
 
     if (access === "trainer") {
       await deleteTrainerClientAvatar(clientId);
     } else {
       await deleteClientAvatar(clientId);
     }
+
+    setAvatarUrl("");
     onAvatarChanged?.("");
+
     showOwnerSuccess("Avatar klienta został usunięty.", {
       id: "client-avatar-delete-success",
     });
@@ -300,132 +364,155 @@ export default function EditClientModal({
         className="relative z-10 flex max-h-full w-full max-w-[820px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient"
       >
         <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
-        <ModalHeader eyebrow="Edycja" title="Dane klienta" onClose={onClose} />
+          <ModalHeader
+            eyebrow="Edycja"
+            title="Dane klienta"
+            onClose={onClose}
+          />
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <OwnerTextField
-            label="Imię"
-            value={firstName}
-            onChange={setFirstName}
-          />
-          <OwnerTextField
-            label="Nazwisko"
-            value={lastName}
-            onChange={setLastName}
-          />
-          <OwnerTextField label="E-mail" value={email} onChange={setEmail} />
-          <OwnerTextField
-            label="Telefon"
-            value={phoneNumber}
-            onChange={setPhoneNumber}
-          />
-          {client.userId !== null ? (
-            <AvatarFilePicker
-              label="Zdjęcie klienta"
-              value={avatarUrl}
-              onChange={setAvatarUrl}
-              onUpload={handleAvatarUpload}
-              onRemove={handleAvatarRemove}
-              fallbackText={avatarFallback}
-              className="md:col-span-2"
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <OwnerTextField
+              label="Imię"
+              value={firstName}
+              onChange={setFirstName}
             />
-          ) : (
-            <div className="flex items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 md:col-span-2">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 font-semibold text-primary-light">
-                {avatarFallback}
-              </div>
-              <p className="text-sm text-on-surface-variant">
-                Zdjęcie będzie dostępne po utworzeniu konta klienta.
-              </p>
-            </div>
-          )}
-
-          <div>
-            <span className="text-label text-on-surface-muted">Trener</span>
-            <CustomSelect
-              value={trainerId}
-              onChange={setTrainerId}
-              className="mt-2"
-              options={trainerOptions}
-            />
-          </div>
-
-          <div>
-            <span className="text-label text-on-surface-muted">
-              {access === "owner" ? "Lokalizacja główna" : "Lokalizacja"}
-            </span>
-            <CustomSelect
-              value={locationId}
-              onChange={setLocationId}
-              icon={<MapPin size={16} />}
-              className="mt-2"
-              options={locationOptions}
-            />
-          </div>
-
-          {access === "owner" ? (
-            <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 md:col-span-2">
-              <p className="text-label text-on-surface-muted">
-                Lokalizacje zajęć grupowych
-              </p>
-              {!groupLocationsAvailable ? (
-                <p className="mt-2 text-sm text-on-surface-variant">
-                  Dane dodatkowych lokalizacji są obecnie niedostępne.
-                </p>
-              ) : groupLocationNames.length ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {groupLocationNames.map((locationName) => (
-                    <span
-                      key={locationName}
-                      className="rounded-full bg-surface-container-low px-3 py-1.5 text-xs font-semibold text-primary-light"
-                    >
-                      {locationName}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-2 text-sm text-on-surface-variant">
-                  Brak dodatkowych lokalizacji
-                </p>
-              )}
-              <p className="mt-3 text-xs text-on-surface-muted">
-                Lokalizacje wynikają z aktywnych pakietów grupowych i są tylko
-                do odczytu.
-              </p>
-            </div>
-          ) : null}
-
-          <DateInput
-            label="Data rozpoczęcia treningów"
-            value={trainingStartDate}
-            onChange={setTrainingStartDate}
-          />
-
-          <OwnerTextArea
-            label="Cel"
-            value={goal}
-            onChange={setGoal}
-            rows={2}
-            className="md:col-span-2"
-          />
-
-          <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-3 md:col-span-2">
-            <div className="mb-3 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
-                <Link2 size={18} />
-              </div>
-              <p className="font-semibold text-on-surface">Pliki</p>
-            </div>
 
             <OwnerTextField
-              label="Link do folderu"
-              value={trainingPlanUrl}
-              onChange={setTrainingPlanUrl}
-              placeholder="https://drive.google.com/drive/folders/..."
+              label="Nazwisko"
+              value={lastName}
+              onChange={setLastName}
             />
-          </div>
-        </div>
 
+            <OwnerTextField
+              label="E-mail"
+              value={email}
+              onChange={setEmail}
+            />
+
+            <OwnerTextField
+              label="Telefon"
+              value={phoneNumber}
+              onChange={setPhoneNumber}
+            />
+
+            {hasUserAccount ? (
+              <AvatarFilePicker
+                label="Zdjęcie klienta"
+                value={avatarUrl}
+                onChange={setAvatarUrl}
+                onUpload={handleAvatarUpload}
+                onRemove={handleAvatarRemove}
+                fallbackText={avatarFallback}
+                className="md:col-span-2"
+              />
+            ) : (
+              <div className="flex items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 md:col-span-2">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/15 font-semibold text-primary-light">
+                  {avatarFallback}
+                </div>
+
+                <p className="text-sm text-on-surface-variant">
+                  Zdjęcie będzie dostępne po utworzeniu konta klienta.
+                </p>
+              </div>
+            )}
+
+            <div>
+              <span className="text-label text-on-surface-muted">
+                Trener
+              </span>
+
+              <CustomSelect
+                value={trainerId}
+                onChange={setTrainerId}
+                className="mt-2"
+                options={trainerOptions}
+              />
+            </div>
+
+            <div>
+              <span className="text-label text-on-surface-muted">
+                {access === "owner"
+                  ? "Lokalizacja główna"
+                  : "Lokalizacja"}
+              </span>
+
+              <CustomSelect
+                value={locationId}
+                onChange={setLocationId}
+                icon={<MapPin size={16} />}
+                className="mt-2"
+                options={locationOptions}
+              />
+            </div>
+
+            {access === "owner" ? (
+              <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 md:col-span-2">
+                <p className="text-label text-on-surface-muted">
+                  Lokalizacje zajęć grupowych
+                </p>
+
+                {!groupLocationsAvailable ? (
+                  <p className="mt-2 text-sm text-on-surface-variant">
+                    Dane dodatkowych lokalizacji są obecnie niedostępne.
+                  </p>
+                ) : groupLocationNames.length ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {groupLocationNames.map((locationName) => (
+                      <span
+                        key={locationName}
+                        className="rounded-full bg-surface-container-low px-3 py-1.5 text-xs font-semibold text-primary-light"
+                      >
+                        {locationName}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-on-surface-variant">
+                    Brak dodatkowych lokalizacji
+                  </p>
+                )}
+
+                <p className="mt-3 text-xs text-on-surface-muted">
+                  Lokalizacje wynikają z aktywnych pakietów grupowych i są
+                  tylko do odczytu.
+                </p>
+              </div>
+            ) : null}
+
+            <DateInput
+              label="Data rozpoczęcia treningów"
+              value={trainingStartDate}
+              onChange={setTrainingStartDate}
+            />
+
+            <OwnerTextArea
+              label="Cel"
+              value={goal}
+              onChange={setGoal}
+              rows={2}
+              className="md:col-span-2"
+            />
+
+            <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-3 md:col-span-2">
+              <div className="mb-3 flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
+                  <Link2 size={18} />
+                </div>
+
+                <p className="font-semibold text-on-surface">
+                  Pliki
+                </p>
+              </div>
+
+              <OwnerTextField
+                label="Link do folderu"
+                value={trainingPlanUrl}
+                onChange={setTrainingPlanUrl}
+                placeholder="https://drive.google.com/drive/folders/..."
+              />
+            </div>
+          </div>
         </div>
 
         <ModalFooter>
@@ -437,6 +524,7 @@ export default function EditClientModal({
           >
             Anuluj
           </Button>
+
           <Button
             type="submit"
             disabled={isSaving}
@@ -451,7 +539,11 @@ export default function EditClientModal({
 }
 
 function formatLocationLabel(location: Location) {
-  return location.name || location.city || `Lokalizacja ${location.id}`;
+  return (
+    location.name ||
+    location.city ||
+    `Lokalizacja ${location.id}`
+  );
 }
 
 async function getTrainersForEditModal(
@@ -461,9 +553,14 @@ async function getTrainersForEditModal(
   try {
     return await getTrainers();
   } catch (err) {
-    if (access !== "trainer" || !isForbiddenError(err)) throw err;
+    if (access !== "trainer" || !isForbiddenError(err)) {
+      throw err;
+    }
 
-    const me = trainerMe || (await getTrainerPortalMe().catch(() => null));
+    const me =
+      trainerMe ||
+      (await getTrainerPortalMe().catch(() => null));
+
     const trainer = trainerPortalMeToTrainer(me);
 
     return trainer ? [trainer] : [];
@@ -477,9 +574,13 @@ async function getLocationsForEditModal(
   try {
     return await getLocations();
   } catch (err) {
-    if (access !== "trainer" || !isForbiddenError(err)) throw err;
+    if (access !== "trainer" || !isForbiddenError(err)) {
+      throw err;
+    }
 
-    const me = trainerMe || (await getTrainerPortalMe().catch(() => null));
+    const me =
+      trainerMe ||
+      (await getTrainerPortalMe().catch(() => null));
 
     return trainerPortalMeToLocations(me);
   }
@@ -492,7 +593,9 @@ async function getTrainingPlanForEditModal(
   try {
     return await getClientTrainingPlan(clientId);
   } catch (err) {
-    if (access !== "trainer" || !isForbiddenError(err)) throw err;
+    if (access !== "trainer" || !isForbiddenError(err)) {
+      throw err;
+    }
 
     return getTrainerPortalClientTrainingPlan(clientId);
   }
@@ -506,7 +609,9 @@ async function updateClientForEditModal(
   try {
     return await updateClient(clientId, payload);
   } catch (err) {
-    if (access !== "trainer" || !isForbiddenError(err)) throw err;
+    if (access !== "trainer" || !isForbiddenError(err)) {
+      throw err;
+    }
 
     return updateTrainerPortalClient(clientId, payload);
   }
@@ -520,11 +625,15 @@ async function getConfirmedClientForEditModal(
   try {
     return await getClient(clientId);
   } catch (err) {
-    if (access !== "trainer" || !isForbiddenError(err)) throw err;
+    if (access !== "trainer" || !isForbiddenError(err)) {
+      throw err;
+    }
 
     const [clientData, me] = await Promise.all([
       getTrainerPortalClient(clientId),
-      trainerMe ? Promise.resolve(trainerMe) : getTrainerPortalMe().catch(() => null),
+      trainerMe
+        ? Promise.resolve(trainerMe)
+        : getTrainerPortalMe().catch(() => null),
     ]);
 
     return trainerPortalClientToClient(clientData, me);
@@ -539,9 +648,14 @@ async function updateTrainingPlanForEditModal(
   try {
     return await updateClientTrainingPlan(clientId, payload);
   } catch (err) {
-    if (access !== "trainer" || !isForbiddenError(err)) throw err;
+    if (access !== "trainer" || !isForbiddenError(err)) {
+      throw err;
+    }
 
-    return updateTrainerPortalClientTrainingPlan(clientId, payload);
+    return updateTrainerPortalClientTrainingPlan(
+      clientId,
+      payload,
+    );
   }
 }
 
@@ -549,10 +663,18 @@ function normalizeLocationName(value?: string | null) {
   return (value || "").trim().toLowerCase();
 }
 
-function resolveClientLocationId(client: Client, locations: Location[]) {
-  if (client.locationId) return String(client.locationId);
+function resolveClientLocationId(
+  client: Client,
+  locations: Location[],
+) {
+  if (client.locationId) {
+    return String(client.locationId);
+  }
 
-  const clientLocationName = normalizeLocationName(client.locationName);
+  const clientLocationName = normalizeLocationName(
+    client.locationName,
+  );
+
   const matchedLocation = locations.find((location) =>
     [location.name, location.city]
       .map(normalizeLocationName)
@@ -560,7 +682,9 @@ function resolveClientLocationId(client: Client, locations: Location[]) {
       .includes(clientLocationName),
   );
 
-  return matchedLocation ? String(matchedLocation.id) : "";
+  return matchedLocation
+    ? String(matchedLocation.id)
+    : "";
 }
 
 function normalizeText(value?: string | null) {
@@ -578,16 +702,24 @@ function parseGoogleDriveLink(value: string) {
   const parsedUrl = parseUrl(value);
 
   if (!parsedUrl) {
-    return { fileId: "", folderId: "" };
+    return {
+      fileId: "",
+      folderId: "",
+    };
   }
 
-  const folderMatch = parsedUrl.pathname.match(/\/folders\/([^/?]+)/);
+  const folderMatch =
+    parsedUrl.pathname.match(/\/folders\/([^/?]+)/);
+
   const fileMatch =
     parsedUrl.pathname.match(/\/d\/([^/?]+)/) ||
     parsedUrl.pathname.match(/\/file\/d\/([^/?]+)/);
 
   return {
-    fileId: parsedUrl.searchParams.get("id") || fileMatch?.[1] || "",
+    fileId:
+      parsedUrl.searchParams.get("id") ||
+      fileMatch?.[1] ||
+      "",
     folderId: folderMatch?.[1] || "",
   };
 }
@@ -603,8 +735,9 @@ function parseUrl(value: string) {
 function isValidUrl(value: string) {
   const parsedUrl = parseUrl(value);
 
-  return Boolean(
-    parsedUrl?.protocol === "http:" || parsedUrl?.protocol === "https:",
+  return (
+    parsedUrl?.protocol === "http:" ||
+    parsedUrl?.protocol === "https:"
   );
 }
 
@@ -614,21 +747,39 @@ function getClientUpdateFailedFields(
 ) {
   const failedFields: string[] = [];
 
-  if (client.trainerId !== payload.trainerId) failedFields.push("trener");
-  if (client.locationId !== payload.locationId) failedFields.push("lokalizacja");
+  if (client.trainerId !== payload.trainerId) {
+    failedFields.push("trener");
+  }
+
+  if (client.locationId !== payload.locationId) {
+    failedFields.push("lokalizacja");
+  }
+
   if (!isSameOptionalText(client.firstName, payload.firstName)) {
     failedFields.push("imię");
   }
+
   if (!isSameOptionalText(client.lastName, payload.lastName)) {
     failedFields.push("nazwisko");
   }
+
   if (!isSameOptionalText(client.email, payload.email)) {
     failedFields.push("e-mail");
   }
-  if (!isSameOptionalText(client.phoneNumber, payload.phoneNumber)) {
+
+  if (
+    !isSameOptionalText(
+      client.phoneNumber,
+      payload.phoneNumber,
+    )
+  ) {
     failedFields.push("telefon");
   }
-  if (!isSameOptionalText(client.goal, payload.goal)) failedFields.push("cel");
+
+  if (!isSameOptionalText(client.goal, payload.goal)) {
+    failedFields.push("cel");
+  }
+
   if (
     toDateInputValue(client.trainingStartDate) !==
     toDateInputValue(payload.trainingStartDate)
