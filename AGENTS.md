@@ -1,5 +1,18 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
+# UX i język aplikacji
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
+- ATLAS jest produktem dla realnych klientów studia treningowego, trenerów i ownerów.
+- Teksty w UI mają brzmieć naturalnie i po polsku, jak komunikaty gotowego produktu.
+- Nie używaj wobec użytkownika terminów technicznych: backend, endpoint, request, DTO, API, rekord, encja, status enum itp.
+- Nie opisuj mechaniki systemu, jeśli klient nie musi jej znać.
+- Unikaj technicznych i sztucznych sformułowań typu:
+  - „Pakiet został utworzony”
+  - „Utworzysz pakiet do opłacenia”
+  - „Operacja zakończona pomyślnie”
+- Zamiast tego pisz językiem działania użytkownika:
+  - „Pakiet czeka na opłacenie”
+  - „Po opłaceniu pakietu możesz zapisać się na zajęcia”
+  - „Płatność została potwierdzona”
+- Toasty i błędy backendu tłumacz na zrozumiały komunikat użytkownika, jeśli znaczenie jest znane.
+- Nie pokazuj klientowi surowych angielskich komunikatów backendu.
+- CTA mają mówić jasno, co się stanie: „Przejdź do płatności”, „Opłać pakiet”, „Zapisz się na zajęcia”.
+- Ownerowi można pokazywać więcej szczegółów operacyjnych, ale nadal bez niepotrzebnego technicznego żargonu.

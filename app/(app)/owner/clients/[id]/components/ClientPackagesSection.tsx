@@ -6,11 +6,15 @@ import { Button } from "@/app/components/ui/button";
 import type { ClientPackageBilling } from "@/app/lib/owner/billing";
 import { formatMoney } from "@/app/lib/formatters/money";
 
-export function isGroupClientPackage(packageData: ClientPackageBilling) {
+export function isGroupClientPackage(
+  packageData: Pick<ClientPackageBilling, "packageType" | "expectedBillingType">,
+) {
   return getClientPackageKind(packageData) === "group";
 }
 
-function getClientPackageKind(packageData: ClientPackageBilling) {
+function getClientPackageKind(
+  packageData: Pick<ClientPackageBilling, "packageType" | "expectedBillingType">,
+) {
   const packageType = packageData.packageType?.trim().toLowerCase();
 
   if (packageType) {

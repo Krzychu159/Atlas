@@ -114,7 +114,6 @@ export default function NotificationsPanel({
                   role={role}
                   onNavigate={onClose}
                   variant="panel"
-                  notificationsHref={notificationsHref}
                   markingAsRead={markingIds.includes(item.id)}
                   onMarkAsRead={handleMarkAsRead}
                 />

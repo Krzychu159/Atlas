@@ -41,7 +41,6 @@ export const getPublicGroupClassBySlug = (slug: string) => backendFetch<PublicGr
 export const purchaseGroupPackage = (packageId: number) => backendFetch<GroupPackagePurchase>(`${base}/packages/${packageId}/purchases/me`, { ...publicOptions, method: "POST" });
 export const bookGroupClass = (sessionId: number) => backendFetch<GroupClassBooking>(`${base}/${sessionId}/bookings/me`, { ...publicOptions, method: "POST" });
 export const cancelGroupClassBooking = (sessionId: number) => backendFetch<void>(`${base}/${sessionId}/bookings/me`, { ...publicOptions, method: "DELETE" });
-export const reportGroupPayment = (payload: { clientPackageId: number; amount: number; method: number; paymentDate: string; note: string }) => backendFetch("client-portal/payments", { ...publicOptions, method: "POST", json: payload });
 
 export async function authenticatePublicClient(payload: { email: string; password: string } | PublicRegistrationPayload, register = false): Promise<PublicRegistrationResponse> {
   const response = await fetch(register ? "/api/auth/public-register" : "/api/auth/login", {

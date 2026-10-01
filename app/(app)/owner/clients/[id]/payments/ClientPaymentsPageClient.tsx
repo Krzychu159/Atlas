@@ -77,6 +77,7 @@ import {
   resumeTrainerPortalClientSubscription,
 } from "@/app/lib/trainer/portal";
 import { trainerPortalClientToClient } from "@/app/lib/trainer/portal-mappers";
+import { isGroupClientPackage } from "../components/ClientPackagesSection";
 
 type ClientPaymentsPageClientProps = {
   clientIdParam: string;
@@ -671,47 +672,28 @@ export default function ClientPaymentsPageClient({
       ),
     [clientPayments],
   );
-  const activeAmountDue =
-    activePackage?.amountDue ??
-    currentCycle?.amountDue ??
-    billing?.activePackageAmountDue ??
-    0;
-  const activeAmountPaid =
-    activePackage?.amountPaid ??
-    currentCycle?.amountPaid ??
-    billing?.activePackageAmountPaid ??
-    0;
-  const activeCurrency = activePackage?.currency || currentCycle?.currency || "PLN";
-  const hasActiveClientPackage = Boolean(
-    activePackage?.isActive ||
-      currentCycle?.isActive ||
-      billing?.activeClientPackageId,
+  const cycle = currentCycle || subscription?.currentCycle || null;
+  const cyclePackage = packagesBilling.find(
+    (item) => item.clientPackageId === cycle?.clientPackageId,
+  ) || cycle;
+  const currentPackages = [
+    ...(cyclePackage?.isActive ? [cyclePackage] : []),
+    ...(activePackage?.isActive ? [activePackage] : []),
+    ...packagesBilling.filter((item) => item.isActive),
+  ].filter(
+    (item, index, items) =>
+      items.findIndex((other) => other.clientPackageId === item.clientPackageId) === index,
   );
-  const activeClientPackageId =
-    activePackage?.clientPackageId ??
-    currentCycle?.clientPackageId ??
-    billing?.activeClientPackageId ??
-    null;
-  const billingActivePackage = billing?.packages?.find(
-    (item) => item.clientPackageId === activeClientPackageId,
-  );
-  const activePackageUsedSessions =
-    activePackage?.usedSessions ??
-    currentCycle?.usedSessions ??
-    billingActivePackage?.usedSessions ??
-    usage?.usedSessions ??
-    0;
-  const activePackageName =
-    activePackage?.packageName ||
-    currentCycle?.packageName ||
-    billingActivePackage?.packageName ||
-    billing?.activePackageName ||
-    "Pakiet klienta";
-  const canDeleteActivePackage = Boolean(
-    basePath === "/owner" &&
-      activeClientPackageId &&
-      activePackageUsedSessions === 0,
-  );
+  const mainPackage = currentPackages.find((item) => !isGroupClientPackage(item)) || null;
+  const groupPackages = currentPackages.filter(isGroupClientPackage);
+  const mainUsage = usage?.clientPackageId === mainPackage?.clientPackageId ? usage : null;
+  const mainSubscription = cycle?.clientPackageId === mainPackage?.clientPackageId
+    ? subscription
+    : null;
+  const summaryPackage = mainPackage || groupPackages[0] || null;
+  const activeAmountDue = summaryPackage?.amountDue ?? 0;
+  const activeAmountPaid = summaryPackage?.amountPaid ?? 0;
+  const activeCurrency = summaryPackage?.currency || "PLN";
   const lastPayment = payments[0] || null;
   const paymentTotalPages = Math.max(
     1,
@@ -769,13 +751,8 @@ export default function ClientPaymentsPageClient({
               icon={<WalletCards size={18} />}
             />
             <BillingStat
-              label="Aktywny pakiet"
-              value={
-                activePackage?.packageName ||
-                currentCycle?.packageName ||
-                billing.activePackageName ||
-                "Brak"
-              }
+              label={mainPackage || !groupPackages.length ? "Pakiet główny" : "Pakiet grupowy"}
+              value={summaryPackage?.packageName || "Brak"}
               icon={<PackagePlus size={18} />}
             />
             <BillingStat
@@ -875,40 +852,47 @@ export default function ClientPaymentsPageClient({
 
           <section
             className={
-              hasActiveClientPackage
+              mainUsage
                 ? "grid gap-5 xl:grid-cols-[0.9fr_1.1fr]"
                 : "grid gap-5"
             }
           >
-            {hasActiveClientPackage ? <UsageCard usage={usage} /> : null}
+            {mainUsage ? <UsageCard usage={mainUsage} /> : null}
 
-            <SubscriptionPanel
-              billing={billing}
-              subscription={subscription}
-              activePackage={activePackage}
-              currentCycle={currentCycle}
-              selectedPackageId={selectedPackageId}
-              selectedNextPackageId={selectedNextPackageId}
-              packageOptions={packageOptions}
-              clientLocationName={client?.locationName || "lokalizacji klienta"}
-              canAssignPackage={basePath === "/owner"}
-              canDeletePackage={canDeleteActivePackage}
-              isSaving={isSaving || isDeletingPackage}
-              onPackageChange={setSelectedPackageId}
-              onNextPackageChange={setSelectedNextPackageId}
-              onAssignPackage={handleAssignPackage}
-              onSetNextPackage={handleSetNextPackage}
-              onCancelAfterCycle={handleRequestCancelAfterCycle}
-              onResumeAutoRenew={handleResumeAutoRenew}
-              onDeletePackage={() => {
-                if (!activeClientPackageId || !canDeleteActivePackage) return;
+            <div className={`grid min-w-0 gap-5 ${!mainUsage && currentPackages.length > 1 ? "xl:grid-cols-2" : ""}`}>
+              {(mainPackage || groupPackages.length === 0
+                ? [mainPackage, ...groupPackages]
+                : groupPackages
+              ).map((packageData) => (
+                <SubscriptionPanel
+                  key={packageData?.clientPackageId || "empty"}
+                  subscription={packageData === mainPackage ? mainSubscription : null}
+                  activePackage={packageData}
+                  isGroup={Boolean(packageData && isGroupClientPackage(packageData))}
+                  selectedPackageId={selectedPackageId}
+                  selectedNextPackageId={selectedNextPackageId}
+                  packageOptions={packageOptions}
+                  clientLocationName={client?.locationName || "lokalizacji klienta"}
+                  canAssignPackage={basePath === "/owner"}
+                  canDeletePackage={Boolean(basePath === "/owner" && packageData && packageData.usedSessions === 0)}
+                  isSaving={isSaving || isDeletingPackage}
+                  onPackageChange={setSelectedPackageId}
+                  onNextPackageChange={setSelectedNextPackageId}
+                  onAssignPackage={handleAssignPackage}
+                  onSetNextPackage={handleSetNextPackage}
+                  onCancelAfterCycle={handleRequestCancelAfterCycle}
+                  onResumeAutoRenew={handleResumeAutoRenew}
+                  onDeletePackage={() => {
+                    if (!packageData || basePath !== "/owner" || packageData.usedSessions !== 0) return;
 
-                setPackageToDelete({
-                  clientPackageId: activeClientPackageId,
-                  packageName: activePackageName,
-                });
-              }}
-            />
+                    setPackageToDelete({
+                      clientPackageId: packageData.clientPackageId,
+                      packageName: packageData.packageName || "Pakiet klienta",
+                    });
+                  }}
+                />
+              ))}
+            </div>
           </section>
         </>
       ) : null}
@@ -1022,10 +1006,9 @@ function getPaymentActionModalCopy(type: PaymentAction) {
 }
 
 function SubscriptionPanel({
-  billing,
   subscription,
   activePackage,
-  currentCycle,
+  isGroup,
   selectedPackageId,
   selectedNextPackageId,
   packageOptions,
@@ -1041,10 +1024,9 @@ function SubscriptionPanel({
   onResumeAutoRenew,
   onDeletePackage,
 }: {
-  billing: ClientBillingSummary;
   subscription: ClientSubscription | null;
-  activePackage: ClientPackageBilling | null;
-  currentCycle: SubscriptionCycle | null;
+  activePackage: ClientPackageBilling | SubscriptionCycle | null;
+  isGroup: boolean;
   selectedPackageId: string;
   selectedNextPackageId: string;
   packageOptions: Array<{ value: string; label: string }>;
@@ -1062,26 +1044,17 @@ function SubscriptionPanel({
 }) {
   const cancelRequested = Boolean(subscription?.cancelRenewalRequested);
   const willRenew = Boolean(subscription?.autoRenewEnabled && !cancelRequested);
-  const cycle = currentCycle || subscription?.currentCycle || null;
   const activePackageName =
-    activePackage?.packageName ||
-    cycle?.packageName ||
-    billing.activePackageName ||
-    "Brak aktywnego pakietu";
-  const amountDue =
-    activePackage?.amountDue ?? cycle?.amountDue ?? billing.activePackageAmountDue;
-  const amountPaid =
-    activePackage?.amountPaid ?? cycle?.amountPaid ?? billing.activePackageAmountPaid;
-  const currency = activePackage?.currency || cycle?.currency || "PLN";
-  const totalSessions =
-    activePackage?.totalSessions ?? cycle?.totalSessions ?? 0;
-  const usedSessions = activePackage?.usedSessions ?? cycle?.usedSessions ?? 0;
+    activePackage?.packageName || "Brak aktywnego pakietu";
+  const amountDue = activePackage?.amountDue ?? 0;
+  const amountPaid = activePackage?.amountPaid ?? 0;
+  const currency = activePackage?.currency || "PLN";
+  const totalSessions = activePackage?.totalSessions ?? 0;
+  const usedSessions = activePackage?.usedSessions ?? 0;
   const progress = totalSessions
     ? Math.min(100, Math.round((usedSessions / totalSessions) * 100))
     : 0;
-  const hasActivePackage = Boolean(
-    activePackage?.isActive || cycle?.isActive || billing.activeClientPackageId,
-  );
+  const hasActivePackage = Boolean(activePackage?.isActive);
   const savedNextPackageId = subscription?.nextPackage?.packageId
     ? String(subscription.nextPackage.packageId)
     : "";
@@ -1139,15 +1112,15 @@ function SubscriptionPanel({
     <section className="card-shell p-4 md:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-section-title">Pakiet klienta</p>
+          <p className="text-section-title">{isGroup ? "Pakiet grupowy" : "Pakiet główny"}</p>
           <p className="mt-2 text-sm text-on-surface-variant">
             Aktualny pakiet, wykorzystanie wejść i status płatności.
           </p>
         </div>
-        <StatusPill label={subscription?.status || "Brak statusu"} muted />
+        <StatusPill label={subscription?.status || activePackage?.paymentStatus || "Brak statusu"} muted />
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+      <div className={`mt-4 grid gap-3 ${!isGroup && subscription ? "lg:grid-cols-2" : ""}`}>
         <div className="rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-low p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -1157,7 +1130,7 @@ function SubscriptionPanel({
               </h3>
             </div>
             <StatusPill
-              label={cycle?.paymentStatus || billing.activePackagePaymentStatus || "Status"}
+              label={activePackage?.paymentStatus || "Status"}
               muted
             />
           </div>
@@ -1190,49 +1163,51 @@ function SubscriptionPanel({
           ) : null}
         </div>
 
-        <div className="rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-low p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-label text-on-surface-muted">
-                Automatyczne przedłużanie
-              </p>
-              <h3 className="mt-2 text-xl font-semibold text-on-surface">
-                {willRenew ? "Włączone" : "Wyłączone"}
-              </h3>
+        {!isGroup && subscription ? (
+          <div className="rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-low p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-label text-on-surface-muted">
+                  Automatyczne przedłużanie
+                </p>
+                <h3 className="mt-2 text-xl font-semibold text-on-surface">
+                  {willRenew ? "Włączone" : "Wyłączone"}
+                </h3>
+              </div>
+              <StatusPill
+                label={willRenew ? "Odnowienie" : "Zakończenie"}
+                muted={!willRenew}
+              />
             </div>
-            <StatusPill
-              label={willRenew ? "Odnowienie" : "Zakończenie"}
-              muted={!willRenew}
-            />
+            <p className="mt-3 text-sm leading-5 text-on-surface-variant">
+              {willRenew
+                ? "Po wykorzystaniu aktualnego pakietu system przedłuży subskrypcję automatycznie."
+                : "Po wykorzystaniu aktualnego pakietu subskrypcja klienta zostanie zakończona."}
+            </p>
+            <div className="mt-4">
+              {willRenew ? (
+                <Button
+                  variant="outline"
+                  onClick={onCancelAfterCycle}
+                  disabled={isSaving || !subscription}
+                >
+                  Zakończ po pakiecie
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  onClick={onResumeAutoRenew}
+                  disabled={isSaving || !subscription}
+                >
+                  Włącz auto-przedłużanie
+                </Button>
+              )}
+            </div>
           </div>
-          <p className="mt-3 text-sm leading-5 text-on-surface-variant">
-            {willRenew
-              ? "Po wykorzystaniu aktualnego pakietu system przedłuży subskrypcję automatycznie."
-              : "Po wykorzystaniu aktualnego pakietu subskrypcja klienta zostanie zakończona."}
-          </p>
-          <div className="mt-4">
-            {willRenew ? (
-              <Button
-                variant="outline"
-                onClick={onCancelAfterCycle}
-                disabled={isSaving || !subscription}
-              >
-                Zakończ po pakiecie
-              </Button>
-            ) : (
-              <Button
-                variant="secondary"
-                onClick={onResumeAutoRenew}
-                disabled={isSaving || !subscription}
-              >
-                Włącz auto-przedłużanie
-              </Button>
-            )}
-          </div>
-        </div>
+        ) : null}
       </div>
 
-      {canAssignPackage ? (
+      {canAssignPackage && !isGroup && subscription ? (
         <div className="mt-3 rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest/50 p-3">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
