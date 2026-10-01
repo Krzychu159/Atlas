@@ -60,7 +60,7 @@ export function markNotificationAsRead(id: number) {
   if (pending) return pending;
   const request = backendPost<void>(`Notifications/${id}/read`)
     .then(result => {
-      notifyNotificationsChanged();
+      notifyNotificationsChanged(-1);
       return result;
     })
     .finally(() => pendingReads.delete(id));
@@ -70,13 +70,13 @@ export function markNotificationAsRead(id: number) {
 
 export async function markAllNotificationsAsRead(category?: string) {
   const result = await backendPost<ReadAllResponse | null>("Notifications/read-all", undefined, { category });
-  notifyNotificationsChanged();
+  notifyNotificationsChanged(result ? -result.markedAsRead : undefined);
   return result;
 }
 
-export function notifyNotificationsChanged() {
+export function notifyNotificationsChanged(unreadCountDelta?: number) {
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+    window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, { detail: { unreadCountDelta } }));
   }
 }
 

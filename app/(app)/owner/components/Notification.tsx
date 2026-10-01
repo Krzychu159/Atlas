@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   BellRing,
@@ -85,7 +85,7 @@ export function formatNotificationTime(createdAt: string) {
 
 export default function NotificationItem({
   item, variant = "page", markingAsRead = false,
-  onNavigate, onMarkAsRead, expanded: pageExpanded = false, onToggle,
+  onNavigate, onMarkAsRead, expanded = false, onToggle,
 }: {
   item: AppNotification;
   variant?: "page" | "panel";
@@ -97,8 +97,6 @@ export default function NotificationItem({
   onToggle?: () => void;
 }) {
   const compact = variant === "panel";
-  const [panelExpanded, setPanelExpanded] = useState(false);
-  const expanded = compact ? panelExpanded : pageExpanded;
   const href = getNotificationDestination(item);
   const router = useRouter();
   const activating = useRef(false);
@@ -108,20 +106,21 @@ export default function NotificationItem({
     if (expanded) element.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [expanded]);
 
+  async function markAsRead() {
+    if (!onMarkAsRead || (!markingAsRead && (item.isRead || read.current))) return true;
+    const success = await onMarkAsRead(item.id);
+    if (success === false) return false;
+    read.current = true;
+    return true;
+  }
+
   async function activate() {
     if (activating.current) return;
     activating.current = true;
     let navigated = false;
     try {
-      if (!href) {
-        if (compact) setPanelExpanded(value => !value);
-        else onToggle?.();
-      }
-      if ((markingAsRead || (!item.isRead && !read.current)) && onMarkAsRead) {
-        const success = await onMarkAsRead(item.id);
-        if (success === false) return;
-        read.current = true;
-      }
+      if (!href && !compact) onToggle?.();
+      if (!await markAsRead()) return;
       if (href) {
         onNavigate?.();
         router.push(href);
@@ -134,7 +133,7 @@ export default function NotificationItem({
 
   return (
     <article ref={element} id={`notification-${item.id}`} className={`min-w-0 scroll-mt-6 overflow-hidden rounded-[var(--radius-lg)] transition ${item.isRead ? "bg-surface-container" : "bg-primary/10"} ${expanded ? "ring-1 ring-primary-light/30" : ""}`}>
-      <button type="button" onClick={() => void activate()} aria-expanded={href ? undefined : expanded} aria-controls={href ? undefined : `notification-details-${item.id}`} className="relative flex w-full min-w-0 items-start gap-3 p-3 text-left transition hover:bg-white/[0.035] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-light">
+      <button type="button" onClick={() => void activate()} aria-busy={markingAsRead} aria-expanded={compact || href ? undefined : expanded} aria-controls={compact || href ? undefined : `notification-details-${item.id}`} className="relative flex w-full min-w-0 items-start gap-3 p-3 text-left transition hover:bg-white/[0.035] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-light">
         {!item.isRead && <span className="absolute bottom-3 left-0 top-3 w-0.5 rounded-r-full bg-primary-light" />}
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] ${getIconStyles(item)}`}>{getIcon(item)}</span>
         <span className="min-w-0 flex-1">
@@ -147,18 +146,16 @@ export default function NotificationItem({
           {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
         </span>
       </button>
-      <div id={`notification-details-${item.id}`} hidden={!expanded && !href} className="px-4 pb-4 sm:pl-14">
-        {expanded && <>
-          <p className="whitespace-pre-wrap break-words text-sm leading-6 text-on-surface-variant">{item.message}</p>
-          <p className="mt-3 text-xs text-on-surface-muted">{item.isRead ? "Przeczytane" : "Nieprzeczytane"}</p>
-        </>}
+      {!compact && <div id={`notification-details-${item.id}`} hidden={!expanded} className="px-4 pb-4 sm:pl-14">
+        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-on-surface-variant">{item.message}</p>
+        <p className="mt-3 text-xs text-on-surface-muted">{item.isRead ? "Przeczytane" : "Nieprzeczytane"}</p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {href && <button type="button" onClick={() => void activate()} className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary/15 px-3 py-2 text-sm font-semibold text-primary-light transition hover:bg-primary/25 focus-visible:outline-2 focus-visible:outline-primary-light sm:w-auto">
             Przejdź do szczegółów <ExternalLink size={14} />
           </button>}
-          {!item.isRead && onMarkAsRead && <button type="button" disabled={markingAsRead} onClick={() => void onMarkAsRead(item.id)} className="inline-flex min-h-10 items-center gap-1.5 text-xs text-on-surface-muted hover:text-on-surface disabled:opacity-50"><Check size={13} />{markingAsRead ? "Oznaczanie…" : "Oznacz jako przeczytane"}</button>}
+          {!item.isRead && onMarkAsRead && <button type="button" disabled={markingAsRead} onClick={event => { event.stopPropagation(); void markAsRead(); }} className="inline-flex min-h-10 items-center gap-1.5 text-xs text-on-surface-muted hover:text-on-surface disabled:opacity-50"><Check size={13} />{markingAsRead ? "Oznaczanie…" : "Oznacz jako przeczytane"}</button>}
         </div>
-      </div>
+      </div>}
     </article>
   );
 }

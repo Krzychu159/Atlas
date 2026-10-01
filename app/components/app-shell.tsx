@@ -43,10 +43,14 @@ export function AppShell({ children, role }: AppShellProps) {
 
   useEffect(() => {
     let active = true;
-    const refreshUnreadCount = () => {
+    let revision = 0;
+    const refreshUnreadCount = (event?: Event) => {
+      const requestRevision = ++revision;
+      const delta = (event as CustomEvent<{ unreadCountDelta?: number }> | undefined)?.detail?.unreadCountDelta;
+      if (typeof delta === "number") setUnreadCount(count => Math.max(0, count + delta));
       getUnreadNotificationCount()
-        .then(data => { if (active) setUnreadCount(data.unreadCount); })
-        .catch(() => { if (active) setUnreadCount(0); });
+        .then(data => { if (active && requestRevision === revision) setUnreadCount(data.unreadCount); })
+        .catch(() => {});
     };
     refreshUnreadCount();
     window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshUnreadCount);

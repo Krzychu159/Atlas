@@ -72,6 +72,10 @@ export function useNotifications(open = true, initialCategory = "", initialRead 
     setNotifications(items => items.map(item => item.id === id ? { ...item, isRead: true } : item));
     const operation = markNotificationAsRead(id).then(() => {
       setNotifications(items => items.map(item => item.id === id ? { ...item, isRead: true } : item));
+      if (previous && !previous.isRead) setCounts(current => ({
+        unreadCount: Math.max(0, current.unreadCount - 1),
+        unreadByCategory: { ...current.unreadByCategory, [previous.category]: Math.max(0, (current.unreadByCategory[previous.category] ?? 0) - 1) },
+      }));
       return true;
     }).catch(error => {
       if (previous) setNotifications(items => items.map(item => item.id === id ? previous : item));
@@ -92,8 +96,14 @@ export function useNotifications(open = true, initialCategory = "", initialRead 
     allPending.current = true;
     setMarkingAll(true);
     try {
-      await markAllNotificationsAsRead(category || undefined);
+      const result = await markAllNotificationsAsRead(category || undefined);
       setNotifications(items => items.map(item => !category || item.category === category ? { ...item, isRead: true } : item));
+      setCounts(current => ({
+        unreadCount: category ? Math.max(0, current.unreadCount - (result?.markedAsRead ?? unreadCount)) : 0,
+        unreadByCategory: category
+          ? { ...current.unreadByCategory, [category]: 0 }
+          : Object.fromEntries(Object.keys(current.unreadByCategory).map(key => [key, 0])),
+      }));
       return true;
     }
     catch (error) {
