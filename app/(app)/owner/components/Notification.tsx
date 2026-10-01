@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BellRing,
   Building2,
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import {
   getNotificationDestination,
+  normalizeNotificationRole,
   type NotificationRole,
   type AppNotification,
 } from "@/app/lib/notifications";
@@ -84,7 +85,7 @@ export function formatNotificationTime(createdAt: string) {
 }
 
 export default function NotificationItem({
-  item, variant = "page", markingAsRead = false,
+  item, variant = "page", markingAsRead = false, role,
   onNavigate, onMarkAsRead, expanded = false, onToggle,
 }: {
   item: AppNotification;
@@ -97,7 +98,9 @@ export default function NotificationItem({
   onToggle?: () => void;
 }) {
   const compact = variant === "panel";
-  const href = getNotificationDestination(item);
+  const pathname = usePathname();
+  const notificationRole = normalizeNotificationRole(role) ?? normalizeNotificationRole(pathname.split("/")[1]);
+  const href = getNotificationDestination(item, notificationRole);
   const router = useRouter();
   const activating = useRef(false);
   const read = useRef(item.isRead);

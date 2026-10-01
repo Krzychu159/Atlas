@@ -27,6 +27,7 @@ type AddClientModalProps = {
   open: boolean;
   onClose: () => void;
   onCreated: () => Promise<void>;
+  initialMode?: AddClientMode;
 };
 
 const initialForm = {
@@ -38,7 +39,7 @@ const initialForm = {
   trainerId: "",
 };
 
-export default function AddClientModal({ open, onClose, onCreated }: AddClientModalProps) {
+export default function AddClientModal({ open, onClose, onCreated, initialMode = "record" }: AddClientModalProps) {
   const router = useRouter();
   const { selectedLocationId } = useOwnerLocationFilter();
   const [mode, setMode] = useState<AddClientMode>("record");
@@ -69,7 +70,7 @@ export default function AddClientModal({ open, onClose, onCreated }: AddClientMo
 
     void Promise.resolve()
       .then(() => {
-        setMode("record");
+        setMode(initialMode);
         setIsLoadingOptions(true);
         return Promise.all([getLocations(), getTrainers()]);
       })
@@ -94,7 +95,7 @@ export default function AddClientModal({ open, onClose, onCreated }: AddClientMo
         });
       })
       .finally(() => setIsLoadingOptions(false));
-  }, [open, selectedLocationId]);
+  }, [open, selectedLocationId, initialMode]);
 
   useEffect(() => {
     if (!open || mode !== "invitation") return;

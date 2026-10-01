@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import {
@@ -17,10 +18,21 @@ function normalize(value: string) {
 }
 
 export default function TrainersPage() {
+  return <Suspense><TrainersContent /></Suspense>;
+}
+
+function TrainersContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const showInvitations = searchParams.get("invitations") === "true";
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const { selectedLocationId } = useOwnerLocationFilter();
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (showInvitations) void Promise.resolve().then(() => setIsModalOpen(true));
+  }, [showInvitations]);
 
   async function loadTrainers() {
     try {
@@ -110,7 +122,14 @@ export default function TrainersPage() {
 
       <AddTrainerModal
         open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          if (showInvitations) {
+            const params = new URLSearchParams(searchParams.toString());
+            params.delete("invitations");
+            router.replace(`/owner/trainers${params.size ? `?${params}` : ""}`, { scroll: false });
+          }
+        }}
       />
     </>
   );

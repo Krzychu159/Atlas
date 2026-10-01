@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Archive, ArrowRight, Plus, UserPlus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
@@ -47,6 +48,13 @@ function getTime(value?: string | null) {
 }
 
 export default function ClientsPage() {
+  return <Suspense><ClientsContent /></Suspense>;
+}
+
+function ClientsContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const showInvitations = searchParams.get("invitations") === "true";
   const [clients, setClients] = useState<Client[]>([]);
   const { selectedLocationId } = useOwnerLocationFilter();
   const [search, setSearch] = useState("");
@@ -56,6 +64,10 @@ export default function ClientsPage() {
   const [sort, setSort] = useState<ClientSort>("package-usage");
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (showInvitations) void Promise.resolve().then(() => setIsModalOpen(true));
+  }, [showInvitations]);
 
   async function loadClients() {
     try {
@@ -401,7 +413,15 @@ export default function ClientsPage() {
 
       <AddClientModal
         open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        initialMode={showInvitations ? "invitation" : "record"}
+        onClose={() => {
+          setIsModalOpen(false);
+          if (showInvitations) {
+            const params = new URLSearchParams(searchParams.toString());
+            params.delete("invitations");
+            router.replace(`/owner/clients${params.size ? `?${params}` : ""}`, { scroll: false });
+          }
+        }}
         onCreated={loadClients}
       />
     </>
