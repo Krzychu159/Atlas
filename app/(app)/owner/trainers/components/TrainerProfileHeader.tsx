@@ -26,7 +26,7 @@ function getInitials(trainer: Trainer) {
 }
 
 function getRateLabel(trainer: Trainer, rates: TrainerRate[]) {
-  const activeRate = rates.find((rate) => rate.isActive) ?? rates[0];
+  const activeRate = rates.find((rate) => rate.isActive && !rate.sessionType);
   const value = activeRate?.rate ?? trainer.hourlyRate ?? 0;
 
   return `${value} zł / h`;

@@ -3,6 +3,7 @@
 import { userTrainingType } from "@/app/lib/user-messages";
 
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
+import { useTrainerRatesRevision } from "@/app/lib/owner/trainer-rates-changes";
 
 import { NativeDateInput } from "@/app/components/ui/native-date-input";
 
@@ -98,6 +99,7 @@ function formatSessionType(value: string | null) {
 
 export default function TrainerSettlementPage() {
   const correctionRevision = useSessionCorrectionRevision();
+  const ratesRevision = useTrainerRatesRevision();
   const params = useParams<{ id: string }>();
   const trainerId = Number(params.id);
   const [monthValue, setMonthValue] = useState("");
@@ -161,7 +163,7 @@ export default function TrainerSettlementPage() {
     }
 
     loadSettlement();
-  }, [monthValue, trainerId, correctionRevision]);
+  }, [monthValue, trainerId, correctionRevision, ratesRevision]);
 
   const activeRates = useMemo(
     () => rates.filter((rate) => rate.isActive),
@@ -325,9 +327,9 @@ export default function TrainerSettlementPage() {
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[0.85fr_1.15fr]">
             <section className="card-shell p-6">
-              <p className="text-section-title">Stawka</p>
+              <p className="text-section-title">Stawki rozliczenia</p>
               <p className="mt-2 text-sm text-on-surface-variant">
-                Aktualna stawka godzinowa trenera.
+                Aktualne stawki trenera.
               </p>
 
               <div className="mt-5 flex flex-col gap-3">
@@ -341,7 +343,7 @@ export default function TrainerSettlementPage() {
                         {userTrainingType(rate.sessionType, "Stawka domyślna")}
                       </p>
                       <p className="mt-2 text-2xl font-semibold text-tertiary-light">
-                        {formatMoney(rate.rate)}
+                        {formatMoney(rate.rate)}{rate.sessionType === "Group" ? "/zajęcia" : "/h"}
                       </p>
                     </div>
                   ))
@@ -485,7 +487,10 @@ function SettlementItemRow({ item }: { item: TrainerSettlementItem }) {
         </p>
       </div>
       <Metric label="Godziny" value={`${item.hours.toFixed(1)} h`} />
-      <Metric label="Stawka" value={formatMoney(item.rate)} />
+      <Metric
+        label="Stawka"
+        value={`${new Intl.NumberFormat("pl-PL").format(item.rate)} zł/${item.rateType === "PerSession" ? "zajęcia" : "h"}`}
+      />
       <div>
         <p className="text-label text-on-surface-muted">Kwota</p>
         <p className="mt-1 text-base font-semibold text-tertiary-light">

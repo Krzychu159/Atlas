@@ -27,9 +27,9 @@ export default function TrainerProfileRates({
     <section className="card-shell p-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-section-title">Stawka</p>
+          <p className="text-section-title">Stawki rozliczenia</p>
           <p className="mt-2 text-sm text-on-surface-variant">
-            Aktualne stawki godzinowe według typu sesji.
+            Stawki godzinowe i za zajęcia grupowe.
           </p>
         </div>
         <div className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container-low text-primary-light">
@@ -54,7 +54,7 @@ export default function TrainerProfileRates({
                   </p>
                 </div>
                 <p className="text-lg font-semibold text-tertiary-light">
-                  {formatMoney(rate.rate)}
+                  {formatMoney(rate.rate)}{rate.sessionType === "Group" ? "/zajęcia" : "/h"}
                 </p>
               </div>
 

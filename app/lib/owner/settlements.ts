@@ -25,6 +25,7 @@ export type TrainerSettlementItem = {
   sessionType: string | null;
   hours: number;
   rate: number;
+  rateType: "Hourly" | "PerSession";
   amount: number;
   participantsCount: number;
 };
@@ -68,10 +69,15 @@ export function getTrainerRates(trainerId: number) {
 
 export function updateTrainerRates(
   trainerId: number,
-  payload: { hourlyRate: number | null },
+  payload: UpdateTrainerRatesPayload,
 ) {
   return backendPut<TrainerRate[]>(`Trainers/${trainerId}/rates`, payload);
 }
+
+export type UpdateTrainerRatesPayload = {
+  hourlyRate?: number | null;
+  groupSessionRate?: number | null;
+};
 
 export function getTrainerSettlement(
   trainerId: number,

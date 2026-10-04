@@ -22,9 +22,11 @@ import { CustomSelect } from "@/app/components/ui/custom-select";
 import { deleteTrainerAvatar, uploadTrainerAvatar } from "@/app/lib/avatars";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
 import {
+  getTrainerRates,
   updateTrainerRates,
   type TrainerRate,
 } from "@/app/lib/owner/settlements";
+import { notifyTrainerRatesChanged } from "@/app/lib/owner/trainer-rates-changes";
 import {
   updateTrainer,
   type Trainer,
@@ -77,7 +79,12 @@ export default function EditTrainerModal({
   onAvatarChanged,
 }: EditTrainerModalProps) {
   const activeRate = useMemo(
-    () => rates.find((rate) => rate.isActive) ?? rates[0],
+    () => rates.find((rate) => rate.isActive && !rate.sessionType),
+    [rates],
+  );
+  const groupRate = useMemo(
+    () => rates.find((rate) => rate.sessionType === "Group" && rate.isActive)
+      ?? rates.find((rate) => rate.sessionType === "Group"),
     [rates],
   );
   const [locations, setLocations] = useState<Location[]>([]);
@@ -92,6 +99,7 @@ export default function EditTrainerModal({
   const [outlookColor, setOutlookColor] = useState("preset7");
   const [locationIds, setLocationIds] = useState<string[]>([]);
   const [hourlyRate, setHourlyRate] = useState("");
+  const [groupSessionRate, setGroupSessionRate] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -117,8 +125,9 @@ export default function EditTrainerModal({
       setOutlookColor(trainer.outlookCategoryColor || "preset7");
       setLocationIds(toLocationValues(trainer.locationIds));
       setHourlyRate(String(activeRate?.rate ?? trainer.hourlyRate ?? 0));
+      setGroupSessionRate(groupRate ? String(groupRate.rate) : "");
     });
-  }, [activeRate, open, trainer]);
+  }, [activeRate, groupRate, open, trainer]);
 
   if (!open || !trainer) return null;
   const trainerId = trainer.id;
@@ -127,6 +136,17 @@ export default function EditTrainerModal({
     event.preventDefault();
 
     if (!trainer) return;
+
+    const parsedHourlyRate = hourlyRate.trim() ? Number(hourlyRate) : null;
+    const parsedGroupRate = groupSessionRate.trim() ? Number(groupSessionRate) : null;
+    if ([parsedHourlyRate, parsedGroupRate].some(
+      (rate) => rate !== null && (!Number.isFinite(rate) || rate < 0),
+    )) {
+      showOwnerError(new Error("Wpisz stawki równe lub większe od 0 zł."), "", {
+        id: "owner-trainer-rates-invalid",
+      });
+      return;
+    }
 
     const payload: UpdateTrainerPayload = {
       firstName: firstName.trim() || null,
@@ -142,17 +162,27 @@ export default function EditTrainerModal({
 
     try {
       setIsSaving(true);
-      const [updatedTrainer, updatedRates] = await Promise.all([
+      const [updatedTrainer, savedRates] = await Promise.all([
         updateTrainer(trainer.id, payload),
         updateTrainerRates(trainer.id, {
-          hourlyRate: hourlyRate.trim() ? Number(hourlyRate) : null,
+          hourlyRate: parsedHourlyRate,
+          groupSessionRate: parsedGroupRate,
         }),
       ]);
 
-      onSaved(updatedTrainer, updatedRates);
+      notifyTrainerRatesChanged();
       showOwnerSuccess("Dane trenera zostały zaktualizowane.", {
         id: "owner-trainer-edit-success",
       });
+      try {
+        const updatedRates = await getTrainerRates(trainer.id);
+        onSaved(updatedTrainer, updatedRates);
+      } catch (err) {
+        onSaved(updatedTrainer, savedRates);
+        showOwnerError(err, "Zmiany zapisano, ale nie udało się odświeżyć stawek. Odśwież profil trenera.", {
+          id: "owner-trainer-rates-refresh-error",
+        });
+      }
       onClose();
     } catch (err) {
       showOwnerError(err, "Nie udało się zaktualizować trenera.", {
@@ -234,12 +264,6 @@ export default function EditTrainerModal({
               onChange={setOutlookCategory}
             />
 
-            <OwnerTextField
-              label="Stawka godzinowa"
-              value={hourlyRate}
-              onChange={setHourlyRate}
-              type="number"
-            />
             <div>
               <CustomSelect
                 label="Kolor kategorii Outlook"
@@ -294,6 +318,42 @@ export default function EditTrainerModal({
               className="md:col-span-2"
             />
           </div>
+          <section className="mt-6 border-t border-white/8 pt-6">
+            <p className="text-section-title">Stawki rozliczenia</p>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <OwnerTextField
+                  label="Stawka godzinowa"
+                  value={hourlyRate}
+                  onChange={setHourlyRate}
+                  type="number"
+                  min={0}
+                  step="any"
+                />
+                <p className="mt-2 text-xs text-on-surface-muted">zł / h</p>
+              </div>
+              <div>
+                <OwnerTextField
+                  label="Stawka za zajęcia grupowe"
+                  value={groupSessionRate}
+                  onChange={setGroupSessionRate}
+                  type="number"
+                  min={0}
+                  step="any"
+                  aria-describedby="group-session-rate-description"
+                />
+                <p className="mt-2 text-xs text-on-surface-muted">zł / zajęcia</p>
+                <p id="group-session-rate-description" className="mt-2 text-xs text-on-surface-variant">
+                  Kwota za jedne zakończone zajęcia grupowe, niezależnie od czasu trwania i liczby uczestników.
+                </p>
+                {!groupRate ? (
+                  <p className="mt-2 text-xs text-on-surface-muted">
+                    Nie ustawiono — obowiązuje rozliczenie godzinowe
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </section>
         </div>
 
         <ModalFooter>

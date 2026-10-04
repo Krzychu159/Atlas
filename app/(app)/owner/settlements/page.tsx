@@ -1,6 +1,7 @@
 "use client";
 
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
+import { useTrainerRatesRevision } from "@/app/lib/owner/trainer-rates-changes";
 
 import { NativeDateInput } from "@/app/components/ui/native-date-input";
 import { Button } from "@/app/components/ui/button";
@@ -68,6 +69,7 @@ export default function OwnerSettlementsPage() {
 
 function OwnerSettlementsPageContent({ locationId }: { locationId: number | null }) {
   const correctionRevision = useSessionCorrectionRevision();
+  const ratesRevision = useTrainerRatesRevision();
   const [monthValue, setMonthValue] = useState("");
   const [search, setSearch] = useState("");
   const [settlements, setSettlements] = useState<TrainerMonthlySettlement[]>(
@@ -102,7 +104,7 @@ function OwnerSettlementsPageContent({ locationId }: { locationId: number | null
     }
 
     loadSettlements();
-  }, [monthValue, locationId, correctionRevision, refreshRevision]);
+  }, [monthValue, locationId, correctionRevision, refreshRevision, ratesRevision]);
 
   const filteredSettlements = useMemo(() => {
     const query = normalize(search);
