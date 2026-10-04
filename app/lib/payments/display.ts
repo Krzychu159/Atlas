@@ -63,7 +63,7 @@ export function isPaymentPending(payment: PaymentBreakdownSource) {
 }
 
 export function isPaymentConfirmed(payment: PaymentBreakdownSource) {
-  return payment.status === 2 || Boolean(payment.confirmedAt);
+  return !isPaymentReversed(payment) && (payment.status === 2 || Boolean(payment.confirmedAt));
 }
 
 export function isPaymentRejected(payment: PaymentBreakdownSource) {
@@ -98,6 +98,9 @@ export function getPaymentStatusLabel(status?: number | string | null) {
   if (typeof status === "string") {
     const normalized = status.toLowerCase();
 
+    if (normalized === "unpaid") return "Nieopłacone";
+    if (normalized === "partiallypaid") return "Częściowo opłacone";
+    if (normalized === "pendingconfirmation") return "Oczekuje na potwierdzenie";
     if (normalized.includes("paid") || normalized.includes("confirm")) {
       return "Opłacone";
     }

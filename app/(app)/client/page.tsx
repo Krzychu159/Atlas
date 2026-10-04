@@ -113,7 +113,7 @@ export default function ClientDashboardPage() {
   const trainer = dashboard?.trainer;
   const payment = dashboard?.payment;
   const currentCycle = subscription?.currentCycle;
-  const mainPackage = getMainPackage(currentCycle, billing?.packages);
+  const mainPackage = getMainPackage(currentCycle, billing?.packages, billing?.activeClientPackageId);
   const groupPackages = getGroupPackages(billing?.packages);
   const nextSession = dashboard?.nextSession;
   const upcomingSessions = useMemo(
@@ -897,10 +897,11 @@ function getPackageKind(source: PackageKindSource) {
 function getMainPackage(
   currentCycle: SubscriptionCycle | null | undefined,
   packages: ClientPackageBilling[] | null | undefined,
+  activeClientPackageId: number | null | undefined,
 ): PackageDisplayData | null {
   const activePackages = packages?.filter((item) => item.isActive) || [];
   const cycleIsMain =
-    currentCycle?.isActive && getPackageKind(currentCycle) === "main";
+    currentCycle?.clientPackageId === activeClientPackageId && currentCycle?.isActive && getPackageKind(currentCycle) === "main";
 
   if (cycleIsMain) {
     const billingDetails = activePackages.find(
@@ -921,7 +922,7 @@ function getMainPackage(
   }
 
   const mainPackage = activePackages.find(
-    (item) => getPackageKind(item) === "main",
+    (item) => item.clientPackageId === activeClientPackageId,
   );
 
   return mainPackage

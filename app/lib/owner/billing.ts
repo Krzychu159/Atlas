@@ -42,6 +42,7 @@ export type ClientPayment = {
 };
 
 export type ClientPackageBilling = {
+  origin?: string | null;
   clientPackageId: number;
   packageId: number;
   packageName: string | null;
@@ -71,6 +72,7 @@ export type ClientPackageBilling = {
 };
 
 export type ClientBillingSummary = {
+  totalAmountDue: number;
   clientId: number;
   clientName: string | null;
   currentBalance: number;
@@ -229,12 +231,63 @@ export function deleteClientPackage(clientId: number, clientPackageId: number) {
   );
 }
 
+export type PackageManagementPreview = {
+  // Opaque token: preserve the value returned by the server without coercion.
+  version: unknown;
+  amountDue: number;
+  remainingSessions: number;
+  canDelete: boolean;
+  canEdit: boolean;
+  canCorrect: boolean;
+  canClose: boolean;
+  deleteBlockReason: unknown;
+  blockers: unknown[];
+};
+
+export type CorrectClientPackagePayload = {
+  expectedVersion: unknown;
+  reason: string;
+  totalSessions?: number;
+  totalPrice?: number;
+  validUntil?: string | null;
+  paymentDueDate?: string | null;
+};
+
+export function getClientPackageManagementPreview(clientId: number, clientPackageId: number) {
+  return backendGet<PackageManagementPreview>(
+    `client-packages/clients/${clientId}/packages/${clientPackageId}/management-preview`,
+  );
+}
+
+export function correctClientPackage(clientId: number, clientPackageId: number, payload: CorrectClientPackagePayload) {
+  return backendPost<void>(
+    `client-packages/clients/${clientId}/packages/${clientPackageId}/correct`, payload,
+  );
+}
+
+const packageBlockerLabels: Record<string, string> = {
+  PackageClosed: "Pakiet został zamknięty. Historia pozostaje dostępna.",
+  PaymentHistory: "Pakiet ma historię wpłat. Użyj zamknięcia zamiast usuwania.",
+  BalanceHistory: "Pakiet ma operacje na saldzie. Nie można go usunąć.",
+  UsedSessions: "Z pakietu odliczono treningi. Nie można go usunąć.",
+  OpeningBalance: "Pakiet został zaimportowany. Zachowujemy jego historię.",
+  PendingPayment: "Najpierw rozstrzygnij oczekującą wpłatę lub płatność online.",
+  UnfinishedSessions: "Najpierw rozlicz niezakończone treningi powiązane z pakietem.",
+  HasRenewal: "Pakiet ma kolejny cykl. Najpierw rozlicz powiązany pakiet.",
+};
+
+export function getPackageBlockerLabel(value: unknown) {
+  return typeof value === "string" && Object.hasOwn(packageBlockerLabels, value)
+    ? packageBlockerLabels[value]
+    : "Ta czynność jest obecnie niedostępna. Odśwież dane pakietu lub skontaktuj się z obsługą studia.";
+}
+
 export function isPendingPayment(payment: ClientPayment) {
   return payment.status === 1 && !payment.confirmedAt && !payment.rejectedAt;
 }
 
 export function isConfirmedPayment(payment: ClientPayment) {
-  return payment.status === 2 || Boolean(payment.confirmedAt);
+  return !isReversedPayment(payment) && (payment.status === 2 || Boolean(payment.confirmedAt));
 }
 
 export function isRejectedPayment(payment: ClientPayment) {

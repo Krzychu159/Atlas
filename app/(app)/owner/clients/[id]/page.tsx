@@ -6,18 +6,25 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   archiveClient,
+  closeClientCooperation,
+  confirmClientRefund,
   getClient,
   getClientArchiveCheck,
+  getClientClosurePreview,
   getClientLegalConsents,
+  getClientRefunds,
   getClientSubscription,
   getClientTrainingPlan,
   restoreClient,
   setClientPortalAccess,
   type Client,
   type ClientArchiveCheck,
+  type ClientClosurePreview,
   type ClientLegalConsent,
+  type ClientRefund,
   type ClientSubscription,
   type ClientTrainingPlan,
+  type CloseCooperationPayload,
 } from "@/app/lib/owner/clients";
 import { getClientSessions, type OwnerSession } from "@/app/lib/owner/sessions";
 import {
@@ -38,7 +45,14 @@ import ClientPackagesSection, {
   getClientGroupLocationNames,
 } from "./components/ClientPackagesSection";
 import EndCooperationModal from "./components/EndCooperationModal";
-import { showOwnerError, showOwnerSuccess } from "../../components/owner-toast";
+import ClientRefundsSection from "./components/ClientRefundsSection";
+import RefundConfirmationModal from "./components/RefundConfirmationModal";
+import { ApiError } from "@/app/lib/backend";
+import {
+  showOwnerError,
+  showOwnerInfo,
+  showOwnerSuccess,
+} from "../../components/owner-toast";
 
 export default function OwnerClientDetailsPage() {
   const correctionRevision = useSessionCorrectionRevision();
@@ -55,6 +69,9 @@ export default function OwnerClientDetailsPage() {
   const [sessions, setSessions] = useState<OwnerSession[]>([]);
   const [payments, setPayments] = useState<ClientPayment[]>([]);
   const [legalConsents, setLegalConsents] = useState<ClientLegalConsent[]>([]);
+  const [refunds, setRefunds] = useState<ClientRefund[]>([]);
+  const [closurePreview, setClosurePreview] =
+    useState<ClientClosurePreview | null>(null);
   const [sessionsAvailable, setSessionsAvailable] = useState(false);
   const [paymentsAvailable, setPaymentsAvailable] = useState(false);
   const [legalConsentsAvailable, setLegalConsentsAvailable] = useState(false);
@@ -67,6 +84,12 @@ export default function OwnerClientDetailsPage() {
   const [isRestoring, setIsRestoring] = useState(false);
   const [isEndCooperationOpen, setIsEndCooperationOpen] = useState(false);
   const [isEndCooperationLoading, setIsEndCooperationLoading] = useState(false);
+  const [isEndingCooperation, setIsEndingCooperation] = useState(false);
+  const [isRefundsLoading, setIsRefundsLoading] = useState(true);
+  const [refundToConfirm, setRefundToConfirm] = useState<ClientRefund | null>(
+    null,
+  );
+  const [isConfirmingRefund, setIsConfirmingRefund] = useState(false);
   const groupLocationNames = getClientGroupLocationNames(
     billing?.packages,
     client?.locationName,
@@ -172,39 +195,133 @@ export default function OwnerClientDetailsPage() {
     setIsEndCooperationOpen(true);
     setIsEndCooperationLoading(true);
 
-    const [subscriptionResult, billingResult, sessionsResult] =
-      await Promise.allSettled([
-        getClientSubscription(client.id),
-        getClientBilling(client.id),
-        getClientSessions(client.id),
-      ]);
+    try {
+      setClosurePreview(await getClientClosurePreview(client.id));
+    } catch (err) {
+      setClosurePreview(null);
+      showOwnerError(err, "Nie udało się sprawdzić stanu współpracy.", {
+        id: "owner-client-end-cooperation-load-error",
+      });
+    } finally {
+      setIsEndCooperationLoading(false);
+    }
+  }
 
+  async function handleEndCooperation(payload: CloseCooperationPayload) {
+    if (!client) return;
+
+    try {
+      setIsEndingCooperation(true);
+      const updatedPreview = await closeClientCooperation(client.id, payload);
+      setClosurePreview(updatedPreview);
+      setIsEndCooperationOpen(false);
+      showOwnerSuccess("Współpraca z klientem została zakończona.", {
+        id: "owner-client-end-cooperation-success",
+      });
+      await refreshCooperationData(client.id);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setClosurePreview(null);
+        try {
+          setClosurePreview(await getClientClosurePreview(client.id));
+        } catch (refreshError) {
+          showOwnerError(
+            refreshError,
+            "Nie udało się odświeżyć stanu współpracy.",
+            { id: "owner-client-end-cooperation-refresh-error" },
+          );
+        }
+        showOwnerInfo(
+          "Dane klienta zmieniły się. Sprawdź je ponownie i wybierz sposób rozliczenia pakietów.",
+          { id: "owner-client-end-cooperation-conflict" },
+        );
+      } else {
+        showOwnerError(err, "Nie udało się zakończyć współpracy.", {
+          id: "owner-client-end-cooperation-error",
+        });
+      }
+    } finally {
+      setIsEndingCooperation(false);
+    }
+  }
+
+  async function handleConfirmRefund(reference: string) {
+    if (!client || !refundToConfirm) return;
+
+    try {
+      setIsConfirmingRefund(true);
+      await confirmClientRefund(client.id, refundToConfirm.clientPackageId, {
+        amount: refundToConfirm.amount,
+        reference,
+      });
+      setRefundToConfirm(null);
+      showOwnerSuccess("Zwrot został oznaczony jako wykonany.", {
+        id: "owner-client-refund-confirm-success",
+      });
+      await refreshRefundData(client.id);
+    } catch (err) {
+      showOwnerError(err, "Nie udało się potwierdzić zwrotu.", {
+        id: "owner-client-refund-confirm-error",
+      });
+    } finally {
+      setIsConfirmingRefund(false);
+    }
+  }
+
+  async function refreshCooperationData(clientId: number, propagateError = false) {
+    const results = await Promise.allSettled([
+      getClient(clientId),
+      getClientSubscription(clientId),
+      getClientBilling(clientId),
+      getClientSessions(clientId),
+      getClientPayments(clientId, { page: 1, pageSize: 3 }),
+      getClientRefunds(clientId, { page: 1, pageSize: 25 }),
+      getClientClosurePreview(clientId),
+    ]);
+
+    const [
+      clientResult,
+      subscriptionResult,
+      billingResult,
+      sessionsResult,
+      paymentsResult,
+      refundsResult,
+      previewResult,
+    ] = results;
+
+    if (clientResult.status === "fulfilled") setClient(clientResult.value);
     if (subscriptionResult.status === "fulfilled") {
       setSubscription(subscriptionResult.value);
     }
-    if (billingResult.status === "fulfilled") {
-      setBilling(billingResult.value);
-    }
+    if (billingResult.status === "fulfilled") setBilling(billingResult.value);
     if (sessionsResult.status === "fulfilled") {
       setSessions(sessionsResult.value);
       setSessionsAvailable(true);
     }
+    if (paymentsResult.status === "fulfilled") {
+      setPayments(paymentsResult.value.items || []);
+      setPaymentsAvailable(true);
+    }
+    if (refundsResult.status === "fulfilled") {
+      setRefunds(refundsResult.value.items || []);
+    }
+    if (previewResult.status === "fulfilled") {
+      setClosurePreview(previewResult.value);
+    }
 
-    const failedResult = [
-      subscriptionResult,
-      billingResult,
-      sessionsResult,
-    ].find((result) => result.status === "rejected");
-
+    const failedResult = results.find((result) => result.status === "rejected");
     if (failedResult?.status === "rejected") {
       showOwnerError(
         failedResult.reason,
-        "Nie udało się pobrać wszystkich danych rozliczenia.",
-        { id: "owner-client-end-cooperation-load-error" },
+        "Część danych klienta nie została odświeżona.",
+        { id: "owner-client-cooperation-refresh-error" },
       );
+      if (propagateError) throw failedResult.reason;
     }
+  }
 
-    setIsEndCooperationLoading(false);
+  async function refreshRefundData(clientId: number) {
+    await refreshCooperationData(clientId);
   }
 
   useEffect(() => {
@@ -224,6 +341,7 @@ export default function OwnerClientDetailsPage() {
         setSessionsAvailable(false);
         setPaymentsAvailable(false);
         setLegalConsentsAvailable(false);
+        setIsRefundsLoading(true);
 
         const [
           clientResult,
@@ -233,6 +351,7 @@ export default function OwnerClientDetailsPage() {
           trainingPlanResult,
           paymentsResult,
           legalConsentsResult,
+          refundsResult,
         ] = await Promise.allSettled([
           getClient(clientId),
           getClientSubscription(clientId),
@@ -241,6 +360,7 @@ export default function OwnerClientDetailsPage() {
           getClientTrainingPlan(clientId),
           getClientPayments(clientId, { page: 1, pageSize: 3 }),
           getClientLegalConsents(clientId),
+          getClientRefunds(clientId, { page: 1, pageSize: 25 }),
         ]);
 
         if (clientResult.status !== "fulfilled") {
@@ -275,12 +395,23 @@ export default function OwnerClientDetailsPage() {
           setLegalConsents(legalConsentsResult.value || []);
           setLegalConsentsAvailable(true);
         }
+
+        if (refundsResult.status === "fulfilled") {
+          setRefunds(refundsResult.value.items || []);
+        } else {
+          showOwnerError(
+            refundsResult.reason,
+            "Nie udało się pobrać zwrotów klienta.",
+            { id: "owner-client-refunds-load-error" },
+          );
+        }
       } catch (err) {
         showOwnerError(err, "Nie udało się pobrać klienta.", {
           id: "owner-client-load-error",
         });
       } finally {
         setIsLoading(false);
+        setIsRefundsLoading(false);
       }
     }
 
@@ -348,7 +479,9 @@ export default function OwnerClientDetailsPage() {
             onPortalAction={client.isArchived ? undefined : handlePortalAction}
             onArchive={client.isArchived ? undefined : handleArchiveCheck}
             onEndCooperation={
-              client.isArchived ? undefined : handleOpenEndCooperation
+              client.isArchived || client.status.toLowerCase() === "inactive"
+                ? undefined
+                : handleOpenEndCooperation
             }
             onRestore={client.isArchived ? handleRestore : undefined}
             isPortalActionPending={isPortalActionPending}
@@ -357,8 +490,17 @@ export default function OwnerClientDetailsPage() {
           <ClientMetricCards
             client={client}
             subscription={subscription}
+            billing={billing}
           />
-          <ClientPackagesSection packages={billing?.packages} />
+          <ClientPackagesSection packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} clientId={!client.isArchived ? client.id : undefined} onSaved={() => refreshCooperationData(client.id, true)} />
+
+          {!client.isArchived ? (
+            <ClientRefundsSection
+              refunds={refunds}
+              loading={isRefundsLoading}
+              onConfirm={setRefundToConfirm}
+            />
+          ) : null}
 
           {client.isArchived &&
           (!sessionsAvailable ||
@@ -422,10 +564,16 @@ export default function OwnerClientDetailsPage() {
               <EndCooperationModal
                 open={isEndCooperationOpen}
                 loading={isEndCooperationLoading}
-                subscription={subscription}
-                billing={billing}
-                sessions={sessions}
+                submitting={isEndingCooperation}
+                preview={closurePreview}
                 onClose={() => setIsEndCooperationOpen(false)}
+                onSubmit={handleEndCooperation}
+              />
+              <RefundConfirmationModal
+                refund={refundToConfirm}
+                submitting={isConfirmingRefund}
+                onClose={() => setRefundToConfirm(null)}
+                onConfirm={handleConfirmRefund}
               />
             </>
           ) : null}

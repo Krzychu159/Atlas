@@ -296,27 +296,24 @@ export default function ClientPaymentsPage() {
         <section className="grid gap-4 lg:grid-cols-4">
           <SummaryCard
             icon={<CreditCard size={20} />}
-            label="Do zapłaty"
-            value={formatMoney(
-              billing?.activePackageAmountDue ?? 0,
-              getCurrency(billing),
-            )}
-            note={billing?.activePackageName || "Aktywny pakiet"}
+            label="Łącznie do zapłaty"
+            value={typeof billing?.totalAmountDue === "number" ? formatMoney(billing.totalAmountDue, getCurrency(billing)) : "Niedostępne"}
+            note="Wszystkie pakiety"
             loading={isLoading}
             accent={
-              (billing?.activePackageAmountDue ?? 0) > 0 ? "warning" : "success"
+              (billing?.totalAmountDue ?? 0) > 0 ? "warning" : "success"
             }
           />
           <SummaryCard
             icon={<Dumbbell size={20} />}
-            label="Aktywny pakiet"
-            value={billing?.activePackageName || "Brak pakietu"}
+            label="Bieżący pakiet indywidualny"
+            value={billing?.activeClientPackageId ? billing.activePackageName || "Brak nazwy" : "Brak pakietu"}
             note={getPaymentStatusLabel(billing?.activePackagePaymentStatus)}
             loading={isLoading}
           />
           <SummaryCard
             icon={<Wallet size={20} />}
-            label="Saldo"
+            label="Saldo do wykorzystania"
             value={formatMoney(
               billing?.currentBalance ?? 0,
               getCurrency(billing),

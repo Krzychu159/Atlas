@@ -176,6 +176,54 @@ export type ClientArchiveCheck = {
   blockers: string[];
 };
 
+export type ClientClosurePackage = {
+  clientPackageId: number;
+  name: string;
+  requiresDecision: boolean;
+  remainingSessions: number;
+  amountPaid: number;
+  amountDue: number;
+  currency: string;
+  disposition: string | null;
+  refundAmount: number;
+  refundConfirmedAt: string | null;
+};
+
+export type ClientClosurePreview = {
+  clientId: number;
+  blockers: string[];
+  futureSessionIds: number[];
+  balance: number;
+  packages: ClientClosurePackage[];
+};
+
+export type CloseCooperationPayload = {
+  reason: string;
+  packages: Array<{
+    clientPackageId: number;
+    disposition: "Retain" | "Refund";
+    refundAmount: number;
+  }>;
+};
+
+export type ClientRefund = {
+  clientPackageId: number;
+  packageName: string | null;
+  amount: number;
+  currency: string | null;
+  disposition: string | null;
+  confirmedAt: string | null;
+  reference: string | null;
+};
+
+export type ClientRefundsPage = {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  items: ClientRefund[] | null;
+};
+
 export type UpdateClientPayload = {
   trainerId?: number | null;
   firstName?: string | null;
@@ -268,6 +316,42 @@ export function getArchivedClients() {
 
 export function getClientArchiveCheck(id: number) {
   return backendGet<ClientArchiveCheck>(`clients/${id}/archive-check`);
+}
+
+export function getClientClosurePreview(id: number) {
+  return backendGet<ClientClosurePreview>(`clients/${id}/closure-preview`);
+}
+
+export function closeClientCooperation(
+  id: number,
+  payload: CloseCooperationPayload,
+) {
+  return backendPost<ClientClosurePreview>(
+    `clients/${id}/close-cooperation`,
+    payload,
+  );
+}
+
+export function getClientRefunds(
+  id: number,
+  query: { page?: number; pageSize?: number } = {},
+) {
+  return backendGet<ClientRefundsPage>("clients/refunds", {
+    ClientId: id,
+    Page: query.page,
+    PageSize: query.pageSize,
+  });
+}
+
+export function confirmClientRefund(
+  clientId: number,
+  clientPackageId: number,
+  payload: { amount: number; reference: string },
+) {
+  return backendPost<void>(
+    `clients/${clientId}/packages/${clientPackageId}/confirm-refund`,
+    payload,
+  );
 }
 
 export function archiveClient(id: number) {

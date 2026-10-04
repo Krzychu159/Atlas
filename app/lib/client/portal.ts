@@ -136,6 +136,7 @@ export type ClientPackageBilling = {
 };
 
 export type ClientBillingSummary = {
+  totalAmountDue?: number;
   clientId: number;
   clientName: string | null;
   currentBalance: number;

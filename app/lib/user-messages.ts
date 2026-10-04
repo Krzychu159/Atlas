@@ -27,6 +27,9 @@ export function userStatus(value: string | null | undefined, fallback = "Status 
     Confirmed: "Potwierdzony", Active: "Aktywny", Paid: "Opłacony", Unpaid: "Nieopłacony",
     Pending: "Oczekuje", PendingConfirmation: "Oczekuje na potwierdzenie",
     Rejected: "Odrzucony", Reversed: "Cofnięty",
+    Closed: "Zamknięty", Exhausted: "Wykorzystany", Expired: "Wygasły",
+    PartiallyPaid: "Częściowo opłacony", RefundPending: "Zwrot oczekuje",
+    RefundConfirmed: "Zwrot potwierdzony",
   };
   return value ? (Object.hasOwn(labels, value) ? labels[value] : userMessage(value, "Status niedostępny")) : fallback;
 }

@@ -1,4 +1,5 @@
 import { CreditCard, Repeat2, UserRound } from "lucide-react";
+import type { ClientBillingSummary } from "@/app/lib/owner/billing";
 import type {
   Client,
   ClientSubscription,
@@ -49,35 +50,41 @@ function MetricCard({
 export default function ClientMetricCards({
   client,
   subscription,
+  billing,
 }: {
   client: Client;
   subscription: ClientSubscription | null;
+  billing?: ClientBillingSummary | null;
   usage?: SubscriptionUsage | null;
 }) {
   const cycle = subscription?.currentCycle;
   const currency = cycle?.currency || client.currency || "PLN";
-  const amountDue = formatMoney(cycle?.amountDue ?? 0, currency);
+  const amountDue = typeof billing?.totalAmountDue === "number" ? formatMoney(billing.totalAmountDue, currency) : "Niedostępne";
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
       <MetricCard
-        label="Do zapłaty"
+        label="Łącznie do zapłaty"
         value={amountDue}
-        note={cycle?.packageName || "Aktualny cykl"}
+        note="Wszystkie pakiety klienta"
         icon={<CreditCard size={22} />}
-        highlight={(cycle?.amountDue ?? 0) > 0}
+        highlight={(billing?.totalAmountDue ?? 0) > 0}
       />
       <MetricCard
-        label="Trener opiekun"
-        value={client.trainerFullName || "Brak"}
-        note="Przypisany trener"
+        label="Saldo do wykorzystania"
+        value={billing ? formatMoney(billing.currentBalance, currency) : "Niedostępne"}
         icon={<UserRound size={22} />}
       />
       <MetricCard
-        label="Następny pakiet"
-        value={subscription?.nextPackage?.packageName || "Nie ustawiono"}
+        label="Bieżący pakiet indywidualny"
+        value={billing?.activeClientPackageId ? billing.activePackageName || "Brak nazwy" : "Brak"}
+        icon={<UserRound size={22} />}
+      />
+      <MetricCard
+        label="Automatyczne przedłużanie"
+        value={subscription ? subscription.autoRenewEnabled && !subscription.cancelRenewalRequested ? "Włączone" : "Wyłączone" : "Niedostępne"}
         note={
-          subscription?.autoRenewEnabled
+          subscription?.autoRenewEnabled && !subscription.cancelRenewalRequested
             ? "Automatyczne przedłużanie aktywne"
             : "Automatyczne przedłużanie wyłączone"
         }

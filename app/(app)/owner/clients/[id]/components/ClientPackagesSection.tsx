@@ -5,6 +5,8 @@ import { CalendarDays, Dumbbell, MapPin, UsersRound } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import type { ClientPackageBilling } from "@/app/lib/owner/billing";
 import { formatMoney } from "@/app/lib/formatters/money";
+import { userStatus, userTrainingType } from "@/app/lib/user-messages";
+import PackageManagementModal from "./PackageManagementModal";
 
 export function isGroupClientPackage(
   packageData: Pick<ClientPackageBilling, "packageType" | "expectedBillingType">,
@@ -58,9 +60,16 @@ export function getClientGroupLocationNames(
 
 export default function ClientPackagesSection({
   packages,
+  activeClientPackageId,
+  clientId,
+  onSaved,
 }: {
   packages: ClientPackageBilling[] | null | undefined;
+  activeClientPackageId?: number | null;
+  clientId?: number;
+  onSaved?: () => Promise<void>;
 }) {
+  const [managedPackage, setManagedPackage] = useState<ClientPackageBilling | null>(null);
   const [visibleCount, setVisibleCount] = useState(6);
   const sortedPackages = useMemo(
     () =>
@@ -70,16 +79,24 @@ export default function ClientPackagesSection({
       ),
     [packages],
   );
-  const visiblePackages = sortedPackages.slice(0, visibleCount);
+  const mainPackage = sortedPackages.find((item) => item.clientPackageId === activeClientPackageId);
+  const groupPackages = sortedPackages.filter(isGroupClientPackage);
+  const history = sortedPackages.filter((item) => item !== mainPackage && !isGroupClientPackage(item));
+  const visiblePackages = history.slice(0, visibleCount);
 
   return (
     <section className="card-shell p-5 md:p-6">
       <div>
         <p className="text-label text-on-surface-muted">Pakiety klienta</p>
         <h2 className="mt-2 font-display text-[1.65rem] font-semibold leading-tight">
-          Historia pakietów
+          Pakiet indywidualny
         </h2>
       </div>
+
+      {mainPackage ? <div className="mt-5"><ClientPackageCard packageData={mainPackage} onManage={clientId && onSaved ? () => setManagedPackage(mainPackage) : undefined} /></div> : <p className="mt-4 text-sm text-on-surface-variant">Klient nie ma bieżącego pakietu indywidualnego. Pakiety grupowe pozostają dostępne niezależnie.</p>}
+      <h2 className="mt-6 text-section-title">Pakiety grupowe</h2>
+      {groupPackages.length ? <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{groupPackages.map((item) => <ClientPackageCard key={item.clientPackageId} packageData={item} onManage={clientId && onSaved ? () => setManagedPackage(item) : undefined} />)}</div> : <p className="mt-4 text-sm text-on-surface-variant">Brak pakietów grupowych.</p>}
+      <h2 className="mt-6 text-section-title">Pozostałe pakiety indywidualne</h2>
 
       {packages === undefined ? (
         <div className="mt-5 rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 text-sm text-on-surface-variant">
@@ -92,10 +109,11 @@ export default function ClientPackagesSection({
               <ClientPackageCard
                 key={packageData.clientPackageId}
                 packageData={packageData}
+                onManage={clientId && onSaved ? () => setManagedPackage(packageData) : undefined}
               />
             ))}
           </div>
-          {visiblePackages.length < sortedPackages.length ? (
+          {visiblePackages.length < history.length ? (
             <Button
               type="button"
               variant="secondary"
@@ -109,17 +127,20 @@ export default function ClientPackagesSection({
         </>
       ) : (
         <div className="mt-5 rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 text-sm text-on-surface-variant">
-          Brak pakietów w historii.
+          Brak pozostałych pakietów indywidualnych.
         </div>
       )}
+      {managedPackage && clientId && onSaved ? <PackageManagementModal key={managedPackage.clientPackageId} clientId={clientId} packageData={managedPackage} onClose={() => setManagedPackage(null)} onSaved={onSaved} /> : null}
     </section>
   );
 }
 
 function ClientPackageCard({
   packageData,
+  onManage,
 }: {
   packageData: ClientPackageBilling;
+  onManage?: () => void;
 }) {
   const packageKind = getClientPackageKind(packageData);
   const isGroup = packageKind === "group";
@@ -133,10 +154,10 @@ function ClientPackageCard({
             {packageKind === "group"
               ? "Grupowy"
               : packageKind === "main"
-                ? "Główny / pozostały"
+                ? "Indywidualny / semi"
                 : "Typ nieokreślony"}
           </span>
-          <h3 className="mt-3 truncate text-base font-semibold">
+          <h3 className="mt-3 break-words text-base font-semibold">
             {packageData.packageName || "Pakiet bez nazwy"}
           </h3>
         </div>
@@ -144,11 +165,21 @@ function ClientPackageCard({
           {getPackageStatusLabel(packageData)}
         </span>
       </div>
+      {packageData.origin === "OpeningBalance" ? <p className="mt-3 text-xs text-primary-light">Stan początkowy</p> : null}
 
       <p className="mt-4 flex items-center gap-2 text-sm text-on-surface-variant">
         <MapPin size={14} className="shrink-0 text-primary-light" />
         {packageData.locationName || "Brak lokalizacji pakietu"}
       </p>
+
+      <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+        <div><dt className="text-on-surface-muted">Typ</dt><dd>{userTrainingType(String(packageData.expectedBillingType), packageKind === "group" ? "Grupowy" : "Indywidualny / semi")}</dd></div>
+        <div><dt className="text-on-surface-muted">Cena</dt><dd>{formatMoney(packageData.totalPrice, packageData.currency || "PLN")}</dd></div>
+        <div><dt className="text-on-surface-muted">Pozostałe wejścia</dt><dd>{packageData.remainingSessions}</dd></div>
+        <div><dt className="text-on-surface-muted">Ważność</dt><dd>{formatPackageDate(packageData.validUntil)}</dd></div>
+        <div><dt className="text-on-surface-muted">Termin płatności</dt><dd>{formatPackageDate(packageData.paymentDueDate)}</dd></div>
+        <div><dt className="text-on-surface-muted">Płatność</dt><dd>{userStatus(packageData.paymentStatus)}</dd></div>
+      </dl>
 
       <p className="mt-2 flex items-center gap-2 text-sm text-on-surface-variant">
         <CalendarDays size={14} className="shrink-0 text-primary-light" />
@@ -158,7 +189,7 @@ function ClientPackageCard({
           : ""}
       </p>
 
-      <div className="mt-4 grid grid-cols-3 items-end gap-3 border-t border-white/5 pt-4">
+      <div className="mt-4 grid grid-cols-1 items-end gap-3 border-t border-white/5 pt-4 sm:grid-cols-3">
         <div>
           <p className="text-label text-on-surface-muted">Wykorzystanie</p>
           <p className="mt-1 text-sm font-semibold">
@@ -178,6 +209,7 @@ function ClientPackageCard({
           </p>
         </div>
       </div>
+      {onManage ? <Button className="mt-4 w-full" variant="secondary" onClick={onManage}>Zarządzaj pakietem</Button> : null}
     </article>
   );
 }
@@ -201,9 +233,7 @@ function getTime(value?: string | null) {
 }
 
 function getPackageStatusLabel(packageData: ClientPackageBilling) {
-  if (!packageData.isActive) return packageData.paymentStatus || "Zakończony";
-
-  return packageData.paymentStatus || packageData.activationMode || "Aktywny";
+  return packageData.isActive ? "Aktywny" : "Nieaktywny";
 }
 
 function normalizeLocation(value?: string | null) {

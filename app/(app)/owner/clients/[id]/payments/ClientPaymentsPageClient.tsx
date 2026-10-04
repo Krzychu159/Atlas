@@ -9,13 +9,10 @@ import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
   ArrowLeft,
-  CheckCircle2,
   PackagePlus,
   ReceiptText,
   RefreshCw,
-  Trash2,
   WalletCards,
 } from "lucide-react";
 import { PaymentActionConfirmModal } from "@/app/components/payments/PaymentActionConfirmModal";
@@ -25,23 +22,16 @@ import { PaymentsList } from "@/app/components/payments/PaymentsList";
 import { PaymentReasonModal } from "@/app/components/payments/PaymentReasonModal";
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
-import {
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-} from "@/app/components/ui/modal";
 import { getPaymentBreakdown } from "@/app/lib/payments/display";
 import {
   cancelClientSubscription,
   getClient,
-  getClientCurrentCycle,
   getClientSubscription,
   getClientSubscriptionUsage,
   resumeClientSubscription,
   setClientNextPackage,
   type Client,
   type ClientSubscription,
-  type SubscriptionCycle,
   type SubscriptionUsage,
 } from "@/app/lib/owner/clients";
 import {
@@ -50,8 +40,6 @@ import {
   confirmClientPayment,
   createClientPackage,
   createClientPayment,
-  deleteClientPackage,
-  getClientActivePackage,
   getClientBilling,
   getClientPayments,
   issuePaymentReceipt,
@@ -81,7 +69,7 @@ import {
   resumeTrainerPortalClientSubscription,
 } from "@/app/lib/trainer/portal";
 import { trainerPortalClientToClient } from "@/app/lib/trainer/portal-mappers";
-import { isGroupClientPackage } from "../components/ClientPackagesSection";
+import ClientPackagesSection from "../components/ClientPackagesSection";
 
 type ClientPaymentsPageClientProps = {
   clientIdParam: string;
@@ -92,10 +80,6 @@ type PaymentAction = "confirm" | "issueReceipt" | "cancelReceipt";
 
 const CLIENT_PAYMENTS_PER_PAGE = 6;
 
-type PackageDeleteTarget = {
-  clientPackageId: number;
-  packageName: string;
-};
 
 export default function ClientPaymentsPageClient({
   clientIdParam,
@@ -109,11 +93,6 @@ export default function ClientPaymentsPageClient({
     null,
   );
   const [usage, setUsage] = useState<SubscriptionUsage | null>(null);
-  const [activePackage, setActivePackage] =
-    useState<ClientPackageBilling | null>(null);
-  const [currentCycle, setCurrentCycle] = useState<SubscriptionCycle | null>(
-    null,
-  );
   const [clientPayments, setClientPayments] = useState<ClientPayment[]>([]);
   const [paymentPage, setPaymentPage] = useState(1);
   const [packages, setPackages] = useState<Package[]>([]);
@@ -136,10 +115,6 @@ export default function ClientPaymentsPageClient({
     payment: ClientPayment;
   } | null>(null);
   const [reversalReason, setReversalReason] = useState("");
-  const [packageToDelete, setPackageToDelete] =
-    useState<PackageDeleteTarget | null>(null);
-  const [isDeletingPackage, setIsDeletingPackage] = useState(false);
-
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const parsedId = Number(clientIdParam);
@@ -160,7 +135,7 @@ export default function ClientPaymentsPageClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientIdParam, correctionRevision]);
 
-  async function loadClientPayments(id = clientId) {
+  async function loadClientPayments(id = clientId, propagateError = false) {
     if (!id) return;
 
     try {
@@ -177,8 +152,6 @@ export default function ClientPaymentsPageClient({
         packagesData,
         usageData,
         paymentsData,
-        activePackageData,
-        currentCycleData,
       ] = await Promise.all([
         getClient(id),
         getClientBilling(id),
@@ -186,18 +159,14 @@ export default function ClientPaymentsPageClient({
         getPackages(),
         getClientSubscriptionUsage(id).catch(() => null),
         getClientPayments(id, { page: 1, pageSize: 1000 }),
-        getClientActivePackage(id).catch(() => null),
-        getClientCurrentCycle(id).catch(() => null),
       ]);
 
       setClient(clientData);
       setBilling(billingData);
       setSubscription(subscriptionData);
       setUsage(usageData);
-      setClientPayments(paymentsData.items || []);
+      setClientPayments(billingData.payments || paymentsData.items || []);
       setPaymentPage(1);
-      setActivePackage(activePackageData);
-      setCurrentCycle(currentCycleData);
       setPackages(
         packagesData.filter(
           (item) =>
@@ -222,6 +191,7 @@ export default function ClientPaymentsPageClient({
       showOwnerError(err, "Nie udało się pobrać płatności klienta.", {
         id: "owner-client-payments-load-error",
       });
+      if (propagateError) throw err;
     } finally {
       setIsLoading(false);
     }
@@ -247,11 +217,6 @@ export default function ClientPaymentsPageClient({
     const activeClientPackageId = billingData.activeClientPackageId
       ? String(billingData.activeClientPackageId)
       : "";
-    const activePackageData =
-      billingData.packages?.find(
-        (item) => item.clientPackageId === billingData.activeClientPackageId,
-      ) || null;
-
     const mappedClient = trainerPortalClientToClient(clientData, meData);
 
     setClient(mappedClient);
@@ -260,8 +225,6 @@ export default function ClientPaymentsPageClient({
     setUsage(usageData);
     setClientPayments(billingData.payments || []);
     setPaymentPage(1);
-    setActivePackage(activePackageData);
-    setCurrentCycle(subscriptionData.currentCycle || null);
     setPackages(
       packagesData.filter(
         (item) =>
@@ -286,8 +249,8 @@ export default function ClientPaymentsPageClient({
       (item) => item.id === Number(selectedPackageId),
     );
 
-    if (!selectedPackage) {
-      showOwnerError(new Error("Wybierz pakiet z lokalizacji klienta."), "", {
+    if (!selectedPackage || selectedPackage.billingType === 5) {
+      showOwnerError(new Error("Wybierz pakiet indywidualny z lokalizacji klienta."), "", {
         id: "owner-client-package-location-required",
       });
       return;
@@ -341,26 +304,6 @@ export default function ClientPaymentsPageClient({
     }
   }
 
-  async function handleDeletePackage() {
-    if (!clientId || !packageToDelete || basePath !== "/owner") return;
-
-    try {
-      setIsDeletingPackage(true);
-      await deleteClientPackage(clientId, packageToDelete.clientPackageId);
-      setPackageToDelete(null);
-      await loadClientPayments(clientId);
-      showOwnerSuccess("Pakiet klienta został usunięty.", {
-        id: "owner-client-package-delete-success",
-      });
-    } catch (err) {
-      showOwnerError(err, "Nie udało się usunąć pakietu klienta.", {
-        id: "owner-client-package-delete-error",
-      });
-    } finally {
-      setIsDeletingPackage(false);
-    }
-  }
-
   async function handleSetNextPackage() {
     if (!clientId || !selectedNextPackageId || basePath !== "/owner") return;
 
@@ -368,8 +311,8 @@ export default function ClientPaymentsPageClient({
       (item) => item.id === Number(selectedNextPackageId),
     );
 
-    if (!selectedPackage) {
-      showOwnerError(new Error("Wybierz pakiet z lokalizacji klienta."), "", {
+    if (!selectedPackage || selectedPackage.billingType === 5) {
+      showOwnerError(new Error("Wybierz pakiet indywidualny z lokalizacji klienta."), "", {
         id: "owner-client-next-package-location-required",
       });
       return;
@@ -380,6 +323,7 @@ export default function ClientPaymentsPageClient({
       const data = await setClientNextPackage(clientId, selectedPackage.id);
 
       setSubscription(data);
+      await loadClientPayments(clientId);
       setSelectedNextPackageId(
         data.nextPackage?.packageId
           ? String(data.nextPackage.packageId)
@@ -413,11 +357,8 @@ export default function ClientPaymentsPageClient({
         basePath === "/trainer"
           ? await cancelTrainerPortalClientSubscription(clientId)
           : await cancelClientSubscription(clientId);
-      setSubscription({
-        ...data,
-        autoRenewEnabled: false,
-        cancelRenewalRequested: true,
-      });
+      setSubscription(data);
+      await loadClientPayments(clientId);
       showOwnerSuccess("Zakończenie po pakiecie zostało ustawione.", {
         id: "owner-client-cancel-after-cycle-updated",
       });
@@ -433,7 +374,7 @@ export default function ClientPaymentsPageClient({
   async function handleResumeAutoRenew() {
     if (!clientId || !subscription) return;
 
-    if (!subscription.cancelRenewalRequested) {
+    if (subscription.autoRenewEnabled && !subscription.cancelRenewalRequested) {
       showOwnerSuccess("Automatyczne przedłużanie jest już aktywne.", {
         id: "owner-client-autorenew-already-active",
       });
@@ -446,11 +387,8 @@ export default function ClientPaymentsPageClient({
         basePath === "/trainer"
           ? await resumeTrainerPortalClientSubscription(clientId)
           : await resumeClientSubscription(clientId);
-      setSubscription({
-        ...data,
-        autoRenewEnabled: true,
-        cancelRenewalRequested: false,
-      });
+      setSubscription(data);
+      await loadClientPayments(clientId);
       showOwnerSuccess("Automatyczne przedłużanie zostało wznowione.", {
         id: "owner-client-autorenew-resumed",
       });
@@ -676,29 +614,11 @@ export default function ClientPaymentsPageClient({
       ),
     [clientPayments],
   );
-  const cycle = currentCycle || subscription?.currentCycle || null;
-  const cyclePackage = packagesBilling.find(
-    (item) => item.clientPackageId === cycle?.clientPackageId,
-  ) || cycle;
-  const currentPackages = [
-    ...(cyclePackage?.isActive ? [cyclePackage] : []),
-    ...(activePackage?.isActive ? [activePackage] : []),
-    ...packagesBilling.filter((item) => item.isActive),
-  ].filter(
-    (item, index, items) =>
-      items.findIndex((other) => other.clientPackageId === item.clientPackageId) === index,
-  );
-  const mainPackage = currentPackages.find((item) => !isGroupClientPackage(item)) || null;
-  const groupPackages = currentPackages.filter(isGroupClientPackage);
+  const mainPackage = packagesBilling.find((item) => item.clientPackageId === billing?.activeClientPackageId) || null;
   const mainUsage = usage?.clientPackageId === mainPackage?.clientPackageId ? usage : null;
-  const mainSubscription = cycle?.clientPackageId === mainPackage?.clientPackageId
-    ? subscription
-    : null;
-  const summaryPackage = mainPackage || groupPackages[0] || null;
-  const activeAmountDue = summaryPackage?.amountDue ?? 0;
-  const activeAmountPaid = summaryPackage?.amountPaid ?? 0;
-  const activeCurrency = summaryPackage?.currency || "PLN";
-  const lastPayment = payments[0] || null;
+  const mainSubscription = subscription;
+  const activeCurrency = mainPackage?.currency || "PLN";
+  const nextPackageOptions = [{ value: "", label: "Wybierz pakiet" }, ...packages.filter((item) => item.billingType !== 5).map((item) => ({ value: String(item.id), label: item.name }))];
   const paymentTotalPages = Math.max(
     1,
     Math.ceil(payments.length / CLIENT_PAYMENTS_PER_PAGE),
@@ -750,37 +670,28 @@ export default function ClientPaymentsPageClient({
         <>
           <section className="grid gap-3 md:grid-cols-4">
             <BillingStat
-              label="Do zapłaty"
-              value={formatMoney(activeAmountDue, activeCurrency)}
+              label="Łącznie do zapłaty"
+              value={typeof billing.totalAmountDue === "number" ? formatMoney(billing.totalAmountDue, activeCurrency) : "Niedostępne"}
               icon={<WalletCards size={18} />}
             />
             <BillingStat
-              label={mainPackage || !groupPackages.length ? "Pakiet główny" : "Pakiet grupowy"}
-              value={summaryPackage?.packageName || "Brak"}
+              label="Bieżący pakiet indywidualny"
+              value={billing.activeClientPackageId ? billing.activePackageName || "Brak nazwy" : "Brak"}
               icon={<PackagePlus size={18} />}
             />
             <BillingStat
-              label="Zapłacono za pakiet"
-              value={formatMoney(activeAmountPaid, activeCurrency)}
-              icon={<CheckCircle2 size={18} />}
+              label="Saldo do wykorzystania"
+              value={formatMoney(billing.currentBalance, activeCurrency)}
+              icon={<WalletCards size={18} />}
             />
             <BillingStat
-              label="Ostatnia wpłata"
-              value={
-                lastPayment
-                  ? formatMoney(lastPayment.amount, lastPayment.currency)
-                  : "Brak"
-              }
-              icon={<ReceiptText size={18} />}
+              label="Automatyczne przedłużanie"
+              value={subscription ? subscription.autoRenewEnabled && !subscription.cancelRenewalRequested ? "Włączone" : "Wyłączone" : "Niedostępne"}
+              icon={<RefreshCw size={18} />}
             />
           </section>
 
-          {billing.currentBalance > 0 ? (
-            <div className="rounded-[var(--radius-lg)] border border-tertiary-light/20 bg-tertiary-container/20 px-4 py-3 text-sm font-semibold text-tertiary-light">
-              Nadpłata klienta zostanie automatycznie odjęta od kolejnego
-              pakietu.
-            </div>
-          ) : null}
+          <ClientPackagesSection packages={billing.packages} activeClientPackageId={billing.activeClientPackageId} clientId={basePath === "/owner" ? clientId || undefined : undefined} onSaved={() => loadClientPayments(clientId, true)} />
 
           <section className="grid gap-5">
             <div className="card-shell flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between md:p-5">
@@ -831,16 +742,16 @@ export default function ClientPaymentsPageClient({
                 onConfirm={(payment) =>
                   setPaymentAction({ type: "confirm", payment })
                 }
-                onIssueReceipt={(payment) =>
+                onIssueReceipt={basePath === "/owner" ? (payment) =>
                   setPaymentAction({ type: "issueReceipt", payment })
-                }
-                onCancelReceipt={(payment) =>
+                : undefined}
+                onCancelReceipt={basePath === "/owner" ? (payment) =>
                   setPaymentAction({ type: "cancelReceipt", payment })
-                }
-                onReverse={(payment) => {
+                : undefined}
+                onReverse={basePath === "/owner" ? (payment) => {
                   setPaymentToReverse(payment);
                   setReversalReason("");
-                }}
+                } : undefined}
               />
 
               {payments.length > 0 ? (
@@ -863,39 +774,25 @@ export default function ClientPaymentsPageClient({
           >
             {mainUsage ? <UsageCard usage={mainUsage} /> : null}
 
-            <div className={`grid min-w-0 gap-5 ${!mainUsage && currentPackages.length > 1 ? "xl:grid-cols-2" : ""}`}>
-              {(mainPackage || groupPackages.length === 0
-                ? [mainPackage, ...groupPackages]
-                : groupPackages
-              ).map((packageData) => (
+            <div className="grid min-w-0 gap-5">
                 <SubscriptionPanel
-                  key={packageData?.clientPackageId || "empty"}
-                  subscription={packageData === mainPackage ? mainSubscription : null}
-                  activePackage={packageData}
-                  isGroup={Boolean(packageData && isGroupClientPackage(packageData))}
+                  subscription={mainSubscription}
+                  activePackage={mainPackage}
+                  isGroup={false}
                   selectedPackageId={selectedPackageId}
                   selectedNextPackageId={selectedNextPackageId}
                   packageOptions={packageOptions}
+                  nextPackageOptions={nextPackageOptions}
                   clientLocationName={client?.locationName || "lokalizacji klienta"}
                   canAssignPackage={basePath === "/owner"}
-                  canDeletePackage={Boolean(basePath === "/owner" && packageData && packageData.usedSessions === 0)}
-                  isSaving={isSaving || isDeletingPackage}
+                  isSaving={isSaving}
                   onPackageChange={setSelectedPackageId}
                   onNextPackageChange={setSelectedNextPackageId}
                   onAssignPackage={handleAssignPackage}
                   onSetNextPackage={handleSetNextPackage}
                   onCancelAfterCycle={handleRequestCancelAfterCycle}
                   onResumeAutoRenew={handleResumeAutoRenew}
-                  onDeletePackage={() => {
-                    if (!packageData || basePath !== "/owner" || packageData.usedSessions !== 0) return;
-
-                    setPackageToDelete({
-                      clientPackageId: packageData.clientPackageId,
-                      packageName: packageData.packageName || "Pakiet klienta",
-                    });
-                  }}
                 />
-              ))}
             </div>
           </section>
         </>
@@ -966,14 +863,6 @@ export default function ClientPaymentsPageClient({
         />
       ) : null}
 
-      {packageToDelete ? (
-        <PackageDeleteConfirmModal
-          packageName={packageToDelete.packageName}
-          processing={isDeletingPackage}
-          onClose={() => setPackageToDelete(null)}
-          onConfirm={() => void handleDeletePackage()}
-        />
-      ) : null}
     </div>
   );
 }
@@ -1016,9 +905,9 @@ function SubscriptionPanel({
   selectedPackageId,
   selectedNextPackageId,
   packageOptions,
+  nextPackageOptions,
   clientLocationName,
   canAssignPackage,
-  canDeletePackage,
   isSaving,
   onPackageChange,
   onNextPackageChange,
@@ -1026,17 +915,16 @@ function SubscriptionPanel({
   onSetNextPackage,
   onCancelAfterCycle,
   onResumeAutoRenew,
-  onDeletePackage,
 }: {
   subscription: ClientSubscription | null;
-  activePackage: ClientPackageBilling | SubscriptionCycle | null;
+  activePackage: ClientPackageBilling | null;
   isGroup: boolean;
   selectedPackageId: string;
   selectedNextPackageId: string;
   packageOptions: Array<{ value: string; label: string }>;
+  nextPackageOptions: Array<{ value: string; label: string }>;
   clientLocationName: string;
   canAssignPackage: boolean;
-  canDeletePackage: boolean;
   isSaving: boolean;
   onPackageChange: (value: string) => void;
   onNextPackageChange: (value: string) => void;
@@ -1044,7 +932,6 @@ function SubscriptionPanel({
   onSetNextPackage: () => void;
   onCancelAfterCycle: () => void;
   onResumeAutoRenew: () => void;
-  onDeletePackage: () => void;
 }) {
   const cancelRequested = Boolean(subscription?.cancelRenewalRequested);
   const willRenew = Boolean(subscription?.autoRenewEnabled && !cancelRequested);
@@ -1058,7 +945,7 @@ function SubscriptionPanel({
   const progress = totalSessions
     ? Math.min(100, Math.round((usedSessions / totalSessions) * 100))
     : 0;
-  const hasActivePackage = Boolean(activePackage?.isActive);
+  const hasActivePackage = Boolean(activePackage);
   const savedNextPackageId = subscription?.nextPackage?.packageId
     ? String(subscription.nextPackage.packageId)
     : "";
@@ -1116,12 +1003,12 @@ function SubscriptionPanel({
     <section className="card-shell p-4 md:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-section-title">{isGroup ? "Pakiet grupowy" : "Pakiet główny"}</p>
+          <p className="text-section-title">{isGroup ? "Pakiet grupowy" : "Pakiet indywidualny"}</p>
           <p className="mt-2 text-sm text-on-surface-variant">
             Aktualny pakiet, wykorzystanie wejść i status płatności.
           </p>
         </div>
-        <StatusPill label={userStatus(subscription?.status || activePackage?.paymentStatus)} muted />
+        <StatusPill label={activePackage?.isActive ? "Aktywny" : "Nieaktywny"} muted />
       </div>
 
       <div className={`mt-4 grid gap-3 ${!isGroup && subscription ? "lg:grid-cols-2" : ""}`}>
@@ -1134,7 +1021,7 @@ function SubscriptionPanel({
               </h3>
             </div>
             <StatusPill
-              label={activePackage?.paymentStatus || "Status"}
+              label={userStatus(activePackage?.paymentStatus)}
               muted
             />
           </div>
@@ -1149,22 +1036,6 @@ function SubscriptionPanel({
             <SmallMetric label="Zapłacono" value={formatMoney(amountPaid, currency)} />
             <SmallMetric label="Do zapłaty" value={formatMoney(amountDue, currency)} />
           </div>
-          {canDeletePackage ? (
-            <div className="mt-4 border-t border-white/5 pt-4">
-              <Button
-                variant="danger"
-                icon={<Trash2 size={16} />}
-                onClick={onDeletePackage}
-                disabled={isSaving}
-                className="w-full sm:w-auto"
-              >
-                Usuń pakiet
-              </Button>
-              <p className="mt-2 text-xs leading-5 text-on-surface-muted">
-                Pakiet można usunąć, ponieważ nie wykorzystano żadnego wejścia.
-              </p>
-            </div>
-          ) : null}
         </div>
 
         {!isGroup && subscription ? (
@@ -1228,7 +1099,7 @@ function SubscriptionPanel({
               <CustomSelect
                 value={selectedNextPackageId}
                 onChange={onNextPackageChange}
-                options={packageOptions}
+                options={nextPackageOptions}
               />
               <Button
                 variant="outline"
@@ -1253,70 +1124,6 @@ function SubscriptionPanel({
       ) : null}
 
     </section>
-  );
-}
-
-function PackageDeleteConfirmModal({
-  packageName,
-  processing,
-  onClose,
-  onConfirm,
-}: {
-  packageName: string;
-  processing: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <ModalOverlay onClose={processing ? undefined : onClose}>
-      <div
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="delete-client-package-title"
-        className="relative z-10 w-full max-w-[500px] overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient"
-      >
-        <ModalHeader
-          title="Usunąć pakiet klienta?"
-          description="Tej operacji nie można cofnąć. Pakiet zostanie usunięty z profilu klienta."
-          icon={<AlertTriangle size={19} />}
-          iconTone="danger"
-          onClose={processing ? () => undefined : onClose}
-          className="p-5 md:p-6"
-        />
-
-        <div className="mx-5 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 md:mx-6">
-          <p
-            id="delete-client-package-title"
-            className="break-words font-semibold text-on-surface"
-          >
-            {packageName}
-          </p>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            Wykorzystane wejścia: 0
-          </p>
-        </div>
-
-        <ModalFooter className="mt-5">
-          <Button
-            variant="secondary"
-            onClick={onClose}
-            disabled={processing}
-            className="w-full sm:w-auto"
-          >
-            Anuluj
-          </Button>
-          <Button
-            variant="danger"
-            icon={<Trash2 size={16} />}
-            onClick={onConfirm}
-            disabled={processing}
-            className="w-full sm:w-auto"
-          >
-            {processing ? "Usuwanie..." : "Usuń pakiet"}
-          </Button>
-        </ModalFooter>
-      </div>
-    </ModalOverlay>
   );
 }
 

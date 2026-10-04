@@ -5,6 +5,7 @@ import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import ClientMetricCards from "@/app/(app)/owner/clients/[id]/components/ClientMetricCards";
+import ClientPackagesSection from "@/app/(app)/owner/clients/[id]/components/ClientPackagesSection";
 import ClientNotesPanel from "@/app/(app)/owner/clients/[id]/components/ClientNotesPanel";
 import ClientProfileHero from "@/app/(app)/owner/clients/[id]/components/ClientProfileHero";
 import ClientSessionsPanel from "@/app/(app)/owner/clients/[id]/components/ClientSessionsPanel";
@@ -20,7 +21,7 @@ import {
   type ClientTrainingPlan,
   type SubscriptionUsage,
 } from "@/app/lib/owner/clients";
-import { getClientPayments, type ClientPayment } from "@/app/lib/owner/billing";
+import { type ClientBillingSummary, type ClientPayment } from "@/app/lib/owner/billing";
 import { getClientSessions, type OwnerSession } from "@/app/lib/owner/sessions";
 import { isForbiddenError } from "@/app/lib/backend";
 import {
@@ -47,6 +48,7 @@ export default function TrainerClientDetailsPage() {
   );
   const [sessions, setSessions] = useState<OwnerSession[]>([]);
   const [payments, setPayments] = useState<ClientPayment[]>([]);
+  const [billing, setBilling] = useState<ClientBillingSummary | null>(null);
   const [me, setMe] = useState<TrainerPortalMe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -81,7 +83,7 @@ export default function TrainerClientDetailsPage() {
         getUsageForTrainerView(clientId),
         getClientSessions(clientId),
         getTrainingPlanForTrainerView(clientId),
-        getPaymentsForTrainerView(clientId),
+        getTrainerPortalClientBilling(clientId),
       ]);
 
       if (clientResult.status !== "fulfilled") {
@@ -107,7 +109,12 @@ export default function TrainerClientDetailsPage() {
       }
 
       if (paymentsResult.status === "fulfilled") {
-        setPayments(paymentsResult.value.items || []);
+        setBilling(paymentsResult.value);
+        setPayments(paymentsResult.value.payments || []);
+      } else {
+        setBilling(null);
+        setPayments([]);
+        showOwnerError(paymentsResult.reason, "Nie udało się pobrać rozliczeń klienta.");
       }
     } catch (err) {
       showOwnerError(err, "Nie udało się pobrać klienta.", {
@@ -160,24 +167,6 @@ export default function TrainerClientDetailsPage() {
       if (!isForbiddenError(err)) throw err;
 
       return getTrainerPortalClientTrainingPlan(clientId);
-    }
-  }
-
-  async function getPaymentsForTrainerView(clientId: number) {
-    try {
-      return await getClientPayments(clientId, { page: 1, pageSize: 3 });
-    } catch (err) {
-      if (!isForbiddenError(err)) throw err;
-
-      const billing = await getTrainerPortalClientBilling(clientId);
-
-      return {
-        page: 1,
-        pageSize: 3,
-        totalCount: billing.payments?.length || 0,
-        totalPages: 1,
-        items: billing.payments?.slice(0, 3) || [],
-      };
     }
   }
 
@@ -254,7 +243,9 @@ export default function TrainerClientDetailsPage() {
             client={client}
             subscription={subscription}
             usage={usage}
+            billing={billing}
           />
+          <ClientPackagesSection packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} />
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_330px]">
             <ClientSessionsPanel sessions={sessions} />
