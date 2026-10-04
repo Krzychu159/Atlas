@@ -15,7 +15,7 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   title: "Atlas",
-  description: "Atlas CRM dashboard",
+  description: "ATLAS — treningi, grafik i rozliczenia studia",
 };
 
 export default function RootLayout({

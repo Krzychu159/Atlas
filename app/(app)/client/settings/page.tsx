@@ -10,7 +10,7 @@ export default function ClientSettingsPage() {
           Profil klienta
         </h1>
         <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
-          Zarządzaj imieniem, nazwiskiem, adresem e-mail i avatarem konta.
+          Zarządzaj imieniem, nazwiskiem, adresem e-mail i zdjęciem profilowym.
         </p>
       </section>
 

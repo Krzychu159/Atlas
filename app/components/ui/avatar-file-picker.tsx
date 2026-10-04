@@ -1,5 +1,7 @@
 "use client";
 
+import { getErrorMessage } from "@/app/lib/backend";
+
 import { type ChangeEvent, useRef, useState } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
@@ -56,9 +58,7 @@ export default function AvatarFilePicker({
       onChange(avatarUrl);
     } catch (uploadError) {
       setError(
-        uploadError instanceof Error && uploadError.message
-          ? uploadError.message
-          : "Nie udało się zapisać zdjęcia.",
+        getErrorMessage(uploadError, "Nie udało się zapisać zdjęcia. Spróbuj ponownie."),
       );
     } finally {
       setIsProcessing(false);
@@ -73,9 +73,7 @@ export default function AvatarFilePicker({
       onChange("");
     } catch (removeError) {
       setError(
-        removeError instanceof Error && removeError.message
-          ? removeError.message
-          : "Nie udało się usunąć zdjęcia.",
+        getErrorMessage(removeError, "Nie udało się usunąć zdjęcia. Spróbuj ponownie."),
       );
     } finally {
       setIsProcessing(false);

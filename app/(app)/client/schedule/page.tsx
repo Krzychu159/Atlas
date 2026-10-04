@@ -1,5 +1,7 @@
 "use client";
 
+import { userMessage } from "@/app/lib/user-messages";
+
 import { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
@@ -185,7 +187,7 @@ export default function ClientSchedulePage() {
         />
         <PlanMetric
           icon={<Dumbbell size={20} />}
-          label="Wykorzystanie cyklu"
+          label="Wykorzystanie pakietu"
           value={
             usage
               ? `${usage.usedSessions}/${usage.totalSessions}`
@@ -271,8 +273,8 @@ export default function ClientSchedulePage() {
           </div>
 
           <p className="mt-5 text-sm leading-6 text-on-surface-variant">
-            Licznik pochodzi z aktualnego cyklu subskrypcji. Sesje anulowane nie
-            powinny zwiększać wykorzystania pakietu.
+            Tutaj sprawdzisz wykorzystane i pozostałe wejścia
+            w aktualnym pakiecie.
           </p>
         </div>
       </section>
@@ -694,5 +696,5 @@ function getSessionStatusLabel(status?: string | null) {
   if (normalized.includes("confirm")) return "Potwierdzony";
   if (normalized.includes("planned")) return "Zaplanowany";
 
-  return status || "Zaplanowany";
+  return status ? userMessage(status, "Status treningu niedostępny") : "Zaplanowany";
 }

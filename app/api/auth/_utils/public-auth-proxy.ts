@@ -11,7 +11,7 @@ export async function proxyPublicAuthPost(
     const backendUrl = process.env.BACKEND_API_URL;
 
     if (!backendUrl) {
-      return jsonError("Brakuje konfiguracji BACKEND_API_URL.", 500);
+      return jsonError("Usługa jest chwilowo niedostępna. Spróbuj ponownie później.", 500);
     }
 
     const body = await req.json().catch(() => ({}));
@@ -47,7 +47,7 @@ export async function proxyPublicAuthPost(
   } catch (error) {
     console.error("PUBLIC_AUTH_PROXY_ERROR", error);
 
-    return jsonError("Nie udało się obsłużyć żądania.", 500);
+    return jsonError("Nie udało się wykonać tej czynności. Spróbuj ponownie.", 500);
   }
 }
 

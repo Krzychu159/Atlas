@@ -32,7 +32,7 @@ export default function TrainerPage() {
         const trainerId = Number(params.id);
 
         if (!trainerId) {
-          showOwnerError(new Error("Nieprawidłowe ID trenera."), "", {
+          showOwnerError(new Error("Nie można otworzyć tego trenera. Wróć do listy trenerów i wybierz go ponownie."), "", {
             id: "owner-trainer-invalid-id",
           });
           return;

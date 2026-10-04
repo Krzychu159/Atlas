@@ -1,3 +1,4 @@
+import { userStatus } from "@/app/lib/user-messages";
 import { MoreVertical } from "lucide-react";
 import type { RecentClient } from "@/app/lib/owner/dashboard";
 import { formatRelativeDate, formatDateTime } from "@/app/lib/formatters/date";
@@ -40,7 +41,7 @@ export default function DashboardClientRow({
         <div className="min-w-0">
           <p className="text-sm font-semibold truncate">{name}</p>
           <p className="text-label text-tertiary-light mt-1 truncate">
-            {client.activity || client.status || "Aktywny"}
+            {client.activity || userStatus(client.status, "Aktywny")}
           </p>
         </div>
       </div>

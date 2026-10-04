@@ -182,7 +182,7 @@ export default function AddClientModal({ open, onClose, onCreated, initialMode =
       showOwnerError(
         err,
         mode === "record"
-          ? "Nie udało się utworzyć klienta."
+          ? "Nie udało się dodać klienta. Sprawdź dane i spróbuj ponownie."
           : "Nie udało się wysłać zaproszenia.",
         { id: "owner-client-create-error" },
       );

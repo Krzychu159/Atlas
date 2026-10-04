@@ -11,7 +11,7 @@ export default function TrainerSettingsPage() {
           Profil trenera
         </h1>
         <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
-          Zarządzaj podstawowymi danymi konta, avatarem i integracją Outlook.
+          Zarządzaj podstawowymi danymi konta, zdjęciem profilowym i połączeniem z Outlookiem.
         </p>
       </section>
 

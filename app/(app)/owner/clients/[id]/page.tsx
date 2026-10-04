@@ -212,7 +212,7 @@ export default function OwnerClientDetailsPage() {
       const clientId = Number(params.id);
 
       if (!clientId) {
-        showOwnerError(new Error("Nieprawidłowe ID klienta."), "", {
+        showOwnerError(new Error("Nie można otworzyć tego klienta. Wróć do listy klientów i wybierz go ponownie."), "", {
           id: "owner-client-invalid-id",
         });
         setIsLoading(false);
@@ -365,8 +365,8 @@ export default function OwnerClientDetailsPage() {
             !paymentsAvailable ||
             !legalConsentsAvailable) ? (
             <div className="card-shell p-5 text-sm text-on-surface-variant">
-              Część historii archiwalnego klienta jest niedostępna w API i nie
-              została pokazana.
+              Nie udało się wyświetlić części historii archiwalnego klienta.
+              Spróbuj odświeżyć profil.
             </div>
           ) : null}
 
@@ -375,7 +375,7 @@ export default function OwnerClientDetailsPage() {
               <ClientSessionHistory clientId={client.id} sessions={sessions} />
             ) : (
               <div className="card-shell p-5 text-sm text-on-surface-variant">
-                Historia sesji jest obecnie niedostępna w API.
+                Historia treningów jest obecnie niedostępna. Spróbuj odświeżyć profil.
               </div>
             )}
             <ClientNotesPanel

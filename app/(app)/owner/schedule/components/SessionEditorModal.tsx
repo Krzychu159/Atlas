@@ -108,7 +108,7 @@ export default function SessionEditorModal({
     (trainer) => trainer.id === selectedTrainerId,
   );
   const outlookCategoryPlaceholder =
-    selectedTrainer?.outlookCategoryName?.trim() || "Np. Personal, Paid";
+    selectedTrainer?.outlookCategoryName?.trim() || "Np. Trening personalny, Opłacone";
   const clientQuery = normalizeSearch(clientSearch);
   const activeClients = clients.filter(
     (client) =>
@@ -531,7 +531,7 @@ export default function SessionEditorModal({
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <Field label="Częstotliwość">
                     <CustomSelect value={frequency}
-                      options={[{ value: "Daily", label: "Codziennie (Daily)" }, { value: "Weekly", label: "Co tydzień (Weekly)" }]}
+                      options={[{ value: "Daily", label: "Codziennie" }, { value: "Weekly", label: "Co tydzień" }]}
                       onChange={(value) => setFrequency(value as SessionRecurrence["frequency"])} />
                   </Field>
                   <Field label={frequency === "Weekly" ? "Co ile tygodni" : "Co ile dni"}>

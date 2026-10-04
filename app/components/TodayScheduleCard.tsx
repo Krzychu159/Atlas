@@ -6,18 +6,18 @@ const todaySchedule = [
     title: "Cross Training",
     time: "08:00 - 09:00",
     trainer: "Marcus Chen",
-    type: "Group",
+    type: "Grupowy",
   },
   {
     id: "2",
     title: "Yoga Flow",
     time: "10:00 - 11:00",
     trainer: "Sarah Jenkins",
-    type: "Mobility",
+    type: "Mobilność",
   },
   {
     id: "3",
-    title: "Personal Session",
+    title: "Trening personalny",
     time: "12:30 - 13:30",
     trainer: "David Chen",
     type: "1:1",
@@ -29,14 +29,14 @@ export default function TodayScheduleCard() {
     <div className="card-shell p-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-section-title">Today Schedule</p>
+          <p className="text-section-title">Dzisiejsze treningi</p>
           <p className="text-sm text-on-surface-variant mt-2">
-            5 sessions planned for today
+            5 treningów zaplanowanych na dziś
           </p>
         </div>
 
         <Link href="/schedule" className="text-label text-primary-light">
-          View Full
+          Zobacz grafik
         </Link>
       </div>
 

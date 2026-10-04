@@ -1,5 +1,7 @@
 "use client";
 
+import { userTrainingType } from "@/app/lib/user-messages";
+
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 
 import { NativeDateInput } from "@/app/components/ui/native-date-input";
@@ -91,7 +93,7 @@ function formatDateTime(value: string) {
 function formatSessionType(value: string | null) {
   if (!value) return "Sesja";
 
-  return value.replace(/([a-z])([A-Z])/g, "$1 $2");
+  return userTrainingType(value);
 }
 
 export default function TrainerSettlementPage() {
@@ -336,7 +338,7 @@ export default function TrainerSettlementPage() {
                       className="rounded-[var(--radius-lg)] bg-surface-container-low p-4"
                     >
                       <p className="text-sm font-semibold text-on-surface">
-                        {rate.sessionType || "Stawka domyślna"}
+                        {userTrainingType(rate.sessionType, "Stawka domyślna")}
                       </p>
                       <p className="mt-2 text-2xl font-semibold text-tertiary-light">
                         {formatMoney(rate.rate)}

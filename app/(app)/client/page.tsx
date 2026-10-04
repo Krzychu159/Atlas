@@ -1,5 +1,7 @@
 "use client";
 
+import { userMessage } from "@/app/lib/user-messages";
+
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -145,7 +147,7 @@ export default function ClientDashboardPage() {
       trainingPlan?.googleDriveFolderUrl || trainingPlan?.url || undefined;
 
     if (!url) {
-      showAppInfo("Plan treningowy nie ma jeszcze podpiętego linku.", {
+      showAppInfo("Trener nie udostępnił jeszcze planu treningowego. Poproś go o link.", {
         id: "client-training-plan-empty",
       });
       return;
@@ -241,11 +243,10 @@ export default function ClientDashboardPage() {
               ) : (
                 <div className="mt-10 max-w-[540px]">
                   <h2 className="font-display text-[2rem] font-semibold leading-[1.1] tracking-tight">
-                    Brak zaplanowanej najbliższej sesji
+                    Nie masz zaplanowanego treningu
                   </h2>
                   <p className="mt-4 text-sm leading-6 text-on-surface-variant">
-                    Gdy trener przypisze trening, pojawi się tutaj termin i
-                    szczegóły spotkania.
+                    Gdy trener zaplanuje trening, zobaczysz tutaj termin i szczegóły.
                   </p>
                 </div>
               )}
@@ -328,8 +329,8 @@ export default function ClientDashboardPage() {
             !mainPackage
               ? "Brak aktywnego pakietu"
               : subscription?.autoRenewEnabled
-              ? "Auto-przedłużanie aktywne"
-              : "Auto-przedłużanie wyłączone"
+              ? "Automatyczne przedłużanie aktywne"
+              : "Automatyczne przedłużanie wyłączone"
           }
         />
       </section>
@@ -338,7 +339,7 @@ export default function ClientDashboardPage() {
         <div className="card-shell p-5 md:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-label text-on-surface-muted">Wykorzystanie cyklu</p>
+              <p className="text-label text-on-surface-muted">Wykorzystanie pakietu</p>
               <h2 className="mt-3 font-display text-[1.85rem] font-semibold leading-tight">
                 {usedSessions} z {totalSessions || 0} treningów
               </h2>
@@ -484,7 +485,7 @@ function MobileDashboard({
               </>
             ) : (
               <p className="mt-5 text-sm leading-6 text-on-surface-variant">
-                Nie masz teraz zaplanowanego najbliższego treningu.
+                Nie masz zaplanowanego treningu. Ustal termin z trenerem.
               </p>
             )}
           </div>
@@ -609,7 +610,7 @@ function ClientPackageCard({
         </>
       ) : (
         <p className="mt-4 text-sm text-on-surface-variant">
-          Brak aktywnego cyklu indywidualnego lub semipersonalnego.
+          Nie masz aktywnego pakietu treningów indywidualnych ani w parze. Skontaktuj się z trenerem lub studiem.
         </p>
       )}
     </section>
@@ -957,7 +958,7 @@ function getPackagePaymentStatusLabel(status: string) {
   if (normalized.includes("pending")) return "oczekuje na potwierdzenie";
   if (normalized.includes("unpaid")) return "nieopłacony";
 
-  return status;
+  return userMessage(status, "Status płatności niedostępny");
 }
 
 function sortSessions(first: ClientPortalSession, second: ClientPortalSession) {
@@ -1016,5 +1017,5 @@ function getSessionStatusLabel(status?: string | null) {
   if (normalized.includes("confirm")) return "Potwierdzony";
   if (normalized.includes("planned")) return "Zaplanowany";
 
-  return status || "Zaplanowany";
+  return status ? userMessage(status, "Status treningu niedostępny") : "Zaplanowany";
 }

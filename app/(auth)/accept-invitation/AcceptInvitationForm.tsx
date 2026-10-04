@@ -1,5 +1,7 @@
 "use client";
 
+import { userMessage } from "@/app/lib/user-messages";
+
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -185,7 +187,7 @@ export default function AcceptInvitationForm({
           <div className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center">
             {missingToken ? (
               <InvitationErrorState
-                title="Brakuje tokenu zaproszenia"
+                title="Link zaproszenia jest niepełny"
                 description="Ten adres nie zawiera danych potrzebnych do aktywacji konta. Otwórz pełny link z wiadomości e-mail."
               />
             ) : validation.status === "loading" ? (
@@ -549,5 +551,5 @@ function getInvitationError(error: unknown) {
     return "Link jest nieprawidłowy albo zaproszenie zostało już wykorzystane.";
   }
 
-  return error.message;
+  return userMessage(error.message, "Nie udało się obsłużyć zaproszenia. Spróbuj ponownie później.");
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { getErrorMessage } from "@/app/lib/backend";
+
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { CheckCircle2, Dumbbell, LoaderCircle, Mail, TriangleAlert } from "lucide-react";
@@ -17,7 +19,7 @@ export default function VerifyEmailView({ token }: { token: string }) {
     token ? "loading" : "error",
   );
   const [message, setMessage] = useState(
-    token ? "Potwierdzamy Twój adres e-mail…" : "Link nie zawiera tokenu weryfikacyjnego.",
+    token ? "Potwierdzamy Twój adres e-mail…" : "Link potwierdzający e-mail jest niepełny. Poproś o nowy link poniżej.",
   );
   const [email, setEmail] = useState("");
   const [resending, setResending] = useState(false);
@@ -39,9 +41,7 @@ export default function VerifyEmailView({ token }: { token: string }) {
         if (!active) return;
         setState("error");
         setMessage(
-          error instanceof Error && error.message
-            ? error.message
-            : "Nie udało się potwierdzić adresu e-mail.",
+          getErrorMessage(error, "Nie udało się potwierdzić adresu e-mail. Poproś o nowy link lub spróbuj ponownie."),
         );
       });
 
@@ -64,7 +64,7 @@ export default function VerifyEmailView({ token }: { token: string }) {
       );
     } catch (error) {
       setResendMessage(
-        error instanceof Error ? error.message : "Nie udało się wysłać wiadomości.",
+        getErrorMessage(error, "Nie udało się wysłać wiadomości. Spróbuj ponownie."),
       );
     } finally {
       setResending(false);

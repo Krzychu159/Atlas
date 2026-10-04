@@ -102,7 +102,7 @@ export default function NotificationsPanel({
               </div>
               <p className="mt-4 text-sm font-semibold">Brak powiadomień</p>
               <p className="mt-1 text-xs leading-5 text-on-surface-muted">
-                Nowe alerty operacyjne pojawią się tutaj.
+                Nowe powiadomienia pojawią się tutaj.
               </p>
             </div>
           ) : (

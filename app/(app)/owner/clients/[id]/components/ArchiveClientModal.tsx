@@ -44,7 +44,7 @@ export default function ArchiveClientModal({
             <ul className="mt-6 flex flex-col gap-3">
               {check.blockers.map((blocker) => (
                 <li key={blocker} className="rounded-[var(--radius-lg)] bg-error-container/30 px-4 py-3 text-sm text-on-surface">
-                  {blockerLabels[blocker] || blocker}
+                  {blockerLabels[blocker] || "Nie można jeszcze zarchiwizować klienta. Sprawdź jego treningi, pakiety i rozliczenia."}
                 </li>
               ))}
             </ul>

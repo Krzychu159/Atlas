@@ -70,13 +70,13 @@ export default function RewardsSettingsSection() {
       <SettingsSectionHeader
         icon={<Gift size={18} />}
         title="Ustawienia nagród"
-        description="Zarządzaj progami stażu klienta i nagrodami, które pojawiają się u ownera, trenera oraz klienta."
+        description="Zarządzaj progami stażu klienta i nagrodami, które pojawiają się w panelach właściciela, trenera i klienta."
         action={<Button type="button" size="sm" icon={<Plus size={16} />} onClick={openCreate} className="w-full sm:w-auto">Dodaj próg</Button>}
       />
 
       <div className="mt-6">
         {isLoading ? (
-          <div className="flex items-center justify-center gap-2 rounded-[var(--radius-xl)] bg-surface-container-low py-12 text-sm text-on-surface-muted"><LoaderCircle size={18} className="animate-spin" />Pobieranie definicji nagród...</div>
+          <div className="flex items-center justify-center gap-2 rounded-[var(--radius-xl)] bg-surface-container-low py-12 text-sm text-on-surface-muted"><LoaderCircle size={18} className="animate-spin" />Wczytywanie nagród...</div>
         ) : definitions.length ? (
           <div className="grid gap-4 xl:grid-cols-2">
             {definitions.map((definition) => (
@@ -141,10 +141,10 @@ function RewardFormModal({ definition, onClose, onSaved }: { definition: Milesto
       if (definition) await updateMilestoneDefinition(definition.id, payload);
       else await createMilestoneDefinition(payload);
       await onSaved();
-      showAppSuccess(definition ? "Definicja nagrody została zapisana." : "Nowa nagroda została dodana.");
+      showAppSuccess(definition ? "Ustawienia nagrody zostały zapisane." : "Nowa nagroda została dodana.");
       onClose();
     } catch (saveError) {
-      showAppError(saveError, "Nie udało się zapisać definicji nagrody.");
+      showAppError(saveError, "Nie udało się zapisać ustawień nagrody. Spróbuj ponownie.");
     } finally {
       setIsSaving(false);
     }
@@ -162,7 +162,7 @@ function RewardFormModal({ definition, onClose, onSaved }: { definition: Milesto
             <TextArea label="Opis" value={form.description} onChange={(description) => setForm((current) => ({ ...current, description }))} placeholder="Krótki opis nagrody i warunków" rows={3} className="sm:col-span-2" />
           </div>
           <div className="mt-5 flex items-center justify-between gap-4 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
-            <div><p className="text-sm font-semibold">Aktywna definicja</p><p className="mt-1 text-xs text-on-surface-muted">Aktywne progi są widoczne w postępie klientów.</p></div>
+            <div><p className="text-sm font-semibold">Nagroda aktywna</p><p className="mt-1 text-xs text-on-surface-muted">Aktywne progi są widoczne w postępie klientów.</p></div>
             <button type="button" role="switch" aria-checked={form.isActive} onClick={() => setForm((current) => ({ ...current, isActive: !current.isActive }))} className={`relative h-7 w-12 shrink-0 rounded-full transition ${form.isActive ? "bg-primary" : "bg-surface-bright"}`}><span className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white transition-transform ${form.isActive ? "translate-x-5" : "translate-x-0"}`} /></button>
           </div>
           {error ? <p className="mt-4 text-sm text-error-light">{error}</p> : null}

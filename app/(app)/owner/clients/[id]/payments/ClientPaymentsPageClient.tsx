@@ -1,5 +1,9 @@
 "use client";
 
+import { userTrainingType } from "@/app/lib/user-messages";
+
+import { userStatus } from "@/app/lib/user-messages";
+
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 
 import Link from "next/link";
@@ -141,7 +145,7 @@ export default function ClientPaymentsPageClient({
       const parsedId = Number(clientIdParam);
 
       if (!parsedId) {
-        showOwnerError(new Error("Nieprawidłowe ID klienta."), "", {
+        showOwnerError(new Error("Nie można otworzyć tego klienta. Wróć do listy klientów i wybierz go ponownie."), "", {
           id: "owner-client-payments-invalid-id",
         });
         setIsLoading(false);
@@ -430,7 +434,7 @@ export default function ClientPaymentsPageClient({
     if (!clientId || !subscription) return;
 
     if (!subscription.cancelRenewalRequested) {
-      showOwnerSuccess("Auto-przedłużanie jest już aktywne.", {
+      showOwnerSuccess("Automatyczne przedłużanie jest już aktywne.", {
         id: "owner-client-autorenew-already-active",
       });
       return;
@@ -447,11 +451,11 @@ export default function ClientPaymentsPageClient({
         autoRenewEnabled: true,
         cancelRenewalRequested: false,
       });
-      showOwnerSuccess("Auto-przedłużanie zostało wznowione.", {
+      showOwnerSuccess("Automatyczne przedłużanie zostało wznowione.", {
         id: "owner-client-autorenew-resumed",
       });
     } catch (err) {
-      showOwnerError(err, "Nie udało się wznowić auto-przedłużania.", {
+      showOwnerError(err, "Nie udało się wznowić automatycznego przedłużania.", {
         id: "owner-client-autorenew-resume-error",
       });
     } finally {
@@ -1117,7 +1121,7 @@ function SubscriptionPanel({
             Aktualny pakiet, wykorzystanie wejść i status płatności.
           </p>
         </div>
-        <StatusPill label={subscription?.status || activePackage?.paymentStatus || "Brak statusu"} muted />
+        <StatusPill label={userStatus(subscription?.status || activePackage?.paymentStatus)} muted />
       </div>
 
       <div className={`mt-4 grid gap-3 ${!isGroup && subscription ? "lg:grid-cols-2" : ""}`}>
@@ -1199,7 +1203,7 @@ function SubscriptionPanel({
                   onClick={onResumeAutoRenew}
                   disabled={isSaving || !subscription}
                 >
-                  Włącz auto-przedłużanie
+                  Włącz automatyczne przedłużanie
                 </Button>
               )}
             </div>
@@ -1217,7 +1221,7 @@ function SubscriptionPanel({
               <p className="mt-1 text-xs leading-5 text-on-surface-muted">
                 {willRenew
                   ? "Zostanie użyty po wykorzystaniu aktualnego pakietu."
-                  : "Wybór zacznie obowiązywać po ponownym włączeniu auto-przedłużania."}
+                  : "Wybór zacznie obowiązywać po ponownym włączeniu automatycznego przedłużania."}
               </p>
             </div>
             <div className="grid w-full shrink-0 gap-2 sm:grid-cols-[minmax(0,280px)_auto] md:w-auto">
@@ -1273,7 +1277,7 @@ function PackageDeleteConfirmModal({
       >
         <ModalHeader
           title="Usunąć pakiet klienta?"
-          description="Tej operacji nie można cofnąć. Pakiet zostanie odpięty od klienta."
+          description="Tej operacji nie można cofnąć. Pakiet zostanie usunięty z profilu klienta."
           icon={<AlertTriangle size={19} />}
           iconTone="danger"
           onClose={processing ? () => undefined : onClose}
@@ -1384,7 +1388,7 @@ function UsageCard({ usage }: { usage: SubscriptionUsage | null }) {
           <div className="mt-3 grid grid-cols-3 gap-2">
             <SmallMetric
               label="Planowany typ"
-              value={usage.expectedBillingType || "Brak"}
+              value={userTrainingType(usage.expectedBillingType, "Brak danych")}
             />
             <SmallMetric
               label="Inny typ"
@@ -1420,8 +1424,8 @@ function UsageCard({ usage }: { usage: SubscriptionUsage | null }) {
                     </p>
                   </div>
                   <p className="mt-1 text-xs text-on-surface-variant">
-                    Plan: {session.plannedBillingType || "brak"} · Faktycznie:{" "}
-                    {session.actualBillingType || "faktycznie"}
+                    Plan: {userTrainingType(session.plannedBillingType, "brak danych")} · Faktycznie:{" "}
+                    {userTrainingType(session.actualBillingType, "brak danych")}
                   </p>
                 </div>
               ))}

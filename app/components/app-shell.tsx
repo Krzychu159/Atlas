@@ -22,11 +22,11 @@ type AppShellProps = {
 function getRoleSubtitle(role: AppRole) {
   switch (role) {
     case "owner":
-      return "Studio Management";
+      return "Zarządzanie studiem";
     case "trainer":
-      return "Trainer Panel";
+      return "Panel trenera";
     case "client":
-      return "Client Portal";
+      return "Panel klienta";
     default:
       return "Atlas";
   }
@@ -202,7 +202,7 @@ export function AppShell({ children, role }: AppShellProps) {
               <div className="rounded-xl bg-surface-container p-4 shadow-soft">
                 <p className="text-label text-on-surface-muted">Status</p>
                 <p className="mt-2 text-sm text-on-surface-variant">
-                  System w budowie
+                  ATLAS
                 </p>
               </div>
             </div>

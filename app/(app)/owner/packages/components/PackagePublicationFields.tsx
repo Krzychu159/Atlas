@@ -22,7 +22,7 @@ export default function PackagePublicationFields({ form, onChange }: {
           onChange={(event) => onChange("isPubliclyAvailable", event.target.checked)} className="h-5 w-5 accent-blue-600" />
         <span className="text-sm text-on-surface-variant">Publicznie dostępny</span>
       </label>
-      {form.isPubliclyAvailable ? <OwnerTextField label="Publiczny slug" value={form.publicSlug}
+      {form.isPubliclyAvailable ? <OwnerTextField label="Końcówka linku do pakietu" value={form.publicSlug}
         onChange={(value) => onChange("publicSlug", value)} placeholder="zajecia-grupowe-4-wejscia" /> : null}
     </>}
   </>;

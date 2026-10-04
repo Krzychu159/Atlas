@@ -1,3 +1,4 @@
+import { userTrainingType } from "@/app/lib/user-messages";
 import { BadgeCheck, Coins } from "lucide-react";
 import type { TrainerRate } from "@/app/lib/owner/settlements";
 
@@ -46,7 +47,7 @@ export default function TrainerProfileRates({
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-semibold text-on-surface">
-                    {rate.sessionType || "Stawka domyślna"}
+                    {userTrainingType(rate.sessionType, "Stawka domyślna")}
                   </p>
                   <p className="mt-1 text-xs text-on-surface-muted">
                     Od {formatDate(rate.validFrom)} do {formatDate(rate.validTo)}
@@ -74,8 +75,8 @@ export default function TrainerProfileRates({
 
       {activeRates.length > 1 ? (
         <p className="mt-4 text-xs text-on-surface-muted">
-          Trener ma kilka aktywnych stawek, dlatego rozliczenie liczy kwoty per
-          typ sesji.
+          Trener ma kilka aktywnych stawek. Kwota rozliczenia zależy
+          od rodzaju treningu.
         </p>
       ) : null}
     </section>

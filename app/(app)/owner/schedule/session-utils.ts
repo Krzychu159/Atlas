@@ -1,3 +1,4 @@
+import { userTrainingType } from "@/app/lib/user-messages";
 import type { Location } from "@/app/lib/owner/locations";
 import type {
   OwnerSession,
@@ -33,8 +34,7 @@ export function sortSessions(sessions: OwnerSession[]) {
 
 export function getSessionType(session: OwnerSession) {
   return (
-    session.actualSessionType ||
-    session.plannedSessionType ||
+    (session.actualSessionType || session.plannedSessionType ? userTrainingType(session.actualSessionType || session.plannedSessionType) : null) ||
     session.primaryOutlookCategory ||
     "Sesja"
   );
@@ -238,8 +238,8 @@ export function toSessionPayload(
     const capacity = Number(values.publicCapacity);
     if (!Number.isInteger(capacity) || capacity <= 0) throw new Error("Limit miejsc musi być dodatnią liczbą całkowitą.");
     const slug = values.publicSlug.trim();
-    if (!slug) throw new Error("Podaj publiczny slug.");
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) throw new Error("Slug może zawierać małe litery a–z, cyfry i pojedyncze myślniki.");
+    if (!slug) throw new Error("Podaj końcówkę linku.");
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) throw new Error("Końcówka linku może zawierać małe litery a–z, cyfry i pojedyncze myślniki.");
     payload.isPubliclyBookable = true;
     payload.plannedSessionType = "Group";
     payload.status = values.status || "Planned";

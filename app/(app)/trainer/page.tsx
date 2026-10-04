@@ -1,5 +1,7 @@
 "use client";
 
+import { userMessage } from "@/app/lib/user-messages";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -483,7 +485,7 @@ function getClientStatusLabel(status?: string | null) {
   if (normalized === "inactive") return "Nieaktywny";
   if (normalized === "cancelled") return "Zakończony";
 
-  return status || "Aktywny";
+  return status ? userMessage(status, "Status niedostępny") : "Aktywny";
 }
 
 function getBillingStatusLabel(status?: string | null) {
@@ -494,7 +496,7 @@ function getBillingStatusLabel(status?: string | null) {
   if (normalized === "pendingpayment") return "Do zapłaty";
   if (normalized === "overdue") return "Zaległość";
 
-  return status || "";
+  return status ? userMessage(status, "Status płatności niedostępny") : "";
 }
 
 function getInitials(name?: string | null) {

@@ -8,7 +8,7 @@ export const paymentMethodOptions = [
   { value: "1", label: "Blik" },
   { value: "2", label: "Przelew" },
   { value: "3", label: "Gotówka" },
-  { value: "4", label: "Bramka płatności" },
+  { value: "4", label: "Płatność online" },
 ];
 
 export type ClientPayment = {
@@ -270,10 +270,10 @@ export function getPaymentMethodLabel(method?: number | null) {
     1: "Blik",
     2: "Przelew",
     3: "Gotówka",
-    4: "Bramka płatności",
+    4: "Płatność online",
   };
 
-  return method ? labels[method] || `Metoda ${method}` : "Brak metody";
+  return method ? labels[method] || "Inna metoda płatności" : "Brak metody";
 }
 
 export function getPaymentStatusLabel(status?: number | null) {
@@ -285,7 +285,7 @@ export function getPaymentStatusLabel(status?: number | null) {
     5: "Cofnięte",
   };
 
-  return status ? labels[status] || `Status ${status}` : "Brak statusu";
+  return status ? labels[status] || "Status płatności niedostępny" : "Brak statusu";
 }
 
 export function getPaymentSourceLabel(source?: number | null) {
@@ -295,7 +295,7 @@ export function getPaymentSourceLabel(source?: number | null) {
     3: "System",
   };
 
-  return source ? labels[source] || `Źródło ${source}` : "Brak źródła";
+  return source ? labels[source] || "Źródło płatności niedostępne" : "Brak źródła";
 }
 
 function toPaymentsQuery(query?: PaymentsQuery) {

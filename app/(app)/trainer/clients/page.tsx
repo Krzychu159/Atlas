@@ -176,7 +176,7 @@ export default function TrainerClientsPage() {
               Klienci
             </h1>
             <span className="rounded-full bg-surface-container px-3 py-1 text-sm text-on-surface-variant">
-              {clients.length} total
+              {clients.length} łącznie
             </span>
           </div>
 

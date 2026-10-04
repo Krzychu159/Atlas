@@ -8,7 +8,7 @@ export async function POST(req: Request) {
 
     if (!backendUrl) {
       return NextResponse.json(
-        { message: "Brakuje konfiguracji BACKEND_API_URL." },
+        { message: "Usługa jest chwilowo niedostępna. Spróbuj ponownie później." },
         { status: 500 },
       );
     }

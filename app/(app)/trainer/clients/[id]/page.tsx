@@ -55,7 +55,7 @@ export default function TrainerClientDetailsPage() {
     const clientId = Number(params.id);
 
     if (!clientId) {
-      showOwnerError(new Error("Nieprawidłowe ID klienta."), "", {
+      showOwnerError(new Error("Nie można otworzyć tego klienta. Wróć do listy klientów i wybierz go ponownie."), "", {
         id: "trainer-client-invalid-id",
       });
       setIsLoading(false);

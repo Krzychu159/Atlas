@@ -3,7 +3,7 @@ import { getAuthCookieOptions } from "@/app/lib/server/auth-cookies";
 
 export async function POST(request: Request) {
   const backendUrl = process.env.BACKEND_API_URL;
-  if (!backendUrl) return NextResponse.json({ message: "Brakuje konfiguracji backendu." }, { status: 500 });
+  if (!backendUrl) return NextResponse.json({ message: "Rejestracja jest chwilowo niedostępna. Spróbuj ponownie później." }, { status: 500 });
   try {
     const body = await request.json();
     const response = await fetch(`${backendUrl}/api/public/group-classes/register`, {
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     const data = await response.json().catch(() => null);
     if (!response.ok) return NextResponse.json({ message: typeof data?.message === "string" ? data.message : "Nie udało się utworzyć konta. Sprawdź dane i spróbuj ponownie." }, { status: response.status });
     if (!data?.token || !data.refreshToken || !data.userId || String(data.role).toLowerCase() !== "client") {
-      return NextResponse.json({ message: "Backend zwrócił niekompletne dane logowania." }, { status: 502 });
+      return NextResponse.json({ message: "Nie udało się zakończyć rejestracji. Spróbuj się zalogować lub skontaktuj się ze studiem." }, { status: 502 });
     }
     const result = NextResponse.json({
       ok: true,

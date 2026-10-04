@@ -8,7 +8,7 @@ import TermsAcceptance from "@/app/components/legal/TermsAcceptance";
 import { TextField } from "@/app/components/ui/input";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
-import { ApiError, getErrorMessage } from "@/app/lib/backend";
+import { ApiError } from "@/app/lib/backend";
 import { publicErrorMessage } from "@/app/lib/public/errors";
 import { resendEmailVerification } from "@/app/lib/email-verification";
 import { acceptLegalTerms, getLegalRequirements, type LegalRequirements } from "@/app/lib/legal";
@@ -272,19 +272,19 @@ function modalErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError && error.status === 401) {
     return "Zaloguj się ponownie, aby kontynuować.";
   }
-  const original = getErrorMessage(error, fallback);
+  const original = error instanceof Error ? error.message : fallback;
   if (/email.*(?:not verified|verification required|must be verified|not confirmed)/i.test(original)) {
     return "Potwierdź adres e-mail, aby kontynuować. Sprawdź wiadomość od studia w swojej skrzynce.";
   }
   const paymentMessage = getTpayErrorMessage(error, fallback);
-  if (paymentMessage !== original) {
-    if (/nie są skonfigurowane/.test(paymentMessage)) {
+  if (paymentMessage !== original && paymentMessage !== fallback) {
+    if (/nie są skonfigurowane|są niedostępne/.test(paymentMessage)) {
       return "Płatności online są teraz niedostępne w tej lokalizacji. Skontaktuj się ze studiem.";
     }
     if (/istnieje już płatność/.test(paymentMessage)) {
       return "Czekamy na potwierdzenie Twojej płatności. Sprawdź ją w „Moje konto”.";
     }
-    if (/nie ma kwoty/.test(paymentMessage)) {
+    if (/nie ma kwoty|nie wymaga dopłaty/.test(paymentMessage)) {
       return "Ten pakiet nie wymaga już dopłaty. Sprawdź go w „Moje konto”.";
     }
     return paymentMessage;

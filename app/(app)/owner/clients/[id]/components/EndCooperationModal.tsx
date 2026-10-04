@@ -113,8 +113,8 @@ export default function EndCooperationModal({
               </div>
 
               <div className="mt-5 rounded-[var(--radius-lg)] bg-error-container/25 p-4 text-sm leading-6 text-on-surface-variant">
-                Frontend nie może bezpiecznie zakończyć współpracy bez
-                dedykowanej operacji backendowej. Pakiet, płatności, sesje,
+                Zakończenie współpracy jest obecnie niedostępne. Ten ekran
+                pokazuje tylko podsumowanie. Pakiet, płatności, treningi,
                 dostęp do panelu i kartoteka pozostają bez zmian.
               </div>
             </>
@@ -126,7 +126,7 @@ export default function EndCooperationModal({
             Zamknij
           </Button>
           <Button type="button" variant="danger" disabled>
-            Funkcja wymaga obsługi po stronie backendu
+            Zakończenie współpracy niedostępne
           </Button>
         </ModalFooter>
       </div>

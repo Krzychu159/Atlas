@@ -44,7 +44,7 @@ export function packageFormPayload(form: PackageForm): UpdatePackagePayload {
       if (!Number.isFinite(Number(value)) || Number(value) <= 0) throw new Error(`${label} musi być większa od zera.`);
     }
     if (!form.locationId || !Number.isFinite(Number(form.locationId)) || Number(form.locationId) <= 0) throw new Error("Wybierz lokalizację publicznego pakietu.");
-    if (!form.publicSlug.trim()) throw new Error("Podaj publiczny slug.");
+    if (!form.publicSlug.trim()) throw new Error("Podaj końcówkę linku.");
   }
   return {
     name: form.name,

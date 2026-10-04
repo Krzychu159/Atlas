@@ -106,7 +106,7 @@ export default function ProfileSettingsCard({
 
   async function handleAvatarUpload(file: File) {
     const avatarUrl = await uploadCurrentUserAvatar(file);
-    showAppSuccess("Avatar został zmieniony.", {
+    showAppSuccess("Zdjęcie profilowe zostało zmienione.", {
       id: "profile-avatar-upload-success",
     });
     return avatarUrl;
@@ -114,7 +114,7 @@ export default function ProfileSettingsCard({
 
   async function handleAvatarRemove() {
     await deleteCurrentUserAvatar();
-    showAppSuccess("Avatar został usunięty.", {
+    showAppSuccess("Zdjęcie profilowe zostało usunięte.", {
       id: "profile-avatar-delete-success",
     });
   }

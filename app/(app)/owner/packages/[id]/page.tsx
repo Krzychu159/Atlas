@@ -54,7 +54,7 @@ export default function PackageDetailsPage({
     if (Number.isFinite(packageId)) {
       void loadData();
     } else {
-      showOwnerError(new Error("Nieprawidłowe ID pakietu."), "", {
+      showOwnerError(new Error("Nie można otworzyć tego pakietu. Wróć do listy pakietów i wybierz go ponownie."), "", {
         id: "owner-package-invalid-id",
       });
       void Promise.resolve().then(() => setIsLoading(false));

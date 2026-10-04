@@ -1,7 +1,7 @@
+import { userMessage } from "@/app/lib/user-messages";
 import {
   backendGet,
   backendPost,
-  getErrorMessage,
 } from "@/app/lib/backend";
 
 export enum ClientPaymentStatus {
@@ -56,26 +56,26 @@ const knownTpayErrors: Record<string, string> = {
   "current terms for this location must be accepted before continuing":
     "Przed rozpoczęciem płatności zaakceptuj aktualny regulamin studia.",
   "online payments are not configured for this location":
-    "Płatności online nie są skonfigurowane dla tej lokalizacji.",
+    "Płatności online są niedostępne w tej lokalizacji. Skontaktuj się ze studiem.",
   "tpay is not configured for this location":
-    "Płatności Tpay nie są skonfigurowane dla tej lokalizacji.",
-  "client package was not found": "Nie znaleziono wybranego pakietu klienta.",
-  "payment was not found": "Nie znaleziono płatności.",
+    "Płatności online są niedostępne w tej lokalizacji. Skontaktuj się ze studiem.",
+  "client package was not found": "Ten pakiet jest niedostępny. Odśwież listę pakietów.",
+  "payment was not found": "Nie znaleziono tej płatności. Wróć do historii płatności i wybierz ją ponownie.",
   "there is no amount due for this package":
-    "Ten pakiet nie ma kwoty pozostałej do zapłaty.",
+    "Ten pakiet nie wymaga dopłaty. Sprawdź swoje płatności.",
   "a pending payment already exists for this package":
     "Dla tego pakietu istnieje już płatność oczekująca na potwierdzenie.",
 };
 
 export function getTpayErrorMessage(
   error: unknown,
-  fallback = "Nie udało się wykonać operacji płatniczej.",
+  fallback = "Nie udało się wykonać tej czynności związanej z płatnością. Spróbuj ponownie.",
 ) {
   const message =
     typeof error === "string" && error.trim()
       ? error
-      : getErrorMessage(error, fallback);
+      : error instanceof Error ? error.message : fallback;
   const normalized = message.trim().replace(/[.!]+$/, "").toLowerCase();
 
-  return knownTpayErrors[normalized] || message;
+  return knownTpayErrors[normalized] || userMessage(message, fallback);
 }

@@ -174,7 +174,7 @@ export default function EditTrainerModal({
   async function handleAvatarUpload(file: File) {
     const uploadedUrl = await uploadTrainerAvatar(trainerId, file);
     onAvatarChanged?.(uploadedUrl);
-    showOwnerSuccess("Avatar trenera został zmieniony.", {
+    showOwnerSuccess("Zdjęcie trenera zostało zmienione.", {
       id: "trainer-avatar-upload-success",
     });
     return uploadedUrl;
@@ -183,7 +183,7 @@ export default function EditTrainerModal({
   async function handleAvatarRemove() {
     await deleteTrainerAvatar(trainerId);
     onAvatarChanged?.("");
-    showOwnerSuccess("Avatar trenera został usunięty.", {
+    showOwnerSuccess("Zdjęcie trenera zostało usunięte.", {
       id: "trainer-avatar-delete-success",
     });
   }

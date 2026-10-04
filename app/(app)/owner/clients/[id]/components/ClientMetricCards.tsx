@@ -78,8 +78,8 @@ export default function ClientMetricCards({
         value={subscription?.nextPackage?.packageName || "Nie ustawiono"}
         note={
           subscription?.autoRenewEnabled
-            ? "Auto-przedłużanie aktywne"
-            : "Auto-przedłużanie wyłączone"
+            ? "Automatyczne przedłużanie aktywne"
+            : "Automatyczne przedłużanie wyłączone"
         }
         icon={<Repeat2 size={22} />}
       />

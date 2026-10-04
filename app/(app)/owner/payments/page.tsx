@@ -59,7 +59,7 @@ export default function OwnerPaymentsPage() {
 function OwnerPaymentsPageContent({ locationId }: { locationId: number | null }) {
   const pathname = usePathname();
   const basePath = pathname.startsWith("/trainer") ? "/trainer" : "/owner";
-  const eyebrow = basePath === "/trainer" ? "Panel trenera" : "Panel ownera";
+  const eyebrow = basePath === "/trainer" ? "Panel trenera" : "Panel właściciela";
   const [payments, setPayments] = useState<ClientPayment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);

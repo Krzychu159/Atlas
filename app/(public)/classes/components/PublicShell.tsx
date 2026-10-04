@@ -15,7 +15,7 @@ type PublicContextValue = {
 const PublicContext = createContext<PublicContextValue | null>(null);
 export function usePublicContext() {
   const value = useContext(PublicContext);
-  if (!value) throw new Error("PublicShell is required");
+  if (!value) throw new Error("Nie udało się wyświetlić strony zajęć. Odśwież stronę.");
   return value;
 }
 

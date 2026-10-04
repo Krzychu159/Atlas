@@ -1,5 +1,7 @@
 "use client";
 
+import { userMessage } from "@/app/lib/user-messages";
+
 import { useEffect, useRef, useState } from "react";
 import {
   CalendarSync,
@@ -150,13 +152,13 @@ export default function OutlookIntegrationCard() {
 
       if (!authWindow) {
         throw new Error(
-          "Nie udało się otworzyć okna Microsoft. Odblokuj wyskakujące okna dla StudioCRM i spróbuj ponownie.",
+          "Nie udało się otworzyć okna Microsoft. Odblokuj wyskakujące okna dla ATLAS i spróbuj ponownie.",
         );
       }
 
       startConnectPolling(authWindow);
       showAppInfo(
-        "Autoryzacja Microsoft otworzyła się w nowym oknie. Zamkniemy je automatycznie po połączeniu.",
+        "Logowanie do Microsoft otworzyło się w nowym oknie. Zamkniemy je automatycznie po połączeniu.",
         { id: "outlook-connect-started" },
       );
     } catch (err) {
@@ -223,8 +225,8 @@ export default function OutlookIntegrationCard() {
   const busy = isReconciling || seriesAction !== null;
 
   function showSyncWarning(data: { outlookSeriesSynced?: boolean; outlookSyncWarning?: string | null }) {
-    const warning = data.outlookSyncWarning || (data.outlookSeriesSynced === false
-      ? "Seria istnieje w CRM, ale nie została zsynchronizowana z Outlookiem."
+    const warning = (data.outlookSyncWarning ? userMessage(data.outlookSyncWarning, "Nie udało się przesłać części treningów do Outlooka. Ponów synchronizację.") : null) || (data.outlookSeriesSynced === false
+      ? "Seria treningów jest zapisana w ATLAS, ale nie pojawiła się w Outlooku. Ponów synchronizację."
       : null);
     setSyncWarning(warning);
     if (warning) showAppInfo(warning);
@@ -404,11 +406,11 @@ export default function OutlookIntegrationCard() {
           <h3 className="font-semibold">Wynik synchronizacji</h3>
           <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {[
-              ["Przetworzone integracje", result.integrationsProcessed],
+              ["Sprawdzone połączenia", result.integrationsProcessed],
               ["Znalezione wydarzenia Outlook", result.outlookEventsFound],
-              ["Zaimportowane lub zaktualizowane", result.importedOrUpdatedEvents],
+              ["Dodane lub zaktualizowane wydarzenia", result.importedOrUpdatedEvents],
               ["Brakujące wydarzenia oznaczone jako usunięte", result.missingOutlookEventsMarkedDeleted],
-              ["Sesje CRM zsynchronizowane z Outlook", result.crmSessionsSyncedToOutlook],
+              ["Treningi z ATLAS przesłane do Outlooka", result.crmSessionsSyncedToOutlook],
             ].map(([label, value]) => (
               <div key={label} className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">
                 <dt className="text-sm text-on-surface-variant">{label}</dt>
@@ -421,7 +423,7 @@ export default function OutlookIntegrationCard() {
               <summary className="cursor-pointer font-semibold text-error-light">Błędy synchronizacji ({result.errors.length})</summary>
               <ul className="mt-3 space-y-2 text-sm">
                 {result.errors.map((error, index) => (
-                  <li key={index} className="whitespace-pre-wrap break-words">{typeof error === "string" ? error : JSON.stringify(error, null, 2)}</li>
+                  <li key={index} className="whitespace-pre-wrap break-words">{userMessage(typeof error === "string" ? error : error && typeof error === "object" && "message" in error ? error.message : null, "Nie udało się zsynchronizować części danych. Spróbuj ponownie. Jeśli błąd się powtarza, skontaktuj się z obsługą.")}</li>
                 ))}
               </ul>
             </details>
@@ -434,7 +436,7 @@ export default function OutlookIntegrationCard() {
           <h3 className="font-semibold">Serie wymagające uwagi</h3>
           {series.map((item) => {
             const id = getSeriesId(item);
-            const warning = typeof item === "string" ? null : item.outlookSyncWarning ||
+            const warning = typeof item === "string" ? null : (item.outlookSyncWarning ? userMessage(item.outlookSyncWarning, "Nie udało się przesłać tej serii do Outlooka. Ponów synchronizację.") : null) ||
               (item.outlookSeriesSynced === false ? "Seria nie została zsynchronizowana z Outlookiem." : null);
             return (
               <div key={id} className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">

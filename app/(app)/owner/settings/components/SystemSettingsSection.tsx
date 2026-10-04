@@ -36,7 +36,7 @@ export default function SystemSettingsSection() {
         setIsLoading(true);
         setSystem(toSystemForm(await getOwnerSettings()));
       } catch (error) {
-        showAppError(error, "Nie udało się pobrać ustawień ownera.", {
+        showAppError(error, "Nie udało się pobrać ustawień studia.", {
           id: "owner-settings-load-error",
         });
       } finally {

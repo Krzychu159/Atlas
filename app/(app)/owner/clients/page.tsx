@@ -187,7 +187,7 @@ function ClientsContent() {
                     Klienci
                   </h1>
                   <span className="px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-sm">
-                    {scopedClients.length} total
+                    {scopedClients.length} łącznie
                   </span>
                 </div>
 
@@ -267,7 +267,7 @@ function ClientsContent() {
               <div className="card-shell p-5 flex items-center justify-between gap-6">
                 <div>
                   <p className="text-label text-on-surface-variant">
-                    Wydajność bazy
+                    Liczba klientów
                   </p>
                   <p className="mt-4 text-[2.6rem] leading-none font-semibold text-primary-light">
                     {scopedClients.length}

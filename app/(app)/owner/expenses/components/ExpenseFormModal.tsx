@@ -966,7 +966,7 @@ function getNipError(value: string) {
   ) % 11;
 
   if (checksum === 10 || checksum !== Number(value[9])) {
-    return "Nieprawidłowa suma kontrolna NIP.";
+    return "NIP jest nieprawidłowy. Sprawdź wpisane cyfry.";
   }
 
   return null;

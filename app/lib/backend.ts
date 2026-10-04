@@ -1,3 +1,4 @@
+import { userMessage } from "./user-messages";
 type ApiQueryValue = string | number | boolean | null | undefined;
 type ApiQuery = Record<string, ApiQueryValue | ApiQueryValue[]>;
 
@@ -149,10 +150,10 @@ export async function backendDownload(
 
 export function getErrorMessage(
   error: unknown,
-  fallback = "Wystąpił nieoczekiwany błąd.",
+  fallback = "Nie udało się wykonać tej czynności. Spróbuj ponownie.",
 ) {
   if (error instanceof Error && error.message) {
-    return error.message;
+    return userMessage(error.message, fallback);
   }
 
   return fallback;
@@ -236,7 +237,7 @@ async function readResponsePayload(response: Response) {
     }
 
     throw new ApiError(
-      `Backend zwrócił niepoprawną odpowiedź JSON. Status: ${response.status}.`,
+      "Nie udało się odczytać danych. Odśwież stronę i spróbuj ponownie.",
       {
         status: response.status,
         payload: text.slice(0, 500),

@@ -12,7 +12,7 @@ export default function NotFound() {
         </p>
 
         <h1 className="-mt-10 text-[2.5rem] md:text-[4rem] leading-none font-semibold font-display tracking-tight">
-          Strona nie znaleziona
+          Nie znaleziono strony
         </h1>
 
         <p className="mt-6 mx-auto max-w-[560px] text-base md:text-lg leading-8 text-on-surface-variant">
@@ -26,7 +26,7 @@ export default function NotFound() {
             className="h-14 px-8 rounded-[var(--radius-lg)] bg-primary text-on-primary font-semibold shadow-soft flex items-center justify-center gap-3"
           >
             <LayoutDashboard size={18} />
-            Powrót do Dashboardu
+            Wróć do panelu
           </Link>
 
           <Link
@@ -34,7 +34,7 @@ export default function NotFound() {
             className="h-14 px-8 rounded-[var(--radius-lg)] bg-surface-container text-on-surface font-semibold flex items-center justify-center gap-3"
           >
             <LifeBuoy size={18} />
-            Kontakt z supportem
+            Skontaktuj się z obsługą
           </Link>
         </div>
 
@@ -42,20 +42,20 @@ export default function NotFound() {
           <div>
             <p className="text-label text-on-surface-muted">Status</p>
             <p className="mt-2 text-sm text-on-surface-variant">
-              CODE_LOST_IN_SPACE
+              Strona niedostępna
             </p>
           </div>
 
           <div>
-            <p className="text-label text-on-surface-muted">Location</p>
+            <p className="text-label text-on-surface-muted">Co dalej?</p>
             <p className="mt-2 text-sm text-on-surface-variant">
-              /internal/err_404
+              Sprawdź adres strony
             </p>
           </div>
 
           <div>
-            <p className="text-label text-on-surface-muted">Time</p>
-            <p className="mt-2 text-sm text-on-surface-variant">GMT</p>
+            <p className="text-label text-on-surface-muted">Pomoc</p>
+            <p className="mt-2 text-sm text-on-surface-variant">Skontaktuj się ze studiem</p>
           </div>
         </div>
       </div>

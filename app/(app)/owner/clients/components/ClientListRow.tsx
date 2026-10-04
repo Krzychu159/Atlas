@@ -103,7 +103,7 @@ export default function ClientListRow({
       </div>
 
       <div className="min-w-0">
-        <p className="text-label text-on-surface-variant">Balance</p>
+        <p className="text-label text-on-surface-variant">Saldo</p>
         <p className="mt-1 text-sm font-semibold text-tertiary-light truncate">
           {formatClientBalance(client)}
         </p>

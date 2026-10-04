@@ -21,7 +21,7 @@ export function getPortalAccessLabel(status: string) {
     Blocked: "Dostęp zablokowany",
   };
 
-  return labels[status] || status || "Bez dostępu do panelu";
+  return labels[status] || (status ? "Status dostępu niedostępny" : "Bez dostępu do panelu");
 }
 
 export function getClientBalance(client: Client) {

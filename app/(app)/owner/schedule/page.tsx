@@ -1,5 +1,7 @@
 "use client";
 
+import { userMessage } from "@/app/lib/user-messages";
+
 import { useEffect, useMemo, useState } from "react";
 import { Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
@@ -293,7 +295,7 @@ export default function SchedulePage() {
       } else if (recurrence) {
         const result = await createSessionSeries(payload, recurrence);
         if (result.outlookSeriesSynced === false) {
-          showOwnerInfo(result.outlookSyncWarning || "Seria została utworzona w CRM, ale nie udało się zsynchronizować jej z Outlookiem.", {
+          showOwnerInfo(userMessage(result.outlookSyncWarning, "Seria treningów jest zapisana w ATLAS, ale nie pojawiła się w Outlooku. Ponów synchronizację w ustawieniach."), {
             id: "owner-session-series-warning",
           });
         } else {

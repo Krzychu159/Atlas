@@ -1,5 +1,7 @@
 "use client";
 
+import { getErrorMessage } from "@/app/lib/backend";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -93,7 +95,7 @@ function getAuthCopy(mode: AuthMode) {
   if (mode === "reset") {
     return {
       title: "Ustaw nowe hasło",
-      description: "Wklej token resetu i wpisz nowe hasło do konta.",
+      description: "Wklej kod z linku do zmiany hasła i wpisz nowe hasło.",
       submit: "Zapisz nowe hasło",
       pending: "Zapisywanie...",
       loadingTitle: "Zapisywanie...",
@@ -136,7 +138,7 @@ function LoginLoadingOverlay({ mode }: { mode: AuthMode }) {
           </div>
 
           <p className="mt-7 text-label uppercase tracking-[0.08em] text-primary-light">
-            Autoryzacja
+            Logowanie
           </p>
 
           <h3 className="mt-3 text-[1.8rem] font-semibold leading-none tracking-tight text-on-surface">
@@ -224,7 +226,7 @@ export default function LoginPage() {
       router.refresh();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Wystąpił nieoczekiwany błąd.",
+        getErrorMessage(err),
       );
       setIsSubmitting(false);
     }
@@ -261,7 +263,7 @@ export default function LoginPage() {
       );
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Wystąpił nieoczekiwany błąd.",
+        getErrorMessage(err),
       );
     } finally {
       setIsSubmitting(false);
@@ -277,7 +279,7 @@ export default function LoginPage() {
     setSuccess("");
 
     if (!resetToken.trim()) {
-      setError("Wklej token resetu hasła.");
+      setError("Wklej kod z linku do zmiany hasła.");
       return;
     }
 
@@ -318,7 +320,7 @@ export default function LoginPage() {
       setSuccess("Hasło zostało zmienione. Możesz się zalogować.");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Wystąpił nieoczekiwany błąd.",
+        getErrorMessage(err),
       );
     } finally {
       setIsSubmitting(false);
@@ -580,7 +582,7 @@ export default function LoginPage() {
                             onClick={() => changeMode("reset")}
                             className="text-sm font-semibold text-primary-light transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
                           >
-                            Mam token resetu
+                            Mam kod do zmiany hasła
                           </button>
                         </div>
                       </form>
@@ -591,7 +593,7 @@ export default function LoginPage() {
                       >
                         <div>
                           <label className="mb-3 block text-label text-on-surface-variant">
-                            Token resetu
+                            Kod do zmiany hasła
                           </label>
 
                           <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
@@ -601,7 +603,7 @@ export default function LoginPage() {
                             />
                             <input
                               type="text"
-                              placeholder="Wklej token z wiadomości"
+                              placeholder="Wklej kod z linku do zmiany hasła"
                               value={resetToken}
                               onChange={(e) => setResetToken(e.target.value)}
                               disabled={isSubmitting}
@@ -791,7 +793,7 @@ export default function LoginPage() {
 
               <div>
                 <label className="mb-3 block text-label text-on-surface-variant">
-                  Klucz bezpieczeństwa
+                  Hasło
                 </label>
 
                 <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
@@ -904,7 +906,7 @@ export default function LoginPage() {
                   onClick={() => changeMode("reset")}
                   className="text-sm font-semibold uppercase tracking-[0.04em] text-primary-light transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
                 >
-                  Mam token
+                  Mam kod do zmiany hasła
                 </button>
               </div>
             </form>
@@ -912,7 +914,7 @@ export default function LoginPage() {
             <form className="mt-12 space-y-7" onSubmit={handleResetSubmit}>
               <div>
                 <label className="mb-3 block text-label text-on-surface-variant">
-                  Token resetu
+                  Kod do zmiany hasła
                 </label>
 
                 <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
@@ -922,7 +924,7 @@ export default function LoginPage() {
                   />
                   <input
                     type="text"
-                    placeholder="Wklej token z wiadomości"
+                    placeholder="Wklej kod z linku do zmiany hasła"
                     value={resetToken}
                     onChange={(e) => setResetToken(e.target.value)}
                     disabled={isSubmitting}

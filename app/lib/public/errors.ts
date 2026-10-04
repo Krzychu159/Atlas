@@ -1,7 +1,7 @@
-import { getErrorMessage } from "../backend";
+import { userMessage } from "../user-messages";
 
 export function publicErrorMessage(error: unknown) {
-  const message = getErrorMessage(error, "Nie udało się połączyć ze studiem. Spróbuj ponownie.");
+  const message = error instanceof Error ? error.message : "Nie udało się połączyć ze studiem. Spróbuj ponownie.";
   const normalized = message.toLowerCase();
   const translations: [RegExp, string][] = [
     [/email.*(?:exist|taken|registered)/, "Ten e-mail jest już używany. Zaloguj się lub odzyskaj hasło."],
@@ -19,5 +19,5 @@ export function publicErrorMessage(error: unknown) {
   if (message.length > 500 || /(?:<html|<!doctype|<body|\[object Object\]|stack trace|exception|\bat \S+\()/i.test(message)) {
     return "Wystąpił błąd po stronie studia. Spróbuj ponownie za chwilę.";
   }
-  return message;
+  return userMessage(message, "Nie udało się wykonać tej czynności. Spróbuj ponownie.");
 }

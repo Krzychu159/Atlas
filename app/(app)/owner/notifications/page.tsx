@@ -64,7 +64,7 @@ function NotificationsList({ initialCategory, initialRead, notificationId }: { i
           <div>
             <p className="text-page-title">Powiadomienia</p>
             <p className="mt-3 text-sm leading-6 text-on-surface-variant">
-              Systemowe i operacyjne alerty przypisane do Twojego konta.
+              Wiadomości o treningach, płatnościach i sprawach studia.
             </p>
           </div>
 

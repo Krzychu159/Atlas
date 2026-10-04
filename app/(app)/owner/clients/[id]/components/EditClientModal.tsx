@@ -275,7 +275,7 @@ export default function EditClientModal({
 
       if (failedFields.length) {
         throw new Error(
-          `Backend zwrócił sukces, ale nie zapisał pól: ${failedFields.join(", ")}.`,
+          `Nie udało się zapisać części danych: ${failedFields.join(", ")}. Sprawdź je i spróbuj ponownie.`,
         );
       }
 
@@ -334,7 +334,7 @@ export default function EditClientModal({
   async function handleAvatarUpload(file: File) {
     if (!hasUserAccount) {
       throw new Error(
-        "Avatar wymaga konta użytkownika klienta.",
+        "Aby dodać zdjęcie, klient musi mieć konto w panelu. Wyślij mu zaproszenie.",
       );
     }
 
@@ -346,7 +346,7 @@ export default function EditClientModal({
     setAvatarUrl(uploadedUrl);
     onAvatarChanged?.(uploadedUrl);
 
-    showOwnerSuccess("Avatar klienta został zmieniony.", {
+    showOwnerSuccess("Zdjęcie klienta zostało zmienione.", {
       id: "client-avatar-upload-success",
     });
 
@@ -365,7 +365,7 @@ export default function EditClientModal({
     setAvatarUrl("");
     onAvatarChanged?.("");
 
-    showOwnerSuccess("Avatar klienta został usunięty.", {
+    showOwnerSuccess("Zdjęcie klienta zostało usunięte.", {
       id: "client-avatar-delete-success",
     });
   }
@@ -477,7 +477,7 @@ export default function EditClientModal({
                 <AlertTriangle size={18} className="mt-0.5 shrink-0" />
                 <p>
                   Wybrany trener nie jest przypisany do lokalizacji głównej
-                  klienta. Backend może odrzucić tę zmianę.
+                  klienta. Zapisanie tej zmiany może być niemożliwe. Wybierz trenera z tej lokalizacji.
                 </p>
               </div>
             ) : null}

@@ -36,7 +36,7 @@ const methodOptions = [
   { value: "1", label: "Blik" },
   { value: "2", label: "Przelew" },
   { value: "3", label: "Gotówka" },
-  { value: "4", label: "Bramka płatności" },
+  { value: "4", label: "Płatność online" },
 ];
 
 const CLIENT_PAYMENTS_PER_PAGE = 6;
@@ -226,7 +226,7 @@ export default function ClientPaymentsPage() {
 
         case ClientPaymentStatus.Rejected:
           throw new Error(
-            "Nie udało się utworzyć płatności w Tpay. Możesz spróbować ponownie.",
+            "Nie udało się rozpocząć płatności online. Spróbuj ponownie.",
           );
 
         case ClientPaymentStatus.Confirmed:

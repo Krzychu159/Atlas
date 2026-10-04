@@ -107,7 +107,7 @@ function PaymentResultContent() {
   if (!hasValidPaymentId) {
     return (
       <PageShell>
-        <PaymentError message="Nieprawidłowy identyfikator płatności." />
+        <PaymentError message="Link do płatności jest nieprawidłowy. Wróć do płatności i sprawdź swoją wpłatę." />
       </PageShell>
     );
   }

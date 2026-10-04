@@ -12,7 +12,7 @@ type RouteContext = {
 
 async function handler(req: NextRequest, context: RouteContext) {
   if (!BACKEND_URL) {
-    return jsonError("Brakuje konfiguracji BACKEND_API_URL.", 500);
+    return jsonError("Usługa jest chwilowo niedostępna. Spróbuj ponownie później.", 500);
   }
 
   const cookieStore = await cookies();
@@ -60,7 +60,7 @@ async function handler(req: NextRequest, context: RouteContext) {
       cache: "no-store",
     });
   } catch {
-    return jsonError("Nie udało się połączyć z backendem.", 502);
+    return jsonError("Nie udało się połączyć ze studiem. Spróbuj ponownie za chwilę.", 502);
   }
 
   // Public listings remain available when a previously valid session expires.
@@ -69,7 +69,7 @@ async function handler(req: NextRequest, context: RouteContext) {
     try {
       response = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
     } catch {
-      return jsonError("Nie udało się połączyć z backendem.", 502);
+      return jsonError("Nie udało się połączyć ze studiem. Spróbuj ponownie za chwilę.", 502);
     }
   }
 

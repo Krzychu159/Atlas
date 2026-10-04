@@ -1,5 +1,9 @@
 "use client";
 
+import { userTrainingType } from "@/app/lib/user-messages";
+
+import { userStatus } from "@/app/lib/user-messages";
+
 import { useMemo, useState } from "react";
 import { Clock3, Dumbbell, MapPin, UserRound } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
@@ -147,12 +151,10 @@ function SessionRow({
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2 lg:max-w-[48%] lg:justify-end">
-          <MetaChip label={session.status || "Brak statusu"} />
+          <MetaChip label={userStatus(session.status)} />
           <MetaChip
             label={
-              session.actualSessionType ||
-              session.plannedSessionType ||
-              "Typ nieokreślony"
+              userTrainingType(session.actualSessionType || session.plannedSessionType, "Typ nieokreślony")
             }
           />
           {participant ? <BillingChip participant={participant} /> : null}

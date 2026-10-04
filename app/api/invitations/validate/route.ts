@@ -4,13 +4,13 @@ export async function GET(request: Request) {
   const backendUrl = process.env.BACKEND_API_URL;
 
   if (!backendUrl) {
-    return jsonError("Brakuje konfiguracji BACKEND_API_URL.", 500);
+    return jsonError("Usługa jest chwilowo niedostępna. Spróbuj ponownie później.", 500);
   }
 
   const token = new URL(request.url).searchParams.get("token")?.trim();
 
   if (!token) {
-    return jsonError("Brakuje tokenu zaproszenia.", 400);
+    return jsonError("Link zaproszenia jest niepełny. Otwórz pełny link z wiadomości e-mail.", 400);
   }
 
   try {
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     if (!text) {
       return jsonError(
         response.ok
-          ? "Backend nie zwrócił danych zaproszenia."
+          ? "Nie udało się odczytać zaproszenia. Otwórz ponownie link z wiadomości e-mail."
           : "Nie udało się zweryfikować zaproszenia.",
         response.ok ? 502 : response.status,
       );

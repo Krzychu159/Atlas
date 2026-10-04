@@ -118,7 +118,7 @@ function OwnerSettlementsPageContent({ locationId }: { locationId: number | null
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-label text-primary-light">Panel ownera</p>
+          <p className="text-label text-primary-light">Panel właściciela</p>
           <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
             Rozliczenia trenerów
           </h1>
