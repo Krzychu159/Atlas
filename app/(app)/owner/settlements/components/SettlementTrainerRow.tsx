@@ -13,14 +13,22 @@ function formatMoney(value: number) {
   }).format(value);
 }
 
-export default function SettlementTrainerRow({ settlement }: {
+export default function SettlementTrainerRow({ settlement, locationId }: {
   settlement: TrainerMonthlySettlement;
+  locationId?: number | null;
 }) {
   const trainerName = settlement.trainerFullName || `Trener #${settlement.trainerId}`;
   const initials = settlement.trainerFullName?.trim().split(/\s+/).filter(Boolean)
     .map((part) => part[0]).filter((_, index, parts) => index === 0 || index === parts.length - 1)
     .join("").toLocaleUpperCase("pl-PL") || "T";
-  const href = `/owner/trainers/${settlement.trainerId}/settlements?year=${settlement.year}&month=${settlement.month}`;
+  const href = {
+    pathname: `/owner/trainers/${settlement.trainerId}/settlements`,
+    query: {
+      year: settlement.year,
+      month: settlement.month,
+      ...(locationId != null ? { locationId } : {}),
+    },
+  };
   const isPending = !settlement.isPaid && settlement.totalAmount > 0;
   const amountDue = settlement.isPaid ? 0 : settlement.totalAmount;
   const status = settlement.isPaid ? "Rozliczone" : isPending ? "Do wypłaty" : "Brak wypłaty";

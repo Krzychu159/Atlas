@@ -212,7 +212,7 @@ function OwnerSettlementsPageContent({ locationId }: { locationId: number | null
             </div>
             <ul className="flex flex-col gap-3 p-3 xl:block xl:p-0">
               {filteredSettlements.map((settlement) => (
-                <SettlementTrainerRow key={settlement.trainerId} settlement={settlement} />
+                <SettlementTrainerRow key={settlement.trainerId} settlement={settlement} locationId={locationId} />
               ))}
             </ul>
           </div>

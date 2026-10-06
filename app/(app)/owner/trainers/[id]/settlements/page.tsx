@@ -11,6 +11,10 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
+  normalizeOwnerLocationFilterValue,
+  useOwnerLocationFilter,
+} from "@/app/lib/owner/location-filter";
+import {
   ArrowLeft,
   CheckCircle2,
   Clock3,
@@ -20,6 +24,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import { CustomSelect } from "@/app/components/ui/custom-select";
 import {
   downloadTrainerWorkHoursDocument,
   getTrainerRates,
@@ -71,7 +76,7 @@ function updateUrlMonth(value: string) {
   const url = new URL(window.location.href);
   url.searchParams.set("year", String(year));
   url.searchParams.set("month", String(month));
-  window.history.replaceState(null, "", url.toString());
+  window.history.replaceState(window.history.state, "", url.toString());
 }
 
 function formatMoney(value: number) {
@@ -98,6 +103,8 @@ function formatSessionType(value: string | null) {
 }
 
 export default function TrainerSettlementPage() {
+  const { selectedLocationId, selectedLocationValue, setSelectedLocationValue } = useOwnerLocationFilter();
+  const [locationReady, setLocationReady] = useState(false);
   const correctionRevision = useSessionCorrectionRevision();
   const ratesRevision = useTrainerRatesRevision();
   const params = useParams<{ id: string }>();
@@ -114,16 +121,33 @@ export default function TrainerSettlementPage() {
   const [isGeneratingDocument, setIsGeneratingDocument] = useState(false);
 
   useEffect(() => {
-    void Promise.resolve().then(() => setMonthValue(getMonthValueFromUrl()));
-  }, []);
+    function readUrlFilters() {
+      setMonthValue(getMonthValueFromUrl());
+      const query = new URLSearchParams(window.location.search);
+      setSelectedLocationValue(normalizeOwnerLocationFilterValue(query.get("locationId")));
+      setLocationReady(true);
+    }
+    void Promise.resolve().then(readUrlFilters);
+    window.addEventListener("popstate", readUrlFilters);
+    return () => window.removeEventListener("popstate", readUrlFilters);
+  }, [setSelectedLocationValue]);
 
   useEffect(() => {
+    if (!locationReady) return;
+    const url = new URL(window.location.href);
+    if (selectedLocationId == null) url.searchParams.delete("locationId");
+    else url.searchParams.set("locationId", String(selectedLocationId));
+    window.history.replaceState(window.history.state, "", url.toString());
+  }, [locationReady, selectedLocationId]);
+
+  useEffect(() => {
+    let active = true;
     async function loadSettlement() {
       await Promise.resolve();
 
       const { year, month } = parseMonth(monthValue);
 
-      if (!monthValue) return;
+      if (!active || !locationReady || !monthValue) return;
 
       if (!trainerId || !year || !month) {
         showOwnerError(new Error("Nieprawidłowe dane rozliczenia."), "", {
@@ -135,35 +159,36 @@ export default function TrainerSettlementPage() {
 
       try {
         setIsLoading(true);
+        setSettlement(null);
         const [trainerResult, ratesResult, settlementResult] =
           await Promise.allSettled([
             getTrainer(trainerId),
             getTrainerRates(trainerId),
-            getTrainerSettlement(trainerId, year, month),
+            getTrainerSettlement(trainerId, year, month, selectedLocationId ?? undefined),
           ]);
 
+        if (!active) return;
+        if (settlementResult.status !== "fulfilled") throw settlementResult.reason;
         if (trainerResult.status !== "fulfilled") {
           throw trainerResult.reason;
         }
 
         setTrainer(trainerResult.value);
         setRates(ratesResult.status === "fulfilled" ? ratesResult.value : []);
-        setSettlement(
-          settlementResult.status === "fulfilled"
-            ? settlementResult.value
-            : null,
-        );
+        setSettlement(settlementResult.value);
       } catch (err) {
+        if (!active) return;
         showOwnerError(err, "Nie udało się pobrać rozliczenia trenera.", {
           id: "owner-trainer-settlement-load-error",
         });
       } finally {
-        setIsLoading(false);
+        if (active) setIsLoading(false);
       }
     }
 
-    loadSettlement();
-  }, [monthValue, trainerId, correctionRevision, ratesRevision]);
+    void loadSettlement();
+    return () => { active = false; };
+  }, [monthValue, trainerId, correctionRevision, ratesRevision, locationReady, selectedLocationId]);
 
   const activeRates = useMemo(
     () => rates.filter((rate) => rate.isActive),
@@ -184,7 +209,10 @@ export default function TrainerSettlementPage() {
         settlement.year,
         settlement.month,
       );
-      setSettlement(data);
+      setSettlement((current) => current &&
+        current.trainerId === data.trainerId && current.year === data.year && current.month === data.month
+        ? { ...current, isPaid: data.isPaid, paidAt: data.paidAt }
+        : current);
       showOwnerSuccess("Rozliczenie oznaczone jako wypłacone.", {
         id: "owner-trainer-settlement-paid",
       });
@@ -209,7 +237,10 @@ export default function TrainerSettlementPage() {
         settlement.year,
         settlement.month,
       );
-      setSettlement(data);
+      setSettlement((current) => current &&
+        current.trainerId === data.trainerId && current.year === data.year && current.month === data.month
+        ? { ...current, isPaid: data.isPaid, paidAt: data.paidAt }
+        : current);
       showOwnerSuccess("Rozliczenie ponownie oznaczone jako niewypłacone.", {
         id: "owner-trainer-settlement-reopened",
       });
@@ -233,6 +264,7 @@ export default function TrainerSettlementPage() {
         settlement.trainerId,
         settlement.year,
         settlement.month,
+        selectedLocationId ?? undefined,
       );
       const objectUrl = URL.createObjectURL(blob);
       const downloadLink = document.createElement("a");
@@ -293,13 +325,31 @@ export default function TrainerSettlementPage() {
         </label>
       </div>
 
+      <div className="xl:hidden">
+        <CustomSelect
+          label="Lokalizacja"
+          value={selectedLocationValue}
+          onChange={setSelectedLocationValue}
+          options={[
+            { value: "all", label: "Wszystkie lokalizacje" },
+            ...(trainer?.locationIds ?? []).map((id, index) => ({
+              value: String(id),
+              label: trainer?.locationNames?.[index] || `Lokalizacja ${id}`,
+            })),
+            ...(selectedLocationId != null && !trainer?.locationIds?.includes(selectedLocationId)
+              ? [{ value: String(selectedLocationId), label: `Lokalizacja ${selectedLocationId}` }]
+              : []),
+          ]}
+        />
+      </div>
+
       {isLoading ? (
         <div className="card-shell p-6 text-on-surface-variant">
           Ładowanie rozliczenia...
         </div>
       ) : null}
 
-      {settlement ? (
+      {settlement && !isLoading ? (
         <>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <SummaryCard
@@ -357,6 +407,9 @@ export default function TrainerSettlementPage() {
               <div className="mt-5 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
                 <p className="text-label text-on-surface-muted">
                   Status płatności
+                </p>
+                <p className="mt-2 text-sm text-on-surface-variant">
+                  Status wypłaty dotyczy całego miesiąca, we wszystkich lokalizacjach.
                 </p>
                 <span
                   className={[

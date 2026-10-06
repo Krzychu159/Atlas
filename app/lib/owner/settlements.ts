@@ -5,7 +5,6 @@ import {
   backendPut,
 } from "../backend";
 import { getTrainers, type Trainer } from "./trainers";
-import { getOwnerSessions } from "./sessions";
 
 export type TrainerRate = {
   id: number;
@@ -83,10 +82,11 @@ export function getTrainerSettlement(
   trainerId: number,
   year: number,
   month: number,
+  locationId?: number,
 ) {
   return backendGet<TrainerMonthlySettlement>(
     `Trainers/${trainerId}/settlement`,
-    { year, month },
+    { year, month, locationId },
   );
 }
 
@@ -118,41 +118,27 @@ export function downloadTrainerWorkHoursDocument(
   trainerId: number,
   year: number,
   month: number,
+  locationId?: number,
 ) {
   return backendDownload(
     `trainers/${trainerId}/settlement/work-hours-document`,
-    { year, month },
+    { year, month, locationId },
   );
 }
 
 export async function getOwnerTrainerSettlements(year: number, month: number, locationId: number | null = null) {
-  const sessionIds = locationId === null ? null : new Set(
-    (await getOwnerSessions({
-      locationId,
-      from: new Date(year, month - 1, 1).toISOString(),
-      to: new Date(year, month, 1).toISOString(),
-    })).filter((session) => session.locationId === locationId).map((session) => session.id),
-  );
   const trainers = await getTrainers();
   const results = await Promise.allSettled(
-    trainers.map((trainer) => getTrainerSettlement(trainer.id, year, month)),
+    trainers.map((trainer) => getTrainerSettlement(trainer.id, year, month, locationId ?? undefined)),
   );
 
   return trainers.map((trainer, index) => {
     const result = results[index];
 
     if (result.status === "fulfilled") {
-      if (!sessionIds) return result.value;
-      const items = (result.value.items || []).filter((item) => sessionIds.has(item.sessionId));
-      return {
-        ...result.value,
-        items,
-        totalSessions: items.length,
-        totalHours: items.reduce((sum, item) => sum + item.hours, 0),
-        totalAmount: items.reduce((sum, item) => sum + item.amount, 0),
-      };
+      return result.value;
     }
 
     return emptySettlement(trainer, year, month);
-  }).filter((settlement) => !sessionIds || settlement.totalSessions > 0);
+  }).filter((settlement) => locationId === null || settlement.totalSessions > 0);
 }

@@ -1,5 +1,8 @@
+"use client";
+
 import { getOutlookColor } from "@/app/lib/calendar/outlook-colors";
 import Link from "next/link";
+import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 import {
   ArrowLeft,
   FileSignature,
@@ -43,9 +46,13 @@ export default function TrainerProfileHeader({
   onEdit: () => void;
   onContracts: () => void;
 }) {
+  const { selectedLocationId } = useOwnerLocationFilter();
   const fullName =
     trainer.fullName || `${trainer.firstName} ${trainer.lastName}`;
-  const settlementsHref = `/owner/trainers/${trainer.id}/settlements`;
+  const settlementsHref = {
+    pathname: `/owner/trainers/${trainer.id}/settlements`,
+    query: selectedLocationId == null ? {} : { locationId: selectedLocationId },
+  };
 
   return (
     <section className="card-shell overflow-hidden p-5 md:p-8">
