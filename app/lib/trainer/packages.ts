@@ -1,3 +1,4 @@
+import type { PackageType } from "@/app/lib/packageFilters";
 import { backendGet } from "@/app/lib/backend";
 
 export type TrainerPackage = {
@@ -11,6 +12,7 @@ export type TrainerPackage = {
   durationDays: number;
   billingType?: number;
   participantsCount: number;
+  packageType?: PackageType | null;
   locationId?: number | null;
   locationName?: string | null;
   isActive: boolean;

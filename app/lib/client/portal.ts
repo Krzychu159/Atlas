@@ -1,4 +1,5 @@
 import { backendDelete, backendGet, backendPatch, backendPost } from "../backend";
+import type { ClientPackageBilling as SharedClientPackageBilling } from "../owner/billing";
 
 export type PaymentMethod = 1 | 2 | 3 | 4;
 export type ClientPaymentStatus = 1 | 2 | 3 | 4 | 5;
@@ -106,34 +107,7 @@ export type ClientPayment = {
   receiptIssuedAt: string | null;
 };
 
-export type ClientPackageBilling = {
-  clientPackageId: number;
-  packageId: number;
-  packageName: string | null;
-  isActive: boolean;
-  activationMode: string | null;
-  totalSessions: number;
-  sessionsPerWeek: number;
-  usedSessions: number;
-  remainingSessions: number;
-  totalPrice: number;
-  originalPrice: number;
-  balanceApplied: number;
-  expectedUnitPrice: number;
-  amountPaid: number;
-  amountDue: number;
-  currency: string | null;
-  expectedBillingType: string | number | null;
-  packageType?: string | null;
-  participantsCount?: number | null;
-  locationId: number | null;
-  locationName: string | null;
-  paymentStatus: string | null;
-  purchaseDate: string;
-  validUntil: string | null;
-  paymentDueDate: string | null;
-  activatedAt: string | null;
-};
+export type ClientPackageBilling = SharedClientPackageBilling;
 
 export type ClientBillingSummary = {
   totalAmountDue?: number;

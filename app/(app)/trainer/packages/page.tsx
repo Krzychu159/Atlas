@@ -7,6 +7,7 @@ import {
   getTrainerPackages,
   type TrainerPackage,
 } from "@/app/lib/trainer/packages";
+import { filterPackages } from "@/app/lib/packageFilters";
 import PackageCard from "@/app/components/packages/PackageCard";
 import PackageFilters, {
   type DurationFilter,
@@ -14,37 +15,6 @@ import PackageFilters, {
   type ParticipantsFilter,
   type SessionsFilter,
 } from "@/app/components/packages/PackageFilters";
-
-function normalize(value: string) {
-  return value.toLowerCase().trim();
-}
-
-function matchesParticipants(item: TrainerPackage, filter: ParticipantsFilter) {
-  const count = item.participantsCount || 1;
-
-  if (filter === "solo") return count <= 1;
-  if (filter === "duo") return count === 2;
-  if (filter === "group") return count > 2;
-  return true;
-}
-
-function matchesSessions(item: TrainerPackage, filter: SessionsFilter) {
-  if (filter === "short") return item.sessionsLimit <= 4;
-  if (filter === "medium") {
-    return item.sessionsLimit >= 5 && item.sessionsLimit <= 10;
-  }
-  if (filter === "long") return item.sessionsLimit > 10;
-  return true;
-}
-
-function matchesDuration(item: TrainerPackage, filter: DurationFilter) {
-  if (filter === "monthly") return item.durationDays <= 31;
-  if (filter === "quarterly") {
-    return item.durationDays > 31 && item.durationDays <= 90;
-  }
-  if (filter === "long") return item.durationDays > 90;
-  return true;
-}
 
 export default function TrainerPackagesPage() {
   const [packages, setPackages] = useState<TrainerPackage[]>([]);
@@ -79,41 +49,12 @@ export default function TrainerPackagesPage() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  const filteredPackages = useMemo(() => {
-    const query = normalize(search);
-    const result = packages.filter((item) => {
-      const name = normalize(item.name || "");
-      const description = normalize(item.description || "");
-      const matchesSearch =
-        !query || name.includes(query) || description.includes(query);
-
-      return (
-        matchesSearch &&
-        matchesParticipants(item, participantsFilter) &&
-        matchesSessions(item, sessionsFilter) &&
-        matchesDuration(item, durationFilter)
-      );
-    });
-
-    return [...result].sort((first, second) => {
-      if (sort === "price-asc") return first.price - second.price;
-      if (sort === "price-desc") return second.price - first.price;
-      if (sort === "sessions-desc") {
-        return second.sessionsLimit - first.sessionsLimit;
-      }
-      if (sort === "duration-desc") {
-        return second.durationDays - first.durationDays;
-      }
-      if (sort === "participants-asc") {
-        return (first.participantsCount || 1) - (second.participantsCount || 1);
-      }
-
-      return (
-        new Date(second.createdAt).getTime() -
-        new Date(first.createdAt).getTime()
-      );
-    });
-  }, [durationFilter, packages, participantsFilter, search, sessionsFilter, sort]);
+  const filteredPackages = useMemo(
+    () => filterPackages(packages, {
+      search, participantsFilter, sessionsFilter, durationFilter, sort,
+    }),
+    [packages, search, participantsFilter, sessionsFilter, durationFilter, sort],
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
@@ -158,7 +99,7 @@ export default function TrainerPackagesPage() {
         </div>
       ) : (
         <div className="card-shell p-8 text-center text-on-surface-variant">
-          Brak pakietów dla wybranych kryteriów.
+          Brak pakietów spełniających wybrane kryteria.
         </div>
       )}
     </div>

@@ -41,13 +41,27 @@ export type ClientPayment = {
   receiptIssuedAt: string | null;
 };
 
-export type ClientPackageBilling = {
-  origin?: string | null;
+export type PackagePaymentStatus = "Unpaid" | "Paid" | "Overdue" | "PartiallyPaid" | "PendingConfirmation";
+export type PackageClosureDisposition = "Retained" | "RefundPending" | "Refunded" | "ClosedWithDebt" | "Closed" | "TransferredToBalance";
+export type PackageOrigin = "Manual" | "GroupManual" | "GroupPublic" | "AutoRenewal" | "StaffPackageChange" | "OpeningBalance" | "SeedScenario";
+export type PackageActivationMode = "Immediately" | "AfterCurrentPackage";
+
+export type PackageClosureFields = {
+  isActive: boolean;
+  closureDisposition: PackageClosureDisposition | null;
+  closureReason: string | null;
+  closedAt: string | null;
+  refundAmount: number;
+  refundConfirmedAt: string | null;
+  refundReference: string | null;
+};
+
+export type ClientPackageBilling = PackageClosureFields & {
+  origin: PackageOrigin | null;
   clientPackageId: number;
   packageId: number;
   packageName: string | null;
-  isActive: boolean;
-  activationMode: string | null;
+  activationMode: PackageActivationMode | null;
   totalSessions: number;
   sessionsPerWeek: number;
   usedSessions: number;
@@ -64,7 +78,7 @@ export type ClientPackageBilling = {
   participantsCount?: number | null;
   locationId: number | null;
   locationName: string | null;
-  paymentStatus: string | null;
+  paymentStatus: PackagePaymentStatus | null;
   purchaseDate: string;
   validUntil: string | null;
   paymentDueDate: string | null;
@@ -249,9 +263,75 @@ export type CorrectClientPackagePayload = {
   reason: string;
   totalSessions?: number;
   totalPrice?: number;
-  validUntil?: string | null;
-  paymentDueDate?: string | null;
+  validUntil?: string;
+  paymentDueDate?: string;
 };
+
+export type CloseClientPackagePayload = {
+  expectedVersion: unknown;
+  reason: string;
+  debtDisposition: "KeepDue" | "WaiveDue";
+  fundsDisposition: "KeepFunds" | "Balance" | "Refund";
+  settlementAmount: number;
+  replacement?: { clientId: number; packageId: number; purchaseDate: string };
+};
+
+export function closeClientPackage(clientId: number, clientPackageId: number, payload: CloseClientPackagePayload) {
+  return backendPost<{ replacementClientPackageId: number | null }>(
+    `client-packages/clients/${clientId}/packages/${clientPackageId}/close`, payload,
+  );
+}
+
+export type ImportClientPackagePayload = {
+  requestId: string;
+  reason: string;
+  usedSessions: number;
+  amountPaid: number;
+  package: {
+    clientId: number;
+    packageId: number;
+    totalSessions: number;
+    totalPrice: number;
+    purchaseDate: string;
+    validUntil: string;
+  };
+};
+
+export function importClientPackage(payload: ImportClientPackagePayload) {
+  return backendPost<{ id: number }>("client-packages/import", payload);
+}
+
+export function getPackageClosureLabel(value: unknown): string | null {
+  const labels: Record<string, string> = {
+    Retained: "Zachowany do wznowienia",
+    RefundPending: "Zwrot oczekuje na potwierdzenie",
+    Refunded: "Zwrot potwierdzony",
+    ClosedWithDebt: "Zamknięty z pozostawioną należnością",
+    Closed: "Zamknięty",
+    TransferredToBalance: "Środki przeniesione na saldo",
+  };
+  return typeof value === "string" ? Object.hasOwn(labels, value) ? labels[value] : "Rozliczenie pakietu niedostępne" : null;
+}
+
+export function getPackageOriginLabel(value: unknown): string | null {
+  const labels: Record<string, string> = {
+    Manual: "Utworzony ręcznie",
+    GroupManual: "Pakiet grupowy — przypisany przez studio",
+    GroupPublic: "Pakiet grupowy — zakup publiczny",
+    AutoRenewal: "Automatyczne odnowienie",
+    StaffPackageChange: "Zmiana pakietu przez studio",
+    OpeningBalance: "Stan początkowy",
+  };
+  return typeof value === "string" && Object.hasOwn(labels, value) ? labels[value] : null;
+}
+
+export function getPackagePaymentStatusLabel(value: unknown): string {
+  const labels: Record<string, string> = {
+    Unpaid: "Nieopłacony", Paid: "Opłacony", Overdue: "Po terminie płatności",
+    PartiallyPaid: "Częściowo opłacony", PendingConfirmation: "Oczekuje na potwierdzenie wpłaty",
+  };
+  return typeof value === "string" && Object.hasOwn(labels, value) ? labels[value] : "Stan płatności niedostępny";
+}
 
 export function getClientPackageManagementPreview(clientId: number, clientPackageId: number) {
   return backendGet<PackageManagementPreview>(

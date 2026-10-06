@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { BadgeCheck } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { OwnerTextArea } from "../../../components/OwnerFormControls";
@@ -12,27 +12,31 @@ import {
 import { formatMoney } from "@/app/lib/formatters/money";
 import type { ClientRefund } from "@/app/lib/owner/clients";
 
-export default function RefundConfirmationModal({
+type RefundConfirmationProps = {
+  refund: ClientRefund | null;
+  submitting: boolean;
+  onClose: () => void;
+  onConfirm: (reference: string) => Promise<void>;
+};
+
+export default function RefundConfirmationModal(props: RefundConfirmationProps) {
+  if (!props.refund) return null;
+  return <RefundConfirmationForm key={props.refund.clientPackageId} {...props} refund={props.refund} />;
+}
+
+function RefundConfirmationForm({
   refund,
   submitting,
   onClose,
   onConfirm,
 }: {
-  refund: ClientRefund | null;
+  refund: ClientRefund;
   submitting: boolean;
   onClose: () => void;
   onConfirm: (reference: string) => Promise<void>;
 }) {
-  const [reference, setReference] = useState("");
+  const [reference, setReference] = useState(refund.reference || "");
   const [validationMessage, setValidationMessage] = useState("");
-
-  useEffect(() => {
-    if (!refund) return;
-    setReference(refund.reference || "");
-    setValidationMessage("");
-  }, [refund]);
-
-  if (!refund) return null;
 
   async function handleConfirm() {
     const cleanReference = reference.trim();
@@ -48,7 +52,7 @@ export default function RefundConfirmationModal({
 
   return (
     <ModalOverlay onClose={submitting ? undefined : onClose}>
-      <div className="relative z-10 w-full max-w-[540px] rounded-[var(--radius-xl)] bg-surface-container shadow-ambient">
+      <div role="dialog" aria-modal="true" aria-label="Potwierdź wykonany zwrot" className="relative z-10 max-h-[90dvh] w-full max-w-[540px] overflow-y-auto rounded-[var(--radius-xl)] bg-surface-container shadow-ambient">
         <div className="p-6">
           <ModalHeader
             eyebrow="Zwrot klienta"

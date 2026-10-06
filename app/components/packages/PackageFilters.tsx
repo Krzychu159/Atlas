@@ -4,16 +4,8 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { Input } from "@/app/components/ui/input";
 
-export type ParticipantsFilter = "all" | "solo" | "duo" | "group";
-export type SessionsFilter = "all" | "short" | "medium" | "long";
-export type DurationFilter = "all" | "monthly" | "quarterly" | "long";
-export type PackageSort =
-  | "newest"
-  | "price-asc"
-  | "price-desc"
-  | "sessions-desc"
-  | "duration-desc"
-  | "participants-asc";
+import type { ParticipantsFilter, SessionsFilter, DurationFilter, PackageSort } from "@/app/lib/packageFilters";
+export type { ParticipantsFilter, SessionsFilter, DurationFilter, PackageSort } from "@/app/lib/packageFilters";
 
 type PackageFiltersProps = {
   search: string;
@@ -62,6 +54,8 @@ export default function PackageFilters({
             { value: "all", label: "Dowolnie" },
             { value: "solo", label: "1 osoba" },
             { value: "duo", label: "2 osoby" },
+            { value: "trio", label: "3 osoby" },
+            { value: "four", label: "4 osoby" },
             { value: "group", label: "Grupowe" },
           ]}
         />
@@ -71,9 +65,10 @@ export default function PackageFilters({
           onChange={(value) => onSessionsFilterChange(value as SessionsFilter)}
           options={[
             { value: "all", label: "Dowolnie" },
-            { value: "short", label: "1-4" },
-            { value: "medium", label: "5-10" },
-            { value: "long", label: "11+" },
+            { value: "1-4", label: "1–4" },
+            { value: "5-8", label: "5–8" },
+            { value: "9-12", label: "9–12" },
+            { value: "13+", label: "13+" },
           ]}
         />
         <CustomSelect
@@ -82,9 +77,10 @@ export default function PackageFilters({
           onChange={(value) => onDurationFilterChange(value as DurationFilter)}
           options={[
             { value: "all", label: "Dowolnie" },
-            { value: "monthly", label: "do 31 dni" },
-            { value: "quarterly", label: "32-90 dni" },
-            { value: "long", label: "90+ dni" },
+            { value: "up-to-30", label: "do 30 dni" },
+            { value: "31-60", label: "31–60 dni" },
+            { value: "61-90", label: "61–90 dni" },
+            { value: "over-90", label: "90+ dni" },
           ]}
         />
         <CustomSelect
@@ -93,11 +89,11 @@ export default function PackageFilters({
           onChange={(value) => onSortChange(value as PackageSort)}
           options={[
             { value: "newest", label: "Najnowsze" },
+            { value: "oldest", label: "Najstarsze" },
             { value: "price-asc", label: "Cena rosnąco" },
             { value: "price-desc", label: "Cena malejąco" },
-            { value: "sessions-desc", label: "Najwięcej sesji" },
-            { value: "duration-desc", label: "Najdłuższe" },
-            { value: "participants-asc", label: "Uczestnicy" },
+            { value: "name-asc", label: "Nazwa A–Z" },
+            { value: "name-desc", label: "Nazwa Z–A" },
           ]}
         />
       </div>

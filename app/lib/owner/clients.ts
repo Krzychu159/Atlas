@@ -249,6 +249,28 @@ export function getClient(id: number) {
   return backendGet<Client>(`Clients/${id}`);
 }
 
+export type ClientAuditDto = {
+  id: number;
+  action: string;
+  actorUserId: number | null;
+  beforeJson: string;
+  afterJson: string;
+  reason: string | null;
+  createdAt: string;
+};
+
+export type ClientAuditResponse = {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  items: ClientAuditDto[];
+};
+
+export function getClientAudit(clientId: number, page = 1, pageSize = 25) {
+  return backendGet<ClientAuditResponse>(`clients/${clientId}/audit`, { page, pageSize });
+}
+
 export function getClientsByTrainer(trainerId: number) {
   return backendGet<Client[]>("Clients/filter", { TrainerId: trainerId });
 }

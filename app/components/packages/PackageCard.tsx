@@ -9,6 +9,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import Link from "next/link";
+import { formatParticipantsLabel, type PackageType } from "@/app/lib/packageFilters";
 import { formatMoney } from "@/app/lib/formatters/money";
 
 export type PackageCardItem = {
@@ -22,6 +23,7 @@ export type PackageCardItem = {
   durationDays: number;
   billingType?: number;
   participantsCount?: number | null;
+  packageType?: PackageType | null;
   locationId?: number | null;
   locationName?: string | null;
   isActive: boolean;
@@ -35,12 +37,6 @@ type PackageCardProps<TItem extends PackageCardItem> = {
   detailsHref?: string;
   onDeleteRequest?: (item: TItem) => void;
 };
-
-function getParticipantsLabel(value?: number | null) {
-  if (!value || value <= 1) return "1:1";
-  if (value === 2) return "2 osoby";
-  return `${value} osób`;
-}
 
 export default function PackageCard<TItem extends PackageCardItem>({
   item,
@@ -57,7 +53,7 @@ export default function PackageCard<TItem extends PackageCardItem>({
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-2 rounded-full bg-tertiary-container px-3 py-1 text-[11px] font-bold text-tertiary-light">
             <UsersRound size={13} />
-            {getParticipantsLabel(item.participantsCount)}
+            {formatParticipantsLabel(item.participantsCount, item.packageType)}
           </span>
 
           {onDeleteRequest ? (

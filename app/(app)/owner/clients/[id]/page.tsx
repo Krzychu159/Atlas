@@ -47,6 +47,7 @@ import ClientPackagesSection, {
 import EndCooperationModal from "./components/EndCooperationModal";
 import ClientRefundsSection from "./components/ClientRefundsSection";
 import RefundConfirmationModal from "./components/RefundConfirmationModal";
+import ClientAuditSection from "./components/ClientAuditSection";
 import { ApiError } from "@/app/lib/backend";
 import {
   showOwnerError,
@@ -90,6 +91,7 @@ export default function OwnerClientDetailsPage() {
     null,
   );
   const [isConfirmingRefund, setIsConfirmingRefund] = useState(false);
+  const [auditRevision, setAuditRevision] = useState(0);
   const groupLocationNames = getClientGroupLocationNames(
     billing?.packages,
     client?.locationName,
@@ -97,6 +99,7 @@ export default function OwnerClientDetailsPage() {
 
   async function refreshClient() {
     if (!client) return;
+    setAuditRevision((value) => value + 1);
 
     try {
       setClient(await getClient(client.id));
@@ -255,7 +258,7 @@ export default function OwnerClientDetailsPage() {
         reference,
       });
       setRefundToConfirm(null);
-      showOwnerSuccess("Zwrot został oznaczony jako wykonany.", {
+      showOwnerSuccess("Zwrot został potwierdzony.", {
         id: "owner-client-refund-confirm-success",
       });
       await refreshRefundData(client.id);
@@ -269,6 +272,7 @@ export default function OwnerClientDetailsPage() {
   }
 
   async function refreshCooperationData(clientId: number, propagateError = false) {
+    setAuditRevision((value) => value + 1);
     const results = await Promise.allSettled([
       getClient(clientId),
       getClientSubscription(clientId),
@@ -326,6 +330,7 @@ export default function OwnerClientDetailsPage() {
 
   useEffect(() => {
     async function loadClientDetails() {
+      setAuditRevision((value) => value + 1);
       const clientId = Number(params.id);
 
       if (!clientId) {
@@ -492,7 +497,8 @@ export default function OwnerClientDetailsPage() {
             subscription={subscription}
             billing={billing}
           />
-          <ClientPackagesSection packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} clientId={!client.isArchived ? client.id : undefined} onSaved={() => refreshCooperationData(client.id, true)} />
+          <ClientPackagesSection key={client.id} packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} clientId={!client.isArchived ? client.id : undefined} onSaved={() => refreshCooperationData(client.id, true)} />
+          <ClientAuditSection key={client.id} clientId={client.id} revision={auditRevision} />
 
           {!client.isArchived ? (
             <ClientRefundsSection
@@ -523,7 +529,7 @@ export default function OwnerClientDetailsPage() {
             <ClientNotesPanel
               client={client}
               payments={payments}
-              onClientChange={setClient}
+              onClientChange={(updated) => { setClient(updated); setAuditRevision((value) => value + 1); }}
               readOnly={client.isArchived}
               showPayments={!client.isArchived || paymentsAvailable}
             />
@@ -541,7 +547,7 @@ export default function OwnerClientDetailsPage() {
                 groupLocationNames={groupLocationNames}
                 groupLocationsAvailable={billing !== null}
                 onClose={() => setIsEditOpen(false)}
-                onSaved={setClient}
+                onSaved={(updated) => { setClient(updated); setAuditRevision((value) => value + 1); }}
                 onAvatarChanged={(avatarUrl) =>
                   setClient((current) =>
                     current ? { ...current, avatarUrl } : current,

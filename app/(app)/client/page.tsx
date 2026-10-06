@@ -1,5 +1,6 @@
 "use client";
 
+import { getPackagePaymentStatusLabel } from "@/app/lib/owner/billing";
 import { userMessage } from "@/app/lib/user-messages";
 
 import { useEffect, useMemo, useState } from "react";
@@ -948,18 +949,6 @@ function getGroupPackages(
       (item) => item.isActive && getPackageKind(item) === "group",
     )
     .slice(0, 3);
-}
-
-function getPackagePaymentStatusLabel(status: string) {
-  const normalized = status.trim().toLowerCase();
-
-  if (normalized.includes("paid") && !normalized.includes("unpaid")) {
-    return "opłacony";
-  }
-  if (normalized.includes("pending")) return "oczekuje na potwierdzenie";
-  if (normalized.includes("unpaid")) return "nieopłacony";
-
-  return userMessage(status, "Status płatności niedostępny");
 }
 
 function sortSessions(first: ClientPortalSession, second: ClientPortalSession) {

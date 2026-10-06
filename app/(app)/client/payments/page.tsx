@@ -14,7 +14,8 @@ import {
 } from "@/app/components/ui/app-toast";
 import { isNotFoundLikeError } from "@/app/lib/backend";
 import { formatMoney } from "@/app/lib/formatters/money";
-import { getPaymentStatusLabel } from "@/app/lib/payments/display";
+import { getPackagePaymentStatusLabel } from "@/app/lib/owner/billing";
+import ClientPackagesSection from "@/app/(app)/owner/clients/[id]/components/ClientPackagesSection";
 import {
   createClientPortalPayment,
   getClientPortalBilling,
@@ -308,7 +309,7 @@ export default function ClientPaymentsPage() {
             icon={<Dumbbell size={20} />}
             label="Bieżący pakiet indywidualny"
             value={billing?.activeClientPackageId ? billing.activePackageName || "Brak nazwy" : "Brak pakietu"}
-            note={getPaymentStatusLabel(billing?.activePackagePaymentStatus)}
+            note={getPackagePaymentStatusLabel(billing?.activePackagePaymentStatus)}
             loading={isLoading}
           />
           <SummaryCard
@@ -408,6 +409,7 @@ export default function ClientPaymentsPage() {
         </section>
       ) : null}
 
+      <ClientPackagesSection audience="client" packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} />
       <ClientPaymentHistory payments={payments} isLoading={isLoading} />
 
       <PaymentEntryModal

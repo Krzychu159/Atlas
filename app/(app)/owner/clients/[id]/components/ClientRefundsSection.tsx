@@ -59,6 +59,7 @@ function RefundRow({
   onConfirm: () => void;
 }) {
   const pending = isPendingRefund(refund);
+  const confirmed = Boolean(refund.confirmedAt) || refund.disposition === "Refunded";
 
   return (
     <article className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4">
@@ -71,13 +72,13 @@ function RefundRow({
             <span
               className={[
                 "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold",
-                pending
+                !confirmed
                   ? "bg-warning-container/35 text-warning-light"
                   : "bg-tertiary/15 text-tertiary-light",
               ].join(" ")}
             >
-              {pending ? <Clock3 size={12} /> : <CheckCircle2 size={12} />}
-              {pending ? "Oczekuje na potwierdzenie" : "Zwrot potwierdzony"}
+              {confirmed ? <CheckCircle2 size={12} /> : <Clock3 size={12} />}
+              {pending ? "Zwrot oczekuje" : confirmed ? "Zwrot potwierdzony" : "Rozliczenie zwrotu"}
             </span>
           </div>
 
@@ -90,7 +91,7 @@ function RefundRow({
             {refund.confirmedAt ? (
               <span>Potwierdzono: {formatDate(refund.confirmedAt)}</span>
             ) : null}
-            {refund.reference ? <span>Potwierdzenie: {refund.reference}</span> : null}
+            {refund.reference ? <span className="min-w-0 break-all">Potwierdzenie: {refund.reference}</span> : null}
           </div>
         </div>
 
@@ -109,8 +110,8 @@ export function isPendingRefund(refund: ClientRefund) {
 }
 
 function getDispositionLabel(disposition?: string | null) {
-  if (disposition === "RefundPending") return "Zwrot uzgodniony";
-  if (disposition === "Refunded") return "Zwrot wykonany";
+  if (disposition === "RefundPending") return "Do wykonania i potwierdzenia przez studio";
+  if (disposition === "Refunded") return "Wykonanie potwierdzone przez studio";
   if (disposition === "Retain") return "Pozostałe wejścia zachowane";
   return "Rozliczenie zwrotu";
 }

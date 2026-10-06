@@ -1,3 +1,4 @@
+import type { PackageType } from "@/app/lib/packageFilters";
 import {
   backendDelete,
   backendGet,
@@ -16,6 +17,7 @@ export type Package = {
   durationDays: number;
   billingType?: number;
   participantsCount: number;
+  packageType?: PackageType | null;
   locationId?: number | null;
   locationIds?: number[] | null;
   locationName?: string | null;

@@ -16,6 +16,7 @@ import {
   matchesOwnerLocationId,
   useOwnerLocationFilter,
 } from "@/app/lib/owner/location-filter";
+import { filterPackages } from "@/app/lib/packageFilters";
 import PackageCard from "@/app/components/packages/PackageCard";
 import PackageFilters, {
   type DurationFilter,
@@ -25,33 +26,6 @@ import PackageFilters, {
 } from "@/app/components/packages/PackageFilters";
 import AddPackageModal from "./components/AddPackageModal";
 import { showOwnerError, showOwnerSuccess } from "../components/owner-toast";
-
-function normalize(value: string) {
-  return value.toLowerCase().trim();
-}
-
-function matchesParticipants(item: Package, filter: ParticipantsFilter) {
-  const count = item.participantsCount || 1;
-
-  if (filter === "solo") return count <= 1;
-  if (filter === "duo") return count === 2;
-  if (filter === "group") return count > 2;
-  return true;
-}
-
-function matchesSessions(item: Package, filter: SessionsFilter) {
-  if (filter === "short") return item.sessionsLimit <= 4;
-  if (filter === "medium") return item.sessionsLimit >= 5 && item.sessionsLimit <= 10;
-  if (filter === "long") return item.sessionsLimit > 10;
-  return true;
-}
-
-function matchesDuration(item: Package, filter: DurationFilter) {
-  if (filter === "monthly") return item.durationDays <= 31;
-  if (filter === "quarterly") return item.durationDays > 31 && item.durationDays <= 90;
-  if (filter === "long") return item.durationDays > 90;
-  return true;
-}
 
 export default function PackagesPage() {
   const { selectedLocationId } = useOwnerLocationFilter();
@@ -107,43 +81,12 @@ export default function PackagesPage() {
     [packages, selectedLocationId],
   );
 
-  const filteredPackages = useMemo(() => {
-    const query = normalize(search);
-
-    const result = locationPackages.filter((item) => {
-      const name = normalize(item.name || "");
-      const description = normalize(item.description || "");
-
-      const matchesSearch =
-        !query || name.includes(query) || description.includes(query);
-
-      return (
-        matchesSearch &&
-        matchesParticipants(item, participantsFilter) &&
-        matchesSessions(item, sessionsFilter) &&
-        matchesDuration(item, durationFilter)
-      );
-    });
-
-    return [...result].sort((first, second) => {
-      if (sort === "price-asc") return first.price - second.price;
-      if (sort === "price-desc") return second.price - first.price;
-      if (sort === "sessions-desc") return second.sessionsLimit - first.sessionsLimit;
-      if (sort === "duration-desc") return second.durationDays - first.durationDays;
-      if (sort === "participants-asc") {
-        return (first.participantsCount || 1) - (second.participantsCount || 1);
-      }
-
-      return new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime();
-    });
-  }, [
-    locationPackages,
-    search,
-    participantsFilter,
-    sessionsFilter,
-    durationFilter,
-    sort,
-  ]);
+  const filteredPackages = useMemo(
+    () => filterPackages(locationPackages, {
+      search, participantsFilter, sessionsFilter, durationFilter, sort,
+    }),
+    [locationPackages, search, participantsFilter, sessionsFilter, durationFilter, sort],
+  );
 
   const handleCreatePackage = async (payload: CreatePackagePayload) => {
     try {
@@ -267,7 +210,7 @@ export default function PackagesPage() {
               </div>
             ) : (
               <div className="card-shell p-8 text-center text-on-surface-variant">
-                Brak pakietów dla wybranych kryteriów.
+                Brak pakietów spełniających wybrane kryteria.
               </div>
             )}
           </div>
@@ -314,6 +257,10 @@ export default function PackagesPage() {
               </button>
             </div>
 
+            <p className="text-label text-on-surface-variant">
+              Wyświetlono {filteredPackages.length} pakietów
+            </p>
+
             <div className="flex flex-col gap-4">
               {isLoading ? (
                 <div className="card-shell p-5 text-on-surface-variant">
@@ -329,7 +276,7 @@ export default function PackagesPage() {
                 ))
               ) : (
                 <div className="card-shell p-8 text-center text-on-surface-variant">
-                  Brak pakietów.
+                  Brak pakietów spełniających wybrane kryteria.
                 </div>
               )}
 

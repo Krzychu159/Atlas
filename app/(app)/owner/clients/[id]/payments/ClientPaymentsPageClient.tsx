@@ -2,8 +2,6 @@
 
 import { userTrainingType } from "@/app/lib/user-messages";
 
-import { userStatus } from "@/app/lib/user-messages";
-
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 
 import Link from "next/link";
@@ -25,6 +23,8 @@ import { CustomSelect } from "@/app/components/ui/custom-select";
 import { getPaymentBreakdown } from "@/app/lib/payments/display";
 import {
   cancelClientSubscription,
+  confirmClientRefund,
+  getClientRefunds,
   getClient,
   getClientSubscription,
   getClientSubscriptionUsage,
@@ -32,6 +32,7 @@ import {
   setClientNextPackage,
   type Client,
   type ClientSubscription,
+  type ClientRefund,
   type SubscriptionUsage,
 } from "@/app/lib/owner/clients";
 import {
@@ -42,6 +43,7 @@ import {
   createClientPayment,
   getClientBilling,
   getClientPayments,
+  getPackagePaymentStatusLabel,
   issuePaymentReceipt,
   isConfirmedPayment,
   isPendingPayment,
@@ -70,6 +72,9 @@ import {
 } from "@/app/lib/trainer/portal";
 import { trainerPortalClientToClient } from "@/app/lib/trainer/portal-mappers";
 import ClientPackagesSection from "../components/ClientPackagesSection";
+import ClientAuditSection from "../components/ClientAuditSection";
+import ClientRefundsSection from "../components/ClientRefundsSection";
+import RefundConfirmationModal from "../components/RefundConfirmationModal";
 
 type ClientPaymentsPageClientProps = {
   clientIdParam: string;
@@ -89,6 +94,10 @@ export default function ClientPaymentsPageClient({
   const [clientId, setClientId] = useState<number | null>(null);
   const [client, setClient] = useState<Client | null>(null);
   const [billing, setBilling] = useState<ClientBillingSummary | null>(null);
+  const [auditRevision, setAuditRevision] = useState(0);
+  const [refunds, setRefunds] = useState<ClientRefund[]>([]);
+  const [refundToConfirm, setRefundToConfirm] = useState<ClientRefund | null>(null);
+  const [isConfirmingRefund, setIsConfirmingRefund] = useState(false);
   const [subscription, setSubscription] = useState<ClientSubscription | null>(
     null,
   );
@@ -144,6 +153,7 @@ export default function ClientPaymentsPageClient({
         await loadTrainerClientPayments(id);
         return;
       }
+      setAuditRevision((value) => value + 1);
 
       const [
         clientData,
@@ -152,6 +162,7 @@ export default function ClientPaymentsPageClient({
         packagesData,
         usageData,
         paymentsData,
+        refundsData,
       ] = await Promise.all([
         getClient(id),
         getClientBilling(id),
@@ -159,9 +170,11 @@ export default function ClientPaymentsPageClient({
         getPackages(),
         getClientSubscriptionUsage(id).catch(() => null),
         getClientPayments(id, { page: 1, pageSize: 1000 }),
+        getClientRefunds(id, { page: 1, pageSize: 25 }),
       ]);
 
       setClient(clientData);
+      setRefunds(refundsData.items || []);
       setBilling(billingData);
       setSubscription(subscriptionData);
       setUsage(usageData);
@@ -240,6 +253,21 @@ export default function ClientPaymentsPageClient({
         ? String(subscriptionData.nextPackage.packageId)
         : "",
     );
+  }
+
+  async function handleConfirmRefund(reference: string) {
+    if (!clientId || !refundToConfirm || basePath !== "/owner" || isConfirmingRefund) return;
+    let committed = false;
+    try {
+      setIsConfirmingRefund(true);
+      await confirmClientRefund(clientId, refundToConfirm.clientPackageId, { amount: refundToConfirm.amount, reference });
+      committed = true;
+      setRefundToConfirm(null);
+      await loadClientPayments(clientId, true);
+      showOwnerSuccess("Zwrot został potwierdzony.");
+    } catch (err) {
+      showOwnerError(err, committed ? "Zwrot został potwierdzony, ale nie udało się odświeżyć danych klienta." : "Nie udało się potwierdzić zwrotu.");
+    } finally { setIsConfirmingRefund(false); }
   }
 
   async function handleAssignPackage() {
@@ -691,7 +719,8 @@ export default function ClientPaymentsPageClient({
             />
           </section>
 
-          <ClientPackagesSection packages={billing.packages} activeClientPackageId={billing.activeClientPackageId} clientId={basePath === "/owner" ? clientId || undefined : undefined} onSaved={() => loadClientPayments(clientId, true)} />
+          <ClientPackagesSection key={`${basePath}:${clientId}`} packages={billing.packages} activeClientPackageId={billing.activeClientPackageId} clientId={basePath === "/owner" ? clientId || undefined : undefined} onSaved={() => loadClientPayments(clientId, true)} />
+          {basePath === "/owner" && clientId ? <><ClientRefundsSection refunds={refunds} loading={isLoading} onConfirm={setRefundToConfirm} /><ClientAuditSection key={clientId} clientId={clientId} revision={auditRevision} /></> : null}
 
           <section className="grid gap-5">
             <div className="card-shell flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between md:p-5">
@@ -821,6 +850,7 @@ export default function ClientPaymentsPageClient({
         onClose={() => setIsPaymentModalOpen(false)}
         onSubmit={handleCreatePayment}
       />
+      {basePath === "/owner" ? <RefundConfirmationModal refund={refundToConfirm} submitting={isConfirmingRefund} onClose={() => setRefundToConfirm(null)} onConfirm={handleConfirmRefund} /> : null}
 
       {paymentAction ? (
         <PaymentActionConfirmModal
@@ -1021,7 +1051,7 @@ function SubscriptionPanel({
               </h3>
             </div>
             <StatusPill
-              label={userStatus(activePackage?.paymentStatus)}
+              label={getPackagePaymentStatusLabel(activePackage?.paymentStatus)}
               muted
             />
           </div>
