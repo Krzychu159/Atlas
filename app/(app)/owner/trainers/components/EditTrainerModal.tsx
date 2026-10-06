@@ -23,12 +23,14 @@ import { deleteTrainerAvatar, uploadTrainerAvatar } from "@/app/lib/avatars";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
 import {
   getTrainerRates,
+  getActiveTrainerHourlyRate,
   updateTrainerRates,
   type TrainerRate,
 } from "@/app/lib/owner/settlements";
 import { notifyTrainerRatesChanged } from "@/app/lib/owner/trainer-rates-changes";
 import {
   updateTrainer,
+  getTrainer,
   type Trainer,
   type UpdateTrainerPayload,
 } from "@/app/lib/owner/trainers";
@@ -79,7 +81,7 @@ export default function EditTrainerModal({
   onAvatarChanged,
 }: EditTrainerModalProps) {
   const activeRate = useMemo(
-    () => rates.find((rate) => rate.isActive && !rate.sessionType),
+    () => getActiveTrainerHourlyRate(rates),
     [rates],
   );
   const groupRate = useMemo(
@@ -162,21 +164,23 @@ export default function EditTrainerModal({
 
     try {
       setIsSaving(true);
-      const [updatedTrainer, savedRates] = await Promise.all([
-        updateTrainer(trainer.id, payload),
-        updateTrainerRates(trainer.id, {
-          hourlyRate: parsedHourlyRate,
-          groupSessionRate: parsedGroupRate,
-        }),
-      ]);
+      // Zapis profilu musi zakończyć się przed aktualizacją stawek tego samego trenera.
+      const updatedTrainer = await updateTrainer(trainer.id, payload);
+      const savedRates = await updateTrainerRates(trainer.id, {
+        hourlyRate: parsedHourlyRate,
+        groupSessionRate: parsedGroupRate,
+      });
 
       notifyTrainerRatesChanged();
       showOwnerSuccess("Dane trenera zostały zaktualizowane.", {
         id: "owner-trainer-edit-success",
       });
       try {
-        const updatedRates = await getTrainerRates(trainer.id);
-        onSaved(updatedTrainer, updatedRates);
+        const [refreshedTrainer, updatedRates] = await Promise.all([
+          getTrainer(trainer.id),
+          getTrainerRates(trainer.id),
+        ]);
+        onSaved(refreshedTrainer, updatedRates);
       } catch (err) {
         onSaved(updatedTrainer, savedRates);
         showOwnerError(err, "Zmiany zapisano, ale nie udało się odświeżyć stawek. Odśwież profil trenera.", {

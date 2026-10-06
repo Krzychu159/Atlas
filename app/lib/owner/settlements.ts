@@ -16,6 +16,11 @@ export type TrainerRate = {
   isActive: boolean;
 };
 
+export function getActiveTrainerHourlyRate(rates: readonly TrainerRate[]) {
+  return rates.find((rate) => rate.isActive && rate.sessionType === "Hourly")
+    ?? rates.find((rate) => rate.isActive && !rate.sessionType);
+}
+
 export type TrainerSettlementItem = {
   sessionId: number;
   startAt: string;

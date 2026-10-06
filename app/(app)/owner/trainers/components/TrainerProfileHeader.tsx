@@ -14,7 +14,7 @@ import {
   Star,
 } from "lucide-react";
 import { Button, ButtonLink } from "@/app/components/ui/button";
-import type { TrainerRate } from "@/app/lib/owner/settlements";
+import { getActiveTrainerHourlyRate, type TrainerRate } from "@/app/lib/owner/settlements";
 import type { Trainer } from "@/app/lib/owner/trainers";
 
 function getInitials(trainer: Trainer) {
@@ -29,7 +29,7 @@ function getInitials(trainer: Trainer) {
 }
 
 function getRateLabel(trainer: Trainer, rates: TrainerRate[]) {
-  const activeRate = rates.find((rate) => rate.isActive && !rate.sessionType);
+  const activeRate = getActiveTrainerHourlyRate(rates);
   const value = activeRate?.rate ?? trainer.hourlyRate ?? 0;
 
   return `${value} zł / h`;

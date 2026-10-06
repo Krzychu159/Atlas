@@ -105,7 +105,7 @@ function getAuthCopy(mode: AuthMode) {
 
   return {
     title: "Zaloguj się",
-    description: "Wprowadź swoje dane, aby uzyskać dostęp.",
+    description: "Wprowadź swoje dane, aby przejść do swojego panelu.",
     submit: "Zaloguj się",
     pending: "Logowanie...",
     loadingTitle: "Logowanie...",
@@ -370,38 +370,37 @@ export default function LoginPage() {
 
                   <div className="relative z-10 max-w-[470px]">
                     <h1 className="mt-10 font-display text-[4.6rem] font-semibold leading-[0.92] tracking-[-0.04em]">
-                      Zarządzaj swoim
+                      Jedna platforma.
                       <br />
-                      <span className="text-primary-light">Studiem</span>
+                      <span className="text-primary-light">Nielimitowane</span>
                       <br />
-                      Treningowym
+                      możliwości.
                     </h1>
 
                     <p className="mt-10 max-w-[430px] text-[1.05rem] leading-9 text-white/80">
-                      Uzyskaj dostęp do centrum dowodzenia Atlas, aby zarządzać
-                      trenerami i klientami, monitorować postępy i optymalizować
-                      operacje swojego studia.
+                      Wszystko, czego potrzebujesz do organizacji treningów,
+                      płatności i codziennej pracy — w jednym miejscu.
                     </p>
                   </div>
 
                   <div className="relative z-10 flex items-center gap-7">
                     <div>
-                      <p className="text-[2.3rem] font-semibold leading-none">
-                        4.9/5
+                      <p className="text-label font-semibold leading-none">
+                        W JEDNYM MIEJSCU
                       </p>
                       <p className="mt-2 text-label text-white/70">
-                        Ocena operatora
+                        Treningi i płatności
                       </p>
                     </div>
 
                     <div className="h-11 w-px bg-white/12" />
 
                     <div>
-                      <p className="text-[2.3rem] font-semibold leading-none">
-                        100+
+                      <p className="text-label font-semibold leading-none">
+                        ZAWSZE POD RĘKĄ
                       </p>
                       <p className="mt-2 text-label text-white/70">
-                        Użytkowników
+                        Dostęp online
                       </p>
                     </div>
                   </div>
