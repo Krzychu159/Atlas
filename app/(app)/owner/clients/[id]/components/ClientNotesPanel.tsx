@@ -59,7 +59,12 @@ export default function ClientNotesPanel({
         nextSessionAt: client.nextSessionAt || null,
         locationId: client.locationId ?? 0,
       };
-      const updatedClient = await updateClientNotes(client, payload, access, trainerMe);
+      const updatedClient = await updateClientNotes(
+        client,
+        access === "trainer" ? { notes } : payload,
+        access,
+        trainerMe,
+      );
       onClientChange(updatedClient);
       showOwnerSuccess("Notatki klienta zostały zapisane.", {
         id: "owner-client-notes-success",

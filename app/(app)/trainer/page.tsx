@@ -9,38 +9,55 @@ import {
   CalendarDays,
   Clock3,
   MapPin,
-  Sparkles,
-  Target,
   Users,
+  Wallet,
 } from "lucide-react";
 import { showAppError } from "@/app/components/ui/app-toast";
+import DashboardStatCard from "@/app/(app)/owner/components/DashboardStatCard";
+import { ApiError, isForbiddenError } from "@/app/lib/backend";
 import {
-  getTrainerPortalClients,
   getTrainerPortalDashboard,
+  getTrainerPortalSettlement,
   type TrainerPortalClient,
   type TrainerPortalDashboard,
   type TrainerPortalSession,
+  type TrainerPortalSettlement,
 } from "@/app/lib/trainer/portal";
+import {
+  formatSettlementMoney,
+  getCurrentTrainerMonth,
+  getSettlementErrorMessage,
+  getSettlementPaymentLabel,
+  parseTrainerMonth,
+} from "@/app/lib/trainer/settlement-display";
 
 export default function TrainerDashboardPage() {
   const [dashboard, setDashboard] = useState<TrainerPortalDashboard | null>(
     null,
   );
-  const [clients, setClients] = useState<TrainerPortalClient[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentMonth] = useState(getCurrentTrainerMonth);
+  const [settlement, setSettlement] = useState<TrainerPortalSettlement | null>(null);
+  const [settlementLoading, setSettlementLoading] = useState(true);
+  const [settlementError, setSettlementError] = useState<string | null>(null);
+  const [settlementAttempt, setSettlementAttempt] = useState(0);
 
   async function loadDashboard() {
     try {
       setIsLoading(true);
-      const [dashboardData, clientsData] = await Promise.all([
-        getTrainerPortalDashboard(),
-        getTrainerPortalClients(),
-      ]);
+      setLoadError(null);
+      const dashboardData = await getTrainerPortalDashboard();
 
       setDashboard(dashboardData);
-      setClients(clientsData);
     } catch (err) {
-      showAppError(err, "Nie udało się pobrać panelu trenera.", {
+      const message = isForbiddenError(err)
+        ? "Nie masz uprawnień do przeglądania panelu trenera."
+        : err instanceof ApiError && err.status === 401
+          ? "Sesja wygasła. Zaloguj się ponownie."
+          : "Nie udało się pobrać panelu trenera. Spróbuj ponownie.";
+      setLoadError(message);
+      showAppError(new Error(message), message, {
         id: "trainer-dashboard-load-error",
       });
     } finally {
@@ -56,31 +73,49 @@ export default function TrainerDashboardPage() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    const period = parseTrainerMonth(currentMonth);
+    if (!period) return;
+    const { year, month } = period;
+    async function loadSettlement() {
+      setSettlementLoading(true);
+      setSettlementError(null);
+      try {
+        const data = await getTrainerPortalSettlement(year, month);
+        if (active) setSettlement(data);
+      } catch (err) {
+        if (active) {
+          setSettlement(null);
+          setSettlementError(getSettlementErrorMessage(err));
+        }
+      } finally {
+        if (active) setSettlementLoading(false);
+      }
+    }
+    void loadSettlement();
+    return () => { active = false; };
+  }, [currentMonth, settlementAttempt]);
+
   const todaySessions = useMemo(
     () =>
       [...(dashboard?.todaySessions || [])]
         .sort(sortSessionsByStart)
-        .slice(0, 3),
+        .slice(0, 8),
     [dashboard],
   );
   const recentClients = useMemo(
     () =>
-      [
-        ...(dashboard?.recentClients?.length
-          ? dashboard.recentClients
-          : clients),
-      ]
+      [...(dashboard?.recentClients || [])]
         .sort(sortClientsByCreatedAt)
-        .slice(0, 3),
-    [clients, dashboard],
-  );
-  const upcomingSessions = useMemo(
-    () => [...(dashboard?.upcomingSessions || [])].sort(sortSessionsByStart),
+        .slice(0, 8),
     [dashboard],
   );
-  const focus = useMemo(
-    () => getTrainerFocus(clients, upcomingSessions),
-    [clients, upcomingSessions],
+  const upcomingSessions = useMemo(
+    () => [...(dashboard?.upcomingSessions || [])]
+      .sort(sortSessionsByStart)
+      .slice(0, 8),
+    [dashboard],
   );
   const firstName = getFirstName(dashboard?.me?.fullName);
 
@@ -108,36 +143,77 @@ export default function TrainerDashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-3">
+      {loadError ? (
+        <div role="alert" className="card-shell p-5 text-on-surface-variant">
+          <p>{loadError}</p>
+          <button type="button" onClick={() => void loadDashboard()} disabled={isLoading} className="mt-3 text-sm font-semibold text-primary-light disabled:opacity-50">
+            Spróbuj ponownie
+          </button>
+        </div>
+      ) : null}
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 [&_p]:break-words">
         <StatCard
           label="Dzisiejsze sesje"
-          value={dashboard?.todaySessionsCount ?? 0}
-          note="Zaplanowane na dziś"
+          value={dashboard?.todaySessionsCount ?? "Niedostępne"}
+          note="Sesje na dziś"
           icon={<CalendarDays size={20} />}
           loading={isLoading}
         />
         <StatCard
           label="Aktywni klienci"
-          value={dashboard?.activeClientsCount ?? clients.length}
+          value={dashboard?.activeClientsCount ?? "Niedostępne"}
           note="Twoi podopieczni"
           icon={<Users size={20} />}
           loading={isLoading}
         />
+        <div className="min-w-0">
+          <StatCard
+            label="Rozliczenie miesiąca"
+            value={settlementError ? "Niedostępne" : settlement ? formatSettlementMoney(settlement.totalAmount) : "Brak danych"}
+            note={settlementError || (settlement ? getSettlementPaymentLabel(settlement.isPaid) : "Brak danych rozliczenia")}
+            icon={<Wallet size={20} />}
+            loading={settlementLoading}
+          />
+          <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold text-primary-light">
+            <Link href="/trainer/settlements">Moje rozliczenia <ArrowRight size={14} className="inline" /></Link>
+            {settlementError ? (
+              <button type="button" onClick={() => setSettlementAttempt((value) => value + 1)} disabled={settlementLoading} className="disabled:opacity-50">Spróbuj ponownie</button>
+            ) : null}
+          </div>
+        </div>
         <StatCard
-          label="Najbliższe sesje"
-          value={dashboard?.upcomingSessionsCount ?? 0}
-          note="W kolejce planu"
+          label="Nadchodzące sesje"
+          value={dashboard?.upcomingSessionsCount ?? "Niedostępne"}
+          note="W Twoim planie"
           icon={<Clock3 size={20} />}
           loading={isLoading}
         />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <TodaySessionsPanel sessions={todaySessions} loading={isLoading} />
-        <RecentClientsPanel clients={recentClients} loading={isLoading} />
+        <div className="flex min-w-0 flex-col gap-5">
+          <SessionsPanel
+            title="Dzisiejszy plan"
+            subtitle="Sesje z Twojego planu na dziś."
+            emptyLabel="Brak sesji zaplanowanych na dziś."
+            sessions={todaySessions}
+            loading={isLoading}
+            error={!dashboard && loadError ? loadError : null}
+          />
+          <SessionsPanel
+            title="Nadchodzące sesje"
+            subtitle="Najbliższe terminy w Twoim kalendarzu."
+            emptyLabel="Brak nadchodzących sesji."
+            sessions={upcomingSessions}
+            loading={isLoading}
+            showDate
+            error={!dashboard && loadError ? loadError : null}
+          />
+        </div>
+        <RecentClientsPanel clients={recentClients} loading={isLoading} error={!dashboard && loadError ? loadError : null} />
       </section>
 
-      <CoachFocusPanel focus={focus} loading={isLoading} />
     </div>
   );
 }
@@ -162,51 +238,43 @@ function DashboardLink({
   );
 }
 
-function StatCard({
-  label,
-  value,
-  note,
-  icon,
-  loading,
-}: {
+function StatCard({ label, value, note, icon, loading }: {
   label: string;
-  value: number;
+  value: number | string;
   note: string;
   icon: React.ReactNode;
   loading: boolean;
 }) {
-  return (
-    <article className="card-shell p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-label text-on-surface-muted">{label}</p>
-          <p className="mt-4 text-[2.1rem] font-semibold leading-none text-on-surface">
-            {loading ? "..." : value}
-          </p>
-          <p className="mt-3 text-sm text-on-surface-variant">{note}</p>
+  if (loading) {
+    return (
+      <article className="card-shell min-h-[132px] p-5" role="status" aria-label={`Ładowanie: ${label}`}>
+        <div className="animate-pulse motion-reduce:animate-none" aria-hidden="true">
+          <div className="h-3 w-28 rounded bg-surface-container-high" />
+          <div className="mt-4 h-9 w-24 rounded bg-surface-container-high" />
+          <div className="mt-4 h-3 w-36 rounded bg-surface-container-high" />
         </div>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
-          {icon}
-        </div>
-      </div>
-    </article>
-  );
+      </article>
+    );
+  }
+  return <DashboardStatCard label={label} value={value} note={note} icon={icon} />;
 }
 
-function TodaySessionsPanel({
-  sessions,
-  loading,
-}: {
+function SessionsPanel({ title, subtitle, emptyLabel, sessions, loading, error, showDate = false }: {
+  title: string;
+  subtitle: string;
+  emptyLabel: string;
   sessions: TrainerPortalSession[];
   loading: boolean;
+  error: string | null;
+  showDate?: boolean;
 }) {
   return (
     <section className="card-shell p-5 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-section-title">Dzisiejsze sesje</p>
+          <p className="text-section-title">{title}</p>
           <p className="mt-2 text-sm text-on-surface-variant">
-            Trzy najbliższe pozycje z Twojego planu dnia.
+            {subtitle}
           </p>
         </div>
         <Link
@@ -220,40 +288,47 @@ function TodaySessionsPanel({
 
       <div className="mt-5 flex flex-col gap-3">
         {loading ? (
-          <EmptyState label="Ładowanie sesji..." />
+          <PanelSkeleton label="Ładowanie sesji" />
+        ) : error ? (
+          <EmptyState label="Sesje są chwilowo niedostępne." />
         ) : sessions.length > 0 ? (
           sessions.map((session) => (
-            <SessionRow key={session.sessionId} session={session} />
+            <SessionRow key={session.sessionId} session={session} showDate={showDate} />
           ))
         ) : (
-          <EmptyState label="Brak sesji zaplanowanych na dziś." />
+          <EmptyState label={emptyLabel} />
         )}
       </div>
     </section>
   );
 }
 
-function SessionRow({ session }: { session: TrainerPortalSession }) {
+function SessionRow({ session, showDate }: { session: TrainerPortalSession; showDate: boolean }) {
   return (
     <article className="rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-4">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-primary-light">
+            {showDate ? `${formatSessionDate(session.startAt)} · ` : ""}
             {formatTimeRange(session.startAt, session.endAt)}
           </p>
           <p className="mt-2 truncate text-lg font-semibold text-on-surface">
             {session.title || "Sesja treningowa"}
           </p>
-          <p className="mt-1 truncate text-sm text-on-surface-variant">
-            {session.clientFullName || "Klient bez nazwy"}
-          </p>
+          {session.clientFullName ? (
+            <p className="mt-1 break-words text-sm text-on-surface-variant">
+              {session.clientFullName}
+            </p>
+          ) : null}
         </div>
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 sm:text-right">
           <StatusPill label={getSessionStatusLabel(session.status)} />
-          <p className="mt-3 inline-flex items-center gap-1 text-xs text-on-surface-muted">
-            <MapPin size={13} />
-            {session.locationName || "Brak lokalizacji"}
-          </p>
+          {session.locationName ? (
+            <p className="mt-3 flex items-center gap-1 text-xs text-on-surface-muted sm:justify-end">
+              <MapPin size={13} />
+              {session.locationName}
+            </p>
+          ) : null}
         </div>
       </div>
     </article>
@@ -263,15 +338,17 @@ function SessionRow({ session }: { session: TrainerPortalSession }) {
 function RecentClientsPanel({
   clients,
   loading,
+  error,
 }: {
   clients: TrainerPortalClient[];
   loading: boolean;
+  error: string | null;
 }) {
   return (
     <section className="card-shell p-5 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-section-title">Nowi podopieczni</p>
+          <p className="text-section-title">Ostatni klienci</p>
           <p className="mt-2 text-sm text-on-surface-variant">
             Ostatnio przypisani klienci i podstawowe informacje.
           </p>
@@ -287,7 +364,9 @@ function RecentClientsPanel({
 
       <div className="mt-5 flex flex-col gap-3">
         {loading ? (
-          <EmptyState label="Ładowanie klientów..." />
+          <PanelSkeleton label="Ładowanie klientów" />
+        ) : error ? (
+          <EmptyState label="Lista klientów jest chwilowo niedostępna." />
         ) : clients.length > 0 ? (
           clients.map((client) => (
             <ClientRow key={client.clientId} client={client} />
@@ -302,8 +381,8 @@ function RecentClientsPanel({
 
 function ClientRow({ client }: { client: TrainerPortalClient }) {
   return (
-    <article className="rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-4">
-      <div className="flex items-center gap-3">
+    <Link href={`/trainer/clients/${client.clientId}`} prefetch={false} className="block rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-4 transition hover:bg-surface-container-high focus-visible:outline-2 focus-visible:outline-primary-light">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-lg)] bg-surface-container-lowest text-sm font-semibold text-primary-light">
           {client.avatarUrl ? (
             <img
@@ -331,82 +410,7 @@ function ClientRow({ client }: { client: TrainerPortalClient }) {
           <span>{getBillingStatusLabel(client.billingStatus)}</span>
         ) : null}
       </div>
-    </article>
-  );
-}
-
-type CoachFocus = {
-  nextSession: TrainerPortalSession | null;
-  newClientsCount: number;
-  missingGoalCount: number;
-};
-
-function CoachFocusPanel({
-  focus,
-  loading,
-}: {
-  focus: CoachFocus;
-  loading: boolean;
-}) {
-  return (
-    <section className="grid gap-4 md:grid-cols-3">
-      <FocusCard
-        label="Następna sesja"
-        value={
-          focus.nextSession
-            ? formatTimeRange(focus.nextSession.startAt, focus.nextSession.endAt)
-            : "Brak"
-        }
-        note={focus.nextSession?.clientFullName || "Najbliższy trening"}
-        icon={<Clock3 size={20} />}
-        loading={loading}
-      />
-      <FocusCard
-        label="Nowi w 14 dni"
-        value={String(focus.newClientsCount)}
-        note="Klienci, których warto wdrożyć"
-        icon={<Sparkles size={20} />}
-        loading={loading}
-      />
-      <FocusCard
-        label="Do uzupełnienia"
-        value={String(focus.missingGoalCount)}
-        note="Klienci bez celu treningowego"
-        icon={<Target size={20} />}
-        loading={loading}
-      />
-    </section>
-  );
-}
-
-function FocusCard({
-  label,
-  value,
-  note,
-  icon,
-  loading,
-}: {
-  label: string;
-  value: string;
-  note: string;
-  icon: React.ReactNode;
-  loading: boolean;
-}) {
-  return (
-    <article className="card-shell p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-label text-on-surface-muted">{label}</p>
-          <p className="mt-4 truncate text-2xl font-semibold text-on-surface">
-            {loading ? "..." : value}
-          </p>
-          <p className="mt-2 text-sm text-on-surface-variant">{note}</p>
-        </div>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container-low text-primary-light">
-          {icon}
-        </div>
-      </div>
-    </article>
+    </Link>
   );
 }
 
@@ -426,20 +430,18 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
-function getTrainerFocus(
-  clients: TrainerPortalClient[],
-  upcomingSessions: TrainerPortalSession[],
-): CoachFocus {
-  const now = Date.now();
-  const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
-
-  return {
-    nextSession: upcomingSessions[0] || null,
-    newClientsCount: clients.filter(
-      (client) => new Date(client.createdAt).getTime() >= twoWeeksAgo,
-    ).length,
-    missingGoalCount: clients.filter((client) => !client.goal?.trim()).length,
-  };
+function PanelSkeleton({ label }: { label: string }) {
+  return (
+    <div role="status" aria-label={label} className="space-y-3">
+      {[0, 1, 2].map((index) => (
+        <div key={index} className="animate-pulse rounded-[var(--radius-lg)] bg-surface-container-low p-4 motion-reduce:animate-none" aria-hidden="true">
+          <div className="h-4 w-24 rounded bg-surface-container-high" />
+          <div className="mt-3 h-5 w-2/3 rounded bg-surface-container-high" />
+          <div className="mt-3 h-3 w-1/2 rounded bg-surface-container-high" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function sortSessionsByStart(
@@ -467,15 +469,12 @@ function normalize(value: string) {
 }
 
 function getSessionStatusLabel(status?: string | null) {
-  const normalized = normalize(status || "");
-
-  if (normalized.includes("cancel")) return "Anulowana";
-  if (normalized.includes("complete") || normalized.includes("done")) {
-    return "Zrealizowana";
-  }
-  if (normalized.includes("active")) return "Aktywna";
-
-  return "Zaplanowana";
+  const labels: Record<string, string> = {
+    planned: "Zaplanowana", scheduled: "Zaplanowana", confirmed: "Potwierdzona",
+    cancelled: "Anulowana", canceled: "Anulowana", completed: "Zrealizowana",
+    done: "Zrealizowana", active: "Aktywna", inprogress: "W trakcie",
+  };
+  return labels[normalize(status || "")] || userMessage(status, "Status niedostępny");
 }
 
 function getClientStatusLabel(status?: string | null) {
@@ -485,7 +484,7 @@ function getClientStatusLabel(status?: string | null) {
   if (normalized === "inactive") return "Nieaktywny";
   if (normalized === "cancelled") return "Zakończony";
 
-  return status ? userMessage(status, "Status niedostępny") : "Aktywny";
+  return userMessage(status, "Status niedostępny");
 }
 
 function getBillingStatusLabel(status?: string | null) {
@@ -515,8 +514,17 @@ function formatTimeRange(start: string, end: string) {
 }
 
 function formatTime(value: string) {
+  if (!value || Number.isNaN(new Date(value).getTime())) return "Brak godziny";
   return new Intl.DateTimeFormat("pl-PL", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Warsaw",
+  }).format(new Date(value));
+}
+
+function formatSessionDate(value: string) {
+  if (!value || Number.isNaN(new Date(value).getTime())) return "Brak daty";
+  return new Intl.DateTimeFormat("pl-PL", {
+    day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Warsaw",
   }).format(new Date(value));
 }

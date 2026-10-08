@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import ClientFilters, {
@@ -16,25 +16,18 @@ import {
   hasActiveClientPackage,
 } from "@/app/(app)/owner/clients/components/client-display";
 import { showOwnerError } from "@/app/(app)/owner/components/owner-toast";
-import {
-  getClientsByTrainer,
-  type Client,
-} from "@/app/lib/owner/clients";
+import type { ClientListItem } from "@/app/lib/owner/clients";
 import { isForbiddenError } from "@/app/lib/backend";
-import {
-  getTrainerPortalClients,
-  getTrainerPortalMe,
-  type TrainerPortalMe,
-} from "@/app/lib/trainer/portal";
-import { trainerPortalClientsToClients } from "@/app/lib/trainer/portal-mappers";
+import { getTrainerPortalClients } from "@/app/lib/trainer/portal";
+import { trainerPortalClientsToListItems } from "@/app/lib/trainer/portal-mappers";
 
 function normalize(value: string) {
   return value.toLowerCase().trim();
 }
 
-function matchesPackageFilter(client: Client, filter: ClientPackageFilter) {
-  if (filter === "active-package") return hasActiveClientPackage(client);
-  if (filter === "inactive-package") return !hasActiveClientPackage(client);
+function matchesPackageFilter(client: ClientListItem, filter: ClientPackageFilter) {
+  if (filter === "active-package") return hasActiveClientPackage(client, true) === true;
+  if (filter === "inactive-package") return hasActiveClientPackage(client, true) === false;
 
   return true;
 }
@@ -47,38 +40,27 @@ function getTime(value?: string | null) {
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 }
 
-function getTrainerDisplayName(me: TrainerPortalMe | null) {
-  return (me?.fullName || "").trim();
-}
-
 export default function TrainerClientsPage() {
-  const [clients, setClients] = useState<Client[]>([]);
-  const [me, setMe] = useState<TrainerPortalMe | null>(null);
+  const [clients, setClients] = useState<ClientListItem[]>([]);
   const [search, setSearch] = useState("");
   const [packageFilter, setPackageFilter] =
     useState<ClientPackageFilter>("all");
-  const [trainerFilter, setTrainerFilter] = useState("all");
   const [sort, setSort] = useState<ClientSort>("package-usage");
   const [isLoading, setIsLoading] = useState(true);
-  const defaultFilterApplied = useRef(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadClients = useCallback(async () => {
     try {
       setIsLoading(true);
-      const meData = await getTrainerPortalMe().catch(() => null);
-      const clientsData = await getClientsForTrainer(meData);
-
-      setMe(meData);
-      setClients(clientsData);
-
-      const trainerName = getTrainerDisplayName(meData);
-
-      if (trainerName && !defaultFilterApplied.current) {
-        defaultFilterApplied.current = true;
-        setTrainerFilter(trainerName);
-      }
+      setLoadError(null);
+      const clientsData = await getTrainerPortalClients();
+      setClients(trainerPortalClientsToListItems(clientsData));
     } catch (err) {
-      showOwnerError(err, "Nie udało się pobrać klientów.", {
+      const message = isForbiddenError(err)
+        ? "Nie masz uprawnień do przeglądania tej listy klientów."
+        : "Nie udało się pobrać klientów. Spróbuj ponownie.";
+      setLoadError(message);
+      showOwnerError(new Error(message), message, {
         id: "trainer-clients-load-error",
       });
       setClients([]);
@@ -95,21 +77,6 @@ export default function TrainerClientsPage() {
     return () => window.clearTimeout(timer);
   }, [loadClients]);
 
-  const trainerOptions = useMemo(() => {
-    const uniqueTrainers = new Set<string>();
-    const currentTrainerName = getTrainerDisplayName(me);
-
-    if (currentTrainerName) uniqueTrainers.add(currentTrainerName);
-
-    clients.forEach((client) => {
-      if (client.trainerFullName) uniqueTrainers.add(client.trainerFullName);
-    });
-
-    return Array.from(uniqueTrainers).sort((first, second) =>
-      first.localeCompare(second, "pl"),
-    );
-  }, [clients, me]);
-
   const filteredClients = useMemo(() => {
     const query = normalize(search);
 
@@ -117,21 +84,13 @@ export default function TrainerClientsPage() {
       const fullName = normalize(getClientName(client));
       const email = normalize(client.email || "");
       const phoneNumber = normalize(client.phoneNumber || "");
-      const trainerName = client.trainerFullName || "";
 
       const matchesSearch =
         !query ||
         fullName.includes(query) ||
         email.includes(query) ||
         phoneNumber.includes(query);
-      const matchesTrainer =
-        trainerFilter === "all" || trainerName === trainerFilter;
-
-      return (
-        matchesSearch &&
-        matchesTrainer &&
-        matchesPackageFilter(client, packageFilter)
-      );
+      return matchesSearch && matchesPackageFilter(client, packageFilter);
     });
 
     return [...result].sort((first, second) => {
@@ -147,25 +106,38 @@ export default function TrainerClientsPage() {
       }
 
       if (sort === "balance-desc") {
-        return getClientBalance(second) - getClientBalance(first);
+        return compareOptionalNumbers(
+          getClientBalance(first, true),
+          getClientBalance(second, true),
+          true,
+        );
       }
 
       if (sort === "balance-asc") {
-        return getClientBalance(first) - getClientBalance(second);
+        return compareOptionalNumbers(
+          getClientBalance(first, true),
+          getClientBalance(second, true),
+        );
       }
 
       if (sort === "package-usage") {
-        return (
-          getClientPackageUsage(second).percent -
-          getClientPackageUsage(first).percent
+        return compareOptionalNumbers(
+          getClientPackageUsage(first, true).sortPercent,
+          getClientPackageUsage(second, true).sortPercent,
+          true,
         );
       }
 
       return getTime(second.createdAt) - getTime(first.createdAt);
     });
-  }, [clients, search, trainerFilter, packageFilter, sort]);
+  }, [clients, search, packageFilter, sort]);
 
-  const activeClientsCount = clients.filter(hasActiveClientPackage).length;
+  const activeClientsCount = clients.filter(
+    (client) => hasActiveClientPackage(client, true) === true,
+  ).length;
+  const hasMissingPackageData = clients.some(
+    (client) => hasActiveClientPackage(client, true) === null,
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
@@ -176,34 +148,30 @@ export default function TrainerClientsPage() {
               Klienci
             </h1>
             <span className="rounded-full bg-surface-container px-3 py-1 text-sm text-on-surface-variant">
-              {clients.length} łącznie
+              {isLoading ? "Ładowanie..." : loadError ? "Niedostępne" : `${clients.length} łącznie`}
             </span>
           </div>
 
           <p className="mt-3 max-w-[760px] text-base text-on-surface-variant">
-            Lista pokazuje wszystkich klientów. Domyślnie filtr jest ustawiony
-            na zalogowanego trenera, ale możesz przełączyć go na wszystkich albo
-            na innego trenera.
+            Klienci przypisani do Ciebie — aktywni i nieaktywni.
           </p>
         </div>
 
         <div className="rounded-[var(--radius-lg)] bg-surface-container px-4 py-3">
           <p className="text-label text-on-surface-muted">Aktywny pakiet</p>
           <p className="mt-2 text-2xl font-semibold leading-none text-on-surface">
-            {activeClientsCount}
+            {isLoading || loadError ? "—" : hasMissingPackageData ? "Brak danych" : activeClientsCount}
           </p>
         </div>
       </section>
 
       <ClientFilters
+        showTrainerFilter={false}
         search={search}
         packageFilter={packageFilter}
-        trainerFilter={trainerFilter}
         sort={sort}
-        trainerOptions={trainerOptions}
         onSearchChange={setSearch}
         onPackageFilterChange={setPackageFilter}
-        onTrainerFilterChange={setTrainerFilter}
         onSortChange={setSort}
       />
 
@@ -212,17 +180,22 @@ export default function TrainerClientsPage() {
           <div className="card-shell p-5 text-on-surface-variant">
             Ładowanie klientów...
           </div>
+        ) : loadError ? (
+          <div role="alert" className="card-shell p-5 text-on-surface-variant">
+            {loadError}
+          </div>
         ) : filteredClients.length > 0 ? (
           filteredClients.map((client) => (
             <ClientListRow
               key={client.id}
               client={client}
+              preserveMissingData
               detailsHref={`/trainer/clients/${client.id}`}
             />
           ))
         ) : (
           <div className="card-shell p-8 text-center text-on-surface-variant">
-            Brak klientów dla wybranego filtra.
+            {clients.length ? "Brak klientów dla wybranych filtrów." : "Nie masz jeszcze przypisanych klientów."}
           </div>
         )}
       </section>
@@ -232,9 +205,13 @@ export default function TrainerClientsPage() {
           <div className="card-shell p-5 text-on-surface-variant">
             Ładowanie klientów...
           </div>
+        ) : loadError ? (
+          <div role="alert" className="card-shell p-5 text-on-surface-variant">
+            {loadError}
+          </div>
         ) : filteredClients.length > 0 ? (
           filteredClients.map((client) => {
-            const packageUsage = getClientPackageUsage(client);
+            const packageUsage = getClientPackageUsage(client, true);
             const fullName = getClientName(client);
 
             return (
@@ -248,7 +225,7 @@ export default function TrainerClientsPage() {
                       {client.email || "Brak adresu e-mail"}
                     </p>
                     <p className="mt-4 text-label text-primary-light">
-                      Trener: {client.trainerFullName || "Nie przypisano"}
+                      Trener: {client.trainerFullName || "Brak danych"}
                     </p>
                   </div>
 
@@ -269,10 +246,12 @@ export default function TrainerClientsPage() {
                     </p>
                     <div className="mt-2 flex items-center gap-3">
                       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-container-lowest">
-                        <div
-                          className="h-full rounded-full bg-primary-gradient"
-                          style={{ width: `${packageUsage.percent}%` }}
-                        />
+                        {packageUsage.sortPercent !== null ? (
+                          <div
+                            className="h-full rounded-full bg-primary-gradient"
+                            style={{ width: `${packageUsage.percent}%` }}
+                          />
+                        ) : null}
                       </div>
                       <p className="text-sm font-semibold text-primary-light">
                         {packageUsage.label}
@@ -286,7 +265,7 @@ export default function TrainerClientsPage() {
                   <div className="text-right">
                     <p className="text-label text-on-surface-variant">Saldo</p>
                     <p className="mt-1 text-sm font-semibold text-tertiary-light">
-                      {formatClientBalance(client)}
+                      {formatClientBalance(client, true)}
                     </p>
                   </div>
                 </div>
@@ -295,7 +274,7 @@ export default function TrainerClientsPage() {
           })
         ) : (
           <div className="card-shell p-8 text-center text-on-surface-variant">
-            Brak klientów.
+            {clients.length ? "Brak klientów dla wybranych filtrów." : "Nie masz jeszcze przypisanych klientów."}
           </div>
         )}
       </section>
@@ -303,15 +282,12 @@ export default function TrainerClientsPage() {
   );
 }
 
-async function getClientsForTrainer(me: TrainerPortalMe | null) {
-  if (me?.trainerId) {
-    try {
-      return await getClientsByTrainer(me.trainerId);
-    } catch (error) {
-      if (!isForbiddenError(error)) throw error;
-    }
-  }
-
-  const portalClients = await getTrainerPortalClients();
-  return trainerPortalClientsToClients(portalClients, me);
+function compareOptionalNumbers(
+  first: number | null,
+  second: number | null,
+  descending = false,
+) {
+  if (first === null) return second === null ? 0 : 1;
+  if (second === null) return -1;
+  return descending ? second - first : first - second;
 }

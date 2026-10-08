@@ -51,11 +51,13 @@ export default function ClientMetricCards({
   client,
   subscription,
   billing,
+  preserveMissingData = false,
 }: {
   client: Client;
   subscription: ClientSubscription | null;
   billing?: ClientBillingSummary | null;
   usage?: SubscriptionUsage | null;
+  preserveMissingData?: boolean;
 }) {
   const cycle = subscription?.currentCycle;
   const currency = cycle?.currency || client.currency || "PLN";
@@ -77,14 +79,16 @@ export default function ClientMetricCards({
       />
       <MetricCard
         label="Bieżący pakiet indywidualny"
-        value={billing?.activeClientPackageId ? billing.activePackageName || "Brak nazwy" : "Brak"}
+        value={preserveMissingData && !billing ? "Niedostępne" : billing?.activeClientPackageId ? billing.activePackageName || "Brak nazwy" : "Brak"}
         icon={<UserRound size={22} />}
       />
       <MetricCard
         label="Automatyczne przedłużanie"
         value={subscription ? subscription.autoRenewEnabled && !subscription.cancelRenewalRequested ? "Włączone" : "Wyłączone" : "Niedostępne"}
         note={
-          subscription?.autoRenewEnabled && !subscription.cancelRenewalRequested
+          preserveMissingData && !subscription
+            ? "Brak danych o automatycznym przedłużaniu"
+            : subscription?.autoRenewEnabled && !subscription.cancelRenewalRequested
             ? "Automatyczne przedłużanie aktywne"
             : "Automatyczne przedłużanie wyłączone"
         }

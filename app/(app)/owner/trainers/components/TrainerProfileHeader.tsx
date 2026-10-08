@@ -49,10 +49,9 @@ export default function TrainerProfileHeader({
   const { selectedLocationId } = useOwnerLocationFilter();
   const fullName =
     trainer.fullName || `${trainer.firstName} ${trainer.lastName}`;
-  const settlementsHref = {
-    pathname: `/owner/trainers/${trainer.id}/settlements`,
-    query: selectedLocationId == null ? {} : { locationId: selectedLocationId },
-  };
+  const settlementsHref = `/owner/trainers/${trainer.id}/settlements${
+    selectedLocationId == null ? "" : `?locationId=${selectedLocationId}`
+  }`;
 
   return (
     <section className="card-shell overflow-hidden p-5 md:p-8">

@@ -1,6 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import type { Client } from "@/app/lib/owner/clients";
+import type { ClientListItem } from "@/app/lib/owner/clients";
 import {
   formatClientBalance,
   getClientName,
@@ -8,7 +8,7 @@ import {
   getPortalAccessLabel,
 } from "./client-display";
 
-function getInitials(client: Client) {
+function getInitials(client: ClientListItem) {
   const name = getClientName(client);
 
   return name
@@ -19,7 +19,7 @@ function getInitials(client: Client) {
     .toUpperCase();
 }
 
-function getStatusDot(client: Client) {
+function getStatusDot(client: ClientListItem, preserveMissingData: boolean) {
   const normalized = client.status?.toLowerCase();
 
   if (normalized === "active" || normalized === "aktywny") {
@@ -30,18 +30,24 @@ function getStatusDot(client: Client) {
     return "bg-error-light";
   }
 
+  if (preserveMissingData && (!normalized || normalized === "inactive" || normalized === "nieaktywny")) {
+    return "bg-on-surface-muted";
+  }
+
   return "bg-primary-light";
 }
 
 export default function ClientListRow({
   client,
   detailsHref,
+  preserveMissingData = false,
 }: {
-  client: Client;
+  client: ClientListItem;
   detailsHref?: string;
+  preserveMissingData?: boolean;
 }) {
   const fullName = getClientName(client);
-  const packageUsage = getClientPackageUsage(client);
+  const packageUsage = getClientPackageUsage(client, preserveMissingData);
 
   return (
     <div className="bg-surface-container rounded-[var(--radius-lg)] px-4 py-3.5 grid grid-cols-[64px_1.2fr_1fr_1.35fr_112px_44px] gap-4 items-center">
@@ -61,6 +67,7 @@ export default function ClientListRow({
         <span
           className={`absolute right-1 bottom-1 h-3 w-3 rounded-full border-2 border-surface-container ${getStatusDot(
             client,
+            preserveMissingData,
           )}`}
         />
       </div>
@@ -71,14 +78,14 @@ export default function ClientListRow({
           {client.email || "Brak adresu email"}
         </p>
         <span className="mt-1.5 inline-flex rounded-full bg-surface-container-low px-2 py-1 text-[10px] font-semibold text-primary-light">
-          {getPortalAccessLabel(client.portalAccessStatus)}
+          {getPortalAccessLabel(client.portalAccessStatus, preserveMissingData)}
         </span>
       </div>
 
       <div className="min-w-0">
         <p className="text-label text-on-surface-variant">Trener</p>
         <p className="text-sm font-semibold truncate">
-          {client.trainerFullName || "Nie przypisano"}
+          {client.trainerFullName || (preserveMissingData ? "Brak danych" : "Nie przypisano")}
         </p>
       </div>
 
@@ -88,10 +95,12 @@ export default function ClientListRow({
         </p>
         <div className="mt-1 flex items-center gap-3">
           <div className="h-1.5 flex-1 rounded-full bg-surface-container-lowest overflow-hidden">
-            <div
-              className="h-full rounded-full bg-primary-gradient"
-              style={{ width: `${packageUsage.percent}%` }}
-            />
+            {!preserveMissingData || packageUsage.sortPercent !== null ? (
+              <div
+                className="h-full rounded-full bg-primary-gradient"
+                style={{ width: `${packageUsage.percent}%` }}
+              />
+            ) : null}
           </div>
           <p className="text-sm font-semibold text-primary-light shrink-0">
             {packageUsage.label}
@@ -105,7 +114,7 @@ export default function ClientListRow({
       <div className="min-w-0">
         <p className="text-label text-on-surface-variant">Saldo</p>
         <p className="mt-1 text-sm font-semibold text-tertiary-light truncate">
-          {formatClientBalance(client)}
+          {formatClientBalance(client, preserveMissingData)}
         </p>
       </div>
 

@@ -265,14 +265,14 @@ function formatArchivedAt(value?: string | null) {
     : new Intl.DateTimeFormat("pl-PL", { dateStyle: "medium" }).format(date);
 }
 
-function getPortalActionLabel(status: string) {
+function getPortalActionLabel(status: string | undefined) {
   if (status === "NoAccount") return "Zaproś do panelu";
   if (status === "Invited") return "Zarządzaj zaproszeniem";
   if (status === "Blocked") return "Odblokuj dostęp";
   return "Zablokuj dostęp";
 }
 
-function PortalActionIcon({ status }: { status: string }) {
+function PortalActionIcon({ status }: { status: string | undefined }) {
   if (status === "NoAccount") return <UserPlus size={16} />;
   if (status === "Invited") return <Mail size={16} />;
   if (status === "Blocked") return <Unlock size={16} />;

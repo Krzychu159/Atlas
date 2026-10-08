@@ -1,4 +1,4 @@
-import type { Client } from "@/app/lib/owner/clients";
+import type { ClientListItem } from "@/app/lib/owner/clients";
 
 function firstNumber(...values: Array<number | null | undefined>) {
   return (
@@ -7,13 +7,13 @@ function firstNumber(...values: Array<number | null | undefined>) {
   );
 }
 
-export function getClientName(client: Client) {
+export function getClientName(client: ClientListItem) {
   const name = client.fullName || `${client.firstName} ${client.lastName}`;
 
   return name.trim() || "Klient bez nazwy";
 }
 
-export function getPortalAccessLabel(status: string) {
+export function getPortalAccessLabel(status: string | undefined, preserveMissingData = false) {
   const labels: Record<string, string> = {
     NoAccount: "Bez dostępu do panelu",
     Invited: "Zaproszony",
@@ -21,10 +21,14 @@ export function getPortalAccessLabel(status: string) {
     Blocked: "Dostęp zablokowany",
   };
 
-  return labels[status] || (status ? "Status dostępu niedostępny" : "Bez dostępu do panelu");
+  if (!status && preserveMissingData) return "Status dostępu niedostępny";
+
+  return (status ? labels[status] : undefined) || (status ? "Status dostępu niedostępny" : "Bez dostępu do panelu");
 }
 
-export function getClientBalance(client: Client) {
+export function getClientBalance(client: ClientListItem): number;
+export function getClientBalance(client: ClientListItem, preserveMissingData: boolean): number | null;
+export function getClientBalance(client: ClientListItem, preserveMissingData = false) {
   return (
     firstNumber(
       client.currentBalance,
@@ -32,25 +36,42 @@ export function getClientBalance(client: Client) {
       client.balanceAmount,
       client.accountBalance,
       client.billingBalance,
-    ) ?? 0
+    ) ?? (preserveMissingData ? null : 0)
   );
 }
 
-export function formatClientBalance(client: Client) {
+export function formatClientBalance(client: ClientListItem, preserveMissingData = false) {
+  const balance = getClientBalance(client, preserveMissingData);
+  if (balance === null) return "Brak danych";
+
   const currency = client.balanceCurrency || client.currency || "PLN";
+  const amount = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 0 }).format(balance);
+  if (preserveMissingData && !client.balanceCurrency && !client.currency) return amount;
 
   try {
     return new Intl.NumberFormat("pl-PL", {
       style: "currency",
       currency,
       maximumFractionDigits: 0,
-    }).format(getClientBalance(client));
+    }).format(balance);
   } catch {
-    return `${getClientBalance(client)} zł`;
+    return preserveMissingData ? amount : `${balance} zł`;
   }
 }
 
-export function hasActiveClientPackage(client: Client) {
+export function hasActiveClientPackage(client: ClientListItem): boolean;
+export function hasActiveClientPackage(client: ClientListItem, preserveMissingData: boolean): boolean | null;
+export function hasActiveClientPackage(client: ClientListItem, preserveMissingData = false) {
+  // Array.filter passes the item index as the second argument.
+  if (preserveMissingData === true) {
+    if (typeof client.hasActivePackage === "boolean") return client.hasActivePackage;
+    if (typeof client.isPackageActive === "boolean") return client.isPackageActive;
+    if (typeof client.activeClientPackageId === "number") return client.activeClientPackageId > 0;
+    if (typeof client.activePackageId === "number") return client.activePackageId > 0;
+    if (client.activeClientPackageId === null || client.activePackageId === null) return false;
+    return null;
+  }
+
   if (typeof client.activeClientPackageId === "number") {
     return client.activeClientPackageId > 0;
   }
@@ -78,8 +99,8 @@ export function hasActiveClientPackage(client: Client) {
   );
 }
 
-export function getClientPackageUsage(client: Client) {
-  const hasPackage = hasActiveClientPackage(client);
+export function getClientPackageUsage(client: ClientListItem, preserveMissingData = false) {
+  const hasPackage = hasActiveClientPackage(client, preserveMissingData);
   const limit = firstNumber(
     client.activePackageTotalSessions,
     client.packageSessionsLimit,
@@ -112,22 +133,33 @@ export function getClientPackageUsage(client: Client) {
     : 0;
 
   const packageName =
+    (preserveMissingData && hasPackage === false ? "Brak aktywnego pakietu" : null) ||
     client.activeClientPackageName ||
     client.currentPackageName ||
     client.activePackageName ||
     client.packageName ||
-    (hasPackage ? "Aktywny pakiet" : "Brak aktywnego pakietu");
+    (hasPackage === null ? "Brak danych o pakiecie" : hasPackage ? "Aktywny pakiet" : "Brak aktywnego pakietu");
 
-  return {
-    packageName,
-    used: normalizedUsed,
-    limit: normalizedLimit,
-    percent,
-    label: normalizedLimit
+  const hasUsageData = hasPackage === true && used !== null && normalizedLimit !== null;
+  const label = preserveMissingData
+    ? hasPackage === false
+      ? "Brak pakietu"
+      : hasUsageData
+        ? `${normalizedUsed}/${normalizedLimit}`
+        : "Brak danych"
+    : normalizedLimit
       ? `${normalizedUsed}/${normalizedLimit}`
       : hasPackage
         ? "Brak danych"
-        : "Brak pakietu",
+        : "Brak pakietu";
+
+  return {
+    packageName,
+    used: preserveMissingData && used === null ? null : normalizedUsed,
+    limit: normalizedLimit,
+    percent,
+    sortPercent: preserveMissingData && !hasUsageData ? null : percent,
+    label,
     paymentStatus: client.activePackagePaymentStatus || client.billingStatus,
   };
 }

@@ -15,7 +15,7 @@ export type PortalAccessStatus =
 
 export type Client = {
   id: number;
-  userId: number | null;
+  userId?: number | null;
   trainerId: number | null;
   activePackageId: number | null;
   activeClientPackageId?: number | null;
@@ -32,7 +32,7 @@ export type Client = {
   avatarUrl: string | null;
   goal: string;
   notes: string;
-  progressPercent: number;
+  progressPercent?: number;
   billingStatus: string;
   status: ClientStatus;
   subscriptionStatus?: string | null;
@@ -58,14 +58,21 @@ export type Client = {
   nextSessionAt: string | null;
   createdAt: string;
   updatedAt: string;
-  createdBy: number;
+  createdBy?: number;
   trainerFullName: string;
   locationId: number;
   locationName: string;
-  portalAccessStatus: PortalAccessStatus;
-  isArchived: boolean;
-  archivedAt: string | null;
+  portalAccessStatus?: PortalAccessStatus;
+  isArchived?: boolean;
+  archivedAt?: string | null;
   emailContactUrl: string;
+};
+
+// The trainer's list does not include profile-only fields or always include package IDs.
+export type ClientListItem = Omit<Client, "locationId" | "updatedAt" | "activePackageId"> & {
+  locationId?: number;
+  updatedAt?: string;
+  activePackageId?: number | null;
 };
 
 export type SubscriptionCycle = {

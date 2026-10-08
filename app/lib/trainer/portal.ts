@@ -186,6 +186,52 @@ export function getTrainerPortalDashboard() {
   return backendGet<TrainerPortalDashboard>("trainer-portal/dashboard");
 }
 
+export type TrainerPortalSettlementItem = {
+  sessionId: number;
+  startAt: string;
+  endAt: string;
+  title: string;
+  sessionType: string;
+  locationId: number | null;
+  locationName: string;
+  isCoveredByContract: boolean;
+  contractId: number | null;
+  contractNumber: string | null;
+  hours: number;
+  rate: number;
+  rateType: string;
+  amount: number;
+  participantsCount: number;
+};
+
+export type TrainerPortalSettlement = {
+  trainerId: number;
+  // The supplied Swagger example does not establish location nullability.
+  locationId: number | null;
+  trainerFullName: string;
+  year: number;
+  month: number;
+  totalHours: number;
+  totalSessions: number;
+  totalAmount: number;
+  contractedTotalHours: number;
+  contractedTotalSessions: number;
+  contractedTotalAmount: number;
+  nonContractedTotalHours: number;
+  nonContractedTotalSessions: number;
+  isPaid: boolean;
+  paidAt: string | null;
+  items: TrainerPortalSettlementItem[];
+  nonContractedItems: TrainerPortalSettlementItem[];
+};
+
+export function getTrainerPortalSettlement(year: number, month: number) {
+  return backendGet<TrainerPortalSettlement | null>("trainer-portal/settlement", {
+    year,
+    month,
+  });
+}
+
 export function getTrainerPortalClients() {
   return backendGet<TrainerPortalClient[]>("trainer-portal/clients");
 }

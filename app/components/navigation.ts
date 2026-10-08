@@ -46,6 +46,7 @@ export const navigationByRole: Record<AppRole, NavItem[]> = {
     { label: "Plan", href: "/trainer/schedule", icon: CalendarDays },
     { label: "Pakiety", href: "/trainer/packages", icon: Wallet },
     { label: "Płatności", href: "/trainer/payments", icon: CreditCard },
+    { label: "Moje rozliczenia", href: "/trainer/settlements", icon: ReceiptText },
     { label: "Ustawienia", href: "/trainer/settings", icon: Settings },
     { label: "Powiadomienia", href: "/trainer/notifications", icon: Bell, mobileOnly: true },
   ],

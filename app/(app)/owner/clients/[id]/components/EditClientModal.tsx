@@ -164,7 +164,7 @@ export default function EditClientModal({
 
   const currentClient = client;
   const clientId = currentClient.id;
-  const hasUserAccount = currentClient.userId !== null;
+  const hasUserAccount = typeof currentClient.userId === "number";
 
   const trainerOptions = [
     {
@@ -229,9 +229,9 @@ export default function EditClientModal({
       goal: goal.trim() || null,
       notes: currentClient.notes || null,
       locationId: resolvedLocationId,
-      progressPercent: currentClient.progressPercent ?? 0,
-      billingStatus: currentClient.billingStatus || null,
-      status: currentClient.status || null,
+      progressPercent: access === "trainer" ? undefined : currentClient.progressPercent ?? 0,
+      billingStatus: currentClient.billingStatus || (access === "trainer" ? undefined : null),
+      status: currentClient.status || (access === "trainer" ? undefined : null),
       trainingStartDate: dateInputToIsoDateTime(trainingStartDate),
       nextSessionAt: currentClient.nextSessionAt || null,
     };
@@ -425,7 +425,9 @@ export default function EditClientModal({
                 </div>
 
                 <p className="text-sm text-on-surface-variant">
-                  Zdjęcie będzie dostępne po utworzeniu konta klienta.
+                  {currentClient.userId === undefined
+                    ? "Brak informacji o koncie klienta. Zmiana zdjęcia jest niedostępna."
+                    : "Zdjęcie będzie dostępne po utworzeniu konta klienta."}
                 </p>
               </div>
             )}
@@ -658,13 +660,7 @@ async function getConfirmedClientForEditModal(
   access: "owner" | "trainer",
   trainerMe?: TrainerPortalMe | null,
 ) {
-  try {
-    return await getClient(clientId);
-  } catch (err) {
-    if (access !== "trainer" || !isForbiddenError(err)) {
-      throw err;
-    }
-
+  if (access === "trainer") {
     const [clientData, me] = await Promise.all([
       getTrainerPortalClient(clientId),
       trainerMe
@@ -674,6 +670,8 @@ async function getConfirmedClientForEditModal(
 
     return trainerPortalClientToClient(clientData, me);
   }
+
+  return getClient(clientId);
 }
 
 async function updateTrainingPlanForEditModal(

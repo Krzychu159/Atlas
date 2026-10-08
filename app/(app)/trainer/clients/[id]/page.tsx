@@ -12,7 +12,6 @@ import ClientSessionsPanel from "@/app/(app)/owner/clients/[id]/components/Clien
 import EditClientModal from "@/app/(app)/owner/clients/[id]/components/EditClientModal";
 import { showOwnerError } from "@/app/(app)/owner/components/owner-toast";
 import {
-  getClient,
   getClientSubscription,
   getClientSubscriptionUsage,
   getClientTrainingPlan,
@@ -51,12 +50,15 @@ export default function TrainerClientDetailsPage() {
   const [billing, setBilling] = useState<ClientBillingSummary | null>(null);
   const [me, setMe] = useState<TrainerPortalMe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   async function loadClientDetails() {
     const clientId = Number(params.id);
 
     if (!clientId) {
+      setClient(null);
+      setLoadError("Nie można otworzyć tego klienta. Wróć do listy klientów i wybierz go ponownie.");
       showOwnerError(new Error("Nie można otworzyć tego klienta. Wróć do listy klientów i wybierz go ponownie."), "", {
         id: "trainer-client-invalid-id",
       });
@@ -66,6 +68,14 @@ export default function TrainerClientDetailsPage() {
 
     try {
       setIsLoading(true);
+      setLoadError(null);
+      setClient(null);
+      setSubscription(null);
+      setUsage(null);
+      setSessions([]);
+      setTrainingPlan(null);
+      setBilling(null);
+      setPayments([]);
 
       const meData = await getTrainerPortalMe().catch(() => null);
       setMe(meData);
@@ -117,7 +127,11 @@ export default function TrainerClientDetailsPage() {
         showOwnerError(paymentsResult.reason, "Nie udało się pobrać rozliczeń klienta.");
       }
     } catch (err) {
-      showOwnerError(err, "Nie udało się pobrać klienta.", {
+      const message = isForbiddenError(err)
+        ? "Nie masz uprawnień do przeglądania tego klienta."
+        : "Nie udało się pobrać klienta. Spróbuj ponownie.";
+      setLoadError(message);
+      showOwnerError(new Error(message), message, {
         id: "trainer-client-load-error",
       });
     } finally {
@@ -129,15 +143,8 @@ export default function TrainerClientDetailsPage() {
     clientId: number,
     meData: TrainerPortalMe | null,
   ) {
-    try {
-      return await getClient(clientId);
-    } catch (err) {
-      if (!isForbiddenError(err)) throw err;
-
-      const clientData = await getTrainerPortalClient(clientId);
-
-      return trainerPortalClientToClient(clientData, meData);
-    }
+    const clientData = await getTrainerPortalClient(clientId);
+    return trainerPortalClientToClient(clientData, meData);
   }
 
   async function getSubscriptionForTrainerView(clientId: number) {
@@ -229,6 +236,12 @@ export default function TrainerClientDetailsPage() {
         </div>
       ) : null}
 
+      {!isLoading && loadError ? (
+        <div role="alert" className="card-shell p-6 text-on-surface-variant">
+          {loadError}
+        </div>
+      ) : null}
+
       {client ? (
         <>
           <ClientProfileHero
@@ -240,6 +253,7 @@ export default function TrainerClientDetailsPage() {
             onFiles={handleOpenTrainingPlan}
           />
           <ClientMetricCards
+            preserveMissingData
             client={client}
             subscription={subscription}
             usage={usage}

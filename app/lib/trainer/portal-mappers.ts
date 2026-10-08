@@ -1,4 +1,4 @@
-import type { Client } from "@/app/lib/owner/clients";
+import type { Client, ClientListItem } from "@/app/lib/owner/clients";
 import type { Location } from "@/app/lib/owner/locations";
 import type { OwnerSession } from "@/app/lib/owner/sessions";
 import type { Trainer } from "@/app/lib/owner/trainers";
@@ -85,14 +85,13 @@ export function trainerPortalClientsToClients(
 
 export function trainerPortalClientToClient(
   client: TrainerPortalClientDetails,
-  me: TrainerPortalMe | null,
+  _me: TrainerPortalMe | null,
 ): Client {
   const names = splitFullName(client.fullName);
 
   return {
     id: client.id,
-    userId: null,
-    trainerId: client.trainerId ?? me?.trainerId ?? null,
+    trainerId: client.trainerId,
     activePackageId: client.activePackageId ?? null,
     activeClientPackageId: client.activeClientPackageId ?? null,
     activeClientPackageName: client.activeClientPackageName ?? null,
@@ -106,12 +105,11 @@ export function trainerPortalClientToClient(
     fullName:
       client.fullName ||
       [client.firstName, client.lastName].filter(Boolean).join(" "),
-    email: client.email || "",
+    email: client.email ?? null,
     phoneNumber: client.phoneNumber || "",
     avatarUrl: client.avatarUrl || "",
     goal: client.goal || "",
     notes: client.notes || "",
-    progressPercent: 0,
     billingStatus: client.billingStatus || "",
     status: client.status || "",
     hasActivePackage: client.hasActivePackage ?? null,
@@ -136,15 +134,29 @@ export function trainerPortalClientToClient(
     nextSessionAt: client.nextSessionAt || null,
     createdAt: client.createdAt || "",
     updatedAt: client.updatedAt || "",
-    createdBy: client.createdBy || 0,
-    trainerFullName: client.trainerFullName || me?.fullName || "",
-    locationId: client.locationId || resolveLocationId(client.locationName, me),
+    createdBy: client.createdBy ?? undefined,
+    trainerFullName: client.trainerFullName ?? "",
+    locationId: client.locationId,
     locationName: client.locationName || "",
-    portalAccessStatus: "Active",
-    isArchived: false,
-    archivedAt: null,
-    emailContactUrl: client.email ? `mailto:${client.email}` : "",
+    emailContactUrl: client.emailContactUrl ?? "",
   };
+}
+
+export function trainerPortalClientsToListItems(
+  clients: TrainerPortalClient[],
+): ClientListItem[] {
+  return trainerPortalClientsToClients(clients, null).map((client, index) => {
+    const { locationId: _locationId, updatedAt: _updatedAt, ...item } = client;
+    const source = clients[index];
+
+    return {
+      ...item,
+      activePackageId: source.activePackageId,
+      activeClientPackageId: source.activeClientPackageId,
+      hasActivePackage: source.hasActivePackage,
+      isPackageActive: source.isPackageActive,
+    };
+  });
 }
 
 export function trainerPortalSessionsToOwnerSessions({

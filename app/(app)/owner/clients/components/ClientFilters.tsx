@@ -16,12 +16,13 @@ export type ClientSort =
 type ClientFiltersProps = {
   search: string;
   packageFilter: ClientPackageFilter;
-  trainerFilter: string;
+  showTrainerFilter?: boolean;
+  trainerFilter?: string;
   sort: ClientSort;
-  trainerOptions: string[];
+  trainerOptions?: string[];
   onSearchChange: (value: string) => void;
   onPackageFilterChange: (value: ClientPackageFilter) => void;
-  onTrainerFilterChange: (value: string) => void;
+  onTrainerFilterChange?: (value: string) => void;
   onSortChange: (value: ClientSort) => void;
 };
 
@@ -43,9 +44,10 @@ const sortOptions: { label: string; value: ClientSort }[] = [
 export default function ClientFilters({
   search,
   packageFilter,
-  trainerFilter,
+  showTrainerFilter = true,
+  trainerFilter = "all",
   sort,
-  trainerOptions,
+  trainerOptions = [],
   onSearchChange,
   onPackageFilterChange,
   onTrainerFilterChange,
@@ -68,12 +70,14 @@ export default function ClientFilters({
           className="h-12 bg-surface-container-low"
         />
 
-        <CustomSelect
-          value={trainerFilter}
-          options={trainerSelectOptions}
-          onChange={onTrainerFilterChange}
-          className="w-full shrink-0 lg:w-[250px]"
-        />
+        {showTrainerFilter && onTrainerFilterChange ? (
+          <CustomSelect
+            value={trainerFilter}
+            options={trainerSelectOptions}
+            onChange={onTrainerFilterChange}
+            className="w-full shrink-0 lg:w-[250px]"
+          />
+        ) : null}
       </div>
 
       <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
