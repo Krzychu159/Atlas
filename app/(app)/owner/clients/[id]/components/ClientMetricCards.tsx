@@ -7,10 +7,12 @@ import type {
 } from "@/app/lib/owner/clients";
 
 function formatMoney(value: number, currency = "PLN") {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "Niedostępne";
   return new Intl.NumberFormat("pl-PL", {
     style: "currency",
     currency,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 

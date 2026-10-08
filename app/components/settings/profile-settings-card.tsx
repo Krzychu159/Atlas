@@ -1,6 +1,7 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
+import { getErrorMessage } from "@/app/lib/backend";
 import { Save, User } from "lucide-react";
 import AvatarFilePicker from "@/app/components/ui/avatar-file-picker";
 import { Button } from "@/app/components/ui/button";
@@ -34,14 +35,21 @@ export default function ProfileSettingsCard({
 }: {
   fallbackLabel: string;
 }) {
+  const saving = useRef(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
   const [profile, setProfile] = useState<ProfileForm>(emptyProfile);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    let active = true;
     const timer = window.setTimeout(() => {
+      setIsLoading(true);
+      setLoadError(null);
       getCurrentUser()
         .then((user) => {
+          if (!active) return;
           const names = getUserNames(user);
           setProfile({
             firstName: names.firstName,
@@ -51,18 +59,21 @@ export default function ProfileSettingsCard({
           });
         })
         .catch((error: unknown) => {
+          if (!active) return;
+          setLoadError(getErrorMessage(error, "Nie udało się pobrać profilu."));
           showAppError(error, "Nie udało się pobrać profilu.", {
             id: "profile-settings-load-error",
           });
         })
-        .finally(() => setIsLoading(false));
+        .finally(() => { if (active) setIsLoading(false); });
     }, 0);
 
-    return () => window.clearTimeout(timer);
-  }, []);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [revision]);
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving.current || isLoading || loadError) return;
 
     const firstName = profile.firstName.trim();
     const lastName = profile.lastName.trim();
@@ -77,6 +88,7 @@ export default function ProfileSettingsCard({
       return;
     }
 
+    saving.current = true;
     try {
       setIsSaving(true);
       const updated = await updateCurrentUserProfile({
@@ -100,6 +112,7 @@ export default function ProfileSettingsCard({
         id: "profile-settings-save-error",
       });
     } finally {
+      saving.current = false;
       setIsSaving(false);
     }
   }
@@ -130,6 +143,7 @@ export default function ProfileSettingsCard({
         <p className="text-section-title">Ustawienia profilu</p>
       </div>
 
+      {loadError ? <div role="alert" className="mt-5 text-sm text-error-light">{loadError}<Button variant="secondary" className="mt-3" onClick={() => setRevision(value => value + 1)}>Spróbuj ponownie</Button></div> : null}
       <form onSubmit={handleSave} className="mt-6">
         <AvatarFilePicker
           value={profile.avatarUrl}
@@ -139,7 +153,7 @@ export default function ProfileSettingsCard({
           }
           onUpload={handleAvatarUpload}
           onRemove={handleAvatarRemove}
-          disabled={isLoading}
+          disabled={isLoading || isSaving || Boolean(loadError)}
         />
 
         <div className="mt-6 grid gap-4 border-t border-white/5 pt-6 md:grid-cols-2">
@@ -178,7 +192,7 @@ export default function ProfileSettingsCard({
           <Button
             type="submit"
             icon={<Save size={16} />}
-            disabled={isLoading || isSaving}
+            disabled={isLoading || isSaving || Boolean(loadError)}
             className="w-full sm:w-auto"
           >
             {isSaving ? "Zapisywanie..." : "Zapisz zmiany w profilu"}

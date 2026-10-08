@@ -1,3 +1,7 @@
+import type { OwnerSession } from "@/app/lib/owner/sessions";
+
+export type CalendarSession = { canEdit?: boolean } & Partial<OwnerSession> & Pick<OwnerSession, "id" | "title" | "note" | "startAt" | "endAt" | "status">;
+
 export type ScheduleView = "day" | "week";
 
 export type SessionStatusFilter =
@@ -9,6 +13,8 @@ export type SessionStatusFilter =
   | "Cancelled";
 
 export type SessionFormValues = {
+  newParticipantCountsAgainstPackage?: boolean;
+  newParticipantSessionsCharged?: string;
   correctionReason?: string;
   actualSessionType?: string;
   isPubliclyBookable: boolean;

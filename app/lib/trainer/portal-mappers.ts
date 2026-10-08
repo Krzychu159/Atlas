@@ -1,6 +1,6 @@
 import type { Client, ClientListItem } from "@/app/lib/owner/clients";
 import type { Location } from "@/app/lib/owner/locations";
-import type { OwnerSession } from "@/app/lib/owner/sessions";
+import type { CalendarSession } from "@/app/(app)/owner/schedule/types";
 import type { Trainer } from "@/app/lib/owner/trainers";
 import type {
   TrainerPortalClient,
@@ -159,71 +159,25 @@ export function trainerPortalClientsToListItems(
   });
 }
 
-export function trainerPortalSessionsToOwnerSessions({
-  sessions,
-  me,
-  clients,
-}: {
-  sessions: TrainerPortalSession[];
-  me: TrainerPortalMe | null;
-  clients: Client[];
-}): OwnerSession[] {
-  return sessions.map((session) => {
-    const client = findClientByName(clients, session.clientFullName);
-    const locationId = resolveLocationId(session.locationName, me);
-    const participants = client
-      ? [
-          {
-            id: client.id,
-            clientId: client.id,
-            clientFullName: client.fullName,
-            packageId: null,
-            packageName: null,
-            clientPackageId: null,
-            attendanceStatus: null,
-            countsAgainstPackage: true,
-            isCountedFromPackage: true,
-            sessionsCharged: 1,
-            plannedBillingType: null,
-            actualBillingType: null,
-            expectedUnitPrice: 0,
-            actualUnitPrice: 0,
-            balanceDifference: 0,
-            note: null,
-          },
-        ]
-      : null;
-
-    return {
-      id: session.sessionId,
-      title: session.title,
-      note: session.note,
-      startAt: session.startAt,
-      endAt: session.endAt,
-      trainerId: me?.trainerId || 0,
-      trainerFullName: me?.fullName || null,
-      locationId,
-      locationName: session.locationName,
-      status: session.status,
-      plannedSessionType: null,
-      actualSessionType: null,
-      actualParticipantsCount: participants?.length || null,
-      completedAt: null,
-      participantsCount: participants?.length || (session.clientFullName ? 1 : 0),
-      clientsDisplayName: session.clientFullName,
-      participants,
-      createdAt: session.startAt,
-      updatedAt: session.startAt,
-      createdBy: null,
-      locationParticipantsCount: 0,
-      locationLimit: 0,
-      isLocationLimitExceeded: false,
-      outlookCategories: session.outlookCategories ?? null,
-      primaryOutlookCategory: session.primaryOutlookCategory ?? null,
-      primaryOutlookCategoryColor: session.primaryOutlookCategoryColor ?? null,
-      outlookCategoryColors: session.outlookCategoryColors ?? null,
-    };
-  });
+export function trainerPortalSessionsToCalendarSessions({ sessions }: { sessions: TrainerPortalSession[] }): CalendarSession[] {
+  return sessions.map((session) => ({
+    id: session.sessionId,
+    canEdit: session.canEdit,
+    title: session.title,
+    note: session.note,
+    startAt: session.startAt,
+    endAt: session.endAt,
+    trainerId: session.trainerId,
+    trainerFullName: session.trainerFullName,
+    locationName: session.locationName,
+    status: session.status,
+    // This summary is not a participant list and must not be used for identity.
+    clientsDisplayName: session.clientFullName,
+    outlookCategories: session.outlookCategories ?? null,
+    primaryOutlookCategory: session.primaryOutlookCategory ?? null,
+    primaryOutlookCategoryColor: session.primaryOutlookCategoryColor ?? null,
+    outlookCategoryColors: session.outlookCategoryColors ?? null,
+  }));
 }
 
 function splitFullName(value?: string | null) {
@@ -245,17 +199,7 @@ function resolveLocationId(
   const normalized = normalize(locationName);
   const index = names.findIndex((name) => normalize(name) === normalized);
 
-  return ids[index] || ids[0] || 0;
-}
-
-function findClientByName(clients: Client[], name?: string | null) {
-  const normalized = normalize(name);
-
-  if (!normalized) return null;
-
-  return (
-    clients.find((client) => normalize(client.fullName) === normalized) || null
-  );
+  return index >= 0 ? ids[index] ?? 0 : 0;
 }
 
 function normalize(value?: string | null) {

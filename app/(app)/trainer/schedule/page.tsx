@@ -1,497 +1,194 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
-import { showOwnerError, showOwnerSuccess } from "@/app/(app)/owner/components/owner-toast";
-import { getClients, type Client } from "@/app/lib/owner/clients";
-import { getLocations, type Location } from "@/app/lib/owner/locations";
-import { getOutlookStatus, type OutlookStatus } from "@/app/lib/owner/outlook";
-import {
-  createSession,
-  getSession,
-  getOwnerSessions,
-  updateSession,
-  type OwnerSession,
-} from "@/app/lib/owner/sessions";
-import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
-import { isForbiddenError } from "@/app/lib/backend";
-import {
-  createTrainerPortalSession,
-  getTrainerPortalClients,
-  getTrainerPortalMe,
-  getTrainerPortalSession,
-  getTrainerPortalSessions,
-  updateTrainerPortalSession,
-  type TrainerPortalMe,
-} from "@/app/lib/trainer/portal";
-import {
-  trainerPortalClientsToClients,
-  trainerPortalMeToLocations,
-  trainerPortalMeToTrainer,
-  trainerPortalSessionsToOwnerSessions,
-} from "@/app/lib/trainer/portal-mappers";
-import {
-  DateNavigator,
-  ViewSwitch,
-} from "@/app/(app)/owner/schedule/components/ScheduleControls";
-import ScheduleFilters from "@/app/(app)/owner/schedule/components/ScheduleFilters";
-import { OutlookRequiredState } from "@/app/(app)/owner/schedule/components/ScheduleStates";
-import {
-  DaySchedule,
-  WeekSchedule,
-} from "@/app/(app)/owner/schedule/components/ScheduleViews";
-import { correctCompletedSession } from "@/app/(app)/owner/schedule/session-utils";
-import { notifySessionCorrected, useSessionCorrectionRevision } from "@/app/lib/session-corrections";
+import { CustomSelect } from "@/app/components/ui/custom-select";
+import { showAppError, showAppSuccess } from "@/app/components/ui/app-toast";
+import { ApiError } from "@/app/lib/backend";
+import { trainerPaymentError } from "@/app/lib/trainer/payment-errors";
+import { getOutlookStatus, type OutlookStatus } from "@/app/lib/calendar/outlook";
+import { createTrainerPortalSession, getTrainerPortalClients, getTrainerPortalMe, getTrainerPortalSession, getTrainerPortalSessions, type TrainerPortalMe, type TrainerSessionDetails, type TrainerSessionPayload } from "@/app/lib/trainer/portal";
+import { trainerPortalClientsToClients, trainerPortalMeToLocations, trainerPortalMeToTrainer, trainerPortalSessionsToCalendarSessions } from "@/app/lib/trainer/portal-mappers";
+import { DateNavigator, ViewSwitch } from "@/app/(app)/owner/schedule/components/ScheduleControls";
+import { DaySchedule, WeekSchedule } from "@/app/(app)/owner/schedule/components/ScheduleViews";
 import SessionEditorModal from "@/app/(app)/owner/schedule/components/SessionEditorModal";
-import {
-  addDays,
-  getPeriod,
-  startOfWeek,
-  toDateInputValue,
-} from "@/app/(app)/owner/schedule/date-utils";
-import {
-  matchesStatusFilter,
-  sortSessions,
-  toSessionPayload,
-} from "@/app/(app)/owner/schedule/session-utils";
-import type {
-  ScheduleView,
-  SessionFormValues,
-  SessionStatusFilter,
-} from "@/app/(app)/owner/schedule/types";
+import { scheduleStatusFilterOptions } from "@/app/(app)/owner/schedule/options";
+import { addDays, getPeriod, startOfWeek, toDateInputValue } from "@/app/(app)/owner/schedule/date-utils";
+import { matchesStatusFilter, sortSessions, toSessionPayload } from "@/app/(app)/owner/schedule/session-utils";
+import type { CalendarSession, ScheduleView, SessionFormValues, SessionStatusFilter } from "@/app/(app)/owner/schedule/types";
+import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
+import type { Client } from "@/app/lib/owner/clients";
+import TrainerSessionDetailsModal from "./components/TrainerSessionDetailsModal";
 
 export default function TrainerSchedulePage() {
   const [view, setView] = useState<ScheduleView>("week");
   const [anchorDate, setAnchorDate] = useState(() => new Date());
-  const [outlookStatus, setOutlookStatus] = useState<OutlookStatus | null>(
-    null,
-  );
-  const [sessions, setSessions] = useState<OwnerSession[]>([]);
-  const [trainers, setTrainers] = useState<Trainer[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
+  const [sessions, setSessions] = useState<CalendarSession[]>([]);
   const [me, setMe] = useState<TrainerPortalMe | null>(null);
-  const [statusFilter, setStatusFilter] =
-    useState<SessionStatusFilter>("without-cancelled");
-  const [trainerFilter, setTrainerFilter] = useState("");
-  const [selectedSession, setSelectedSession] = useState<OwnerSession | null>(
-    null,
-  );
-  const [createSessionDate, setCreateSessionDate] = useState(() => new Date());
-  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
-  const [isStatusLoading, setIsStatusLoading] = useState(true);
-  const [isSessionsLoading, setIsSessionsLoading] = useState(false);
-  const [isResourcesLoading, setIsResourcesLoading] = useState(false);
-  const [isSavingSession, setIsSavingSession] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [statusFilter, setStatusFilter] = useState<SessionStatusFilter>("without-cancelled");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [resourcesError, setResourcesError] = useState<string | null>(null);
+  const [outlookError, setOutlookError] = useState<string | null>(null);
+  const [outlookStatus, setOutlookStatus] = useState<OutlookStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isResourcesLoading, setIsResourcesLoading] = useState(true);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<TrainerSessionDetails | null>(null);
+  const [createDate, setCreateDate] = useState(() => new Date());
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const loadRevision = useRef(0);
+  const detailRevision = useRef(0);
+  const resourceRevision = useRef(0);
+  const saving = useRef(false);
+  const dashboardCreateHandled = useRef(false);
   const calendarRevision = useSessionCorrectionRevision();
-  const [sessionRevision, setSessionRevision] = useState(0);
-  const [isTrainerFilterReady, setIsTrainerFilterReady] = useState(false);
-  const defaultTrainerApplied = useRef(false);
+  const period = useMemo(() => getPeriod(view, anchorDate, true), [view, anchorDate]);
+  const locations = useMemo(() => trainerPortalMeToLocations(me), [me]);
+  const trainers = useMemo(() => { const trainer = trainerPortalMeToTrainer(me); return trainer ? [trainer] : []; }, [me]);
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(anchorDate), index)), [anchorDate]);
+  const visibleSessions = useMemo(() => sortSessions(sessions.filter(session => {
+    const start = Date.parse(session.startAt), end = Date.parse(session.endAt);
+    return start <= period.to.getTime() && end > period.from.getTime() && matchesStatusFilter(session, statusFilter);
+  })), [sessions, period, statusFilter]);
 
-  const period = useMemo(() => getPeriod(view, anchorDate), [anchorDate, view]);
-  const visibleSessions = useMemo(
-    () =>
-      sortSessions(
-        sessions.filter((session) => matchesStatusFilter(session, statusFilter)),
-      ),
-    [sessions, statusFilter],
-  );
-  const weekDays = useMemo(() => {
-    const weekStart = startOfWeek(anchorDate);
-
-    return Array.from({ length: 6 }, (_, index) => addDays(weekStart, index));
-  }, [anchorDate]);
-  const modalTrainers = useMemo(() => {
-    const selectedTrainerId = Number(trainerFilter);
-
-    if (!selectedTrainerId) return trainers;
-
-    const selectedTrainer = trainers.find(
-      (trainer) => trainer.id === selectedTrainerId,
-    );
-
-    if (!selectedTrainer) return trainers;
-
-    return [
-      selectedTrainer,
-      ...trainers.filter((trainer) => trainer.id !== selectedTrainerId),
-    ];
-  }, [trainerFilter, trainers]);
-
-  async function loadOutlookStatus() {
+  const loadSessions = useCallback(async () => {
+    const revision = ++loadRevision.current;
+    setIsLoading(true);
+    setLoadError(null);
     try {
-      setIsStatusLoading(true);
-      const data = await getOutlookStatus();
-      setOutlookStatus(data);
-    } catch (err) {
-      showOwnerError(err, "Nie udało się sprawdzić połączenia Outlook.", {
-        id: "trainer-schedule-outlook-status",
-      });
-      setOutlookStatus(null);
+      const data = await getTrainerPortalSessions();
+      if (revision !== loadRevision.current) return;
+      setSessions(trainerPortalSessionsToCalendarSessions({ sessions: data }));
+    } catch (error) {
+      if (revision !== loadRevision.current) return;
+      setLoadError(trainerPaymentError(error, "Nie udało się pobrać zajęć. Spróbuj ponownie."));
     } finally {
-      setIsStatusLoading(false);
+      if (revision === loadRevision.current) setIsLoading(false);
     }
-  }
+  }, []);
 
   const loadResources = useCallback(async () => {
+    const revision = ++resourceRevision.current;
+    setIsResourcesLoading(true);
+    setResourcesError(null);
     try {
-      setIsResourcesLoading(true);
-      const meData = await getTrainerPortalMe().catch(() => null);
-      const [trainersData, locationsData, clientsData] = await Promise.all([
-        getTrainersForTrainerView(meData),
-        getLocationsForTrainerView(meData),
-        getClientsForTrainerView(meData),
-      ]);
-
+      const [meData, clientData] = await Promise.all([getTrainerPortalMe(), getTrainerPortalClients()]);
+      if (revision !== resourceRevision.current) return;
       setMe(meData);
-      setTrainers(trainersData);
-      setLocations(locationsData.filter((item) => item.isActive));
-      setClients(clientsData);
-
-      if (!defaultTrainerApplied.current) {
-        defaultTrainerApplied.current = true;
-
-        if (meData?.trainerId) {
-          setTrainerFilter(String(meData.trainerId));
-        }
-      }
-    } catch (err) {
-      showOwnerError(err, "Nie udało się pobrać trenerów, klientów i lokalizacji.", {
-        id: "trainer-schedule-resources",
-      });
-    } finally {
-      setIsTrainerFilterReady(true);
-      setIsResourcesLoading(false);
-    }
-  }, []);
-
-  async function loadSessions() {
-    try {
-      setIsSessionsLoading(true);
-      const data = await getSessionsForTrainerView();
-      setSessions(data);
-    } catch (err) {
-      showOwnerError(err, "Nie udało się pobrać sesji.", {
-        id: "trainer-schedule-sessions",
-      });
-      setSessions([]);
-    } finally {
-      setIsSessionsLoading(false);
-    }
-  }
-
-  async function getSessionsForTrainerView() {
-    try {
-      return await getOwnerSessions({
-        from: period.fromIso,
-        to: period.toIso,
-        trainerId: trainerFilter ? Number(trainerFilter) : undefined,
-        status:
-          statusFilter !== "all" && statusFilter !== "without-cancelled"
-            ? statusFilter
-            : undefined,
-      });
-    } catch (err) {
-      if (!isForbiddenError(err)) throw err;
-
-      if (
-        trainerFilter &&
-        me?.trainerId &&
-        Number(trainerFilter) !== me.trainerId
-      ) {
-        return [];
-      }
-
-      const portalSessions = await getTrainerPortalSessions();
-
-      return trainerPortalSessionsToOwnerSessions({
-        sessions: portalSessions,
-        me,
-        clients,
-      }).filter((session) => {
-        const start = new Date(session.startAt).getTime();
-
-        return start >= period.from.getTime() && start <= period.to.getTime();
-      });
-    }
-  }
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadOutlookStatus();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
+      setClients(trainerPortalClientsToClients(clientData, meData));
+    } catch (error) {
+      if (revision !== resourceRevision.current) return;
+      setResourcesError(trainerPaymentError(error, "Nie udało się pobrać danych potrzebnych do dodania zajęć."));
+    } finally { if (revision === resourceRevision.current) setIsResourcesLoading(false); }
   }, []);
 
   useEffect(() => {
-    if (!outlookStatus?.isConnected) return;
-
-    const timer = window.setTimeout(() => {
-      void loadResources();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, [loadResources, outlookStatus?.isConnected]);
-
+    void loadSessions();
+    return () => { loadRevision.current += 1; detailRevision.current += 1; };
+  }, [loadSessions, calendarRevision]);
+  useEffect(() => { void loadResources(); return () => { resourceRevision.current += 1; }; }, [loadResources]);
   useEffect(() => {
-    if (!outlookStatus?.isConnected || !isTrainerFilterReady) return;
+    let active = true;
+    getOutlookStatus().then(data => { if (active) setOutlookStatus(data); }).catch(error => {
+      if (active) setOutlookError(trainerPaymentError(error, "Nie udało się sprawdzić połączenia z Outlookiem."));
+    });
+    return () => { active = false; };
+  }, []);
 
-    const timer = window.setTimeout(() => {
-      void loadSessions();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    outlookStatus?.isConnected,
-    isTrainerFilterReady,
-    period.fromIso,
-    period.toIso,
-    trainerFilter,
-    statusFilter,
-    calendarRevision,
-  ]);
-
-  function movePeriod(direction: -1 | 1) {
-    setAnchorDate((current) =>
-      addDays(current, view === "week" ? 7 * direction : direction),
-    );
+  function openCreate(date = anchorDate) {
+    if (isResourcesLoading || resourcesError || !me?.trainerId || !locations.length || saving.current) return;
+    setCreateDate(date);
+    setIsCreateOpen(true);
   }
-
-  function openCreateModal(date = anchorDate) {
+  const openDetails = useCallback(async (session: Pick<CalendarSession, "id">) => {
+    const revision = ++detailRevision.current;
+    setIsDetailLoading(true);
     setSelectedSession(null);
-    setCreateSessionDate(date);
-    setIsSessionModalOpen(true);
-  }
-
-  async function openEditModal(session: OwnerSession) {
-    if (session.status !== "Completed" && session.participants?.length) {
-      setSelectedSession(session);
-      setIsSessionModalOpen(true);
-      return;
-    }
-
     try {
-      const detailedSession = await getTrainerPortalSession(session.id);
-
-      setSelectedSession(detailedSession);
-    } catch (err) {
-      if (session.status === "Completed") {
-        showOwnerError(err, "Nie udało się pobrać szczegółów sesji.");
-        return;
-      }
-      setSelectedSession(session);
-    }
-
-    setIsSessionModalOpen(true);
-  }
-
-  async function handleSaveSession(values: SessionFormValues) {
-    if (isSavingSession) return;
+      const details = await getTrainerPortalSession(session.id);
+      if (revision === detailRevision.current) setSelectedSession(details);
+    } catch (error) {
+      if (revision === detailRevision.current) showAppError(new Error(trainerPaymentError(error, "Nie udało się pobrać szczegółów zajęć.")), "Nie udało się pobrać szczegółów zajęć.");
+    } finally { if (revision === detailRevision.current) setIsDetailLoading(false); }
+  }, []);
+  async function handleCreate(values: SessionFormValues) {
+    if (saving.current || !me?.trainerId || resourcesError) return;
     try {
-      setIsSavingSession(true);
-      if (selectedSession?.status === "Completed") {
-        await correctCompletedSession(selectedSession, values);
-        showOwnerSuccess("Korekta została zapisana.");
-        notifySessionCorrected();
-        // A refresh failure must not turn a successful correction into a retry.
-        try {
-          const refreshed = await getSession(selectedSession.id).catch((err) => { if (!isForbiddenError(err)) throw err; return getTrainerPortalSession(selectedSession.id); });
-          setSelectedSession(refreshed);
-          setSessionRevision((current) => current + 1);
-        } catch (err) {
-          setIsSessionModalOpen(false);
-          setSelectedSession(null);
-          showOwnerError(err, "Korekta zapisana, ale nie udało się odświeżyć szczegółów.");
-        }
-        await loadSessions();
-        return;
-      }
-      const payload = toSessionPayload(values, selectedSession);
-
-      if (selectedSession) {
-        try {
-          await updateSession(selectedSession.id, payload);
-        } catch (err) {
-          if (!isForbiddenError(err)) throw err;
-          await updateTrainerPortalSession(selectedSession.id, payload);
-        }
-        showOwnerSuccess("Sesja została zaktualizowana.", {
-          id: "trainer-session-updated",
-        });
-      } else {
-        try {
-          await createSession(payload);
-        } catch (err) {
-          if (!isForbiddenError(err)) throw err;
-          await createTrainerPortalSession(payload);
-        }
-        showOwnerSuccess("Sesja została dodana.", {
-          id: "trainer-session-created",
-        });
-      }
-
+      if (Number(values.trainerId) !== me.trainerId) throw new Error("Możesz dodawać tylko własne zajęcia.");
+      if (!locations.some(location => location.id === Number(values.locationId))) throw new Error("Wybierz dostępną lokalizację.");
+      if (!values.title.trim()) throw new Error("Podaj tytuł zajęć.");
+      if (!["Planned", "Active"].includes(values.status)) throw new Error("Wybierz status zajęć.");
+      if (values.participantIds.some(id => !clients.some(client => client.id === Number(id)))) throw new Error("Wybierz uczestników z listy swoich klientów.");
+      const sessionsCharged = Number(values.newParticipantSessionsCharged);
+      if (values.participantIds.length && (!values.newParticipantSessionsCharged?.trim() || !Number.isSafeInteger(sessionsCharged) || sessionsCharged < 0)) throw new Error("Podaj poprawną liczbę wejść na uczestnika.");
+      const formPayload = toSessionPayload(values, null);
+      const payload: TrainerSessionPayload = {
+        title: values.title.trim(), note: values.note.trim() || null,
+        startAt: formPayload.startAt, endAt: formPayload.endAt,
+        trainerId: me.trainerId, locationId: Number(values.locationId), status: values.status,
+        isPubliclyBookable: values.isPubliclyBookable,
+        publicSlug: values.isPubliclyBookable ? values.publicSlug.trim() : null,
+        publicCapacity: values.isPubliclyBookable ? Number(values.publicCapacity) : null,
+        plannedSessionType: values.isPubliclyBookable ? "Group" : values.plannedSessionType || null,
+        outlookCategories: values.outlookCategories.split(",").map(value => value.trim()).filter(Boolean),
+        participants: values.participantIds.map(id => ({ clientId: Number(id), countsAgainstPackage: values.newParticipantCountsAgainstPackage === true, sessionsCharged, note: null })),
+      };
+      saving.current = true;
+      setIsSaving(true);
+      await createTrainerPortalSession(payload);
+      setIsCreateOpen(false);
+      showAppSuccess("Zajęcia zostały dodane.");
       await loadSessions();
-      setIsSessionModalOpen(false);
-      setSelectedSession(null);
-    } catch (err) {
-      showOwnerError(err, "Nie udało się zapisać sesji.", {
-        id: "trainer-session-save-error",
-      });
-    } finally {
-      setIsSavingSession(false);
-    }
+    } catch (error) {
+      const message = error instanceof ApiError && error.status === 409 ? "Termin koliduje z innymi zajęciami. Wybierz inny termin lub sprawdź uczestników." : trainerPaymentError(error, "Nie udało się dodać zajęć. Sprawdź wpisane dane.");
+      showAppError(new Error(message), message);
+    } finally { saving.current = false; setIsSaving(false); }
   }
+  const canCreate = !isResourcesLoading && !resourcesError && Boolean(me?.trainerId) && locations.length > 0;
 
-  const connected = Boolean(outlookStatus?.isConnected);
-  const trainerName = me?.fullName ? ` (${me.fullName})` : "";
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = Number(params.get("sessionId"));
+    const date = params.get("date");
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date + "T12:00:00"))) {
+      setAnchorDate(new Date(date + "T12:00:00"));
+      setView("day");
+    }
+    if (Number.isSafeInteger(sessionId) && sessionId > 0) void openDetails({ id: sessionId });
+  }, [openDetails]);
+
+  useEffect(() => {
+    if (dashboardCreateHandled.current || isResourcesLoading || resourcesError) return;
+    if (new URLSearchParams(window.location.search).get("action") !== "new") return;
+    if (!canCreate) return;
+    dashboardCreateHandled.current = true;
+    setCreateDate(new Date());
+    setIsCreateOpen(true);
+  }, [canCreate, isResourcesLoading, resourcesError]);
 
   return (
     <>
       <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-label text-primary-light">Plan</p>
-            <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
-              Sesje treningowe
-            </h1>
-            <p className="mt-3 max-w-[760px] text-sm leading-6 text-on-surface-variant">
-              Grafik pokazuje wszystkie sesje. Domyślnie filtr trenera ustawia
-              się na zalogowanego trenera{trainerName}, ale możesz wybrać
-              wszystkich albo konkretną osobę.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <ViewSwitch value={view} onChange={setView} />
-            <DateNavigator
-              view={view}
-              anchorDate={anchorDate}
-              periodLabel={period.label}
-              onDateChange={setAnchorDate}
-              onMove={movePeriod}
-            />
-            {connected ? (
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  icon={
-                    <RefreshCw
-                      size={16}
-                      className={isSessionsLoading ? "animate-spin" : ""}
-                    />
-                  }
-                  onClick={loadSessions}
-                  disabled={isSessionsLoading || !isTrainerFilterReady}
-                >
-                  Odśwież
-                </Button>
-                <Button
-                  icon={<Plus size={16} />}
-                  onClick={() => openCreateModal()}
-                  disabled={isResourcesLoading}
-                >
-                  Dodaj sesję
-                </Button>
-              </div>
-            ) : null}
-          </div>
+          <div><p className="text-label text-primary-light">Plan</p><h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-tight tracking-tight">Moje zajęcia</h1><p className="mt-3 text-sm leading-6 text-on-surface-variant">Własne treningi i zajęcia grupowe. Wybierz zajęcia, aby zobaczyć uczestników i szczegóły.</p></div>
+          <div className="flex flex-wrap items-center gap-3"><ViewSwitch value={view} onChange={setView} /><DateNavigator view={view} anchorDate={anchorDate} periodLabel={period.label} onDateChange={setAnchorDate} onMove={direction => setAnchorDate(date => addDays(date, (view === "week" ? 7 : 1) * direction))} />
+            <Button variant="secondary" icon={<RefreshCw size={16} />} disabled={isLoading || isSaving} onClick={() => void loadSessions()}>Odśwież</Button><Button icon={<Plus size={16} />} disabled={!canCreate || isSaving} onClick={() => openCreate()}>Dodaj sesję</Button></div>
         </div>
-
-        {connected ? (
-          <ScheduleFilters
-            statusFilter={statusFilter}
-            trainerFilter={trainerFilter}
-            trainers={trainers}
-            visibleCount={visibleSessions.length}
-            onStatusFilterChange={setStatusFilter}
-            onTrainerFilterChange={setTrainerFilter}
-          />
-        ) : null}
-
-        {isStatusLoading ? (
-          <div className="card-shell p-6 text-on-surface-variant">
-            Sprawdzanie połączenia z Microsoft Outlook...
-          </div>
-        ) : !connected ? (
-          <OutlookRequiredState settingsHref="/trainer/settings" />
-        ) : view === "week" ? (
-          <WeekSchedule
-            days={weekDays}
-            sessions={visibleSessions}
-            isLoading={isSessionsLoading}
-            onSelectSession={openEditModal}
-            onCreateSession={openCreateModal}
-          />
-        ) : (
-          <DaySchedule
-            date={anchorDate}
-            sessions={visibleSessions}
-            isLoading={isSessionsLoading}
-            onSelectSession={openEditModal}
-            onCreateSession={openCreateModal}
-          />
-        )}
+        <div className="card-shell flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><CustomSelect label="Status zajęć" value={statusFilter} options={scheduleStatusFilterOptions} onChange={value => setStatusFilter(value as SessionStatusFilter)} /><p className="text-sm text-on-surface-muted">{!isLoading && !loadError ? visibleSessions.length + " zajęć w wybranym terminie" : ""}</p></div>
+        {resourcesError ? <div role="alert" className="card-shell p-4 text-sm text-on-surface-variant">{resourcesError}<Button variant="secondary" className="mt-3" onClick={() => void loadResources()}>Spróbuj ponownie</Button></div> : !isResourcesLoading && !locations.length ? <p className="card-shell p-4 text-sm text-on-surface-variant">Nie masz przypisanej lokalizacji. Ustal ją z właścicielem studia przed dodaniem zajęć.</p> : null}
+        {outlookError || outlookStatus?.isConnected === false ? <div className="card-shell p-4 text-sm text-on-surface-variant">{outlookError || "Połącz Outlook, aby korzystać z synchronizacji kalendarza."}<Link href="/trainer/settings" className="ml-2 font-semibold text-primary-light">Ustawienia połączenia</Link></div> : null}
+        {isDetailLoading ? <p role="status" className="text-sm text-on-surface-variant">Pobieranie szczegółów zajęć…</p> : null}
+        {loadError && !isLoading ? <div role="alert" className="card-shell p-5 text-on-surface-variant">{loadError}<Button variant="secondary" className="mt-3" onClick={() => void loadSessions()}>Spróbuj ponownie</Button></div> : <>
+          {!isLoading && !visibleSessions.length ? <p className="card-shell p-5 text-sm text-on-surface-variant">Brak zajęć w wybranym terminie i dla wybranego statusu.</p> : null}
+          {view === "week" ? <WeekSchedule days={weekDays} sessions={visibleSessions} isLoading={isLoading} onSelectSession={openDetails} onCreateSession={canCreate ? openCreate : undefined} /> : <DaySchedule date={anchorDate} sessions={visibleSessions} isLoading={isLoading} onSelectSession={openDetails} onCreateSession={canCreate ? openCreate : undefined} />}
+        </>}
       </div>
-
-      <SessionEditorModal
-        key={
-          isSessionModalOpen
-            ? selectedSession
-              ? `session-${selectedSession.id}-${sessionRevision}`
-              : `new-${toDateInputValue(createSessionDate)}-${trainerFilter}`
-            : "closed"
-        }
-        open={isSessionModalOpen}
-        session={selectedSession}
-        anchorDate={selectedSession ? anchorDate : createSessionDate}
-        trainers={modalTrainers}
-        locations={locations}
-        clients={clients}
-        defaultTrainerId={me?.trainerId}
-        isSaving={isSavingSession}
-        onClose={() => {
-          setIsSessionModalOpen(false);
-          setSelectedSession(null);
-        }}
-        onSubmit={handleSaveSession}
-      />
+      {selectedSession ? <TrainerSessionDetailsModal session={selectedSession} onClose={() => { detailRevision.current += 1; setSelectedSession(null); }} /> : null}
+      <SessionEditorModal key={isCreateOpen ? "new-" + toDateInputValue(createDate) : "closed"} open={isCreateOpen} session={null} anchorDate={createDate} trainers={trainers} locations={locations} clients={clients} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsCreateOpen(false); }} onSubmit={handleCreate} />
     </>
   );
-}
-
-async function getTrainersForTrainerView(meData: TrainerPortalMe | null) {
-  try {
-    return await getTrainers();
-  } catch (err) {
-    if (!isForbiddenError(err)) throw err;
-
-    const currentTrainer = trainerPortalMeToTrainer(meData);
-
-    return currentTrainer ? [currentTrainer] : [];
-  }
-}
-
-async function getLocationsForTrainerView(meData: TrainerPortalMe | null) {
-  try {
-    return await getLocations();
-  } catch (err) {
-    if (!isForbiddenError(err)) throw err;
-
-    return trainerPortalMeToLocations(meData);
-  }
-}
-
-async function getClientsForTrainerView(meData: TrainerPortalMe | null) {
-  try {
-    return await getClients();
-  } catch (err) {
-    if (!isForbiddenError(err)) throw err;
-
-    const portalClients = await getTrainerPortalClients();
-
-    return trainerPortalClientsToClients(portalClients, meData);
-  }
 }

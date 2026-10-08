@@ -92,7 +92,7 @@ export function getSafeNotificationUrl(actionUrl: string | null) {
 // Only page.tsx routes present under app/(app), excluding notification history.
 const notificationRoutes: Record<NotificationRole, RegExp> = {
   owner: /^\/owner(?:\/(?:schedule|settings|statistics|expenses|settlements|payments|packages(?:\/[1-9]\d*)?|clients(?:\/archived|\/[1-9]\d*(?:\/payments)?)?|trainers(?:\/[1-9]\d*(?:\/settlements)?)?))?$/,
-  trainer: /^\/trainer(?:\/(?:schedule|settings|payments|packages|clients(?:\/[1-9]\d*(?:\/payments)?)?))?$/,
+  trainer: /^\/trainer(?:\/(?:schedule|settings|payments|settlements|packages|clients(?:\/[1-9]\d*(?:\/payments)?)?))?$/,
   client: /^\/client(?:\/(?:schedule|settings|payments|rewards))?$/,
 };
 
@@ -120,7 +120,7 @@ function matchNotificationUrl(notification: AppNotification, role: NotificationR
   const url = new URL(safe, "https://atlas.invalid");
   const path = url.pathname.replace(/\/$/, "");
   if (path === "/accept-invitation" && url.searchParams.get("token")) return safe;
-  if (isNotificationRoute(path)) return safe;
+  if (role ? notificationRoutes[role].test(path) : isNotificationRoute(path)) return safe;
   if (!role) return null;
 
   const domainPath = path.replace(/^\/(owner|trainer|client)(?=\/|$)/, "");
@@ -150,6 +150,7 @@ function matchNotificationUrl(notification: AppNotification, role: NotificationR
     return role === "trainer" ? `/trainer/settings${suffix}` : role === "client" ? `/client/schedule${suffix}` : null;
   }
   if (/^\/(?:trainers\/[1-9]\d*\/)?settlements(?:\/[1-9]\d*)?$/.test(domainPath) && role === "owner") return `/owner/settlements${suffix}`;
+  if (/^\/(?:trainers\/[1-9]\d*\/)?settlements(?:\/[1-9]\d*)?$/.test(domainPath) && role === "trainer") return `/trainer/settlements${suffix}`;
   return null;
 }
 
@@ -173,7 +174,7 @@ export function getNotificationDestination(notification: AppNotification, reques
   if (entity === "trainer" && validId) {
     const settlement = kind === "settlement" || kind === "payment";
     if (role === "owner") return `/owner/trainers/${id}${settlement ? "/settlements" : ""}`;
-    if (settlement) return null; // No trainer/client settlement page.
+    if (settlement) return role === "trainer" ? "/trainer/settlements" : null;
     return role === "trainer" ? "/trainer/settings" : "/client/schedule";
   }
   switch (kind) {
@@ -185,7 +186,7 @@ export function getNotificationDestination(notification: AppNotification, reques
       return `/${role}/clients`;
     case "client": return role === "client" ? "/client/settings" : `/${role}/clients`;
     case "trainer": return role === "owner" ? "/owner/trainers" : role === "trainer" ? "/trainer/settings" : "/client/schedule";
-    case "settlement": return role === "owner" ? "/owner/settlements" : null;
+    case "settlement": return role === "owner" ? "/owner/settlements" : role === "trainer" ? "/trainer/settlements" : null;
     case "expense": return role === "owner" ? "/owner/expenses" : null;
     default: return null;
   }

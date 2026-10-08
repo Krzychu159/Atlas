@@ -9,7 +9,7 @@ import type { Trainer } from "@/app/lib/owner/trainers";
 import { completeSession, updateSession } from "@/app/lib/owner/sessions";
 import { getOwnerSessionPackageName } from "../components/session-display";
 import { toDateTimeLocalValue } from "./date-utils";
-import type { SessionFormValues, SessionStatusFilter } from "./types";
+import type { CalendarSession, SessionFormValues, SessionStatusFilter } from "./types";
 
 export function generatePublicSessionSlug(title: string, startAt: string) {
   const name = title.toLowerCase().replace(/ł/g, "l").normalize("NFD")
@@ -25,14 +25,14 @@ function publicDateTime(value: string) {
   }).format(new Date(value)).replace(" ", "T");
 }
 
-export function sortSessions(sessions: OwnerSession[]) {
+export function sortSessions<TSession extends CalendarSession>(sessions: TSession[]) {
   return [...sessions].sort(
     (first, second) =>
       new Date(first.startAt).getTime() - new Date(second.startAt).getTime(),
   );
 }
 
-export function getSessionType(session: OwnerSession) {
+export function getSessionType(session: CalendarSession) {
   return (
     (session.actualSessionType || session.plannedSessionType ? userTrainingType(session.actualSessionType || session.plannedSessionType) : null) ||
     session.primaryOutlookCategory ||
@@ -40,40 +40,28 @@ export function getSessionType(session: OwnerSession) {
   );
 }
 
-export function getSessionTitle(session: OwnerSession) {
+export function getSessionTitle(session: CalendarSession) {
   return session.title || getSessionType(session);
 }
 
 export function getSessionStatusLabel(status?: string | null) {
-  const normalized = (status || "").toLowerCase();
-
-  if (normalized.includes("cancel")) return "Anulowana";
-  if (normalized.includes("complete") || normalized.includes("done")) {
-    return "Zrealizowana";
-  }
-  if (normalized.includes("active")) return "Aktywna";
-
-  return "Zaplanowana";
+  const labels: Record<string, string> = { planned: "Zaplanowana", active: "Aktywna", completed: "Zrealizowana", cancelled: "Anulowana" };
+  return status ? labels[status.toLowerCase()] || "Status nierozpoznany" : "Status niedostępny";
 }
 
-export function getParticipantsLabel(session: OwnerSession) {
-  const count =
-    session.actualParticipantsCount ??
-    session.participantsCount ??
-    session.participants?.length ??
-    0;
-
-  if (session.locationLimit) return `${count}/${session.locationLimit}`;
-
-  return `${count}`;
+export function getParticipantsLabel(session: CalendarSession) {
+  const count = session.actualParticipantsCount ?? session.participantsCount ?? session.participants?.length;
+  if (count === undefined) return "Brak danych";
+  const limit = session.publicCapacity ?? session.locationLimit;
+  return limit != null && limit > 0 ? count + "/" + limit : String(count);
 }
 
-export function isCancelledSession(session: OwnerSession) {
-  return (session.status || "").toLowerCase().includes("cancel");
+export function isCancelledSession(session: CalendarSession) {
+  return (session.status || "").toLowerCase() === "cancelled";
 }
 
 export function matchesStatusFilter(
-  session: OwnerSession,
+  session: CalendarSession,
   statusFilter: SessionStatusFilter,
 ) {
   const normalizedStatus = (session.status || "").toLowerCase();
@@ -82,17 +70,15 @@ export function matchesStatusFilter(
   if (statusFilter === "without-cancelled") return !isCancelledSession(session);
   if (statusFilter === "Cancelled") return isCancelledSession(session);
   if (statusFilter === "Completed") {
-    return (
-      normalizedStatus.includes("complete") || normalizedStatus.includes("done")
-    );
+    return normalizedStatus === "completed";
   }
 
-  return normalizedStatus.includes(statusFilter.toLowerCase());
+  return normalizedStatus === statusFilter.toLowerCase();
 }
 
 export const getSessionPackageName = getOwnerSessionPackageName;
 
-function getSessionTone(session: OwnerSession) {
+function getSessionTone(session: CalendarSession) {
   const status = (session.status || "").toLowerCase();
 
   if (status.includes("cancel")) return "danger";
@@ -104,7 +90,7 @@ function getSessionTone(session: OwnerSession) {
   return "neutral";
 }
 
-export function getToneClasses(session: OwnerSession) {
+export function getToneClasses(session: CalendarSession) {
   const tone = getSessionTone(session);
 
   if (tone === "danger") {

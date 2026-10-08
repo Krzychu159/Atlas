@@ -6,7 +6,6 @@ import type {
   UpdateClientTrainingPlanPayload,
 } from "../owner/clients";
 import type { ClientBillingSummary, ClientPayment, CreateClientPaymentPayload } from "../owner/billing";
-import type { OwnerSession } from "../owner/sessions";
 import type { OutlookSessionColors } from "../calendar/outlook-colors";
 
 export type TrainerPortalMe = {
@@ -27,6 +26,9 @@ export type TrainerPortalMe = {
 export type TrainerPortalSession = OutlookSessionColors & {
   outlookCategories?: string[] | null;
   sessionId: number;
+  trainerId: number;
+  trainerFullName: string;
+  canEdit: boolean;
   title: string | null;
   note: string | null;
   startAt: string;
@@ -40,21 +42,80 @@ export type TrainerSessionParticipantPayload = {
   clientId: number;
   countsAgainstPackage: boolean;
   sessionsCharged: number;
-  note?: string | null;
+  note: string | null;
+};
+
+export type TrainerSessionParticipant = {
+  id: number;
+  clientId: number;
+  clientFullName: string;
+  packageId: number | null;
+  packageName: string | null;
+  clientPackageId: number | null;
+  attendanceStatus: string;
+  countsAgainstPackage: boolean;
+  isCountedFromPackage: boolean;
+  sessionsCharged: number;
+  plannedBillingType: string | null;
+  actualBillingType: string | null;
+  expectedUnitPrice: number | null;
+  actualUnitPrice: number | null;
+  balanceDifference: number | null;
+  note: string | null;
+};
+
+export type TrainerSessionDetails = OutlookSessionColors & {
+  id: number;
+  title: string;
+  note: string | null;
+  startAt: string;
+  endAt: string;
+  trainerId: number;
+  trainerFullName: string;
+  canEdit: boolean;
+  locationId: number | null;
+  locationName: string | null;
+  status: string;
+  isPubliclyBookable: boolean;
+  publicSlug: string | null;
+  publicCapacity: number | null;
+  publicAvailableSpots: number | null;
+  plannedSessionType: string | null;
+  actualSessionType: string | null;
+  actualParticipantsCount: number | null;
+  completedAt: string | null;
+  participantsCount: number;
+  clientsDisplayName: string | null;
+  participants: TrainerSessionParticipant[];
+  createdAt: string;
+  updatedAt: string;
+  createdBy: number;
+  locationParticipantsCount: number;
+  locationLimit: number;
+  isLocationLimitExceeded: boolean;
+  outlookCategories: string[];
+  isRecurring: boolean;
+  recurringGroupId: string | null;
+  recurrenceInstanceNumber: number | null;
 };
 
 export type TrainerSessionPayload = {
-  title?: string | null;
-  note?: string | null;
+  title: string;
+  note: string | null;
   startAt: string;
   endAt: string;
   trainerId: number;
   locationId: number;
-  status?: string | null;
-  plannedSessionType?: string | null;
-  outlookCategories?: string[] | null;
-  participants?: TrainerSessionParticipantPayload[] | null;
+  status: string;
+  isPubliclyBookable: boolean;
+  publicSlug: string | null;
+  publicCapacity: number | null;
+  plannedSessionType: string | null;
+  outlookCategories: string[];
+  participants: TrainerSessionParticipantPayload[];
 };
+
+export type UpdateTrainerSessionPayload = TrainerSessionPayload & { correctionReason: string | null };
 
 export type TrainerPortalClient = {
   clientId: number;
@@ -257,18 +318,18 @@ export function getTrainerPortalSessions() {
 }
 
 export function getTrainerPortalSession(sessionId: number) {
-  return backendGet<OwnerSession>(`trainer-portal/sessions/${sessionId}`);
+  return backendGet<TrainerSessionDetails>(`trainer-portal/sessions/${sessionId}`);
 }
 
 export function createTrainerPortalSession(payload: TrainerSessionPayload) {
-  return backendPost<TrainerPortalSession>("trainer-portal/sessions", payload);
+  return backendPost<unknown>("trainer-portal/sessions", payload);
 }
 
 export function updateTrainerPortalSession(
   sessionId: number,
-  payload: TrainerSessionPayload,
+  payload: UpdateTrainerSessionPayload,
 ) {
-  return backendPut<TrainerPortalSession>(
+  return backendPut<unknown>(
     `trainer-portal/sessions/${sessionId}`,
     payload,
   );

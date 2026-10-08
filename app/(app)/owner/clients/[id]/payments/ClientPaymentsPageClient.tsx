@@ -5,7 +5,7 @@ import { userTrainingType } from "@/app/lib/user-messages";
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   PackagePlus,
@@ -20,7 +20,6 @@ import { PaymentsList } from "@/app/components/payments/PaymentsList";
 import { PaymentReasonModal } from "@/app/components/payments/PaymentReasonModal";
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
-import { getPaymentBreakdown } from "@/app/lib/payments/display";
 import {
   cancelClientSubscription,
   confirmClientRefund,
@@ -68,8 +67,12 @@ import {
   getTrainerPortalClientSubscription,
   getTrainerPortalClientSubscriptionUsage,
   getTrainerPortalMe,
+  getTrainerPortalPendingPayments,
   resumeTrainerPortalClientSubscription,
+  setTrainerPortalClientNextPackage,
 } from "@/app/lib/trainer/portal";
+import { getTrainerPackages } from "@/app/lib/trainer/packages";
+import { trainerPaymentError } from "@/app/lib/trainer/payment-errors";
 import { trainerPortalClientToClient } from "@/app/lib/trainer/portal-mappers";
 import ClientPackagesSection from "../components/ClientPackagesSection";
 import ClientAuditSection from "../components/ClientAuditSection";
@@ -90,6 +93,14 @@ export default function ClientPaymentsPageClient({
   clientIdParam,
   basePath = "/owner",
 }: ClientPaymentsPageClientProps) {
+  const mutationLock = useRef(false);
+  const loadRevision = useRef(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [confirmablePaymentIds, setConfirmablePaymentIds] = useState<Set<number>>(new Set());
+  const [pendingPaymentsError, setPendingPaymentsError] = useState<string | null>(null);
+  const [usageError, setUsageError] = useState<string | null>(null);
   const correctionRevision = useSessionCorrectionRevision();
   const [clientId, setClientId] = useState<number | null>(null);
   const [client, setClient] = useState<Client | null>(null);
@@ -128,7 +139,11 @@ export default function ClientPaymentsPageClient({
     const timer = window.setTimeout(() => {
       const parsedId = Number(clientIdParam);
 
-      if (!parsedId) {
+      if (!Number.isSafeInteger(parsedId) || parsedId <= 0) {
+        setBilling(null);
+        setClient(null);
+        setClientId(null);
+        setLoadError("Nie można otworzyć tego klienta. Wróć do listy klientów i wybierz go ponownie.");
         showOwnerError(new Error("Nie można otworzyć tego klienta. Wróć do listy klientów i wybierz go ponownie."), "", {
           id: "owner-client-payments-invalid-id",
         });
@@ -140,17 +155,19 @@ export default function ClientPaymentsPageClient({
       void loadClientPayments(parsedId);
     }, 0);
 
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); loadRevision.current += 1; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientIdParam, correctionRevision]);
 
   async function loadClientPayments(id = clientId, propagateError = false) {
     if (!id) return;
+    const revision = ++loadRevision.current;
 
     try {
       setIsLoading(true);
+      setLoadError(null);
       if (basePath === "/trainer") {
-        await loadTrainerClientPayments(id);
+        await loadTrainerClientPayments(id, revision);
         return;
       }
       setAuditRevision((value) => value + 1);
@@ -201,58 +218,50 @@ export default function ClientPaymentsPageClient({
           : "",
       );
     } catch (err) {
+      if (revision !== loadRevision.current) return;
+      setLoadError(basePath === "/trainer" ? trainerPaymentError(err, "Nie udało się pobrać płatności klienta.") : "Nie udało się pobrać płatności klienta.");
+      if (basePath === "/trainer") setBilling(null);
       showOwnerError(err, "Nie udało się pobrać płatności klienta.", {
         id: "owner-client-payments-load-error",
       });
       if (propagateError) throw err;
     } finally {
-      setIsLoading(false);
+      if (revision === loadRevision.current) setIsLoading(false);
     }
   }
 
-  async function loadTrainerClientPayments(id: number) {
-    const [
-      meData,
-      clientData,
-      billingData,
-      subscriptionData,
-      usageData,
-      packagesData,
-    ] =
-      await Promise.all([
-        getTrainerPortalMe().catch(() => null),
-        getTrainerPortalClient(id),
-        getTrainerPortalClientBilling(id),
-        getTrainerPortalClientSubscription(id),
-        getTrainerPortalClientSubscriptionUsage(id).catch(() => null),
-        getPackages().catch(() => []),
-      ]);
-    const activeClientPackageId = billingData.activeClientPackageId
-      ? String(billingData.activeClientPackageId)
-      : "";
+  async function loadTrainerClientPayments(id: number, revision: number) {
+    const [clientData, meData] = await Promise.all([
+      getTrainerPortalClient(id), getTrainerPortalMe().catch(() => null),
+    ]);
+    const [billingResult, subscriptionResult, usageResult, catalogResult, pendingResult] = await Promise.allSettled([
+      getTrainerPortalClientBilling(id),
+      getTrainerPortalClientSubscription(id),
+      getTrainerPortalClientSubscriptionUsage(id),
+      getTrainerPackages(),
+      getTrainerPortalPendingPayments(),
+    ]);
+    if (revision !== loadRevision.current) return;
+    if (billingResult.status === "rejected") throw billingResult.reason;
+    const billingData = billingResult.value;
+    const subscriptionData = subscriptionResult.status === "fulfilled" ? subscriptionResult.value : null;
     const mappedClient = trainerPortalClientToClient(clientData, meData);
-
+    setSubscriptionError(subscriptionResult.status === "rejected" ? trainerPaymentError(subscriptionResult.reason, "Nie udało się pobrać odnowień pakietu.") : null);
+    setUsageError(usageResult.status === "rejected" ? trainerPaymentError(usageResult.reason, "Nie udało się pobrać wykorzystania pakietu.") : null);
+    setCatalogError(catalogResult.status === "rejected" ? trainerPaymentError(catalogResult.reason, "Nie udało się pobrać oferty pakietów. Odśwież widok, aby wybrać kolejny pakiet.") : null);
+    setConfirmablePaymentIds(new Set(pendingResult.status === "fulfilled" ? pendingResult.value.map((payment) => payment.id) : []));
+    setPendingPaymentsError(pendingResult.status === "rejected" ? trainerPaymentError(pendingResult.reason, "Nie udało się sprawdzić wpłat oczekujących. Odśwież widok przed potwierdzeniem wpłaty.") : null);
     setClient(mappedClient);
     setBilling(billingData);
     setSubscription(subscriptionData);
-    setUsage(usageData);
+    setUsage(usageResult.status === "fulfilled" ? usageResult.value : null);
     setClientPayments(billingData.payments || []);
     setPaymentPage(1);
-    setPackages(
-      packagesData.filter(
-        (item) =>
-          item.isActive &&
-          packageMatchesClientLocation(item, mappedClient.locationId),
-      ),
-    );
-    setPaymentAmount(String(Math.max(billingData.activePackageAmountDue, 0)));
-    setPaymentPackageId(activeClientPackageId);
+    setPackages(catalogResult.status === "fulfilled" ? catalogResult.value.filter((item) => item.isActive && packageMatchesClientLocation(item, mappedClient.locationId)) : []);
+    setPaymentAmount(typeof billingData.activePackageAmountDue === "number" ? String(Math.max(billingData.activePackageAmountDue, 0)) : "");
+    setPaymentPackageId(billingData.activeClientPackageId ? String(billingData.activeClientPackageId) : "");
     setSelectedPackageId("");
-    setSelectedNextPackageId(
-      subscriptionData.nextPackage?.packageId
-        ? String(subscriptionData.nextPackage.packageId)
-        : "",
-    );
+    setSelectedNextPackageId(subscriptionData?.nextPackage?.packageId ? String(subscriptionData.nextPackage.packageId) : "");
   }
 
   async function handleConfirmRefund(reference: string) {
@@ -333,7 +342,7 @@ export default function ClientPaymentsPageClient({
   }
 
   async function handleSetNextPackage() {
-    if (!clientId || !selectedNextPackageId || basePath !== "/owner") return;
+    if (!clientId || !selectedNextPackageId || mutationLock.current || isLoading || (basePath === "/trainer" && (!subscription || catalogError))) return;
 
     const selectedPackage = packages.find(
       (item) => item.id === Number(selectedNextPackageId),
@@ -346,31 +355,35 @@ export default function ClientPaymentsPageClient({
       return;
     }
 
+    mutationLock.current = true;
     try {
       setIsSaving(true);
-      const data = await setClientNextPackage(clientId, selectedPackage.id);
+      const data = basePath === "/trainer"
+        ? await setTrainerPortalClientNextPackage(clientId, selectedPackage.id)
+        : await setClientNextPackage(clientId, selectedPackage.id);
 
       setSubscription(data);
       await loadClientPayments(clientId);
       setSelectedNextPackageId(
         data.nextPackage?.packageId
           ? String(data.nextPackage.packageId)
-          : String(selectedPackage.id),
+          : "",
       );
       showOwnerSuccess("Kolejny pakiet klienta został zapisany.", {
         id: "owner-client-next-package-set",
       });
     } catch (err) {
-      showOwnerError(err, "Nie udało się ustawić kolejnego pakietu.", {
+      showOwnerError(basePath === "/trainer" ? new Error(trainerPaymentError(err, "Nie udało się zapisać zmian. Spróbuj ponownie.")) : err, "Nie udało się ustawić kolejnego pakietu.", {
         id: "owner-client-next-package-error",
       });
     } finally {
+      mutationLock.current = false;
       setIsSaving(false);
     }
   }
 
   async function handleRequestCancelAfterCycle() {
-    if (!clientId || !subscription) return;
+    if (!clientId || !subscription || mutationLock.current || isLoading) return;
 
     if (subscription.cancelRenewalRequested) {
       showOwnerSuccess("Zakończenie po obecnym pakiecie jest już ustawione.", {
@@ -379,6 +392,7 @@ export default function ClientPaymentsPageClient({
       return;
     }
 
+    mutationLock.current = true;
     try {
       setIsSaving(true);
       const data =
@@ -391,16 +405,17 @@ export default function ClientPaymentsPageClient({
         id: "owner-client-cancel-after-cycle-updated",
       });
     } catch (err) {
-      showOwnerError(err, "Nie udało się ustawić zakończenia po pakiecie.", {
+      showOwnerError(basePath === "/trainer" ? new Error(trainerPaymentError(err, "Nie udało się zapisać zmian. Spróbuj ponownie.")) : err, "Nie udało się ustawić zakończenia po pakiecie.", {
         id: "owner-client-cancel-after-cycle-error",
       });
     } finally {
+      mutationLock.current = false;
       setIsSaving(false);
     }
   }
 
   async function handleResumeAutoRenew() {
-    if (!clientId || !subscription) return;
+    if (!clientId || !subscription || mutationLock.current || isLoading) return;
 
     if (subscription.autoRenewEnabled && !subscription.cancelRenewalRequested) {
       showOwnerSuccess("Automatyczne przedłużanie jest już aktywne.", {
@@ -409,6 +424,7 @@ export default function ClientPaymentsPageClient({
       return;
     }
 
+    mutationLock.current = true;
     try {
       setIsSaving(true);
       const data =
@@ -421,16 +437,17 @@ export default function ClientPaymentsPageClient({
         id: "owner-client-autorenew-resumed",
       });
     } catch (err) {
-      showOwnerError(err, "Nie udało się wznowić automatycznego przedłużania.", {
+      showOwnerError(basePath === "/trainer" ? new Error(trainerPaymentError(err, "Nie udało się zapisać zmian. Spróbuj ponownie.")) : err, "Nie udało się wznowić automatycznego przedłużania.", {
         id: "owner-client-autorenew-resume-error",
       });
     } finally {
+      mutationLock.current = false;
       setIsSaving(false);
     }
   }
 
   async function handleCreatePayment() {
-    if (!clientId) return;
+    if (!clientId || mutationLock.current || isLoading || !billing || loadError) return;
 
     const amount = Number(paymentAmount.replace(",", "."));
     const selectedPackage = packagesBilling.find(
@@ -451,13 +468,19 @@ export default function ClientPaymentsPageClient({
       return;
     }
 
-    if (!amount || amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0 || !/^\d+(?:[.,]\d{1,2})?$/.test(paymentAmount.trim())) {
       showOwnerError(new Error("Podaj poprawną kwotę wpłaty."), "", {
         id: "owner-client-payment-amount-invalid",
       });
       return;
     }
 
+    if (!paymentMethodOptions.some((option) => option.value === paymentMethod)) {
+      showOwnerError(new Error("Wybierz sposób płatności."), "");
+      return;
+    }
+
+    mutationLock.current = true;
     try {
       setIsSaving(true);
       const paymentPayload = {
@@ -466,7 +489,7 @@ export default function ClientPaymentsPageClient({
         amount,
         method: Number(paymentMethod) as PaymentMethod,
         paymentDate: new Date().toISOString(),
-        note: paymentNote.trim() || "Wpłata dodana w panelu.",
+        note: paymentNote.trim() || null,
       };
       const createdPayment =
         basePath === "/trainer"
@@ -480,16 +503,19 @@ export default function ClientPaymentsPageClient({
       setIsPaymentModalOpen(false);
       await loadClientPayments(clientId);
     } catch (err) {
-      showOwnerError(err, "Nie udało się dodać wpłaty.", {
+      showOwnerError(basePath === "/trainer" ? new Error(trainerPaymentError(err, "Nie udało się zapisać zmian. Spróbuj ponownie.")) : err, "Nie udało się dodać wpłaty.", {
         id: "owner-client-payment-create-error",
       });
     } finally {
+      mutationLock.current = false;
       setIsSaving(false);
     }
   }
 
   async function handleConfirmPayment(payment: ClientPayment) {
-    if (!clientId) return;
+    if (!clientId || mutationLock.current || isLoading || !billing || loadError) return;
+
+    if (basePath === "/trainer" && !confirmablePaymentIds.has(payment.id)) return;
 
     if (!isPendingPayment(payment)) {
       showOwnerSuccess("Ta wpłata nie wymaga potwierdzenia.", {
@@ -498,6 +524,7 @@ export default function ClientPaymentsPageClient({
       return;
     }
 
+    mutationLock.current = true;
     try {
       setProcessingPaymentId(payment.id);
       if (basePath === "/trainer") {
@@ -510,16 +537,17 @@ export default function ClientPaymentsPageClient({
       });
       await loadClientPayments(clientId);
     } catch (err) {
-      showOwnerError(err, "Nie udało się potwierdzić wpłaty.", {
+      showOwnerError(basePath === "/trainer" ? new Error(trainerPaymentError(err, "Nie udało się zapisać zmian. Spróbuj ponownie.")) : err, "Nie udało się potwierdzić wpłaty.", {
         id: `owner-client-payment-confirm-error-${payment.id}`,
       });
     } finally {
+      mutationLock.current = false;
       setProcessingPaymentId(null);
     }
   }
 
   async function handleIssueReceipt(payment: ClientPayment) {
-    if (!clientId) return;
+    if (!clientId || basePath !== "/owner") return;
 
     try {
       setProcessingPaymentId(payment.id);
@@ -538,7 +566,7 @@ export default function ClientPaymentsPageClient({
   }
 
   async function handleCancelReceipt(payment: ClientPayment) {
-    if (!clientId) return;
+    if (!clientId || basePath !== "/owner") return;
 
     try {
       setProcessingPaymentId(payment.id);
@@ -557,7 +585,7 @@ export default function ClientPaymentsPageClient({
   }
 
   async function handleReversePayment() {
-    if (!clientId || !paymentToReverse) return;
+    if (!clientId || !paymentToReverse || basePath !== "/owner") return;
 
     const reason = reversalReason.trim();
 
@@ -594,7 +622,7 @@ export default function ClientPaymentsPageClient({
     );
 
     if (selectedPackage) {
-      setPaymentAmount(String(Math.max(selectedPackage.amountDue, 0)));
+      setPaymentAmount(typeof selectedPackage.amountDue === "number" ? String(Math.max(selectedPackage.amountDue, 0)) : "");
     }
   }
 
@@ -622,7 +650,7 @@ export default function ClientPaymentsPageClient({
       ...packagesBilling.map((item) => ({
         value: String(item.clientPackageId),
         label: `${item.packageName || `Pakiet #${item.clientPackageId}`} · ${
-          item.amountDue > 0
+          typeof item.amountDue !== "number" ? "kwota niedostępna" : item.amountDue > 0
             ? `${formatMoney(item.amountDue, item.currency)} do zapłaty`
             : "opłacony"
         }`,
@@ -682,7 +710,7 @@ export default function ClientPaymentsPageClient({
             <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
           }
           onClick={() => loadClientPayments()}
-          disabled={isLoading || !clientId}
+          disabled={isLoading || isSaving || processingPaymentId !== null || !clientId}
         >
           Odśwież
         </Button>
@@ -694,7 +722,9 @@ export default function ClientPaymentsPageClient({
         </div>
       ) : null}
 
-      {billing ? (
+      {!isLoading && loadError ? <div role="alert" className="card-shell p-5 text-on-surface-variant">{loadError}</div> : null}
+
+      {billing && !isLoading && !(basePath === "/trainer" && loadError) ? (
         <>
           <section className="grid gap-3 md:grid-cols-4">
             <BillingStat
@@ -728,7 +758,7 @@ export default function ClientPaymentsPageClient({
                 <p className="text-section-title">Wpłaty klienta</p>
                 <p className="mt-2 max-w-[720px] text-sm leading-6 text-on-surface-variant">
                   Dodaj wpłatę do konkretnego pakietu. Jeśli kwota jest większa
-                  niż należność za pakiet, nadpłata przejdzie na saldo klienta.
+                  niż należność za pakiet, po potwierdzeniu wpłaty nadpłata zasili saldo klienta.
                 </p>
                 {!packagesBilling.length ? (
                   <p className="mt-3 text-sm font-semibold text-warning-light">
@@ -740,7 +770,7 @@ export default function ClientPaymentsPageClient({
                 size="lg"
                 icon={<ReceiptText size={17} />}
                 onClick={() => setIsPaymentModalOpen(true)}
-                disabled={isSaving || packagesBilling.length === 0}
+                disabled={isSaving || processingPaymentId !== null || isLoading || packagesBilling.length === 0}
                 className="w-full md:w-auto"
               >
                 Dodaj wpłatę
@@ -761,11 +791,13 @@ export default function ClientPaymentsPageClient({
                 </p>
               </div>
 
+              {pendingPaymentsError ? <p role="alert" className="px-5 pb-4 text-sm text-on-surface-variant">{pendingPaymentsError}</p> : null}
               <PaymentsList
                 payments={visiblePayments}
                 isLoading={false}
                 processingId={processingPaymentId}
                 showClient={false}
+                canConfirm={basePath === "/trainer" ? (payment) => confirmablePaymentIds.has(payment.id) : undefined}
                 emptyTitle="Brak wpłat klienta"
                 emptyMessage="Pierwsza wpłata pojawi się tutaj po jej dodaniu."
                 onConfirm={(payment) =>
@@ -804,7 +836,9 @@ export default function ClientPaymentsPageClient({
             {mainUsage ? <UsageCard usage={mainUsage} /> : null}
 
             <div className="grid min-w-0 gap-5">
-                <SubscriptionPanel
+                {catalogError ? <div role="alert" className="card-shell p-4 text-on-surface-variant">{catalogError}</div> : null}
+                {usageError ? <div role="alert" className="card-shell p-4 text-on-surface-variant">{usageError}</div> : null}
+                {subscriptionError ? <div role="alert" className="card-shell p-4 text-on-surface-variant">{subscriptionError}</div> : <SubscriptionPanel
                   subscription={mainSubscription}
                   activePackage={mainPackage}
                   isGroup={false}
@@ -814,14 +848,15 @@ export default function ClientPaymentsPageClient({
                   nextPackageOptions={nextPackageOptions}
                   clientLocationName={client?.locationName || "lokalizacji klienta"}
                   canAssignPackage={basePath === "/owner"}
-                  isSaving={isSaving}
+                  canSetNextPackage={basePath === "/owner" || !catalogError}
+                  isSaving={isSaving || processingPaymentId !== null}
                   onPackageChange={setSelectedPackageId}
                   onNextPackageChange={setSelectedNextPackageId}
                   onAssignPackage={handleAssignPackage}
                   onSetNextPackage={handleSetNextPackage}
                   onCancelAfterCycle={handleRequestCancelAfterCycle}
                   onResumeAutoRenew={handleResumeAutoRenew}
-                />
+                />}
             </div>
           </section>
         </>
@@ -831,7 +866,7 @@ export default function ClientPaymentsPageClient({
         open={isPaymentModalOpen}
         eyebrow="Wpłata klienta"
         title="Dodaj wpłatę"
-        description="Wybierz pakiet i wpisz kwotę. Nadpłata zostanie automatycznie przeniesiona na saldo klienta."
+        description="Wybierz pakiet i wpisz kwotę. Po potwierdzeniu wpłaty nadpłata zasili saldo klienta."
         amount={paymentAmount}
         packageId={paymentPackageId}
         method={paymentMethod}
@@ -847,7 +882,7 @@ export default function ClientPaymentsPageClient({
         onPackageChange={handlePaymentPackageChange}
         onMethodChange={setPaymentMethod}
         onNoteChange={setPaymentNote}
-        onClose={() => setIsPaymentModalOpen(false)}
+        onClose={() => { if (!mutationLock.current) setIsPaymentModalOpen(false); }}
         onSubmit={handleCreatePayment}
       />
       {basePath === "/owner" ? <RefundConfirmationModal refund={refundToConfirm} submitting={isConfirmingRefund} onClose={() => setRefundToConfirm(null)} onConfirm={handleConfirmRefund} /> : null}
@@ -857,7 +892,7 @@ export default function ClientPaymentsPageClient({
           payment={paymentAction.payment}
           processing={processingPaymentId === paymentAction.payment.id}
           {...getPaymentActionModalCopy(paymentAction.type)}
-          onClose={() => setPaymentAction(null)}
+          onClose={() => { if (!mutationLock.current) setPaymentAction(null); }}
           onConfirm={async () => {
             if (paymentAction.type === "confirm") {
               await handleConfirmPayment(paymentAction.payment);
@@ -938,6 +973,7 @@ function SubscriptionPanel({
   nextPackageOptions,
   clientLocationName,
   canAssignPackage,
+  canSetNextPackage,
   isSaving,
   onPackageChange,
   onNextPackageChange,
@@ -955,6 +991,7 @@ function SubscriptionPanel({
   nextPackageOptions: Array<{ value: string; label: string }>;
   clientLocationName: string;
   canAssignPackage: boolean;
+  canSetNextPackage: boolean;
   isSaving: boolean;
   onPackageChange: (value: string) => void;
   onNextPackageChange: (value: string) => void;
@@ -967,14 +1004,14 @@ function SubscriptionPanel({
   const willRenew = Boolean(subscription?.autoRenewEnabled && !cancelRequested);
   const activePackageName =
     activePackage?.packageName || "Brak aktywnego pakietu";
-  const amountDue = activePackage?.amountDue ?? 0;
-  const amountPaid = activePackage?.amountPaid ?? 0;
+  const amountDue = activePackage?.amountDue;
+  const amountPaid = activePackage?.amountPaid;
   const currency = activePackage?.currency || "PLN";
-  const totalSessions = activePackage?.totalSessions ?? 0;
-  const usedSessions = activePackage?.usedSessions ?? 0;
-  const progress = totalSessions
+  const totalSessions = activePackage?.totalSessions;
+  const usedSessions = activePackage?.usedSessions;
+  const progress = typeof totalSessions === "number" && totalSessions > 0 && typeof usedSessions === "number"
     ? Math.min(100, Math.round((usedSessions / totalSessions) * 100))
-    : 0;
+    : null;
   const hasActivePackage = Boolean(activePackage);
   const savedNextPackageId = subscription?.nextPackage?.packageId
     ? String(subscription.nextPackage.packageId)
@@ -989,10 +1026,9 @@ function SubscriptionPanel({
         <div className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-xl)] bg-primary/15 text-primary-light">
           <PackagePlus size={28} />
         </div>
-        <p className="mt-5 text-section-title">Ustaw pakiet klienta</p>
+        <p className="mt-5 text-section-title">{canAssignPackage ? "Ustaw pakiet klienta" : "Brak aktywnego pakietu"}</p>
         <p className="mt-3 max-w-[560px] text-sm leading-6 text-on-surface-variant">
-          Klient nie ma aktywnego pakietu. Wybierz jeden z pakietów dostępnych
-          w lokalizacji {clientLocationName}.
+          {canAssignPackage ? "Wybierz pakiet dostępny w lokalizacji " + clientLocationName + "." : "Klient nie ma obecnie aktywnego pakietu indywidualnego."}
         </p>
 
         {canAssignPackage ? (
@@ -1038,7 +1074,7 @@ function SubscriptionPanel({
             Aktualny pakiet, wykorzystanie wejść i status płatności.
           </p>
         </div>
-        <StatusPill label={activePackage?.isActive ? "Aktywny" : "Nieaktywny"} muted />
+        <StatusPill label={typeof activePackage?.isActive === "boolean" ? activePackage.isActive ? "Aktywny" : "Nieaktywny" : "Niedostępne"} muted />
       </div>
 
       <div className={`mt-4 grid gap-3 ${!isGroup && subscription ? "lg:grid-cols-2" : ""}`}>
@@ -1055,14 +1091,14 @@ function SubscriptionPanel({
               muted
             />
           </div>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-container-high">
+          {progress !== null ? <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-container-high">
             <div
               className="h-full rounded-full bg-tertiary-light"
               style={{ width: `${progress}%` }}
             />
-          </div>
+          </div> : null}
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
-            <SmallMetric label="Wejścia" value={`${usedSessions}/${totalSessions}`} />
+            <SmallMetric label="Wejścia" value={usedSessions !== undefined && totalSessions !== undefined ? `${usedSessions}/${totalSessions}` : "Niedostępne"} />
             <SmallMetric label="Zapłacono" value={formatMoney(amountPaid, currency)} />
             <SmallMetric label="Do zapłaty" value={formatMoney(amountDue, currency)} />
           </div>
@@ -1112,7 +1148,7 @@ function SubscriptionPanel({
         ) : null}
       </div>
 
-      {canAssignPackage && !isGroup && subscription ? (
+      {canSetNextPackage && !isGroup && subscription ? (
         <div className="mt-3 rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest/50 p-3">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
@@ -1183,11 +1219,11 @@ function BillingStat({
 
 function UsageCard({ usage }: { usage: SubscriptionUsage | null }) {
   const [showAllSessions, setShowAllSessions] = useState(false);
-  const totalSessions = usage?.totalSessions || 0;
-  const usedSessions = usage?.usedSessions || 0;
-  const progress = totalSessions
+  const totalSessions = usage?.totalSessions;
+  const usedSessions = usage?.usedSessions;
+  const progress = typeof totalSessions === "number" && totalSessions > 0 && typeof usedSessions === "number"
     ? Math.min(100, Math.round((usedSessions / totalSessions) * 100))
-    : 0;
+    : null;
   const allSessions = [...(usage?.sessions || [])].sort(
     (first, second) =>
       new Date(second.date).getTime() - new Date(first.date).getTime(),
@@ -1207,19 +1243,19 @@ function UsageCard({ usage }: { usage: SubscriptionUsage | null }) {
                   Użyte wejścia
                 </p>
                 <p className="mt-2 text-2xl font-semibold text-on-surface">
-                  {usedSessions}/{totalSessions}
+                  {usedSessions ?? "—"}/{totalSessions ?? "—"}
                 </p>
               </div>
               <p className="text-sm font-semibold text-tertiary-light">
-                zostało {usage.remainingSessions}
+                zostało {usage.remainingSessions ?? "—"}
               </p>
             </div>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-container-high">
+            {progress !== null ? <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-container-high">
               <div
                 className="h-full rounded-full bg-tertiary-light"
                 style={{ width: `${progress}%` }}
               />
-            </div>
+            </div> : null}
           </div>
 
           <div className="mt-3 grid grid-cols-3 gap-2">
@@ -1288,7 +1324,7 @@ function UsageCard({ usage }: { usage: SubscriptionUsage | null }) {
 }
 
 function getCreatedPaymentMessage(payment: ClientPayment) {
-  const breakdown = getPaymentBreakdown(payment);
+  const breakdown = payment;
 
   if (isPendingPayment(payment)) {
     return "Wpłata została dodana i oczekuje na potwierdzenie.";
@@ -1357,7 +1393,8 @@ function packageMatchesClientLocation(
   );
 }
 
-function formatMoney(amount: number, currency?: string | null) {
+function formatMoney(amount: number | null | undefined, currency?: string | null) {
+  if (typeof amount !== "number" || !Number.isFinite(amount)) return "Niedostępne";
   return `${amount.toLocaleString("pl-PL", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,

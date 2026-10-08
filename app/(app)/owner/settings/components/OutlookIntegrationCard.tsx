@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/app/lib/backend";
 import { userMessage } from "@/app/lib/user-messages";
 
 import { useEffect, useRef, useState } from "react";
@@ -44,7 +45,8 @@ function formatConnectedDate(value: string | null) {
   });
 }
 
-export default function OutlookIntegrationCard() {
+export default function OutlookIntegrationCard({ allowAdministration = true }: { allowAdministration?: boolean }) {
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [status, setStatus] = useState<OutlookStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -63,9 +65,11 @@ export default function OutlookIntegrationCard() {
   async function loadStatus() {
     try {
       setIsLoading(true);
+      setLoadError(null);
       const data = await getOutlookStatus();
       setStatus(data);
     } catch (err) {
+      setLoadError(getErrorMessage(err, "Nie udało się sprawdzić połączenia Outlook."));
       showAppError(err, "Nie udało się sprawdzić połączenia Outlook.", {
         id: "outlook-status-error",
       });
@@ -205,6 +209,7 @@ export default function OutlookIntegrationCard() {
   }
 
   async function handleSyncClients() {
+    if (!allowAdministration) return;
     try {
       setIsSyncing(true);
       await syncOutlookClients();
@@ -233,6 +238,7 @@ export default function OutlookIntegrationCard() {
   }
 
   async function handleReconcile() {
+    if (!allowAdministration) return;
     if (syncLock.current) return;
     syncLock.current = true;
     setIsReconciling(true);
@@ -253,6 +259,7 @@ export default function OutlookIntegrationCard() {
   }
 
   async function handleSeriesAction(id: string, action: "retry" | "delete") {
+    if (!allowAdministration) return;
     if (syncLock.current) return;
     syncLock.current = true;
     setSeriesAction({ id, action });
@@ -315,6 +322,7 @@ export default function OutlookIntegrationCard() {
         </div>
 
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap lg:max-w-[440px]">
+          {allowAdministration ? <>
           <Button
             icon={<RefreshCw size={16} className={isReconciling ? "animate-spin" : ""} />}
             onClick={handleReconcile}
@@ -343,12 +351,14 @@ export default function OutlookIntegrationCard() {
           >
             {isSyncing ? "Synchronizowanie kontaktów..." : "Synchronizuj kontakty"}
           </Button>
+          </> : null}
+          <Button variant="secondary" icon={<RefreshCw size={16} />} disabled={isLoading || isConnecting || isDisconnecting || busy} onClick={() => void loadStatus()}>Odśwież status</Button>
           {connected ? (
             <Button
               variant="outline"
               icon={<Unplug size={16} />}
               onClick={handleDisconnect}
-              disabled={isDisconnecting || isSyncing || busy}
+              disabled={isLoading || isConnecting || isDisconnecting || isSyncing || busy || Boolean(loadError)}
               className="w-full sm:w-auto"
             >
               {isDisconnecting ? "Odłączanie..." : "Odłącz"}
@@ -357,7 +367,7 @@ export default function OutlookIntegrationCard() {
             <Button
               icon={<ExternalLink size={16} />}
               onClick={handleConnect}
-              disabled={isLoading || isConnecting || isSyncing || busy}
+              disabled={isLoading || isConnecting || isSyncing || busy || Boolean(loadError)}
               className="w-full sm:w-auto"
             >
               {isConnecting ? "Przekierowanie..." : "Połącz Microsoft"}
@@ -366,6 +376,7 @@ export default function OutlookIntegrationCard() {
         </div>
       </div>
 
+      {loadError ? <p role="alert" className="mt-5 text-sm text-error-light">{loadError}</p> : null}
       <div className="mt-6 grid gap-3 md:grid-cols-3">
         <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">
           <p className="text-label text-on-surface-muted">Status</p>
@@ -377,7 +388,7 @@ export default function OutlookIntegrationCard() {
           >
             {isLoading
               ? "Sprawdzanie..."
-              : connected
+              : loadError ? "Nie udało się sprawdzić" : connected
                 ? "Połączono"
                 : "Niepołączono"}
           </p>
@@ -386,7 +397,7 @@ export default function OutlookIntegrationCard() {
         <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">
           <p className="text-label text-on-surface-muted">Konto</p>
           <p className="mt-2 truncate text-sm font-semibold text-on-surface">
-            {status?.email || "Brak połączonego konta"}
+            {loadError ? "Dane niedostępne" : status?.email || "Brak połączonego konta"}
           </p>
         </div>
 
@@ -431,7 +442,7 @@ export default function OutlookIntegrationCard() {
         </div>
       )}
 
-      {series.length > 0 && (
+      {allowAdministration && series.length > 0 && (
         <div className="mt-6 space-y-3">
           <h3 className="font-semibold">Serie wymagające uwagi</h3>
           {series.map((item) => {
@@ -457,7 +468,7 @@ export default function OutlookIntegrationCard() {
         </div>
       )}
 
-      {deleteTarget && (
+      {allowAdministration && deleteTarget && (
         <ModalOverlay onClose={() => { if (!busy) setDeleteTarget(null); }}>
           <div role="dialog" aria-modal="true" aria-label="Usunięcie błędnej serii"
             className="relative z-10 w-full max-w-lg overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient">

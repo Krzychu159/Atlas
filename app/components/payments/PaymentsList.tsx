@@ -15,7 +15,6 @@ import { PaymentStatusBadge } from "@/app/components/payments/PaymentDisplay";
 import { Button } from "@/app/components/ui/button";
 import { formatDateTime } from "@/app/lib/formatters/date";
 import {
-  getPaymentBreakdown,
   getPaymentMethodLabel,
   hasPaymentOverpayment,
   isPaymentConfirmed,
@@ -35,6 +34,7 @@ type PaymentsListProps<TPayment extends PaymentDisplaySource> = {
   emptyTitle?: string;
   emptyMessage?: string;
   onConfirm?: (payment: TPayment) => void;
+  canConfirm?: (payment: TPayment) => boolean;
   onReject?: (payment: TPayment) => void;
   onIssueReceipt?: (payment: TPayment) => void;
   onCancelReceipt?: (payment: TPayment) => void;
@@ -50,6 +50,7 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
   emptyTitle = "Brak płatności",
   emptyMessage = "Zmień filtry, aby zobaczyć więcej wyników.",
   onConfirm,
+  canConfirm,
   onReject,
   onIssueReceipt,
   onCancelReceipt,
@@ -110,7 +111,7 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
             showActions={hasActions}
             gridClass={gridClass}
             detailsHref={getDetailsHref?.(payment)}
-            onConfirm={onConfirm ? () => onConfirm(payment) : undefined}
+            onConfirm={onConfirm && (!canConfirm || canConfirm(payment)) ? () => onConfirm(payment) : undefined}
             onReject={onReject ? () => onReject(payment) : undefined}
             onIssueReceipt={
               onIssueReceipt ? () => onIssueReceipt(payment) : undefined
@@ -147,7 +148,6 @@ function PaymentListRow(props: PaymentListRowProps) {
   const rejected = isPaymentRejected(payment);
   const reversed = isPaymentReversed(payment);
   const receiptIssued = isPaymentReceiptIssued(payment);
-  const breakdown = getPaymentBreakdown(payment);
   const accentClass = pending
     ? "before:bg-warning-light"
     : rejected || reversed
@@ -182,16 +182,16 @@ function PaymentListRow(props: PaymentListRowProps) {
         </div>
         <div>
           <p className="text-sm font-semibold text-on-surface">
-            {formatMoney(breakdown.amount, payment.currency)}
+            {formatMoney(payment.amount, payment.currency)}
           </p>
           {hasPaymentOverpayment(payment) ? (
             <p className="mt-1 text-xs text-tertiary-light">
-              +{formatMoney(breakdown.balanceCreditAmount, payment.currency)} na
+              +{formatMoney(payment.balanceCreditAmount, payment.currency)} na
               saldo
             </p>
           ) : (
             <p className="mt-1 text-xs text-on-surface-muted">
-              Rozliczono z pakietem
+              {pending ? "Oczekuje na potwierdzenie" : rejected || reversed ? "Wpłata nierozliczona" : confirmed && typeof payment.appliedToPackageAmount === "number" && payment.appliedToPackageAmount > 0 ? "Rozliczono z pakietem" : "Brak danych o rozliczeniu"}
             </p>
           )}
         </div>
@@ -224,7 +224,7 @@ function PaymentListRow(props: PaymentListRowProps) {
           </div>
           <div className="shrink-0 text-right">
             <p className="text-base font-bold text-on-surface">
-              {formatMoney(breakdown.amount, payment.currency)}
+              {formatMoney(payment.amount, payment.currency)}
             </p>
             <div className="mt-2 flex justify-end">
               <PaymentStatusBadge payment={payment} />
@@ -236,7 +236,7 @@ function PaymentListRow(props: PaymentListRowProps) {
           <PaymentMethod method={payment.method} />
           {hasPaymentOverpayment(payment) ? (
             <span className="text-tertiary-light">
-              +{formatMoney(breakdown.balanceCreditAmount, payment.currency)} na
+              +{formatMoney(payment.balanceCreditAmount, payment.currency)} na
               saldo
             </span>
           ) : null}
@@ -451,7 +451,8 @@ function PaymentMethod({ method }: { method?: number | null }) {
   );
 }
 
-function formatMoney(amount: number, currency?: string | null) {
+function formatMoney(amount: number | null | undefined, currency?: string | null) {
+  if (typeof amount !== "number" || !Number.isFinite(amount)) return "Brak danych";
   return `${amount.toLocaleString("pl-PL", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,

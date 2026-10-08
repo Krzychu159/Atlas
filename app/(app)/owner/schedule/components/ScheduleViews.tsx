@@ -2,20 +2,19 @@
 
 import { MapPin, Plus, UserRound } from "lucide-react";
 import { getSessionOutlookColor } from "@/app/lib/calendar/outlook-colors";
-import type { OwnerSession } from "@/app/lib/owner/sessions";
+import type { CalendarSession } from "../types";
 import {
   dayNames,
   formatDayLabel,
   formatFullDate,
   formatTime,
-  isSameDay,
   shortDayNames,
 } from "../date-utils";
 import { getSessionTitle, getToneClasses } from "../session-utils";
 import { LoadingState } from "./ScheduleStates";
 import SessionMetaChip from "./SessionMetaChip";
 
-export function WeekSchedule({
+export function WeekSchedule<TSession extends CalendarSession>({
   days,
   sessions,
   isLoading,
@@ -23,20 +22,20 @@ export function WeekSchedule({
   onCreateSession,
 }: {
   days: Date[];
-  sessions: OwnerSession[];
+  sessions: TSession[];
   isLoading: boolean;
-  onSelectSession: (session: OwnerSession) => void;
-  onCreateSession: (date: Date) => void;
+  onSelectSession: (session: TSession) => void;
+  onCreateSession?: (date: Date) => void;
 }) {
   return (
     <section className="card-shell overflow-hidden p-4">
       {isLoading ? (
         <LoadingState />
       ) : (
-        <div className="grid gap-3 lg:grid-cols-3 2xl:grid-cols-6">
+        <div className={days.length === 7 ? "grid gap-3 lg:grid-cols-3 2xl:grid-cols-7" : "grid gap-3 lg:grid-cols-3 2xl:grid-cols-6"}>
           {days.map((day) => {
             const daySessions = sessions.filter((session) =>
-              isSameDay(new Date(session.startAt), day),
+              overlapsDay(session, day),
             );
 
             return (
@@ -69,16 +68,10 @@ export function WeekSchedule({
                           onSelect={onSelectSession}
                         />
                       ))}
-                      <AddSessionCard
-                        compact
-                        onClick={() => onCreateSession(day)}
-                      />
+                      {onCreateSession ? <AddSessionCard compact onClick={() => onCreateSession(day)} /> : null}
                     </>
                   ) : (
-                    <AddSessionCard
-                      compact
-                      onClick={() => onCreateSession(day)}
-                    />
+                    onCreateSession ? <AddSessionCard compact onClick={() => onCreateSession(day)} /> : <p className="py-4 text-xs text-on-surface-muted">Brak zajęć</p>
                   )}
                 </div>
               </div>
@@ -90,7 +83,7 @@ export function WeekSchedule({
   );
 }
 
-export function DaySchedule({
+export function DaySchedule<TSession extends CalendarSession>({
   date,
   sessions,
   isLoading,
@@ -98,13 +91,13 @@ export function DaySchedule({
   onCreateSession,
 }: {
   date: Date;
-  sessions: OwnerSession[];
+  sessions: TSession[];
   isLoading: boolean;
-  onSelectSession: (session: OwnerSession) => void;
-  onCreateSession: (date: Date) => void;
+  onSelectSession: (session: TSession) => void;
+  onCreateSession?: (date: Date) => void;
 }) {
   const daySessions = sessions.filter((session) =>
-    isSameDay(new Date(session.startAt), date),
+    overlapsDay(session, date),
   );
 
   return (
@@ -133,24 +126,24 @@ export function DaySchedule({
                 onSelect={onSelectSession}
               />
             ))}
-            <AddSessionCard onClick={() => onCreateSession(date)} />
+            {onCreateSession ? <AddSessionCard onClick={() => onCreateSession(date)} /> : null}
           </>
-        ) : (
+        ) : onCreateSession ? (
           <AddSessionCard onClick={() => onCreateSession(date)} />
-        )}
+        ) : <p className="text-sm text-on-surface-muted">Brak zajęć</p>}
       </div>
     </section>
   );
 }
 
-function SessionCard({
+function SessionCard<TSession extends CalendarSession>({
   session,
   compact,
   onSelect,
 }: {
-  session: OwnerSession;
+  session: TSession;
   compact?: boolean;
-  onSelect: (session: OwnerSession) => void;
+  onSelect: (session: TSession) => void;
 }) {
   const color = getSessionOutlookColor(session);
   return (
@@ -231,4 +224,10 @@ function AddSessionCard({
       Dodaj sesję
     </button>
   );
+}
+
+function overlapsDay(session: CalendarSession, day: Date) {
+  const start = new Date(day); start.setHours(0, 0, 0, 0);
+  const end = new Date(start); end.setDate(end.getDate() + 1);
+  return Date.parse(session.startAt) < end.getTime() && Date.parse(session.endAt) > start.getTime();
 }

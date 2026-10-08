@@ -23,13 +23,13 @@ export default function TrainerSettingsPage() {
             <Settings2 size={18} />
           </div>
           <div>
-            <p className="text-section-title">Ustawienia systemowe</p>
+            <p className="text-section-title">Połączenie z kalendarzem</p>
             <p className="mt-1 text-sm text-on-surface-variant">
               Integracja i synchronizacja danych z Microsoft Outlook.
             </p>
           </div>
         </div>
-        <OutlookIntegrationCard />
+        <OutlookIntegrationCard allowAdministration={false} />
       </section>
     </div>
   );

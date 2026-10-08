@@ -4,7 +4,6 @@ import { useState } from "react";
 import { PaymentCompactRow } from "@/app/components/payments/PaymentDisplay";
 import { Button } from "@/app/components/ui/button";
 import { updateClient, type Client } from "@/app/lib/owner/clients";
-import { isForbiddenError } from "@/app/lib/backend";
 import {
   getTrainerPortalMe,
   updateTrainerPortalClient,
@@ -116,16 +115,13 @@ async function updateClientNotes(
   access: "owner" | "trainer",
   trainerMe?: TrainerPortalMe | null,
 ) {
-  try {
-    return await updateClient(client.id, payload);
-  } catch (err) {
-    if (access !== "trainer" || !isForbiddenError(err)) throw err;
-
+  if (access === "trainer") {
     const updated = await updateTrainerPortalClient(client.id, payload);
     const me = trainerMe || (await getTrainerPortalMe().catch(() => null));
 
     return trainerPortalClientToClient(updated, me);
   }
+  return updateClient(client.id, payload);
 }
 
 function PaymentHistory({ payments }: { payments: ClientPayment[] }) {

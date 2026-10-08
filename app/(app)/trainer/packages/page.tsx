@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/app/components/ui/button";
+import { trainerPaymentError } from "@/app/lib/trainer/payment-errors";
 import { Wallet } from "lucide-react";
 import { showAppError } from "@/app/components/ui/app-toast";
 import {
@@ -24,14 +26,17 @@ export default function TrainerPackagesPage() {
   const [sessionsFilter, setSessionsFilter] = useState<SessionsFilter>("all");
   const [durationFilter, setDurationFilter] = useState<DurationFilter>("all");
   const [sort, setSort] = useState<PackageSort>("newest");
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   async function loadPackages() {
     try {
       setIsLoading(true);
+      setLoadError(null);
       const data = await getTrainerPackages();
       setPackages(data.filter((item) => item.isActive));
     } catch (err) {
+      setLoadError(trainerPaymentError(err, "Nie udało się pobrać pakietów."));
       showAppError(err, "Nie udało się pobrać pakietów.", {
         id: "trainer-packages-load-error",
       });
@@ -91,6 +96,8 @@ export default function TrainerPackagesPage() {
         <div className="card-shell p-5 text-on-surface-variant">
           Ładowanie pakietów...
         </div>
+      ) : loadError ? (
+        <div role="alert" className="card-shell p-5 text-on-surface-variant">{loadError}<Button variant="secondary" className="mt-3" onClick={() => void loadPackages()}>Spróbuj ponownie</Button></div>
       ) : filteredPackages.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {filteredPackages.map((item) => (
@@ -99,7 +106,7 @@ export default function TrainerPackagesPage() {
         </div>
       ) : (
         <div className="card-shell p-8 text-center text-on-surface-variant">
-          Brak pakietów spełniających wybrane kryteria.
+          {packages.length ? "Brak pakietów spełniających wybrane kryteria." : "Obecnie nie ma pakietów w ofercie."}
         </div>
       )}
     </div>

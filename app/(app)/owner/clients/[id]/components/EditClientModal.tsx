@@ -33,7 +33,6 @@ import {
   type UpdateClientPayload,
 } from "@/app/lib/owner/clients";
 
-import { isForbiddenError } from "@/app/lib/backend";
 
 import {
   deleteClientAvatar,
@@ -584,75 +583,24 @@ function formatLocationLabel(location: Location) {
   );
 }
 
-async function getTrainersForEditModal(
-  access: "owner" | "trainer",
-  trainerMe?: TrainerPortalMe | null,
-) {
-  try {
-    return await getTrainers();
-  } catch (err) {
-    if (access !== "trainer" || !isForbiddenError(err)) {
-      throw err;
-    }
-
-    const me =
-      trainerMe ||
-      (await getTrainerPortalMe().catch(() => null));
-
-    const trainer = trainerPortalMeToTrainer(me);
-
-    return trainer ? [trainer] : [];
-  }
+async function getTrainersForEditModal(access: "owner" | "trainer", trainerMe?: TrainerPortalMe | null) {
+  if (access === "owner") return getTrainers();
+  const me = trainerMe || await getTrainerPortalMe();
+  const trainer = trainerPortalMeToTrainer(me);
+  return trainer ? [trainer] : [];
 }
 
-async function getLocationsForEditModal(
-  access: "owner" | "trainer",
-  trainerMe?: TrainerPortalMe | null,
-) {
-  try {
-    return await getLocations();
-  } catch (err) {
-    if (access !== "trainer" || !isForbiddenError(err)) {
-      throw err;
-    }
-
-    const me =
-      trainerMe ||
-      (await getTrainerPortalMe().catch(() => null));
-
-    return trainerPortalMeToLocations(me);
-  }
+async function getLocationsForEditModal(access: "owner" | "trainer", trainerMe?: TrainerPortalMe | null) {
+  if (access === "owner") return getLocations();
+  return trainerPortalMeToLocations(trainerMe || await getTrainerPortalMe());
 }
 
-async function getTrainingPlanForEditModal(
-  clientId: number,
-  access: "owner" | "trainer",
-) {
-  try {
-    return await getClientTrainingPlan(clientId);
-  } catch (err) {
-    if (access !== "trainer" || !isForbiddenError(err)) {
-      throw err;
-    }
-
-    return getTrainerPortalClientTrainingPlan(clientId);
-  }
+async function getTrainingPlanForEditModal(clientId: number, access: "owner" | "trainer") {
+  return access === "trainer" ? getTrainerPortalClientTrainingPlan(clientId) : getClientTrainingPlan(clientId);
 }
 
-async function updateClientForEditModal(
-  clientId: number,
-  payload: UpdateClientPayload,
-  access: "owner" | "trainer",
-) {
-  try {
-    return await updateClient(clientId, payload);
-  } catch (err) {
-    if (access !== "trainer" || !isForbiddenError(err)) {
-      throw err;
-    }
-
-    return updateTrainerPortalClient(clientId, payload);
-  }
+async function updateClientForEditModal(clientId: number, payload: UpdateClientPayload, access: "owner" | "trainer") {
+  return access === "trainer" ? updateTrainerPortalClient(clientId, payload) : updateClient(clientId, payload);
 }
 
 async function getConfirmedClientForEditModal(
@@ -674,23 +622,8 @@ async function getConfirmedClientForEditModal(
   return getClient(clientId);
 }
 
-async function updateTrainingPlanForEditModal(
-  clientId: number,
-  payload: UpdateClientTrainingPlanPayload,
-  access: "owner" | "trainer",
-) {
-  try {
-    return await updateClientTrainingPlan(clientId, payload);
-  } catch (err) {
-    if (access !== "trainer" || !isForbiddenError(err)) {
-      throw err;
-    }
-
-    return updateTrainerPortalClientTrainingPlan(
-      clientId,
-      payload,
-    );
-  }
+async function updateTrainingPlanForEditModal(clientId: number, payload: UpdateClientTrainingPlanPayload, access: "owner" | "trainer") {
+  return access === "trainer" ? updateTrainerPortalClientTrainingPlan(clientId, payload) : updateClientTrainingPlan(clientId, payload);
 }
 
 function normalizeLocationName(value?: string | null) {

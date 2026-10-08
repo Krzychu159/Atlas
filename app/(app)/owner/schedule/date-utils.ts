@@ -87,7 +87,7 @@ export function formatFullDate(value: Date) {
   });
 }
 
-export function getPeriod(view: ScheduleView, anchorDate: Date) {
+export function getPeriod(view: ScheduleView, anchorDate: Date, includeSunday = false) {
   if (view === "day") {
     const from = startOfDay(anchorDate);
     const to = endOfDay(anchorDate);
@@ -102,7 +102,7 @@ export function getPeriod(view: ScheduleView, anchorDate: Date) {
   }
 
   const from = startOfWeek(anchorDate);
-  const saturday = addDays(from, 5);
+  const saturday = addDays(from, includeSunday ? 6 : 5);
   const to = endOfDay(saturday);
 
   return {

@@ -14,6 +14,7 @@ export type TrainerPackage = {
   participantsCount: number;
   packageType?: PackageType | null;
   locationId?: number | null;
+  locationIds?: number[] | null;
   locationName?: string | null;
   isActive: boolean;
   createdAt: string;

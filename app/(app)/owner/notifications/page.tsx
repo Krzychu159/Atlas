@@ -116,7 +116,7 @@ function NotificationsList({ initialCategory, initialRead, notificationId }: { i
             <LoaderCircle size={18} className="animate-spin" />
             Pobieranie powiadomień…
           </div>
-        ) : items.length === 0 ? (
+        ) : items.length === 0 && !error ? (
           <div className="mt-12 flex flex-col items-center rounded-[var(--radius-xl)] bg-surface-container px-6 py-16 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-container-high text-on-surface-muted">
               <BellOff size={22} />
@@ -127,7 +127,7 @@ function NotificationsList({ initialCategory, initialRead, notificationId }: { i
               miejscu.
             </p>
           </div>
-        ) : (
+        ) : items.length > 0 ? (
           <div className="mt-5 flex flex-col gap-2">
             {items.map(item => (
               <NotificationItem key={item.id} item={item} role={role}
@@ -141,7 +141,7 @@ function NotificationsList({ initialCategory, initialRead, notificationId }: { i
               />
             ))}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

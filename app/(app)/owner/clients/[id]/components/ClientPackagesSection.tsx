@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { CalendarDays, Dumbbell, MapPin, UsersRound } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { getPackageClosureLabel, getPackageOriginLabel, getPackagePaymentStatusLabel, type ClientPackageBilling } from "@/app/lib/owner/billing";
-import { formatMoney } from "@/app/lib/formatters/money";
+import { formatMoney as formatKnownMoney } from "@/app/lib/formatters/money";
 import { userTrainingType } from "@/app/lib/user-messages";
 import PackageManagementModal from "./PackageManagementModal";
 import ImportClientPackageModal from "./ImportClientPackageModal";
@@ -94,6 +94,8 @@ export default function ClientPackagesSection({
     await onSaved?.();
   }
 
+  if (packages === undefined) return <section className="card-shell p-5 md:p-6"><p className="text-section-title">Pakiety klienta</p><p className="mt-4 text-sm text-on-surface-variant">Dane pakietów są obecnie niedostępne.</p></section>;
+
   return (
     <section className="card-shell p-5 md:p-6">
       <div>
@@ -109,11 +111,7 @@ export default function ClientPackagesSection({
       {groupPackages.length ? <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{groupPackages.map((item) => <ClientPackageCard key={item.clientPackageId} packageData={item} highlighted={item.clientPackageId === highlightedId} onManage={clientId && onSaved ? () => setManagedPackage(item) : undefined} />)}</div> : <p className="mt-4 text-sm text-on-surface-variant">Brak pakietów grupowych.</p>}
       <h2 className="mt-6 text-section-title">Pozostałe pakiety indywidualne</h2>
 
-      {packages === undefined ? (
-        <div className="mt-5 rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 text-sm text-on-surface-variant">
-          Dane pakietów są obecnie niedostępne.
-        </div>
-      ) : visiblePackages.length ? (
+      {visiblePackages.length ? (
         <>
           <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {visiblePackages.map((packageData) => (
@@ -190,9 +188,9 @@ function ClientPackageCard({
       </p>
 
       <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-        <div><dt className="text-on-surface-muted">Typ</dt><dd>{userTrainingType(String(packageData.expectedBillingType), packageKind === "group" ? "Grupowy" : "Indywidualny / semi")}</dd></div>
+        <div><dt className="text-on-surface-muted">Typ</dt><dd>{userTrainingType(String(packageData.expectedBillingType), packageKind === "group" ? "Grupowy" : packageKind === "main" ? "Indywidualny / semi" : "Brak danych")}</dd></div>
         <div><dt className="text-on-surface-muted">Cena</dt><dd>{formatMoney(packageData.totalPrice, packageData.currency || "PLN")}</dd></div>
-        <div><dt className="text-on-surface-muted">Pozostałe wejścia</dt><dd>{packageData.remainingSessions}</dd></div>
+        <div><dt className="text-on-surface-muted">Pozostałe wejścia</dt><dd>{packageData.remainingSessions ?? "Brak danych"}</dd></div>
         <div><dt className="text-on-surface-muted">Ważność</dt><dd>{formatPackageDate(packageData.validUntil)}</dd></div>
         <div><dt className="text-on-surface-muted">Termin płatności</dt><dd>{formatPackageDate(packageData.paymentDueDate)}</dd></div>
         <div><dt className="text-on-surface-muted">Płatność</dt><dd>{getPackagePaymentStatusLabel(packageData.paymentStatus)}</dd></div>
@@ -215,7 +213,7 @@ function ClientPackageCard({
         <div>
           <p className="text-label text-on-surface-muted">Wykorzystanie</p>
           <p className="mt-1 text-sm font-semibold">
-            {packageData.usedSessions}/{packageData.totalSessions}
+            {packageData.usedSessions ?? "—"}/{packageData.totalSessions ?? "—"}
           </p>
         </div>
         <div className="text-right">
@@ -255,9 +253,13 @@ function getTime(value?: string | null) {
 }
 
 function getPackageStatusLabel(packageData: ClientPackageBilling) {
-  return packageData.isActive ? "Aktywny" : "Nieaktywny";
+  return typeof packageData.isActive === "boolean" ? packageData.isActive ? "Aktywny" : "Nieaktywny" : "Brak danych";
 }
 
 function normalizeLocation(value?: string | null) {
   return (value || "").trim().toLowerCase();
+}
+
+function formatMoney(amount: number | null | undefined, currency?: string | null) {
+  return typeof amount === "number" && Number.isFinite(amount) ? formatKnownMoney(amount, currency) : "Brak danych";
 }

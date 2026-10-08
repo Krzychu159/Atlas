@@ -69,10 +69,10 @@ export function PaymentEntryModal({
     (option) => option.value === packageId,
   );
   const parsedAmount = Number(amount.replace(",", "."));
-  const amountDue = selectedPackage?.amountDue ?? 0;
+  const amountDue = selectedPackage?.amountDue;
   const currency = selectedPackage?.currency || "PLN";
   const overpayment =
-    Number.isFinite(parsedAmount) && parsedAmount > amountDue
+    typeof amountDue === "number" && Number.isFinite(amountDue) && Number.isFinite(parsedAmount) && parsedAmount > amountDue
       ? parsedAmount - amountDue
       : 0;
   const selectPackageOptions = packageOptions.length
@@ -80,14 +80,16 @@ export function PaymentEntryModal({
     : [{ value: "", label: "Brak pakietu do wyboru" }];
   const canSubmit =
     packageOptions.length > 0 &&
-    Boolean(packageId) &&
+    Boolean(selectedPackage) &&
+    methodOptions.some((option) => option.value === method) &&
+    /^\d+(?:[.,]\d{1,2})?$/.test(amount.trim()) &&
     Number.isFinite(parsedAmount) &&
     parsedAmount > 0 &&
     !isSubmitting;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onSubmit();
+    if (canSubmit) onSubmit();
   }
 
   return (
@@ -141,7 +143,7 @@ export function PaymentEntryModal({
                 ) : null}
                 {overpayment > 0 ? (
                   <p className="mt-1 text-xs font-semibold text-tertiary-light">
-                    Nadpłata zasili saldo klienta i obniży kolejny pakiet.
+                    Po potwierdzeniu wpłaty nadpłata zasili saldo klienta.
                   </p>
                 ) : null}
               </div>

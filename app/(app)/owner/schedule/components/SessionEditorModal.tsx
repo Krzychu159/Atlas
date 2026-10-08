@@ -26,7 +26,7 @@ import {
   normalizeSearch,
 } from "../client-utils";
 import { toDateTimeLocalValue } from "../date-utils";
-import { statusOptions } from "../options";
+import { sessionTypeOptions, statusOptions } from "../options";
 import {
   getDefaultFormValues,
   generatePublicSessionSlug,
@@ -46,6 +46,7 @@ export default function SessionEditorModal({
   locations,
   clients,
   defaultTrainerId,
+  trainerAccess = false,
   allowPublicSessions = false,
   allowRecurringSessions = false,
   allowCorrectionHistory = false,
@@ -60,6 +61,7 @@ export default function SessionEditorModal({
   locations: Location[];
   clients: Client[];
   defaultTrainerId?: number | null;
+  trainerAccess?: boolean;
   allowPublicSessions?: boolean;
   allowRecurringSessions?: boolean;
   allowCorrectionHistory?: boolean;
@@ -76,6 +78,8 @@ export default function SessionEditorModal({
       defaultTrainerId,
     }),
   );
+  const [countsAgainstPackage, setCountsAgainstPackage] = useState(true);
+  const [sessionsCharged, setSessionsCharged] = useState("1");
   const [repeat, setRepeat] = useState(false);
   const [frequency, setFrequency] = useState<SessionRecurrence["frequency"]>("Weekly");
   const [interval, setInterval] = useState("1");
@@ -112,7 +116,7 @@ export default function SessionEditorModal({
   const clientQuery = normalizeSearch(clientSearch);
   const activeClients = clients.filter(
     (client) =>
-      selectedClientIds.has(String(client.id)) ||
+      trainerAccess || selectedClientIds.has(String(client.id)) ||
       isActiveClientForSession(client),
   );
   const orderedClients = [...activeClients].sort((first, second) => {
@@ -153,7 +157,7 @@ export default function SessionEditorModal({
     setValues((current) => ({
       ...current,
       startAt: value,
-      endAt: getOneHourLaterDateTimeLocal(value) || current.endAt,
+      endAt: session ? current.endAt : getOneHourLaterDateTimeLocal(value) || current.endAt,
       publicSlug:
         current.isPubliclyBookable && !isSlugEdited
           ? generatePublicSessionSlug(current.title, value)
@@ -218,7 +222,7 @@ export default function SessionEditorModal({
         onSubmit={(event) => {
           event.preventDefault();
           if (isSaving) return;
-          onSubmit(values, allowRecurringSessions && !session && repeat ? {
+          onSubmit(trainerAccess ? { ...values, newParticipantCountsAgainstPackage: countsAgainstPackage, newParticipantSessionsCharged: sessionsCharged } : values, allowRecurringSessions && !session && repeat ? {
             frequency,
             interval: Number(interval),
             daysOfWeek: frequency === "Weekly" ? daysOfWeek : [],
@@ -281,7 +285,7 @@ export default function SessionEditorModal({
             <Field label="Tytuł" className="md:col-span-2">
               <input
                 value={values.title}
-                required={values.isPubliclyBookable}
+                required={trainerAccess || values.isPubliclyBookable}
                 onChange={(event) => updateTitle(event.target.value)}
                 placeholder={
                   values.isPubliclyBookable
@@ -327,6 +331,7 @@ export default function SessionEditorModal({
             <Field label="Start">
               <NativeDateInput
                 type="datetime-local"
+                required
                 value={values.startAt}
                 onChange={(event) => updateStartAt(event.target.value)}
                 className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
@@ -461,7 +466,7 @@ export default function SessionEditorModal({
             <Field label="Status" className="md:col-span-2">
               <CustomSelect
                 value={values.status}
-                options={session?.status === "Completed" ? statusOptions.filter((option) => ["Completed", "Planned", "Cancelled"].includes(option.value)) : statusOptions}
+                options={trainerAccess ? statusOptions.filter(option => ["", "Planned", "Active"].includes(option.value)).map(option => option.value ? option : { ...option, label: "Wybierz status" }) : session?.status === "Completed" ? statusOptions.filter((option) => ["Completed", "Planned", "Cancelled"].includes(option.value)) : statusOptions}
                 onChange={(value) => updateValue("status", value)}
               />
             </Field>
@@ -485,15 +490,21 @@ export default function SessionEditorModal({
               </>
             )}
 
-            {/*
-          <Field label="Typ sesji">
+            {trainerAccess ? <>
+          <Field label="Rodzaj zajęć">
             <CustomSelect
               value={values.plannedSessionType}
               options={sessionTypeOptions}
               onChange={(value) => updateValue("plannedSessionType", value)}
             />
           </Field>
-          */}
+          {values.participantIds.length > 0 ? <fieldset className="min-w-0 md:col-span-2"><legend className="mb-2 text-label text-on-surface-muted">Rozliczenie wybranych uczestników</legend>
+            <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">
+              <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={countsAgainstPackage} onChange={event => setCountsAgainstPackage(event.target.checked)} className="h-5 w-5 accent-primary" />Wejścia z pakietu</label>
+              <label className="mt-3 block text-sm text-on-surface-variant">Liczba wejść na uczestnika<input type="number" min="0" step="1" required value={sessionsCharged} onChange={event => setSessionsCharged(event.target.value)} className="mt-2 h-12 w-full rounded-[var(--radius-lg)] bg-surface-container px-4 text-on-surface" /></label>
+            </div>
+          </fieldset> : null}
+          </> : null}
 
             <Field label="Kategorie Outlook" className="md:col-span-2">
               <input
