@@ -1,22 +1,25 @@
 "use client";
 
+import SessionToggle from "@/app/components/schedule/SessionToggle";
+import SessionAccordion from "@/app/components/schedule/SessionAccordion";
+import { groupSeatsLabel } from "@/app/lib/group-sessions";
+import { userTrainingType } from "@/app/lib/user-messages";
+import GroupSessionDetails from "@/app/components/schedule/GroupSessionDetails";
+import BookingThresholdField from "@/app/components/schedule/BookingThresholdField";
 import { NativeDateInput } from "@/app/components/ui/native-date-input";
 
 import { useState, type ReactNode } from "react";
 import {
-  MapPin,
   Plus,
   Save,
   Search,
-  UserRound,
-  WalletCards,
   X,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import type { Client } from "@/app/lib/owner/clients";
 import type { Location } from "@/app/lib/owner/locations";
-import type { OwnerSession, SessionRecurrence } from "@/app/lib/owner/sessions";
+import type { SessionRecurrence } from "@/app/lib/owner/sessions";
 import type { Trainer } from "@/app/lib/owner/trainers";
 import {
   getClientDisplayName,
@@ -30,13 +33,11 @@ import { sessionTypeOptions, statusOptions } from "../options";
 import {
   getDefaultFormValues,
   generatePublicSessionSlug,
-  getSessionPackageName,
   getSessionStatusLabel,
   getSessionTitle,
 } from "../session-utils";
-import type { SessionFormValues } from "../types";
+import type { SessionEditorSession, SessionFormValues } from "../types";
 import SessionCorrectionHistory from "./SessionCorrectionHistory";
-import SessionMetaChip from "./SessionMetaChip";
 
 export default function SessionEditorModal({
   open,
@@ -55,7 +56,7 @@ export default function SessionEditorModal({
   onSubmit,
 }: {
   open: boolean;
-  session: OwnerSession | null;
+  session: SessionEditorSession | null;
   anchorDate: Date;
   trainers: Trainer[];
   locations: Location[];
@@ -91,13 +92,15 @@ export default function SessionEditorModal({
   const [isSlugEdited, setIsSlugEdited] = useState(
     Boolean(session?.publicSlug),
   );
-  const [privateSessionType] = useState(session?.plannedSessionType || "");
   const [isTitleEdited, setIsTitleEdited] = useState(() =>
     Boolean(session?.title),
   );
 
   if (!open) return null;
 
+  const readOnly = session?.canEdit === false || (trainerAccess && session != null && session.canEdit !== true);
+  const isGroupForm = values.plannedSessionType === "Group";
+  const typeOptions = sessionTypeOptions.some(option => option.value === values.plannedSessionType) ? sessionTypeOptions : [...sessionTypeOptions, { value: values.plannedSessionType, label: userTrainingType(values.plannedSessionType, "Obecny rodzaj zajęć") }];
   const trainerOptions = trainers.map((trainer) => ({
     value: String(trainer.id),
     label: trainer.fullName || `${trainer.firstName} ${trainer.lastName}`,
@@ -137,11 +140,7 @@ export default function SessionEditorModal({
       "pl",
     );
   });
-  const visibleClients = orderedClients.filter(
-    (client) =>
-      selectedClientIds.has(String(client.id)) ||
-      matchesClientSearch(client, clientQuery),
-  );
+  const visibleClients = orderedClients.filter(client => matchesClientSearch(client, clientQuery));
 
   function updateValue(
     key: Exclude<
@@ -177,11 +176,15 @@ export default function SessionEditorModal({
     }));
   }
 
+  function updateSessionType(value: string) {
+    setValues(current => ({ ...current, plannedSessionType: value, isPubliclyBookable: value === "Group" && current.isPubliclyBookable }));
+  }
+
   function togglePublicSession(checked: boolean) {
     setValues((current) => ({
       ...current,
       isPubliclyBookable: checked,
-      plannedSessionType: checked ? "Group" : privateSessionType,
+      plannedSessionType: checked ? "Group" : current.plannedSessionType,
       status: checked ? current.status || "Planned" : current.status,
       publicSlug:
         checked && !isSlugEdited
@@ -221,7 +224,7 @@ export default function SessionEditorModal({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          if (isSaving) return;
+          if (isSaving || readOnly) return;
           onSubmit(trainerAccess ? { ...values, newParticipantCountsAgainstPackage: countsAgainstPackage, newParticipantSessionsCharged: sessionsCharged } : values, allowRecurringSessions && !session && repeat ? {
             frequency,
             interval: Number(interval),
@@ -230,7 +233,8 @@ export default function SessionEditorModal({
             endDate: ending === "date" ? endDate : null,
           } : undefined);
         }}
-        className="relative z-10 flex max-h-[92vh] w-full max-w-[980px] flex-col overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient"
+        role="dialog" aria-modal="true" aria-label={session ? "Szczegóły i edycja zajęć" : "Dodaj zajęcia"}
+        className="atlas-session-editor relative z-10 flex max-h-[92vh] w-full max-w-[980px] flex-col overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient"
       >
         <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
           <div className="flex items-start justify-between gap-4">
@@ -258,30 +262,13 @@ export default function SessionEditorModal({
             </button>
           </div>
 
-          {session ? (
-            <div className="mt-5 grid gap-2 md:grid-cols-3">
-              <SessionMetaChip
-                icon={<UserRound size={14} />}
-                label="Trener"
-                value={session.trainerFullName || "Brak"}
-                tone="primary"
-              />
-              <SessionMetaChip
-                icon={<MapPin size={14} />}
-                label="Lokalizacja"
-                value={session.locationName || "Brak"}
-                tone="neutral"
-              />
-              <SessionMetaChip
-                icon={<WalletCards size={14} />}
-                label="Pakiet"
-                value={getSessionPackageName(session)}
-                tone="success"
-              />
-            </div>
-          ) : null}
-
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
+          {readOnly ? <p className="mt-4 text-sm text-on-surface-variant">Te zajęcia są dostępne tylko do podglądu.</p> : null}
+          {isGroupForm ? <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+            <span className="rounded-full bg-primary/15 px-3 py-1 font-semibold text-primary-light">Grupowe</span>
+            <span className="text-on-surface-variant">{session?.isGroupSession === true ? groupSeatsLabel(session) : values.participantIds.length + " wybranych" + (values.publicCapacity ? " · limit " + values.publicCapacity : "")}</span>
+            {session?.isGroupSession === true && session.isFullyBooked ? <span className="text-on-surface-variant">Brak miejsc</span> : null}
+          </div> : null}
+          <fieldset disabled={isSaving || readOnly} className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
             <Field label="Tytuł" className="md:col-span-2">
               <input
                 value={values.title}
@@ -297,36 +284,6 @@ export default function SessionEditorModal({
                 className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
               />
             </Field>
-
-            {allowPublicSessions && values.isPubliclyBookable && (
-              <>
-                <Field label="Limit miejsc">
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    required
-                    value={values.publicCapacity}
-                    onChange={(event) =>
-                      updateValue("publicCapacity", event.target.value)
-                    }
-                    className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
-                  />
-                </Field>
-                <Field label="Publiczny link">
-                  <input
-                    required
-                    value={values.publicSlug}
-                    onChange={(event) => {
-                      setIsSlugEdited(true);
-                      updateValue("publicSlug", event.target.value);
-                    }}
-                    placeholder="full-body-2026-09-10-18-00"
-                    className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
-                  />
-                </Field>
-              </>
-            )}
 
             <Field label="Start">
               <NativeDateInput
@@ -371,26 +328,41 @@ export default function SessionEditorModal({
               />
             </Field>
 
-            <Field
-              label={
-                values.isPubliclyBookable
-                  ? "Klienci sesji (opcjonalnie)"
-                  : "Klienci sesji"
-              }
-              className="md:col-span-2"
-            >
-              {session?.status === "Completed" && (
+            <Field label="Status">
+              <CustomSelect
+                value={values.status}
+                options={trainerAccess ? statusOptions.filter(option => ["", "Planned", "Active", "Cancelled", session?.status].includes(option.value)).map(option => option.value ? option : { ...option, label: "Wybierz status" }) : session?.status === "Completed" ? statusOptions.filter((option) => ["Completed", "Planned", "Cancelled"].includes(option.value)) : statusOptions}
+                onChange={(value) => updateValue("status", value)}
+              />
+            </Field>
+
+            <Field label="Rodzaj zajęć">
+              <CustomSelect value={values.plannedSessionType} options={typeOptions} onChange={updateSessionType} />
+            </Field>
+          </fieldset>
+          <div className="mt-4 space-y-3">
+            <SessionAccordion title="Uczestnicy" summary={values.participantIds.length + (readOnly ? " osób" : " wybranych")}>
+              {!readOnly ? <fieldset disabled={isSaving} className="min-w-0 space-y-4">
+            <div className="space-y-3">
+              {!trainerAccess && session?.status === "Completed" && (
                 <span className="mb-3 block text-xs text-on-surface-variant">
                   Zmianę uczestników lub typu rozliczenia zapisz osobno od pozostałych danych sesji.
                 </span>
               )}
-              {values.isPubliclyBookable && (
+              {trainerAccess && isGroupForm ? <span className="mb-3 block text-xs text-on-surface-variant">Możesz dodawać uczestników z listy swoich klientów.</span> : null}
+              {isGroupForm && (
                 <span className="mb-3 block text-xs text-on-surface-variant">
                   Możesz zapisać zajęcia bez klientów. Przy edycji istniejące
                   zapisy pozostaną bez zmian, dopóki nie zmienisz wyboru
                   uczestników.
                 </span>
               )}
+              {trainerAccess && session?.participants ? <div className="mb-3 max-h-40 space-y-2 overflow-y-auto overscroll-contain">
+                {session.participants.filter(participant => !clients.some(client => client.id === participant.clientId)).map(participant => <div key={participant.clientId} className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] bg-surface-container-low px-3 py-2">
+                  <span className="text-sm">{participant.clientFullName || "Uczestnik bez nazwy"}</span>
+                  <Button type="button" variant="secondary" onClick={() => toggleParticipant(String(participant.clientId))}>{selectedClientIds.has(String(participant.clientId)) ? "Usuń z zajęć" : "Przywróć wybór"}</Button>
+                </div>)}
+              </div> : null}
               <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-2">
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                   <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-md)] bg-surface-container px-3">
@@ -398,18 +370,19 @@ export default function SessionEditorModal({
                     <input
                       value={clientSearch}
                       onChange={(event) => setClientSearch(event.target.value)}
+                      aria-label="Szukaj uczestnika"
                       placeholder="Szukaj klienta..."
-                      className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-on-surface-muted"
+                      className="min-w-0 flex-1 rounded-[var(--radius-md)] px-3 py-2 text-sm outline-none placeholder:text-on-surface-muted"
                     />
                   </div>
                   <span className="shrink-0 rounded-full bg-surface-container px-3 py-2 text-xs font-semibold text-on-surface-variant">
-                    {values.participantIds.length}/{activeClients.length}
+                    {values.participantIds.length} wybranych
                   </span>
                 </div>
 
                 {activeClients.length ? (
                   visibleClients.length ? (
-                    <div className="mt-2 grid max-h-[260px] gap-2 overflow-y-auto md:grid-cols-2">
+                    <div className="mt-2 grid max-h-[260px] gap-2 overflow-y-auto overscroll-contain md:grid-cols-2">
                       {visibleClients.map((client) => {
                         const clientId = String(client.id);
                         const selected = selectedClientIds.has(clientId);
@@ -418,6 +391,7 @@ export default function SessionEditorModal({
                           <button
                             key={client.id}
                             type="button"
+                            aria-pressed={selected}
                             onClick={() => toggleParticipant(clientId)}
                             className={[
                               "flex min-w-0 items-center justify-between gap-3 rounded-[var(--radius-md)] border px-3 py-2 text-left transition",
@@ -461,25 +435,86 @@ export default function SessionEditorModal({
                   </div>
                 )}
               </div>
-            </Field>
+            </div>
+            {trainerAccess ? <>
 
-            <Field label="Status" className="md:col-span-2">
-              <CustomSelect
-                value={values.status}
-                options={trainerAccess ? statusOptions.filter(option => ["", "Planned", "Active"].includes(option.value)).map(option => option.value ? option : { ...option, label: "Wybierz status" }) : session?.status === "Completed" ? statusOptions.filter((option) => ["Completed", "Planned", "Cancelled"].includes(option.value)) : statusOptions}
-                onChange={(value) => updateValue("status", value)}
+          {(!session || values.participantIds.some(id => !session.participants?.some(participant => participant.clientId === Number(id)))) && values.participantIds.length > 0 ? <fieldset className="min-w-0 md:col-span-2"><legend className="mb-2 text-label text-on-surface-muted">Rozliczenie wybranych uczestników</legend>
+            <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">
+              <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={countsAgainstPackage} onChange={event => setCountsAgainstPackage(event.target.checked)} className="h-5 w-5 accent-primary" />Wejścia z pakietu</label>
+              <label className="mt-3 block text-sm text-on-surface-variant">Liczba wejść na uczestnika<input type="number" min="0" step="1" required value={sessionsCharged} onChange={event => setSessionsCharged(event.target.value)} className="mt-2 h-12 w-full rounded-[var(--radius-lg)] bg-surface-container px-4 text-on-surface" /></label>
+            </div>
+          </fieldset> : null}
+          </> : null}
+
+              </fieldset> : null}
+              {session?.isGroupSession === true && readOnly ? <GroupSessionDetails key={session.id + ":" + session.updatedAt} session={session} trainerAccess={trainerAccess} participantsOnly showSummary={false} wrapParticipants={false} /> : session?.isGroupSession === true ? <SessionAccordion title="Szczegóły zapisów" summary={session.bookedSeats != null ? session.bookedSeats + " zapisanych" : undefined}>
+                <GroupSessionDetails key={session.id + ":" + session.updatedAt} session={session} trainerAccess={trainerAccess} participantsOnly showSummary={false} wrapParticipants={false} />
+              </SessionAccordion> : null}
+          {session?.isGroupSession !== true && session?.participants?.length ? (
+            <div className="mt-6 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
+              <p className="text-label text-on-surface-muted">Uczestnicy</p>
+              <div className="mt-3 grid max-h-[260px] gap-2 overflow-y-auto overscroll-contain md:grid-cols-2">
+                {session.participants.map((participant) => (
+                  <div
+                    key={participant.id}
+                    className="rounded-[var(--radius-md)] bg-surface-container px-3 py-2"
+                  >
+                    <p className="text-sm font-semibold text-on-surface">
+                      {participant.clientFullName ||
+                        `Klient #${participant.clientId}`}
+                    </p>
+                    <p className="mt-1 text-xs text-on-surface-muted">
+                      {participant.packageName || "Brak pakietu"} ·{" "}
+                      {participant.sessionsCharged} ses.
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+            </SessionAccordion>
+            {!readOnly || values.note.trim() ? <SessionAccordion title="Opis zajęć" summary={values.note.trim() ? "Uzupełniony" : undefined}>
+              <fieldset disabled={isSaving || readOnly} className="min-w-0">
+            <Field
+              label={isGroupForm ? "Opis zajęć" : "Notatka"}
+              className="md:col-span-2"
+            >
+              <textarea
+                value={values.note}
+                onChange={(event) => updateValue("note", event.target.value)}
+                rows={4}
+                className="w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3 text-sm outline-none"
               />
             </Field>
-
+              </fieldset>
+            </SessionAccordion> : null}
+            {isGroupForm && (!readOnly || values.eventRules.trim() || values.publicCapacity || values.isPubliclyBookable) ? <SessionAccordion title="Zasady uczestnictwa i rezerwacji">
+              <fieldset disabled={isSaving || readOnly} className="grid min-w-0 gap-4 md:grid-cols-2">
+            {isGroupForm ? <>
+              {!readOnly || values.publicCapacity ? <Field label={values.isPubliclyBookable ? "Limit uczestników" : "Limit uczestników (bez limitu: pozostaw puste)"}>
+                <input type="number" min="1" step="1" required={values.isPubliclyBookable} value={values.publicCapacity} onChange={event => updateValue("publicCapacity", event.target.value)} className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+              </Field> : null}
+              {!readOnly || values.eventRules.trim() ? <Field label="Zasady uczestnictwa" className="md:col-span-2">
+                <textarea rows={4} value={values.eventRules} onChange={event => updateValue("eventRules", event.target.value)} className="w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+              </Field> : null}
+              {values.isPubliclyBookable && (!readOnly || values.registrationClosesBeforeMinutes !== "" || values.cancellationClosesBeforeMinutes !== "") ? <>
+              <BookingThresholdField label="Zamknięcie zapisów przed rozpoczęciem" value={values.registrationClosesBeforeMinutes} onChange={value => updateValue("registrationClosesBeforeMinutes", value)} />
+              <BookingThresholdField label="Anulowanie przed rozpoczęciem" value={values.cancellationClosesBeforeMinutes} onChange={value => updateValue("cancellationClosesBeforeMinutes", value)} />
+              </> : null}
+            </> : null}
+              </fieldset>
+            </SessionAccordion> : null}
+            {!readOnly || values.outlookCategories.trim() || (session?.status === "Completed" && !trainerAccess && (session.actualSessionType || session.plannedSessionType)) || values.isPubliclyBookable ? <SessionAccordion title="Ustawienia dodatkowe">
+              <fieldset disabled={isSaving || readOnly} className="grid min-w-0 gap-4 md:grid-cols-2">
             {session?.status === "Completed" && (
               <>
-                <Field label="Powód korekty" className="md:col-span-2">
+                {!readOnly ? <Field label="Powód korekty" className="md:col-span-2">
                   <textarea required value={values.correctionReason || ""} rows={2}
                     onChange={(event) => updateValue("correctionReason", event.target.value)}
                     className="w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3 text-sm outline-none" />
                   <span className="mt-2 block text-xs text-on-surface-variant">Korekta dotyczy tylko tego wystąpienia sesji. Rozliczenie zostanie przeliczone przez system.</span>
-                </Field>
-                {values.status === "Completed" && (
+                </Field> : null}
+                {values.status === "Completed" && !trainerAccess && (!readOnly || values.actualSessionType || session.actualSessionType || session.plannedSessionType) && (
                   <Field label="Typ rozliczenia" className="md:col-span-2">
                     <input value={values.actualSessionType ?? session.actualSessionType ?? session.plannedSessionType ?? ""}
                       onChange={(event) => updateValue("actualSessionType", event.target.value)}
@@ -490,23 +525,7 @@ export default function SessionEditorModal({
               </>
             )}
 
-            {trainerAccess ? <>
-          <Field label="Rodzaj zajęć">
-            <CustomSelect
-              value={values.plannedSessionType}
-              options={sessionTypeOptions}
-              onChange={(value) => updateValue("plannedSessionType", value)}
-            />
-          </Field>
-          {values.participantIds.length > 0 ? <fieldset className="min-w-0 md:col-span-2"><legend className="mb-2 text-label text-on-surface-muted">Rozliczenie wybranych uczestników</legend>
-            <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">
-              <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={countsAgainstPackage} onChange={event => setCountsAgainstPackage(event.target.checked)} className="h-5 w-5 accent-primary" />Wejścia z pakietu</label>
-              <label className="mt-3 block text-sm text-on-surface-variant">Liczba wejść na uczestnika<input type="number" min="0" step="1" required value={sessionsCharged} onChange={event => setSessionsCharged(event.target.value)} className="mt-2 h-12 w-full rounded-[var(--radius-lg)] bg-surface-container px-4 text-on-surface" /></label>
-            </div>
-          </fieldset> : null}
-          </> : null}
-
-            <Field label="Kategorie Outlook" className="md:col-span-2">
+            {!readOnly || values.outlookCategories.trim() ? <Field label="Kategorie Outlook" className="md:col-span-2">
               <input
                 value={values.outlookCategories}
                 onChange={(event) =>
@@ -515,28 +534,48 @@ export default function SessionEditorModal({
                 placeholder={outlookCategoryPlaceholder}
                 className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
               />
-            </Field>
+            </Field> : null}
 
-            <Field
-              label={values.isPubliclyBookable ? "Opis publiczny" : "Notatka"}
-              className="md:col-span-2"
-            >
-              <textarea
-                value={values.note}
-                onChange={(event) => updateValue("note", event.target.value)}
-                rows={4}
-                className="w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3 text-sm outline-none"
-              />
-            </Field>
-          </div>
+          {allowPublicSessions && isGroupForm && (!readOnly || values.isPubliclyBookable) && (
+            <div className="md:col-span-2">
+              <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4 md:col-span-2">
+                <label className="flex cursor-pointer items-center justify-between gap-4">
+                  <span>
+                    <span className="block font-semibold">
+                      Zajęcia publiczne
+                    </span>
+                    <span className="mt-1 block text-xs text-on-surface-variant">
+                      Widoczne w publicznym grafiku. Klienci mogą zapisywać się
+                      samodzielnie.
+                    </span>
+                  </span>
+                  <SessionToggle label="Zajęcia publiczne" checked={values.isPubliclyBookable} disabled={isSaving || readOnly} onChange={togglePublicSession} />
+                </label>
+              </div>
+            </div>
+          )}
+            {allowPublicSessions && values.isPubliclyBookable && (
+              <>
+                <Field label="Publiczny link">
+                  <input
+                    required
+                    value={values.publicSlug}
+                    onChange={(event) => {
+                      setIsSlugEdited(true);
+                      updateValue("publicSlug", event.target.value);
+                    }}
+                    placeholder="full-body-2026-09-10-18-00"
+                    className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
+                  />
+                </Field>
+              </>
+            )}
 
           {allowRecurringSessions && !session && (
-            <div className="mt-4 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
+            <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4 md:col-span-2">
               <label className="flex cursor-pointer items-center justify-between gap-4 font-semibold">
                 Powtarzaj
-                <input type="checkbox" role="switch" checked={repeat}
-                  onChange={(event) => setRepeat(event.target.checked)}
-                  className="h-6 w-6 shrink-0 accent-primary" />
+                <SessionToggle label="Powtarzaj zajęcia" checked={repeat} disabled={isSaving || readOnly} onChange={setRepeat} />
               </label>
               {repeat && (
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -588,54 +627,9 @@ export default function SessionEditorModal({
             </div>
           )}
 
-          {session?.participants?.length ? (
-            <div className="mt-6 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
-              <p className="text-label text-on-surface-muted">Uczestnicy</p>
-              <div className="mt-3 grid gap-2 md:grid-cols-2">
-                {session.participants.map((participant) => (
-                  <div
-                    key={participant.id}
-                    className="rounded-[var(--radius-md)] bg-surface-container px-3 py-2"
-                  >
-                    <p className="text-sm font-semibold text-on-surface">
-                      {participant.clientFullName ||
-                        `Klient #${participant.clientId}`}
-                    </p>
-                    <p className="mt-1 text-xs text-on-surface-muted">
-                      {participant.packageName || "Brak pakietu"} ·{" "}
-                      {participant.sessionsCharged} ses.
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {allowCorrectionHistory && session && <SessionCorrectionHistory sessionId={session.id} />}
-          <div className="mt-4">
-            {allowPublicSessions && (
-              <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4 md:col-span-2">
-                <label className="flex cursor-pointer items-center justify-between gap-4">
-                  <span>
-                    <span className="block font-semibold">
-                      Zajęcia publiczne
-                    </span>
-                    <span className="mt-1 block text-xs text-on-surface-variant">
-                      Widoczne w publicznym grafiku. Klienci mogą zapisywać się
-                      samodzielnie.
-                    </span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    role="switch"
-                    checked={values.isPubliclyBookable}
-                    onChange={(event) =>
-                      togglePublicSession(event.target.checked)
-                    }
-                    className="h-6 w-6 shrink-0 accent-primary"
-                  />
-                </label>
-              </div>
-            )}
+              </fieldset>
+            </SessionAccordion> : null}
+            {allowCorrectionHistory && !trainerAccess && session ? <SessionAccordion title="Historia korekt">{() => <SessionCorrectionHistory sessionId={session.id} />}</SessionAccordion> : null}
           </div>
         </div>
 
@@ -646,7 +640,7 @@ export default function SessionEditorModal({
           <Button
             type="submit"
             icon={session ? <Save size={16} /> : <Plus size={16} />}
-            disabled={isSaving}
+            disabled={isSaving || readOnly}
           >
             {isSaving
               ? "Zapisywanie..."

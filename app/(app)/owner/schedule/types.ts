@@ -1,6 +1,8 @@
-import type { OwnerSession } from "@/app/lib/owner/sessions";
+import type { TrainerSessionDetails } from "@/app/lib/trainer/portal";
+import type { OwnerSession, OwnerSessionParticipant } from "@/app/lib/owner/sessions";
 
-export type CalendarSession = { canEdit?: boolean } & Partial<OwnerSession> & Pick<OwnerSession, "id" | "title" | "note" | "startAt" | "endAt" | "status">;
+export type SessionEditorSession = OwnerSession | TrainerSessionDetails;
+export type CalendarSession = { canEdit?: boolean; locationId?: number | null; participants?: (Pick<OwnerSessionParticipant, "clientId" | "clientFullName" | "attendanceStatus"> & { packageName?: string | null })[] | null } & Partial<Omit<OwnerSession, "locationId" | "participants">> & Pick<OwnerSession, "id" | "title" | "note" | "startAt" | "endAt" | "status">;
 
 export type ScheduleView = "day" | "week";
 
@@ -31,4 +33,7 @@ export type SessionFormValues = {
   outlookCategories: string;
   participantIds: string[];
   note: string;
+  eventRules: string;
+  registrationClosesBeforeMinutes: string;
+  cancellationClosesBeforeMinutes: string;
 };

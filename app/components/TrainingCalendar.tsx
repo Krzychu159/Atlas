@@ -1,9 +1,10 @@
 "use client";
 
+import { groupSeatsLabel, type GroupSessionFields } from "@/app/lib/group-sessions";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 
-export type SessionEvent = {
+export type SessionEvent = GroupSessionFields & {
   id: string;
   title: string;
   start: string;
@@ -180,7 +181,8 @@ export default function TrainingCalendar({
           const data = arg.event.extendedProps as SessionEvent;
 
           return (
-            <div className="fc-custom-event fc-custom-event-dense">
+            <div className={"fc-custom-event fc-custom-event-dense" + (data.isGroupSession === true ? " rounded-lg ring-2 ring-primary-light/30" : "")}>
+              {data.isGroupSession === true ? <p className="flex flex-wrap gap-x-2 text-[10px] font-semibold text-primary-light"><span>Grupowe</span><span>{groupSeatsLabel(data)}</span>{data.isFullyBooked === true ? <span>Brak miejsc</span> : null}</p> : null}
               <p className="fc-custom-event-tag">{data.typ}</p>
               <p className="fc-custom-event-title">{arg.event.title}</p>
               <div className="fc-custom-event-footer">

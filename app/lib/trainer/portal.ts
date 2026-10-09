@@ -1,3 +1,4 @@
+import type { GroupSessionFields, GroupSessionSettings } from "../group-sessions";
 import { backendGet, backendPatch, backendPost, backendPut } from "../backend";
 import type {
   ClientSubscription,
@@ -23,7 +24,12 @@ export type TrainerPortalMe = {
   outlookCategoryName?: string | null;
 };
 
-export type TrainerPortalSession = OutlookSessionColors & {
+export type TrainerPortalSession = OutlookSessionColors & GroupSessionFields & {
+  locationId?: number;
+  isPubliclyBookable?: boolean;
+  publicCapacity?: number | null;
+  plannedSessionType?: string | null;
+  participants?: TrainerPortalSessionParticipant[] | null;
   outlookCategories?: string[] | null;
   sessionId: number;
   trainerId: number;
@@ -38,14 +44,22 @@ export type TrainerPortalSession = OutlookSessionColors & {
   status: string | null;
 };
 
+export type TrainerPortalSessionParticipant = {
+  clientId: number;
+  clientFullName: string | null;
+  attendanceStatus: string | null;
+  profileUrl?: string | null;
+};
+
 export type TrainerSessionParticipantPayload = {
   clientId: number;
   countsAgainstPackage: boolean;
   sessionsCharged: number;
-  note: string | null;
+  note?: string | null;
 };
 
 export type TrainerSessionParticipant = {
+  trainerProfileUrl?: string | null;
   id: number;
   clientId: number;
   clientFullName: string;
@@ -64,9 +78,9 @@ export type TrainerSessionParticipant = {
   note: string | null;
 };
 
-export type TrainerSessionDetails = OutlookSessionColors & {
+export type TrainerSessionDetails = OutlookSessionColors & GroupSessionFields & {
   id: number;
-  title: string;
+  title: string | null;
   note: string | null;
   startAt: string;
   endAt: string;
@@ -86,7 +100,7 @@ export type TrainerSessionDetails = OutlookSessionColors & {
   completedAt: string | null;
   participantsCount: number;
   clientsDisplayName: string | null;
-  participants: TrainerSessionParticipant[];
+  participants: TrainerSessionParticipant[] | null;
   createdAt: string;
   updatedAt: string;
   createdBy: number;
@@ -99,7 +113,7 @@ export type TrainerSessionDetails = OutlookSessionColors & {
   recurrenceInstanceNumber: number | null;
 };
 
-export type TrainerSessionPayload = {
+export type TrainerSessionPayload = GroupSessionSettings & {
   title: string;
   note: string | null;
   startAt: string;
@@ -111,11 +125,11 @@ export type TrainerSessionPayload = {
   publicSlug: string | null;
   publicCapacity: number | null;
   plannedSessionType: string | null;
-  outlookCategories: string[];
-  participants: TrainerSessionParticipantPayload[];
+  outlookCategories: string[] | null;
+  participants?: TrainerSessionParticipantPayload[] | null;
 };
 
-export type UpdateTrainerSessionPayload = TrainerSessionPayload & { correctionReason: string | null };
+export type UpdateTrainerSessionPayload = Partial<TrainerSessionPayload> & { correctionReason?: string | null };
 
 export type TrainerPortalClient = {
   clientId: number;
@@ -333,6 +347,18 @@ export function updateTrainerPortalSession(
     `trainer-portal/sessions/${sessionId}`,
     payload,
   );
+}
+
+export type TrainerGroupParticipantProfile = {
+  clientId: number;
+  fullName: string | null;
+  attendanceStatus: string | null;
+  sessionId: number;
+  locationId: number;
+};
+
+export function getTrainerGroupParticipantProfile(sessionId: number, clientId: number) {
+  return backendGet<TrainerGroupParticipantProfile>(`trainer-portal/sessions/${sessionId}/participants/${clientId}/profile`);
 }
 
 export function getTrainerPortalMe() {

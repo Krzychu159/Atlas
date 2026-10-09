@@ -1,34 +1,33 @@
 "use client";
 
+import SessionAccordion from "@/app/components/schedule/SessionAccordion";
+import GroupSessionDetails from "@/app/components/schedule/GroupSessionDetails";
+import { groupSeatsLabel } from "@/app/lib/group-sessions";
 import { Button } from "@/app/components/ui/button";
 import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
 import { getSessionStatusLabel } from "@/app/(app)/owner/schedule/session-utils";
 import { userTrainingType } from "@/app/lib/user-messages";
 import type { TrainerSessionDetails } from "@/app/lib/trainer/portal";
 
-export default function TrainerSessionDetailsModal({ session, onClose }: { session: TrainerSessionDetails; onClose: () => void }) {
+export default function TrainerSessionDetailsModal({ session, onClose, onEdit }: { session: TrainerSessionDetails; onClose: () => void; onEdit?: () => void }) {
   const participants = session.participants;
   return (
     <ModalOverlay onClose={onClose}>
       <div role="dialog" aria-modal="true" aria-label="Szczegóły zajęć" className="relative z-10 flex max-h-[92vh] w-full max-w-[1000px] flex-col overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient">
         <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
           <ModalHeader title={session.title || "Sesja treningowa"} description={dateLabel(session.startAt) + " – " + dateLabel(session.endAt)} onClose={onClose} />
-          <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Detail label="Trener" value={session.trainerFullName || "Brak danych"} />
             <Detail label="Lokalizacja" value={session.locationName || "Brak danych"} />
             <Detail label="Status" value={getSessionStatusLabel(session.status)} />
-            <Detail label="Rodzaj zajęć" value={userTrainingType(session.actualSessionType || session.plannedSessionType, "Brak danych")} />
-            <Detail label="Uczestnicy" value={numberLabel(session.participantsCount)} />
-            {session.isPubliclyBookable ? <>
-              <Detail label="Limit miejsc" value={numberLabel(session.publicCapacity)} />
-              <Detail label="Wolne miejsca" value={numberLabel(session.publicAvailableSpots)} />
-            </> : null}
-            {typeof session.locationLimit === "number" && session.locationLimit > 0 ? <Detail label="Limit lokalizacji" value={numberLabel(session.locationLimit)} /> : null}
+            <Detail label="Rodzaj zajęć" value={session.isGroupSession === true ? "Grupowe" : userTrainingType(session.actualSessionType || session.plannedSessionType, "Brak danych")} />
+            <Detail label="Uczestnicy" value={session.isGroupSession === true ? groupSeatsLabel(session) : numberLabel(session.participantsCount)} />
           </dl>
           {session.isLocationLimitExceeded === true ? <p className="mt-4 rounded-[var(--radius-lg)] bg-warning-container p-4 text-sm text-warning-light">Liczba uczestników przekracza limit lokalizacji.</p> : null}
-          {session.note ? <div className="mt-4 whitespace-pre-wrap rounded-[var(--radius-lg)] bg-surface-container-low p-4 text-sm text-on-surface-variant">{session.note}</div> : null}
-          <h2 className="mt-6 text-section-title">Uczestnicy zajęć</h2>
-          {Array.isArray(participants) ? participants.length ? <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <GroupSessionDetails key={session.id + ":" + session.updatedAt} session={session} trainerAccess showSummary={false} />
+          {session.isGroupSession !== true && session.note?.trim() ? <div className="mt-4"><SessionAccordion title="Opis zajęć"><p className="whitespace-pre-wrap break-words text-sm leading-6 text-on-surface-variant">{session.note}</p></SessionAccordion></div> : null}
+          {session.isGroupSession !== true ? <div className="mt-4"><SessionAccordion title="Uczestnicy" summary={Array.isArray(participants) ? participants.length + " osób" : undefined}>
+          {Array.isArray(participants) ? participants.length ? <div className="grid max-h-[320px] gap-3 overflow-y-auto overscroll-contain md:grid-cols-2">
             {participants.map((participant) => <article key={participant.id} className="min-w-0 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
               <h3 className="break-words font-semibold">{participant.clientFullName || "Uczestnik bez nazwy"}</h3>
               <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
@@ -43,16 +42,22 @@ export default function TrainerSessionDetailsModal({ session, onClose }: { sessi
               {participant.note ? <p className="mt-3 whitespace-pre-wrap break-words text-sm text-on-surface-variant">{participant.note}</p> : null}
             </article>)}
           </div> : <p className="mt-4 text-sm text-on-surface-variant">Brak zapisanych uczestników.</p> : <p className="mt-4 text-sm text-on-surface-variant">Lista uczestników jest niedostępna.</p>}
-          <p className="mt-5 text-sm text-on-surface-muted">{session.canEdit === true ? "Zmiany w istniejących zajęciach ustal z właścicielem studia." : "Te zajęcia są dostępne tylko do podglądu."}</p>
+          </SessionAccordion></div> : null}
+          {(session.isGroupSession === true && (session.availableSeats != null || session.isPubliclyBookable)) || session.locationLimit > 0 ? <div className="mt-4"><SessionAccordion title="Ustawienia dodatkowe"><dl className="grid gap-3 text-sm sm:grid-cols-2">
+            {session.isGroupSession === true && session.availableSeats != null ? <ParticipantDetail label="Wolne miejsca" value={numberLabel(session.availableSeats)} /> : null}
+            {session.isPubliclyBookable ? <ParticipantDetail label="Zapisy" value="Publiczne" /> : null}
+            {session.locationLimit > 0 ? <ParticipantDetail label="Limit lokalizacji" value={numberLabel(session.locationLimit)} /> : null}
+          </dl></SessionAccordion></div> : null}
+          <p className="mt-5 text-sm text-on-surface-muted">{session.canEdit === true ? "Możesz edytować te zajęcia." : "Te zajęcia są dostępne tylko do podglądu."}</p>
         </div>
-        <ModalFooter><Button variant="secondary" onClick={onClose}>Zamknij</Button></ModalFooter>
+        <ModalFooter>{session.canEdit === true && onEdit ? <Button onClick={onEdit}>Edytuj zajęcia</Button> : null}<Button variant="secondary" onClick={onClose}>Zamknij</Button></ModalFooter>
       </div>
     </ModalOverlay>
   );
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
-  return <div className="min-w-0 rounded-[var(--radius-lg)] bg-surface-container-low p-4"><dt className="text-label text-on-surface-muted">{label}</dt><dd className="mt-2 break-words text-sm font-semibold">{value}</dd></div>;
+  return <div className="min-w-0 rounded-[var(--radius-lg)] bg-surface-container-low p-3"><dt className="text-label text-on-surface-muted">{label}</dt><dd className="mt-2 break-words text-sm font-semibold">{value}</dd></div>;
 }
 function ParticipantDetail({ label, value }: { label: string; value: string }) {
   return <div className="min-w-0"><dt className="text-on-surface-muted">{label}</dt><dd className="mt-1 break-words">{value}</dd></div>;

@@ -1,5 +1,6 @@
 "use client";
 
+import { ApiError } from "@/app/lib/backend";
 import { userMessage } from "@/app/lib/user-messages";
 
 import { useEffect, useMemo, useState } from "react";
@@ -250,11 +251,6 @@ export default function SchedulePage() {
   }
 
   async function openEditModal(session: OwnerSession) {
-    if (session.status !== "Completed") {
-      setSelectedSession(session);
-      setIsSessionModalOpen(true);
-      return;
-    }
     try {
       const detailed = await getSession(session.id);
       setSelectedSession(detailed);
@@ -266,6 +262,7 @@ export default function SchedulePage() {
 
   async function handleSaveSession(values: SessionFormValues, recurrence?: SessionRecurrence) {
     if (isSavingSession) return;
+    if (selectedSession?.canEdit === false) { showOwnerError(new Error("Te zajęcia są dostępne tylko do podglądu."), "Te zajęcia są dostępne tylko do podglądu."); return; }
     try {
       setIsSavingSession(true);
       if (selectedSession?.status === "Completed") {
@@ -317,6 +314,13 @@ export default function SchedulePage() {
       showOwnerError(err, "Nie udało się zapisać sesji.", {
         id: "owner-session-save-error",
       });
+      if (err instanceof ApiError) {
+        await loadSessions();
+        if (selectedSession) {
+          try { setSelectedSession(await getSession(selectedSession.id)); setSessionRevision(current => current + 1); }
+          catch (refreshError) { setIsSessionModalOpen(false); setSelectedSession(null); showOwnerError(refreshError, "Nie udało się odświeżyć szczegółów zajęć."); }
+        }
+      }
     } finally {
       setIsSavingSession(false);
     }
@@ -430,6 +434,7 @@ export default function SchedulePage() {
         defaultTrainerId={defaultTrainerId}
         isSaving={isSavingSession}
         onClose={() => {
+          if (isSavingSession) return;
           setIsSessionModalOpen(false);
           setSelectedSession(null);
         }}

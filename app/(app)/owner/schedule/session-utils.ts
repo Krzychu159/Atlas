@@ -1,3 +1,4 @@
+import { groupSeatsLabel } from "@/app/lib/group-sessions";
 import { userTrainingType } from "@/app/lib/user-messages";
 import type { Location } from "@/app/lib/owner/locations";
 import type {
@@ -7,9 +8,9 @@ import type {
 } from "@/app/lib/owner/sessions";
 import type { Trainer } from "@/app/lib/owner/trainers";
 import { completeSession, updateSession } from "@/app/lib/owner/sessions";
-import { getOwnerSessionPackageName } from "../components/session-display";
+
 import { toDateTimeLocalValue } from "./date-utils";
-import type { CalendarSession, SessionFormValues, SessionStatusFilter } from "./types";
+import type { CalendarSession, SessionEditorSession, SessionFormValues, SessionStatusFilter } from "./types";
 
 export function generatePublicSessionSlug(title: string, startAt: string) {
   const name = title.toLowerCase().replace(/ł/g, "l").normalize("NFD")
@@ -50,6 +51,7 @@ export function getSessionStatusLabel(status?: string | null) {
 }
 
 export function getParticipantsLabel(session: CalendarSession) {
+  if (session.isGroupSession === true) return groupSeatsLabel(session);
   const count = session.actualParticipantsCount ?? session.participantsCount ?? session.participants?.length;
   if (count === undefined) return "Brak danych";
   const limit = session.publicCapacity ?? session.locationLimit;
@@ -76,7 +78,10 @@ export function matchesStatusFilter(
   return normalizedStatus === statusFilter.toLowerCase();
 }
 
-export const getSessionPackageName = getOwnerSessionPackageName;
+export function getSessionPackageName(session: CalendarSession) {
+  const names = [...new Set(session.participants?.map(participant => participant.packageName?.trim()).filter((name): name is string => Boolean(name)) || [])];
+  return names.length ? names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}` : "Brak pakietu";
+}
 
 function getSessionTone(session: CalendarSession) {
   const status = (session.status || "").toLowerCase();
@@ -108,6 +113,13 @@ export function getToneClasses(session: CalendarSession) {
   return "border-white/8 bg-surface-container-low";
 }
 
+// The group flag determines the displayed kind; preserve the original API value
+// when the user saves without changing the kind.
+export function getSessionFormType(session: SessionEditorSession) {
+  if (session.isGroupSession === true || ["Group", "GroupTraining"].includes(session.plannedSessionType || "")) return "Group";
+  return session.plannedSessionType || "";
+}
+
 export function getDefaultFormValues({
   session,
   date,
@@ -115,7 +127,7 @@ export function getDefaultFormValues({
   locations,
   defaultTrainerId,
 }: {
-  session: OwnerSession | null;
+  session: SessionEditorSession | null;
   date: Date;
   trainers: Trainer[];
   locations: Location[];
@@ -124,7 +136,7 @@ export function getDefaultFormValues({
   if (session) {
     return {
       isPubliclyBookable: session.isPubliclyBookable ?? false,
-      publicCapacity: session.publicCapacity == null ? "" : String(session.publicCapacity),
+      publicCapacity: (session.capacity ?? session.publicCapacity) == null ? "" : String(session.capacity ?? session.publicCapacity),
       publicSlug: session.publicSlug || "",
       participantsEdited: false,
       title: session.title || "",
@@ -133,13 +145,16 @@ export function getDefaultFormValues({
       trainerId: String(session.trainerId || ""),
       locationId: String(session.locationId || ""),
       status: session.status || "",
-      plannedSessionType: session.plannedSessionType || "",
+      plannedSessionType: getSessionFormType(session),
       outlookCategories: session.outlookCategories?.join(", ") || "",
       participantIds:
         session.participants
           ?.map((participant) => String(participant.clientId))
           .filter(Boolean) || [],
       note: session.note || "",
+      eventRules: session.eventRules || "",
+      registrationClosesBeforeMinutes: String(session.registrationClosesBeforeMinutes ?? session.bookingRules?.registrationClosesBeforeMinutes ?? ""),
+      cancellationClosesBeforeMinutes: String(session.cancellationClosesBeforeMinutes ?? session.bookingRules?.cancellationClosesBeforeMinutes ?? ""),
     };
   }
 
@@ -170,12 +185,15 @@ export function getDefaultFormValues({
     outlookCategories: "",
     participantIds: [],
     note: "",
+    eventRules: "",
+    registrationClosesBeforeMinutes: "30",
+    cancellationClosesBeforeMinutes: "720",
   };
 }
 
 export function toSessionPayload(
   values: SessionFormValues,
-  session: OwnerSession | null,
+  session: SessionEditorSession | null,
 ): SessionPayload {
   const trainerId = Number(values.trainerId);
   const locationId = Number(values.locationId);
@@ -186,9 +204,9 @@ export function toSessionPayload(
     throw new Error("Uzupełnij czas sesji.");
   }
 
-  const preservePublicParticipants = Boolean(session &&
-    (session.isPubliclyBookable || values.isPubliclyBookable) && !values.participantsEdited);
-  if (session?.status !== "Completed" && !values.isPubliclyBookable && !preservePublicParticipants && !values.participantIds.length) {
+  const preserveParticipants = Boolean(session && !values.participantsEdited);
+  const isGroupForm = values.plannedSessionType === "Group" || values.plannedSessionType === "GroupTraining";
+  if (session?.status !== "Completed" && !isGroupForm && !preserveParticipants && !values.participantIds.length) {
     throw new Error("Wybierz przynajmniej jednego klienta.");
   }
 
@@ -211,12 +229,31 @@ export function toSessionPayload(
     locationId,
   };
 
+  if (isGroupForm) {
+    if (!session || values.eventRules !== (session.eventRules || "")) payload.eventRules = values.eventRules.trim();
+    for (const key of ["registrationClosesBeforeMinutes", "cancellationClosesBeforeMinutes"] as const) {
+      const initial = session ? String(session[key] ?? session.bookingRules?.[key] ?? "") : "";
+      if (values[key] === initial || !values[key].trim()) continue;
+      const minutes = Number(values[key]);
+      if (!Number.isInteger(minutes) || minutes < 0 || minutes > 525600) throw new Error("Termin musi wynosić od 0 do 525600 minut.");
+      payload[key] = minutes;
+    }
+    const initialCapacity = session ? String(session.capacity ?? session.publicCapacity ?? "") : "";
+    if (values.publicCapacity !== initialCapacity) {
+      const capacity = Number(values.publicCapacity);
+      if (values.publicCapacity.trim() && (!Number.isInteger(capacity) || capacity <= 0)) throw new Error("Limit miejsc musi być dodatnią liczbą całkowitą.");
+      payload.publicCapacity = values.publicCapacity.trim() ? capacity : null;
+    }
+  }
+
   if (values.status) {
     payload.status = values.status;
   }
 
   if (values.plannedSessionType) {
-    payload.plannedSessionType = values.plannedSessionType;
+    payload.plannedSessionType = session && values.plannedSessionType === getSessionFormType(session)
+      ? session.plannedSessionType || undefined
+      : values.plannedSessionType;
   }
 
   if (values.isPubliclyBookable) {
@@ -244,7 +281,7 @@ export function toSessionPayload(
     payload.outlookCategories = outlookCategories;
   }
 
-  if (!preservePublicParticipants) {
+  if (!preserveParticipants) {
     payload.participants = values.participantIds.map((clientId) =>
       getParticipantPayload(Number(clientId), session),
     );
@@ -294,7 +331,7 @@ export async function correctCompletedSession(session: OwnerSession, values: Ses
 
 function getParticipantPayload(
   clientId: number,
-  session: OwnerSession | null,
+  session: SessionEditorSession | null,
 ): SessionParticipantPayload {
   const existing = session?.participants?.find(
     (participant) => participant.clientId === clientId,

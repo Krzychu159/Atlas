@@ -9,7 +9,7 @@ import { showAppError, showAppSuccess } from "@/app/components/ui/app-toast";
 import { ApiError } from "@/app/lib/backend";
 import { trainerPaymentError } from "@/app/lib/trainer/payment-errors";
 import { getOutlookStatus, type OutlookStatus } from "@/app/lib/calendar/outlook";
-import { createTrainerPortalSession, getTrainerPortalClients, getTrainerPortalMe, getTrainerPortalSession, getTrainerPortalSessions, type TrainerPortalMe, type TrainerSessionDetails, type TrainerSessionPayload } from "@/app/lib/trainer/portal";
+import { updateTrainerPortalSession, createTrainerPortalSession, getTrainerPortalClients, getTrainerPortalMe, getTrainerPortalSession, getTrainerPortalSessions, type TrainerPortalMe, type TrainerSessionDetails, type TrainerSessionPayload } from "@/app/lib/trainer/portal";
 import { trainerPortalClientsToClients, trainerPortalMeToLocations, trainerPortalMeToTrainer, trainerPortalSessionsToCalendarSessions } from "@/app/lib/trainer/portal-mappers";
 import { DateNavigator, ViewSwitch } from "@/app/(app)/owner/schedule/components/ScheduleControls";
 import { DaySchedule, WeekSchedule } from "@/app/(app)/owner/schedule/components/ScheduleViews";
@@ -38,6 +38,8 @@ export default function TrainerSchedulePage() {
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedSession, setSelectedSession] = useState<TrainerSessionDetails | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editorRevision, setEditorRevision] = useState(0);
   const [createDate, setCreateDate] = useState(() => new Date());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const loadRevision = useRef(0);
@@ -132,7 +134,10 @@ export default function TrainerSchedulePage() {
         trainerId: me.trainerId, locationId: Number(values.locationId), status: values.status,
         isPubliclyBookable: values.isPubliclyBookable,
         publicSlug: values.isPubliclyBookable ? values.publicSlug.trim() : null,
-        publicCapacity: values.isPubliclyBookable ? Number(values.publicCapacity) : null,
+        publicCapacity: formPayload.publicCapacity ?? null,
+        eventRules: formPayload.eventRules,
+        registrationClosesBeforeMinutes: formPayload.registrationClosesBeforeMinutes,
+        cancellationClosesBeforeMinutes: formPayload.cancellationClosesBeforeMinutes,
         plannedSessionType: values.isPubliclyBookable ? "Group" : values.plannedSessionType || null,
         outlookCategories: values.outlookCategories.split(",").map(value => value.trim()).filter(Boolean),
         participants: values.participantIds.map(id => ({ clientId: Number(id), countsAgainstPackage: values.newParticipantCountsAgainstPackage === true, sessionsCharged, note: null })),
@@ -144,8 +149,44 @@ export default function TrainerSchedulePage() {
       showAppSuccess("Zajęcia zostały dodane.");
       await loadSessions();
     } catch (error) {
-      const message = error instanceof ApiError && error.status === 409 ? "Termin koliduje z innymi zajęciami. Wybierz inny termin lub sprawdź uczestników." : trainerPaymentError(error, "Nie udało się dodać zajęć. Sprawdź wpisane dane.");
+      const message = trainerPaymentError(error, "Nie udało się dodać zajęć. Sprawdź wpisane dane i dostępność miejsc.");
       showAppError(new Error(message), message);
+      if (error instanceof ApiError) await loadSessions();
+    } finally { saving.current = false; setIsSaving(false); }
+  }
+  async function handleEdit(values: SessionFormValues) {
+    const session = selectedSession;
+    if (saving.current || !session || session.canEdit !== true || session.trainerId !== me?.trainerId) return;
+    try {
+      if (Number(values.trainerId) !== session.trainerId) throw new Error("Możesz edytować tylko własne zajęcia.");
+      if (Number(values.locationId) !== session.locationId && !locations.some(location => location.id === Number(values.locationId))) throw new Error("Wybierz dostępną lokalizację.");
+      if (!values.title.trim()) throw new Error("Podaj tytuł zajęć.");
+      if (session.status === "Completed" && !values.correctionReason?.trim()) throw new Error("Podaj powód korekty.");
+      const payload = toSessionPayload(values, session);
+      if (values.participantsEdited) {
+        if (!session.participants) throw new Error("Lista uczestników jest niedostępna. Odśwież zajęcia przed zmianą zapisów.");
+        const oldIds = new Set((session.participants || []).map(participant => participant.clientId));
+        if (values.participantIds.some(id => !oldIds.has(Number(id)) && !clients.some(client => client.id === Number(id)))) throw new Error("Wybierz uczestników z dostępnej listy klientów.");
+        const charged = Number(values.newParticipantSessionsCharged);
+        if (values.participantIds.some(id => !oldIds.has(Number(id))) && (!Number.isSafeInteger(charged) || charged < 0)) throw new Error("Podaj poprawną liczbę wejść na uczestnika.");
+        payload.participants = values.participantIds.map(id => {
+          const existing = session.participants?.find(participant => participant.clientId === Number(id));
+          return { clientId: Number(id), countsAgainstPackage: existing?.countsAgainstPackage ?? values.newParticipantCountsAgainstPackage === true, sessionsCharged: existing?.sessionsCharged ?? charged, note: existing?.note ?? null };
+        });
+      }
+      saving.current = true; setIsSaving(true);
+      await updateTrainerPortalSession(session.id, { ...payload, title: values.title.trim(), correctionReason: values.correctionReason?.trim() || null });
+      setIsEditOpen(false);
+      showAppSuccess("Zmiany w zajęciach zostały zapisane.");
+      await loadSessions();
+      await openDetails({ id: session.id });
+    } catch (error) {
+      showAppError(new Error(trainerPaymentError(error, "Nie udało się zapisać zmian w zajęciach.")), "Nie udało się zapisać zmian w zajęciach.");
+      if (error instanceof ApiError) {
+        await loadSessions();
+        try { setSelectedSession(await getTrainerPortalSession(session.id)); setEditorRevision(current => current + 1); }
+        catch (refreshError) { setIsEditOpen(false); setSelectedSession(null); showAppError(new Error(trainerPaymentError(refreshError, "Nie udało się odświeżyć szczegółów zajęć.")), "Nie udało się odświeżyć szczegółów zajęć."); }
+      }
     } finally { saving.current = false; setIsSaving(false); }
   }
   const canCreate = !isResourcesLoading && !resourcesError && Boolean(me?.trainerId) && locations.length > 0;
@@ -187,7 +228,8 @@ export default function TrainerSchedulePage() {
           {view === "week" ? <WeekSchedule days={weekDays} sessions={visibleSessions} isLoading={isLoading} onSelectSession={openDetails} onCreateSession={canCreate ? openCreate : undefined} /> : <DaySchedule date={anchorDate} sessions={visibleSessions} isLoading={isLoading} onSelectSession={openDetails} onCreateSession={canCreate ? openCreate : undefined} />}
         </>}
       </div>
-      {selectedSession ? <TrainerSessionDetailsModal session={selectedSession} onClose={() => { detailRevision.current += 1; setSelectedSession(null); }} /> : null}
+      {selectedSession && !isEditOpen ? <TrainerSessionDetailsModal session={selectedSession} onEdit={!isResourcesLoading && !resourcesError && selectedSession.trainerId === me?.trainerId ? () => { if (selectedSession.canEdit === true) setIsEditOpen(true); } : undefined} onClose={() => { detailRevision.current += 1; setSelectedSession(null); }} /> : null}
+      {isEditOpen && selectedSession ? <SessionEditorModal key={"edit-" + selectedSession.id + "-" + editorRevision} open session={selectedSession} anchorDate={new Date(selectedSession.startAt)} trainers={trainers} locations={locations} clients={clients} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsEditOpen(false); }} onSubmit={handleEdit} /> : null}
       <SessionEditorModal key={isCreateOpen ? "new-" + toDateInputValue(createDate) : "closed"} open={isCreateOpen} session={null} anchorDate={createDate} trainers={trainers} locations={locations} clients={clients} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsCreateOpen(false); }} onSubmit={handleCreate} />
     </>
   );

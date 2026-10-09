@@ -1,3 +1,4 @@
+import type { GroupSessionFields, GroupSessionSettings } from "../group-sessions";
 import { backendDelete, backendGet, backendPost, backendPut } from "../backend";
 
 export type OwnerSessionParticipant = {
@@ -19,7 +20,8 @@ export type OwnerSessionParticipant = {
   note: string | null;
 };
 
-export type OwnerSession = {
+export type OwnerSession = GroupSessionFields & {
+  canEdit?: boolean;
   isRecurring?: boolean;
   recurringGroupId?: string | null;
   recurrenceInstanceNumber?: number | null;
@@ -71,7 +73,7 @@ export type SessionParticipantPayload = {
   note?: string | null;
 };
 
-export type SessionPayload = {
+export type SessionPayload = GroupSessionSettings & {
   correctionReason?: string;
   isPubliclyBookable?: boolean;
   publicSlug?: string | null;

@@ -1,5 +1,6 @@
 "use client";
 
+import { groupSeatsLabel } from "@/app/lib/group-sessions";
 import { MapPin, Plus, UserRound } from "lucide-react";
 import { getSessionOutlookColor } from "@/app/lib/calendar/outlook-colors";
 import type { CalendarSession } from "../types";
@@ -153,9 +154,15 @@ function SessionCard<TSession extends CalendarSession>({
       className={[
         "w-full rounded-[var(--radius-lg)] border p-3 text-left transition hover:-translate-y-0.5 hover:border-primary-light/35 hover:bg-surface-container-high",
         getToneClasses(session),
+        session.isGroupSession === true ? "ring-2 ring-primary-light/30 bg-surface-container" : "",
         compact ? "" : "md:p-4",
       ].join(" ")}
     >
+      {session.isGroupSession === true ? <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+        <span className="rounded-full bg-primary/15 px-2 py-1 font-semibold text-primary-light">Grupowe</span>
+        <span className="text-on-surface-variant">{groupSeatsLabel(session)}</span>
+        {session.isFullyBooked === true ? <span className="font-semibold text-on-surface-variant">Brak miejsc</span> : null}
+      </div> : null}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-primary-light">

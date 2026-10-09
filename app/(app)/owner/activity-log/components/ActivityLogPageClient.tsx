@@ -21,7 +21,6 @@ export function ActivityLogPageClient() {
   const [data, setData] = useState<ActivityLogResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [selected, setSelected] = useState<ActivityLogEntry | null>(null);
   const validation = validateActivityFilters(filters);
   const closeDetails = useCallback(() => setSelected(null), []);
@@ -77,7 +76,7 @@ export function ActivityLogPageClient() {
       <div><p className="text-label text-primary-light">Panel właściciela</p><h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">Historia zmian</h1><p className="mt-3 text-sm leading-6 text-on-surface-variant">Sprawdź, kto i jakie zmiany wprowadził w studiu.</p></div>
       <Button variant="secondary" icon={<RefreshCw size={16} className={loading && !validation ? "animate-spin" : ""} />} onClick={refresh} disabled={Boolean(validation) || loading}>Odśwież</Button>
     </div>
-    <ActivityFilters value={filters} metadata={metadata} advancedOpen={advancedOpen} onAdvancedOpenChange={setAdvancedOpen} onChange={changeFilters} onClear={() => changeFilters(defaultActivityFilters)} />
+    <ActivityFilters value={filters} metadata={metadata} onChange={changeFilters} onClear={() => changeFilters(defaultActivityFilters)} />
     {metadataError ? <div role="alert" className="card-shell flex flex-col gap-3 p-4 text-sm text-on-surface-variant sm:flex-row sm:items-center sm:justify-between"><p>Nie udało się pobrać dostępnych rodzajów danych, operacji i źródeł. {metadataError}</p><Button variant="secondary" size="sm" onClick={() => setMetadataRevision((current) => current + 1)}>Ponów pobieranie filtrów</Button></div> : null}
     <section className="overflow-hidden rounded-[var(--radius-xl)] bg-surface-container-low shadow-soft" aria-busy={loading && !validation}>
       <div className="flex flex-col gap-2 px-4 py-5 md:flex-row md:items-end md:justify-between md:px-5"><h2 className="text-section-title">Zmiany w studiu</h2>{data && !loading && !message ? <p className="text-xs text-on-surface-muted">Znaleziono: {data.totalCount} wpisów</p> : null}</div>
@@ -85,6 +84,6 @@ export function ActivityLogPageClient() {
         : loading ? <div role="status" className="flex min-h-56 items-center justify-center gap-2 bg-surface-container-lowest text-sm text-on-surface-muted"><LoaderCircle size={18} className="animate-spin" />Ładowanie historii zmian...</div>
         : data ? <><ActivityList items={data.items ?? []} onSelect={setSelected} /><ActivityPagination data={data} onPageChange={(next) => { if (next === page) return; setPage(next); setData(null); setLoading(true); }} onPageSizeChange={(next) => { if (next === pageSize) return; setPageSize(next); setPage(1); setData(null); setLoading(true); }} /></> : null}
     </section>
-    {selected ? <ActivityDetails entry={selected} onClose={closeDetails} onRelated={(changeSetId) => { changeFilters({ ...defaultActivityFilters, changeSetId }); setAdvancedOpen(true); setSelected(null); }} /> : null}
+    {selected ? <ActivityDetails entry={selected} onClose={closeDetails} onRelated={(changeSetId) => { changeFilters({ ...defaultActivityFilters, changeSetId }); setSelected(null); }} /> : null}
   </div>;
 }

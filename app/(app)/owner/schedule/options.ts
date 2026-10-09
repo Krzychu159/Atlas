@@ -24,6 +24,6 @@ export const sessionTypeOptions = [
   { value: "", label: "Domyślnie" },
   { value: "PersonalTraining", label: "Trening personalny" },
   { value: "DuoTraining", label: "Trening 2:1" },
-  { value: "GroupTraining", label: "Trening grupowy" },
+  { value: "Group", label: "Grupowe" },
   { value: "Consultation", label: "Konsultacja" },
 ];
