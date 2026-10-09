@@ -11,6 +11,7 @@ import {
   ChartNoAxesCombined,
   Gift,
   Bell,
+  History,
 } from "lucide-react";
 
 export type AppRole = "owner" | "trainer" | "client";
@@ -37,6 +38,7 @@ export const navigationByRole: Record<AppRole, NavItem[]> = {
       icon: ChartNoAxesCombined,
     },
     { label: "Rozliczenia", href: "/owner/settlements", icon: ReceiptText },
+    { label: "Historia zmian", href: "/owner/activity-log", icon: History },
     { label: "Ustawienia", href: "/owner/settings", icon: Settings },
     { label: "Powiadomienia", href: "/owner/notifications", icon: Bell, mobileOnly: true },
   ],
