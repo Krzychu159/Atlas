@@ -359,7 +359,7 @@ export default function TrainerSettlementPage() {
             />
             <SummaryCard
               label="Roboczogodziny"
-              value={`${settlement.totalHours.toFixed(1)} h`}
+              value={`${settlement.totalHours.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h`}
               icon={<Clock3 size={20} />}
             />
             <SummaryCard
@@ -539,7 +539,7 @@ function SettlementItemRow({ item }: { item: TrainerSettlementItem }) {
           {formatDateTime(item.startAt)} · {formatSessionType(item.sessionType)}
         </p>
       </div>
-      <Metric label="Godziny" value={`${item.hours.toFixed(1)} h`} />
+      <Metric label="Godziny" value={`${item.hours.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h`} />
       <Metric
         label="Stawka"
         value={`${new Intl.NumberFormat("pl-PL").format(item.rate)} zł/${item.rateType === "PerSession" ? "zajęcia" : "h"}`}

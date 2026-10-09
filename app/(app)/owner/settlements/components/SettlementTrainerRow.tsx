@@ -51,7 +51,7 @@ export default function SettlementTrainerRow({ settlement, locationId }: {
       <Metric
         icon={<Clock3 size={14} />}
         label="Roboczogodziny"
-        value={`${settlement.totalHours.toLocaleString("pl-PL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} h`}
+        value={`${settlement.totalHours.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h`}
         className="col-start-1 row-start-3 xl:col-auto xl:row-auto"
       />
 

@@ -16,12 +16,12 @@ type FilterablePackage = {
   createdAt: string;
 };
 
-export function isGroupPackage(participantsCount?: number | null, packageType?: PackageType | null) {
-  return packageType === "Group" || (participantsCount != null && participantsCount > 4);
+export function isGroupPackage(packageType?: PackageType | null) {
+  return packageType === "Group";
 }
 
 export function formatParticipantsLabel(participantsCount?: number | null, packageType?: PackageType | null) {
-  if (isGroupPackage(participantsCount, packageType)) return "Grupowe";
+  if (isGroupPackage(packageType)) return "Grupowe";
   if (participantsCount === 1) return "1 osoba";
   if (participantsCount === 2 || participantsCount === 3 || participantsCount === 4) {
     return `${participantsCount} osoby`;
@@ -46,7 +46,7 @@ export function filterPackages<T extends FilterablePackage>(
     if (query && ![item.name, item.description, item.locationName, item.packageType]
       .some((value) => value?.toLocaleLowerCase("pl").includes(query))) return false;
 
-    const group = isGroupPackage(item.participantsCount, item.packageType);
+    const group = isGroupPackage(item.packageType);
     if (filters.participantsFilter === "group") {
       if (!group) return false;
     } else if (filters.participantsFilter !== "all") {

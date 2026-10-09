@@ -65,7 +65,7 @@ export default function SettlementSummary({ settlements, isLoading = false }: {
       />
       <SummaryCard
         label="Roboczogodziny"
-        value={`${totalHours.toLocaleString("pl-PL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} h`}
+        value={`${totalHours.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h`}
         icon={<Clock3 size={17} />}
         description="Łączny czas sesji w tym miesiącu"
         isLoading={isLoading}

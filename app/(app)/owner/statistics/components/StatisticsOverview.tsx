@@ -82,7 +82,7 @@ export default function StatisticsOverview({
     },
     {
       label: "Godziny rozliczeniowe",
-      value: formatNumber(trainerCosts.billableHours, 1),
+      value: formatNumber(trainerCosts.billableHours, 2),
       icon: <Clock3 size={17} />,
     },
   ];
