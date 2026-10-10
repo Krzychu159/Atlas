@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthCookieOptions } from "@/app/lib/server/auth-cookies";
 import { hasSameOrigin } from "@/app/lib/server/request-origin";
+import { verifyBackendSession } from "@/app/lib/server/session";
 
 export async function POST(req: Request) {
   if (!hasSameOrigin(req)) return NextResponse.json({ message: "Odśwież stronę i spróbuj ponownie." }, { status: 403 });
@@ -38,18 +39,26 @@ export async function POST(req: Request) {
       );
     }
 
-    const role = String(data.role || "").toLowerCase();
-
-    if (typeof data.token !== "string" || !data.token || typeof data.refreshToken !== "string" || !data.refreshToken || !data.userId || !["owner", "trainer", "client"].includes(role)) {
+    if (typeof data.token !== "string" || !data.token || typeof data.refreshToken !== "string" || !data.refreshToken) {
       return NextResponse.json({ message: "Nie udało się potwierdzić logowania. Spróbuj ponownie." }, { status: 502 });
     }
+
+    const session = await verifyBackendSession(data.token);
+    if (session.state !== "authenticated") {
+      return NextResponse.json(
+        { message: "Nie możemy teraz potwierdzić dostępu. Spróbuj zalogować się ponownie za chwilę." },
+        { status: session.state === "unavailable" ? 503 : session.state === "forbidden" ? 403 : 401 },
+      );
+    }
+    const { role, roles, id, email } = session.user;
 
     const res = NextResponse.json({
       ok: true,
       user: {
-        userId: data.userId,
-        email: data.email,
+        userId: id,
+        email,
         role,
+        roles,
       },
     });
     res.headers.set("Cache-Control", "no-store");
@@ -59,7 +68,7 @@ export async function POST(req: Request) {
     res.cookies.set("accessToken", data.token, cookieOptions);
     res.cookies.set("refreshToken", data.refreshToken, cookieOptions);
     res.cookies.set("role", role, cookieOptions);
-    res.cookies.set("userId", String(data.userId), cookieOptions);
+    res.cookies.set("userId", id, cookieOptions);
 
     return res;
   } catch (error) {

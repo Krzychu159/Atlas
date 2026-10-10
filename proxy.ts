@@ -3,7 +3,7 @@ import { verifyBackendSession, VERIFIED_USER_HEADER } from "@/app/lib/server/ses
 import { expireAuthCookies } from "@/app/lib/server/auth-cookies";
 import type { CurrentUser } from "@/app/lib/auth/user";
 
-const protectedPrefixes = ["/owner", "/trainer", "/client"];
+const protectedPrefixes = ["/owner", "/trainer", "/client", "/super-admin"];
 
 function isProtectedPath(pathname: string) {
   return protectedPrefixes.some(
@@ -60,5 +60,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/owner/:path*", "/trainer/:path*", "/client/:path*"],
+  matcher: ["/owner/:path*", "/trainer/:path*", "/client/:path*", "/super-admin/:path*"],
 };

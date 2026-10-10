@@ -31,6 +31,7 @@ export async function GET() {
     user: {
       userId: session.user.id,
       role: session.user.role,
+      roles: session.user.roles,
     },
   });
   response.headers.set("Cache-Control", "no-store");

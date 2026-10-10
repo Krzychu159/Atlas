@@ -3,6 +3,8 @@
 import { clearClientSession } from "@/app/lib/backend";
 
 import { getErrorMessage } from "@/app/lib/backend";
+import { getLoginRedirectPath } from "@/app/lib/auth/redirect";
+import type { SessionRole } from "@/app/lib/auth/user";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -22,34 +24,6 @@ type AuthMode = "login" | "forgot" | "reset";
 type ApiMessage = {
   message?: string;
 };
-
-function getRedirectPath(role?: string) {
-  switch (role) {
-    case "owner":
-      return "/owner";
-    case "trainer":
-      return "/trainer";
-    case "client":
-      return "/client";
-    default:
-      return "/login";
-  }
-}
-
-function getSafeRedirectPath(value: string | null) {
-  if (!value) return null;
-  if (!value.startsWith("/") || value.startsWith("//")) return null;
-  if (value.startsWith("/login") || value.startsWith("/logout")) return null;
-  if (
-    !["/owner", "/trainer", "/client"].some(
-      (prefix) => value === prefix || value.startsWith(`${prefix}/`),
-    )
-  ) {
-    return null;
-  }
-
-  return value;
-}
 
 function getLoginNotice(reason: string | null) {
   if (reason === "session-expired") {
@@ -222,10 +196,8 @@ export default function LoginPage() {
 
       clearClientSession();
       const params = new URLSearchParams(window.location.search);
-      const role = (data as { user?: { role?: string } })?.user?.role;
-      const nextPath = getSafeRedirectPath(params.get("next"));
-
-      router.replace(nextPath || getRedirectPath(role));
+      const role = (data as { user?: { role?: SessionRole } })?.user?.role;
+      router.replace(getLoginRedirectPath(role, params.get("next")));
       router.refresh();
     } catch (err) {
       setError(

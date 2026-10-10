@@ -38,6 +38,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     if (session.state !== "authenticated") redirect(`/logout?reason=session-expired${nextQuery}`);
     user = session.user;
   }
+  if (user.role === "super-admin") redirect("/super-admin");
   if (!isValidAppRole(user.role)) redirect("/login");
   const pathRole = currentPath?.split(/[/?]/)[1];
   if (!pathRole || pathRole !== user.role) redirect(`/${user.role}`);
