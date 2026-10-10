@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { getErrorMessage } from "@/app/lib/backend";
+import { useCurrentUser } from "@/app/components/current-user-provider";
 import { Save, User } from "lucide-react";
 import AvatarFilePicker from "@/app/components/ui/avatar-file-picker";
 import { Button } from "@/app/components/ui/button";
@@ -12,7 +12,6 @@ import {
   uploadCurrentUserAvatar,
 } from "@/app/lib/avatars";
 import {
-  getCurrentUser,
   updateCurrentUserProfile,
 } from "@/app/lib/auth/current-user";
 
@@ -36,40 +35,16 @@ export default function ProfileSettingsCard({
   fallbackLabel: string;
 }) {
   const saving = useRef(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [revision, setRevision] = useState(0);
+  const { user, loading: isLoading, error: loadError, refresh } = useCurrentUser();
   const [profile, setProfile] = useState<ProfileForm>(emptyProfile);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    let active = true;
-    const timer = window.setTimeout(() => {
-      setIsLoading(true);
-      setLoadError(null);
-      getCurrentUser()
-        .then((user) => {
-          if (!active) return;
-          const names = getUserNames(user);
-          setProfile({
-            firstName: names.firstName,
-            lastName: names.lastName,
-            email: user.email === "Brak e-maila" ? "" : user.email,
-            avatarUrl: user.avatarUrl || "",
-          });
-        })
-        .catch((error: unknown) => {
-          if (!active) return;
-          setLoadError(getErrorMessage(error, "Nie udało się pobrać profilu."));
-          showAppError(error, "Nie udało się pobrać profilu.", {
-            id: "profile-settings-load-error",
-          });
-        })
-        .finally(() => { if (active) setIsLoading(false); });
-    }, 0);
-
-    return () => { active = false; window.clearTimeout(timer); };
-  }, [revision]);
+    if (!user) return;
+    const names = getUserNames(user);
+    setProfile({ firstName: names.firstName, lastName: names.lastName,
+      email: user.email === "Brak e-maila" ? "" : user.email, avatarUrl: user.avatarUrl || "" });
+  }, [user]);
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -143,7 +118,7 @@ export default function ProfileSettingsCard({
         <p className="text-section-title">Ustawienia profilu</p>
       </div>
 
-      {loadError ? <div role="alert" className="mt-5 text-sm text-error-light">{loadError}<Button variant="secondary" className="mt-3" onClick={() => setRevision(value => value + 1)}>Spróbuj ponownie</Button></div> : null}
+      {loadError ? <div role="alert" className="mt-5 text-sm text-error-light">{loadError}<Button variant="secondary" className="mt-3" onClick={() => void refresh()}>Spróbuj ponownie</Button></div> : null}
       <form onSubmit={handleSave} className="mt-6">
         <AvatarFilePicker
           value={profile.avatarUrl}

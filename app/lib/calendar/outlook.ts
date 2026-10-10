@@ -11,8 +11,8 @@ export type OutlookConnectUrl = {
   url: string | null;
 };
 
-export function getOutlookStatus() {
-  return backendGet<OutlookStatus>("outlook/status");
+export function getOutlookStatus(signal?: AbortSignal) {
+  return backendGet<OutlookStatus>("outlook/status", undefined, signal);
 }
 
 export function getOutlookConnectUrl() {

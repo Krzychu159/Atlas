@@ -1,5 +1,7 @@
 "use client";
 
+import { safeExternalUrl } from "@/app/lib/safe-url";
+
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 
 import { useEffect, useState } from "react";
@@ -590,5 +592,5 @@ export default function OwnerClientDetailsPage() {
 }
 
 function getTrainingPlanUrl(plan: ClientTrainingPlan | null) {
-  return plan?.url || plan?.googleDriveFolderUrl || "";
+  return safeExternalUrl(plan?.url || plan?.googleDriveFolderUrl) || "";
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { getErrorMessage } from "@/app/lib/backend";
+import { getErrorMessage, isAbortError } from "@/app/lib/backend";
+import { safeMicrosoftAuthUrl } from "@/app/lib/safe-url";
 import { userMessage } from "@/app/lib/user-messages";
 
 import { useEffect, useRef, useState } from "react";
@@ -61,34 +62,50 @@ export default function OutlookIntegrationCard({ allowAdministration = true }: {
   const syncLock = useRef(false);
   const authWindowRef = useRef<Window | null>(null);
   const pollingRef = useRef<number | null>(null);
+  const pollRevision = useRef(0);
+  const statusRevision = useRef(0);
+  const statusController = useRef<AbortController | null>(null);
+  const statusRequest = useRef<Promise<OutlookStatus | null> | null>(null);
+  const connectLock = useRef(false);
+  const mounted = useRef(true);
 
-  async function loadStatus() {
-    try {
-      setIsLoading(true);
-      setLoadError(null);
-      const data = await getOutlookStatus();
-      setStatus(data);
-    } catch (err) {
-      setLoadError(getErrorMessage(err, "Nie udało się sprawdzić połączenia Outlook."));
-      showAppError(err, "Nie udało się sprawdzić połączenia Outlook.", {
-        id: "outlook-status-error",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+  function loadStatus(): Promise<OutlookStatus | null> {
+    if (statusRequest.current) return statusRequest.current;
+    const revision = ++statusRevision.current;
+    const controller = new AbortController(); statusController.current = controller;
+    setIsLoading(true); setLoadError(null);
+    const request = getOutlookStatus(controller.signal).then(data => {
+      if (mounted.current && revision === statusRevision.current) setStatus(data);
+      return data;
+    }).catch(error => {
+      if (mounted.current && revision === statusRevision.current && !isAbortError(error)) {
+        setLoadError(getErrorMessage(error, "Nie udało się sprawdzić połączenia Outlook."));
+      }
+      return null;
+    }).finally(() => {
+      if (revision === statusRevision.current) {
+        statusRequest.current = null;
+        if (mounted.current) setIsLoading(false);
+      }
+    });
+    statusRequest.current = request;
+    return request;
   }
 
   useEffect(() => {
+    mounted.current = true;
     const timer = window.setTimeout(() => {
       void loadStatus();
     }, 0);
 
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); mounted.current = false; statusRevision.current += 1; statusController.current?.abort(); statusRequest.current = null; };
   }, []);
 
   function stopConnectPolling() {
+    pollRevision.current += 1;
+    connectLock.current = false;
     if (pollingRef.current) {
-      window.clearInterval(pollingRef.current);
+      window.clearTimeout(pollingRef.current);
       pollingRef.current = null;
     }
 
@@ -106,50 +123,42 @@ export default function OutlookIntegrationCard({ allowAdministration = true }: {
   }
 
   function startConnectPolling(authWindow: Window) {
+    const revision = ++pollRevision.current;
     let attempts = 0;
     authWindowRef.current = authWindow;
-
-    if (pollingRef.current) {
-      window.clearInterval(pollingRef.current);
-    }
-
-    pollingRef.current = window.setInterval(async () => {
+    if (pollingRef.current) window.clearTimeout(pollingRef.current);
+    const poll = async () => {
+      if (!mounted.current || revision !== pollRevision.current) return;
       attempts += 1;
-
-      try {
-        const data = await getOutlookStatus();
-        setStatus(data);
-
-        if (data.isConnected) {
-          closeAuthWindow();
-          stopConnectPolling();
-          showAppSuccess("Konto Microsoft zostało połączone.", {
-            id: "outlook-connected",
-          });
-          return;
-        }
-      } catch {
-        // Retry on the next tick. The regular status check handles visible errors.
+      const data = await loadStatus();
+      if (!mounted.current || revision !== pollRevision.current) return;
+      if (data?.isConnected) {
+        closeAuthWindow(); stopConnectPolling();
+        showAppSuccess("Konto Microsoft zostało połączone.", { id: "outlook-connected" });
+        return;
       }
-
-      if (authWindow.closed || attempts >= 60) {
-        stopConnectPolling();
-        await loadStatus();
-      }
-    }, 1500);
+      if (authWindow.closed || attempts >= 60) { stopConnectPolling(); return; }
+      pollingRef.current = window.setTimeout(() => void poll(), Math.min(1500 * (data ? 1 : attempts), 10_000));
+    };
+    pollingRef.current = window.setTimeout(() => void poll(), 1500);
   }
 
   async function handleConnect() {
+    if (connectLock.current) return;
+    connectLock.current = true;
+    const revision = pollRevision.current;
     try {
       setIsConnecting(true);
       const data = await getOutlookConnectUrl();
 
-      if (!data.url) {
+      if (!mounted.current || revision !== pollRevision.current) return;
+      const url = safeMicrosoftAuthUrl(data.url);
+      if (!url) {
         throw new Error("Nie udało się przygotować połączenia Microsoft.");
       }
 
       const authWindow = window.open(
-        data.url,
+        url,
         "atlas-outlook-connect",
         "width=720,height=760,menubar=no,toolbar=no,location=yes,status=no",
       );
@@ -160,6 +169,7 @@ export default function OutlookIntegrationCard({ allowAdministration = true }: {
         );
       }
 
+      authWindow.opener = null;
       startConnectPolling(authWindow);
       showAppInfo(
         "Logowanie do Microsoft otworzyło się w nowym oknie. Zamkniemy je automatycznie po połączeniu.",
@@ -175,7 +185,7 @@ export default function OutlookIntegrationCard({ allowAdministration = true }: {
 
   useEffect(() => {
     function handleFocus() {
-      loadStatus();
+      if (!connectLock.current) void loadStatus();
     }
 
     window.addEventListener("focus", handleFocus);
@@ -185,17 +195,28 @@ export default function OutlookIntegrationCard({ allowAdministration = true }: {
 
   useEffect(() => {
     return () => {
+      pollRevision.current += 1;
+      connectLock.current = false;
       if (pollingRef.current) {
-        window.clearInterval(pollingRef.current);
+        window.clearTimeout(pollingRef.current);
       }
     };
   }, []);
+
+  function refreshStatusAfterWrite() {
+    statusRevision.current += 1;
+    statusController.current?.abort();
+    statusRequest.current = null;
+    return loadStatus();
+  }
 
   async function handleDisconnect() {
     try {
       setIsDisconnecting(true);
       await disconnectOutlook();
-      await loadStatus();
+      if (!mounted.current) return;
+      stopConnectPolling();
+      await refreshStatusAfterWrite();
       showAppSuccess("Konto Microsoft zostało odłączone.", {
         id: "outlook-disconnected",
       });
@@ -213,7 +234,8 @@ export default function OutlookIntegrationCard({ allowAdministration = true }: {
     try {
       setIsSyncing(true);
       await syncOutlookClients();
-      await loadStatus();
+      if (!mounted.current) return;
+      await refreshStatusAfterWrite();
       showAppSuccess("Kontakty klientów zostały zsynchronizowane z Outlook.", {
         id: "outlook-clients-sync-success",
       });

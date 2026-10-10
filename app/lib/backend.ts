@@ -21,6 +21,34 @@ export type BackendDownload = {
 };
 
 let authRedirectStarted = false;
+export const SESSION_CLEARED_EVENT = "atlas:session-cleared";
+let sessionRevision = 0;
+type PendingGet = { controller: AbortController; promise: Promise<unknown>; subscribers: number; settled: boolean };
+const pendingGets = new Map<string, PendingGet>();
+
+// In-flight requests only: no resolved business data is cached globally.
+export function clearBackendRequests() {
+  sessionRevision += 1;
+  pendingGets.forEach(request => request.controller.abort());
+  pendingGets.clear();
+}
+
+export function invalidateBackendGets(paths: string[]) {
+  for (const [url, request] of pendingGets) {
+    if (paths.some(path => url.split("?")[0] === buildBackendUrl(path))) {
+      pendingGets.delete(url);
+      request.controller.abort();
+    }
+  }
+}
+
+export function clearClientSession() {
+  clearBackendRequests();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(SESSION_CLEARED_EVENT));
+    try { localStorage.setItem(SESSION_CLEARED_EVENT, `${Date.now()}:${Math.random()}`); } catch { /* Storage may be disabled. */ }
+  }
+}
 
 export class ApiError extends Error {
   status: number;
@@ -44,6 +72,7 @@ export async function backendFetch<T>(
   path: string,
   options: BackendFetchOptions = {},
 ): Promise<T> {
+  const revision = sessionRevision;
   const { json, query, skipUnauthorizedRedirect, ...fetchOptions } = options;
   const body = json !== undefined ? JSON.stringify(json) : fetchOptions.body;
   const headers = new Headers(fetchOptions.headers);
@@ -62,7 +91,7 @@ export async function backendFetch<T>(
     body,
     headers,
   });
-  const payload = await readResponsePayload(response);
+  if (typeof window !== "undefined" && revision !== sessionRevision) throw new DOMException("Sesja zmieniła się.", "AbortError");
 
   if (response.status === 401) {
     if (!skipUnauthorizedRedirect) {
@@ -71,7 +100,6 @@ export async function backendFetch<T>(
 
     throw new ApiError("Sesja wygasła. Zaloguj się ponownie.", {
       status: response.status,
-      payload,
       path,
     });
   }
@@ -79,10 +107,12 @@ export async function backendFetch<T>(
   if (response.status === 403) {
     throw new ApiError("Nie masz uprawnień do tej operacji.", {
       status: response.status,
-      payload,
       path,
     });
   }
+
+  const payload = await readResponsePayload(response);
+  if (typeof window !== "undefined" && revision !== sessionRevision) throw new DOMException("Sesja zmieniła się.", "AbortError");
 
   if (!response.ok) {
     throw new ApiError(getBackendErrorMessage(payload), {
@@ -95,8 +125,42 @@ export async function backendFetch<T>(
   return payload as T;
 }
 
-export function backendGet<T>(path: string, query?: ApiQuery) {
-  return backendFetch<T>(path, { method: "GET", query });
+export function backendGet<T>(path: string, query?: ApiQuery, signal?: AbortSignal): Promise<T> {
+  if (signal?.aborted) return Promise.reject(new DOMException("Anulowano pobieranie.", "AbortError"));
+  // Never share requests between server-side users.
+  if (typeof window === "undefined") return backendFetch<T>(path, { method: "GET", query, signal });
+  const url = buildBackendUrl(path, query);
+  let request = pendingGets.get(url);
+  if (!request || request.controller.signal.aborted) {
+    const controller = new AbortController();
+    const entry: PendingGet = { controller, promise: Promise.resolve(), subscribers: 0, settled: false };
+    entry.promise = backendFetch<T>(path, { method: "GET", query, signal: controller.signal }).finally(() => {
+      entry.settled = true;
+      if (pendingGets.get(url) === entry) pendingGets.delete(url);
+    });
+    request = entry;
+    pendingGets.set(url, entry);
+  }
+  const shared = request;
+  shared.subscribers += 1;
+  return new Promise<T>((resolve, reject) => {
+    let done = false;
+    const release = () => {
+      if (done) return false;
+      done = true;
+      signal?.removeEventListener("abort", abort);
+      shared.subscribers -= 1;
+      if (!shared.subscribers && !shared.settled) {
+        if (pendingGets.get(url) === shared) pendingGets.delete(url);
+        shared.controller.abort();
+      }
+      return true;
+    };
+    const abort = () => { if (release()) reject(new DOMException("Anulowano pobieranie.", "AbortError")); };
+    signal?.addEventListener("abort", abort, { once: true });
+    shared.promise.then(value => { if (release()) resolve(value as T); }, error => { if (release()) reject(error); });
+    if (signal?.aborted) abort();
+  });
 }
 
 export function backendPost<T>(path: string, json?: unknown, query?: ApiQuery) {
@@ -119,6 +183,7 @@ export async function backendDownload(
   path: string,
   query?: ApiQuery,
 ): Promise<BackendDownload> {
+  const revision = sessionRevision;
   const response = await fetch(buildBackendUrl(path, query), {
     method: "GET",
     cache: "no-store",
@@ -128,8 +193,14 @@ export async function backendDownload(
     },
   });
 
+  if (typeof window !== "undefined" && revision !== sessionRevision) throw new DOMException("Sesja zmieniła się.", "AbortError");
+
   if (response.status === 401) {
     handleUnauthorizedSession();
+    throw new ApiError("Sesja wygasła. Zaloguj się ponownie.", { status: 401, path });
+  }
+  if (response.status === 403) {
+    throw new ApiError("Nie masz uprawnień do tej operacji.", { status: 403, path });
   }
 
   if (!response.ok) {
@@ -142,8 +213,10 @@ export async function backendDownload(
     });
   }
 
+  const blob = await response.blob();
+  if (typeof window !== "undefined" && revision !== sessionRevision) throw new DOMException("Sesja zmieniła się.", "AbortError");
   return {
-    blob: await response.blob(),
+    blob,
     fileName: getDownloadFileName(response.headers.get("content-disposition")),
   };
 }
@@ -157,6 +230,10 @@ export function getErrorMessage(
   }
 
   return fallback;
+}
+
+export function isAbortError(error: unknown) {
+  return error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
 }
 
 export function isForbiddenError(error: unknown) {
@@ -279,16 +356,18 @@ function handleUnauthorizedSession() {
   }
 
   authRedirectStarted = true;
+  clearClientSession();
 
   const nextPath = `${window.location.pathname}${window.location.search}`;
   const loginPath = `/login?reason=session-expired&next=${encodeURIComponent(
     nextPath,
   )}`;
 
-  fetch("/api/auth/logout", {
+  void fetch("/api/auth/logout", {
     method: "POST",
     cache: "no-store",
-  }).finally(() => {
+    signal: AbortSignal.timeout(5000),
+  }).catch(() => undefined).finally(() => {
     window.location.assign(loginPath);
   });
 }

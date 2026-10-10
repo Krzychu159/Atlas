@@ -22,6 +22,6 @@ export type TrainerPackage = {
   createdBy: number | null;
 };
 
-export function getTrainerPackages() {
-  return backendGet<TrainerPackage[]>("Packages");
+export function getTrainerPackages(signal?: AbortSignal) {
+  return backendGet<TrainerPackage[]>("Packages", undefined, signal);
 }

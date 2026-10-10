@@ -1,7 +1,10 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Link2, MapPin, Save } from "lucide-react";
+
+import { isNotFoundError } from "@/app/lib/backend";
+import { safeExternalUrl } from "@/app/lib/safe-url";
 
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
@@ -89,6 +92,8 @@ export default function EditClientModal({
   groupLocationNames = [],
   groupLocationsAvailable = true,
 }: EditClientModalProps) {
+  const saveLock = useRef(false);
+  const lifecycle = useRef(0);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
 
@@ -106,58 +111,54 @@ export default function EditClientModal({
     useState<ClientTrainingPlan | null>(null);
 
   const [trainingPlanUrl, setTrainingPlanUrl] = useState("");
+  const [planReady, setPlanReady] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-
-    Promise.all([
-      getTrainersForEditModal(access, trainerMe),
-      getLocationsForEditModal(access, trainerMe),
-    ])
+    let active = true;
+    Promise.all([getTrainersForEditModal(access, trainerMe), getLocationsForEditModal(access, trainerMe)])
       .then(([trainersData, locationsData]) => {
-        setTrainers(trainersData);
-        setLocations(locationsData);
-      })
-      .catch(() => {
-        setTrainers([]);
-        setLocations([]);
-      });
+        if (!active) return;
+        setTrainers(trainersData); setLocations(locationsData);
+      }).catch(() => { if (active) { setTrainers([]); setLocations([]); } });
+    return () => { active = false; };
   }, [access, open, trainerMe]);
 
+  const currentClientId = client?.id;
   useEffect(() => {
-  if (!client || !open) return;
-
-  const currentClient = client;
-
-  void Promise.resolve().then(() => {
-    setFirstName(currentClient.firstName || "");
-    setLastName(currentClient.lastName || "");
-    setEmail(currentClient.email || "");
-    setPhoneNumber(currentClient.phoneNumber || "");
-    setAvatarUrl(currentClient.avatarUrl || "");
-    setTrainerId(
-      currentClient.trainerId ? String(currentClient.trainerId) : "",
-    );
-    setLocationId(resolveClientLocationId(currentClient, locations));
-    setGoal(currentClient.goal || "");
-    setTrainingStartDate(toDateInputValue(currentClient.trainingStartDate));
-  });
-}, [client, locations, open]);
+    const revision = ++lifecycle.current;
+    if (!client || !open) return;
+    const current = client;
+    void Promise.resolve().then(() => {
+      if (revision !== lifecycle.current) return;
+      setFirstName(current.firstName || ""); setLastName(current.lastName || "");
+      setEmail(current.email || ""); setPhoneNumber(current.phoneNumber || "");
+      setAvatarUrl(current.avatarUrl || ""); setTrainerId(current.trainerId ? String(current.trainerId) : "");
+      setLocationId(current.locationId ? String(current.locationId) : resolveClientLocationId(current, locations));
+      setGoal(current.goal || ""); setTrainingStartDate(toDateInputValue(current.trainingStartDate));
+    });
+    return () => { lifecycle.current += 1; };
+    // A new client object (e.g. after avatar upload) must not overwrite the draft.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentClientId, open]);
 
   useEffect(() => {
     if (!client || !open) return;
+    setLocationId(value => value || resolveClientLocationId(client, locations));
+  }, [client, locations, open]);
 
-    getTrainingPlanForEditModal(client.id, access)
-      .then((plan) => {
-        setTrainingPlan(plan);
-        setTrainingPlanUrl(plan.url || plan.googleDriveFolderUrl || "");
-      })
-      .catch(() => {
-        setTrainingPlan(null);
-        setTrainingPlanUrl("");
-      });
-  }, [access, client, open]);
+  useEffect(() => {
+    if (!currentClientId || !open) return;
+    let active = true;
+    const controller = new AbortController();
+    setTrainingPlan(null); setTrainingPlanUrl(""); setPlanReady(false); setPlanError(null);
+    getTrainingPlanForEditModal(currentClientId, access, controller.signal)
+      .then(plan => { if (active) { setTrainingPlan(plan); setTrainingPlanUrl(plan.url || plan.googleDriveFolderUrl || ""); setPlanReady(true); } })
+      .catch(error => { if (active) { setTrainingPlan(null); setTrainingPlanUrl(""); if (isNotFoundError(error)) setPlanReady(true); else setPlanError("Nie udało się pobrać linku do plików. Zamknij edycję i spróbuj ponownie."); } });
+    return () => { active = false; controller.abort(); };
+  }, [access, currentClientId, open]);
 
   if (!open || !client) return null;
 
@@ -208,6 +209,8 @@ export default function EditClientModal({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saveLock.current || !planReady) return;
+    const revision = lifecycle.current;
 
     const resolvedLocationId = Number(locationId);
 
@@ -256,6 +259,7 @@ export default function EditClientModal({
       return;
     }
 
+    saveLock.current = true;
     try {
       setIsSaving(true);
 
@@ -267,6 +271,7 @@ export default function EditClientModal({
         trainerMe,
       );
 
+      if (revision !== lifecycle.current) return;
       const failedFields = getClientUpdateFailedFields(
         confirmedClient,
         payload,
@@ -298,6 +303,7 @@ export default function EditClientModal({
           access,
         );
 
+        if (revision !== lifecycle.current) return;
         const normalizedPlan: ClientTrainingPlan = {
           ...savedPlan,
           fileName: savedPlan.fileName || "Folder klienta",
@@ -322,11 +328,13 @@ export default function EditClientModal({
 
       onClose();
     } catch (err) {
+      if (revision !== lifecycle.current) return;
       showOwnerError(err, "Nie udało się zaktualizować klienta.", {
         id: "owner-client-edit-error",
       });
     } finally {
-      setIsSaving(false);
+      saveLock.current = false;
+      if (revision === lifecycle.current) setIsSaving(false);
     }
   }
 
@@ -337,11 +345,13 @@ export default function EditClientModal({
       );
     }
 
+    const revision = lifecycle.current;
     const uploadedUrl =
       access === "trainer"
         ? await uploadTrainerClientAvatar(clientId, file)
         : await uploadClientAvatar(clientId, file);
 
+    if (revision !== lifecycle.current) return uploadedUrl;
     setAvatarUrl(uploadedUrl);
     onAvatarChanged?.(uploadedUrl);
 
@@ -354,6 +364,7 @@ export default function EditClientModal({
 
   async function handleAvatarRemove() {
     if (!hasUserAccount) return;
+    const revision = lifecycle.current;
 
     if (access === "trainer") {
       await deleteTrainerClientAvatar(clientId);
@@ -361,6 +372,7 @@ export default function EditClientModal({
       await deleteClientAvatar(clientId);
     }
 
+    if (revision !== lifecycle.current) return;
     setAvatarUrl("");
     onAvatarChanged?.("");
 
@@ -542,8 +554,10 @@ export default function EditClientModal({
                 </p>
               </div>
 
+              {!planReady ? <p role="status" className="mb-3 text-sm text-on-surface-variant">{planError || "Pobieramy link do plików…"}</p> : null}
               <OwnerTextField
                 label="Link do folderu"
+                disabled={!planReady || isSaving}
                 value={trainingPlanUrl}
                 onChange={setTrainingPlanUrl}
                 placeholder="https://drive.google.com/drive/folders/..."
@@ -564,7 +578,7 @@ export default function EditClientModal({
 
           <Button
             type="submit"
-            disabled={isSaving}
+            disabled={isSaving || !planReady}
             icon={<Save size={16} />}
           >
             {isSaving ? "Zapisywanie..." : "Zapisz zmiany"}
@@ -595,8 +609,8 @@ async function getLocationsForEditModal(access: "owner" | "trainer", trainerMe?:
   return trainerPortalMeToLocations(trainerMe || await getTrainerPortalMe());
 }
 
-async function getTrainingPlanForEditModal(clientId: number, access: "owner" | "trainer") {
-  return access === "trainer" ? getTrainerPortalClientTrainingPlan(clientId) : getClientTrainingPlan(clientId);
+async function getTrainingPlanForEditModal(clientId: number, access: "owner" | "trainer", signal?: AbortSignal) {
+  return access === "trainer" ? getTrainerPortalClientTrainingPlan(clientId, signal) : getClientTrainingPlan(clientId);
 }
 
 async function updateClientForEditModal(clientId: number, payload: UpdateClientPayload, access: "owner" | "trainer") {
@@ -700,12 +714,7 @@ function parseUrl(value: string) {
 }
 
 function isValidUrl(value: string) {
-  const parsedUrl = parseUrl(value);
-
-  return (
-    parsedUrl?.protocol === "http:" ||
-    parsedUrl?.protocol === "https:"
-  );
+  return Boolean(safeExternalUrl(value));
 }
 
 function getClientUpdateFailedFields(

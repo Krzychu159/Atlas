@@ -18,10 +18,11 @@ export default function GroupSessionDetails({ session, trainerAccess = false, pa
   const [loading, setLoading] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const revision = useRef(0);
+  const profileController = useRef<AbortController | null>(null);
   useEffect(() => {
     if (session.isGroupSession !== true) return;
     const timer = window.setInterval(() => setNow(Date.now()), 30000);
-    return () => { window.clearInterval(timer); revision.current += 1; };
+    return () => { window.clearInterval(timer); revision.current += 1; profileController.current?.abort(); };
   }, [session.isGroupSession]);
   if (session.isGroupSession !== true) return null;
   const rules = session.bookingRules;
@@ -29,9 +30,11 @@ export default function GroupSessionDetails({ session, trainerAccess = false, pa
   const cancellationTime = cancellationUtc ? Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(cancellationUtc) ? cancellationUtc : `${cancellationUtc}Z`) : NaN;
   async function openProfile(clientId: number) {
     const current = ++revision.current;
+    profileController.current?.abort();
+    const controller = new AbortController(); profileController.current = controller;
     setProfile(null); setProfileError(null); setLoading(true);
     try {
-      const data = await getTrainerGroupParticipantProfile(session.id, clientId);
+      const data = await getTrainerGroupParticipantProfile(session.id, clientId, controller.signal);
       if (current === revision.current) setProfile(data);
     } catch (error) {
       if (current === revision.current) setProfileError(error instanceof ApiError && error.status === 404
@@ -57,7 +60,7 @@ export default function GroupSessionDetails({ session, trainerAccess = false, pa
     {profileError ? <p role="alert" className="text-sm text-on-surface-variant">{profileError}</p> : null}
     {profile ? <section aria-label="Profil uczestnika" className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4">
       <h3 className="font-semibold">{profile.fullName || "Uczestnik bez nazwy"}</h3><p className="mt-2 text-sm text-on-surface-variant">{attendanceLabel(profile.attendanceStatus)}</p>
-      <Button type="button" variant="secondary" className="mt-3" onClick={() => { revision.current += 1; setProfile(null); }}>Zamknij profil</Button>
+      <Button type="button" variant="secondary" className="mt-3" onClick={() => { revision.current += 1; profileController.current?.abort(); setProfile(null); setLoading(false); }}>Zamknij profil</Button>
     </section> : null}
   </>;
   return <section className="mt-5 space-y-4" aria-label="Szczegóły zajęć grupowych">

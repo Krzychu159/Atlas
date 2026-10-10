@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CalendarDays,
   Check,
@@ -41,6 +41,8 @@ export default function ClientRewardProgress({
   trainingStartDate,
   variant = "compact",
 }: Props) {
+  const revision = useRef(0);
+  const loadController = useRef<AbortController | null>(null);
   const [progressData, setProgressData] = useState<ClientMilestonesResponse | null>(null);
   const [selected, setSelected] = useState<ClientMilestone | null>(null);
   const [note, setNote] = useState("");
@@ -51,9 +53,13 @@ export default function ClientRewardProgress({
   const loadMilestones = useCallback(async () => {
     if (access !== "client" && !clientId) return null;
 
+    const current = ++revision.current;
+    loadController.current?.abort();
+    const controller = new AbortController(); loadController.current = controller;
     try {
       setIsLoading(true);
-      const data = await getClientMilestones(access, clientId);
+      const data = await getClientMilestones(access, clientId, controller.signal);
+      if (current !== revision.current || controller.signal.aborted) return null;
       const sorted = {
         ...data,
         milestones: [...data.milestones].sort(
@@ -63,18 +69,19 @@ export default function ClientRewardProgress({
       setProgressData(sorted);
       return sorted;
     } catch (error) {
+      if (current !== revision.current || controller.signal.aborted) return null;
       showAppError(error, "Nie udało się pobrać postępu nagród.", {
         id: `${access}-milestones-load-error-${clientId || "me"}`,
       });
       return null;
     } finally {
-      setIsLoading(false);
+      if (current === revision.current) setIsLoading(false);
     }
   }, [access, clientId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadMilestones(), 0);
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); revision.current += 1; loadController.current?.abort(); };
   }, [loadMilestones]);
 
   const milestones = progressData?.milestones ?? [];

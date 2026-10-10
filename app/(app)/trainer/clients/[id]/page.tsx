@@ -32,10 +32,14 @@ import {
   getTrainerPortalMe,
   type TrainerPortalMe,
 } from "@/app/lib/trainer/portal";
+import { safeExternalUrl } from "@/app/lib/safe-url";
 import { trainerPortalClientToClient } from "@/app/lib/trainer/portal-mappers";
 
 export default function TrainerClientDetailsPage() {
   const loadRevision = useRef(0);
+  const loadController = useRef<AbortController | null>(null);
+  const [sectionLoading, setSectionLoading] = useState({ subscription: true, usage: true, sessions: true, billing: true });
+  const [editingLoading, setEditingLoading] = useState(false);
   const [sectionErrors, setSectionErrors] = useState<string[]>([]);
   const correctionRevision = useSessionCorrectionRevision();
   const params = useParams<{ id: string }>();
@@ -59,108 +63,67 @@ export default function TrainerClientDetailsPage() {
 
   async function loadClientDetails() {
     const revision = ++loadRevision.current;
+    loadController.current?.abort();
+    const controller = new AbortController();
+    loadController.current = controller;
+    const signal = controller.signal;
+    const active = () => revision === loadRevision.current && !signal.aborted;
     const clientId = Number(params.id);
-
+    setIsEditOpen(false);
+    setMe(null);
+    setEditingLoading(false);
+    setTrainingPlan(null);
     if (!Number.isSafeInteger(clientId) || clientId <= 0) {
       setClient(null);
       setLoadError("Nie można otworzyć tego klienta. Wróć do listy klientów i wybierz go ponownie.");
-      showOwnerError(new Error("Nie można otworzyć tego klienta. Wróć do listy klientów i wybierz go ponownie."), "", {
-        id: "trainer-client-invalid-id",
-      });
       setIsLoading(false);
       return;
     }
-
-    try {
-      setIsLoading(true);
-      setLoadError(null);
-      setBillingError(null);
-      setSessionsError(null);
-      setSectionErrors([]);
-      setClient(null);
-      setSubscription(null);
-      setUsage(null);
-      setSessions([]);
-      setTrainingPlan(null);
-      setBilling(null);
-      setPayments([]);
-
-      const meData = await getTrainerPortalMe().catch(() => null);
-      if (revision !== loadRevision.current) return;
-      setMe(meData);
-
-      const [
-        clientResult,
-        subscriptionResult,
-        usageResult,
-        sessionsResult,
-        trainingPlanResult,
-        paymentsResult,
-      ] = await Promise.allSettled([
-        getClientForTrainerView(clientId, meData),
-        getTrainerPortalClientSubscription(clientId),
-        getTrainerPortalClientSubscriptionUsage(clientId),
-        getClientSessions(clientId),
-        getTrainerPortalClientTrainingPlan(clientId),
-        getTrainerPortalClientBilling(clientId),
-      ]);
-
-      if (revision !== loadRevision.current) return;
-      if (clientResult.status !== "fulfilled") {
-        throw clientResult.reason;
-      }
-
-      setClient(clientResult.value);
-      setSectionErrors([
-        subscriptionResult.status === "rejected" ? trainerPaymentError(subscriptionResult.reason, "Nie udało się pobrać odnowień pakietu.") : null,
-        usageResult.status === "rejected" ? trainerPaymentError(usageResult.reason, "Nie udało się pobrać wykorzystania pakietu.") : null,
-        trainingPlanResult.status === "rejected" ? trainerPaymentError(trainingPlanResult.reason, "Nie udało się pobrać plików klienta.") : null,
-      ].filter((message): message is string => message !== null));
-
-      if (subscriptionResult.status === "fulfilled") {
-        setSubscription(subscriptionResult.value);
-      }
-
-      if (usageResult.status === "fulfilled") {
-        setUsage(usageResult.value);
-      }
-
-      if (sessionsResult.status === "fulfilled") {
-        setSessions(sessionsResult.value);
-      } else {
-        setSessionsError(trainerPaymentError(sessionsResult.reason, "Nie udało się pobrać treningów klienta."));
-      }
-
-      if (trainingPlanResult.status === "fulfilled") {
-        setTrainingPlan(trainingPlanResult.value);
-      }
-
-      if (paymentsResult.status === "fulfilled") {
-        setBilling(paymentsResult.value);
-        setPayments([...(paymentsResult.value.payments || [])].sort((first, second) => Date.parse(second.paymentDate || second.createdAt) - Date.parse(first.paymentDate || first.createdAt)));
-      } else {
-        setBilling(null);
-        setPayments([]);
-        setBillingError(trainerPaymentError(paymentsResult.reason, "Nie udało się pobrać rozliczeń klienta."));
-      }
-    } catch (err) {
-      if (revision !== loadRevision.current) return;
-      const message = trainerPaymentError(err, "Nie udało się pobrać klienta. Spróbuj ponownie.");
-      setLoadError(message);
-      showOwnerError(new Error(message), message, {
-        id: "trainer-client-load-error",
-      });
-    } finally {
-      if (revision === loadRevision.current) setIsLoading(false);
+    setIsLoading(true); setLoadError(null); setClient(null);
+    setBillingError(null); setSessionsError(null); setSectionErrors([]);
+    setSubscription(null); setUsage(null); setSessions([]); setBilling(null); setPayments([]);
+    setSectionLoading({ subscription: true, usage: true, sessions: true, billing: true });
+    async function section<T>(key: keyof typeof sectionLoading, request: Promise<T>, apply: (value: T) => void, fallback: string) {
+      try { const value = await request; if (active()) apply(value); }
+      catch (error) {
+        if (!active()) return;
+        const message = trainerPaymentError(error, fallback);
+        if (key === "billing") setBillingError(message);
+        else if (key === "sessions") setSessionsError(message);
+        else setSectionErrors(errors => [...errors, message]);
+      } finally { if (active()) setSectionLoading(current => ({ ...current, [key]: false })); }
     }
+    // Each section publishes its own result; the hero never waits for billing/history.
+    const profile = getTrainerPortalClient(clientId, signal).then(data => {
+      if (active()) setClient(trainerPortalClientToClient(data, null));
+    }).catch(error => {
+      if (!active()) return;
+      setLoadError(trainerPaymentError(error, "Nie udało się pobrać klienta. Spróbuj ponownie."));
+      controller.abort();
+    }).finally(() => { if (revision === loadRevision.current) setIsLoading(false); });
+    await Promise.all([
+      profile,
+      section("subscription", getTrainerPortalClientSubscription(clientId, signal), setSubscription, "Nie udało się pobrać odnowień pakietu."),
+      section("usage", getTrainerPortalClientSubscriptionUsage(clientId, signal), setUsage, "Nie udało się pobrać wykorzystania pakietu."),
+      section("sessions", getClientSessions(clientId, signal), setSessions, "Nie udało się pobrać treningów klienta."),
+      section("billing", getTrainerPortalClientBilling(clientId, signal), data => {
+        setBilling(data);
+        setPayments([...(data.payments || [])].sort((a, b) => Date.parse(b.paymentDate || b.createdAt) - Date.parse(a.paymentDate || a.createdAt)));
+      }, "Nie udało się pobrać rozliczeń klienta."),
+    ]);
   }
 
-  async function getClientForTrainerView(
-    clientId: number,
-    meData: TrainerPortalMe | null,
-  ) {
-    const clientData = await getTrainerPortalClient(clientId);
-    return trainerPortalClientToClient(clientData, meData);
+  async function handleOpenEdit() {
+    if (editingLoading) return;
+    if (me) { setIsEditOpen(true); return; }
+    const revision = loadRevision.current;
+    setEditingLoading(true);
+    try {
+      const data = await getTrainerPortalMe(loadController.current?.signal);
+      if (revision === loadRevision.current) { setMe(data); setIsEditOpen(true); }
+    } catch (error) {
+      if (revision === loadRevision.current && !loadController.current?.signal.aborted) showOwnerError(error, "Nie udało się otworzyć edycji klienta.");
+    } finally { if (revision === loadRevision.current) setEditingLoading(false); }
   }
 
   useEffect(() => {
@@ -168,12 +131,13 @@ export default function TrainerClientDetailsPage() {
       void loadClientDetails();
     }, 0);
 
-    return () => { window.clearTimeout(timer); loadRevision.current += 1; };
+    return () => { window.clearTimeout(timer); loadRevision.current += 1; loadController.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id, correctionRevision]);
 
   async function handleOpenTrainingPlan() {
     if (!client) return;
+    const revision = loadRevision.current;
 
     const cachedUrl = getTrainingPlanUrl(trainingPlan);
 
@@ -191,11 +155,13 @@ export default function TrainerClientDetailsPage() {
     let url = "";
 
     try {
-      const plan = await getTrainerPortalClientTrainingPlan(client.id);
+      const plan = await getTrainerPortalClientTrainingPlan(client.id, loadController.current?.signal);
+      if (revision !== loadRevision.current) { pendingTab?.close(); return; }
       setTrainingPlan(plan);
       url = getTrainingPlanUrl(plan);
     } catch (error) {
       pendingTab?.close();
+      if (revision !== loadRevision.current || loadController.current?.signal.aborted) return;
       const message = trainerPaymentError(error, "Nie udało się otworzyć plików klienta. Spróbuj ponownie.");
       showOwnerError(new Error(message), message);
       return;
@@ -231,17 +197,18 @@ export default function TrainerClientDetailsPage() {
         </div>
       ) : null}
 
-      {client ? (
+      {client && client.id === Number(params.id) ? (
         <>
           <ClientProfileHero
             client={client}
             milestoneAccess="trainer"
             backHref="/trainer/clients"
             paymentsHref={`/trainer/clients/${client.id}/payments`}
-            onEdit={() => setIsEditOpen(true)}
+            onEdit={() => void handleOpenEdit()}
             onFiles={handleOpenTrainingPlan}
           />
           {sectionErrors.length ? <div role="alert" className="card-shell p-5 text-sm text-on-surface-variant">{sectionErrors.map((message, index) => <p key={index}>{message}</p>)}<Button variant="secondary" className="mt-3" onClick={() => void loadClientDetails()}>Spróbuj ponownie</Button></div> : null}
+          {sectionLoading.subscription || sectionLoading.usage ? <p role="status" className="text-sm text-on-surface-variant">Pobieranie wykorzystania pakietu…</p> : null}
           <ClientMetricCards
             preserveMissingData
             client={client}
@@ -249,7 +216,7 @@ export default function TrainerClientDetailsPage() {
             usage={usage}
             billing={billing}
           />
-          {billingError ? <div role="alert" className="card-shell p-5 text-on-surface-variant">{billingError}<Button variant="secondary" className="mt-3" onClick={() => void loadClientDetails()}>Spróbuj ponownie</Button></div> : <ClientPackagesSection packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} />}
+          {sectionLoading.billing ? <p role="status" className="card-shell p-5">Pobieranie rozliczeń klienta…</p> : billingError ? <div role="alert" className="card-shell p-5 text-on-surface-variant">{billingError}<Button variant="secondary" className="mt-3" onClick={() => void loadClientDetails()}>Spróbuj ponownie</Button></div> : <ClientPackagesSection packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} />}
           {billing ? <section className="card-shell overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 p-5">
               <h2 className="text-section-title">Historia wpłat</h2>
@@ -259,8 +226,9 @@ export default function TrainerClientDetailsPage() {
           </section> : null}
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_330px]">
-            {sessionsError ? <div role="alert" className="card-shell p-5 text-on-surface-variant">{sessionsError}</div> : <ClientSessionsPanel sessions={sessions} />}
+            {sectionLoading.sessions ? <p role="status" className="card-shell p-5">Pobieranie treningów klienta…</p> : sessionsError ? <div role="alert" className="card-shell p-5 text-on-surface-variant">{sessionsError}</div> : <ClientSessionsPanel sessions={sessions} />}
             <ClientNotesPanel
+              key={client.id}
               client={client}
               payments={payments}
               showPayments={false}
@@ -271,6 +239,7 @@ export default function TrainerClientDetailsPage() {
           </div>
 
           <EditClientModal
+            key={client.id}
             open={isEditOpen}
             client={client}
             access="trainer"
@@ -291,5 +260,5 @@ export default function TrainerClientDetailsPage() {
 }
 
 function getTrainingPlanUrl(plan: ClientTrainingPlan | null) {
-  return plan?.url || plan?.googleDriveFolderUrl || "";
+  return safeExternalUrl(plan?.url || plan?.googleDriveFolderUrl) || "";
 }

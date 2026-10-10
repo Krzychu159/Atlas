@@ -11,5 +11,5 @@ export default async function TrainerClientPaymentsPage({
 }: TrainerClientPaymentsPageProps) {
   const { id } = await params;
 
-  return <ClientPaymentsPageClient clientIdParam={id} basePath="/trainer" />;
+  return <ClientPaymentsPageClient key={id} clientIdParam={id} basePath="/trainer" />;
 }

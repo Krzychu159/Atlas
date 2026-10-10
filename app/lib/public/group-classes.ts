@@ -1,4 +1,4 @@
-import { backendFetch } from "../backend";
+import { backendFetch, clearClientSession } from "../backend";
 
 export type PublicLocation = { id: number; name: string; city: string | null; address: string | null };
 export type PublicGroupPackage = {
@@ -48,6 +48,7 @@ export async function authenticatePublicClient(payload: { email: string; passwor
   });
   const result = await response.json().catch(() => null);
   if (!response.ok || !result?.user) throw new Error(typeof result?.message === "string" ? result.message : "Nie udało się zalogować. Spróbuj ponownie.");
+  clearClientSession();
   return result;
 }
 export const registerPublicClient = (payload: PublicRegistrationPayload) => authenticatePublicClient(payload, true);

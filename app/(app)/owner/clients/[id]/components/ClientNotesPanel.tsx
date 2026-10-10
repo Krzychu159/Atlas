@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PaymentCompactRow } from "@/app/components/payments/PaymentDisplay";
 import { Button } from "@/app/components/ui/button";
 import { updateClient, type Client } from "@/app/lib/owner/clients";
 import {
-  getTrainerPortalMe,
   updateTrainerPortalClient,
   type TrainerPortalMe,
 } from "@/app/lib/trainer/portal";
@@ -33,6 +32,9 @@ export default function ClientNotesPanel({
   readOnly?: boolean;
   showPayments?: boolean;
 }) {
+  const saveLock = useRef(false);
+  const revision = useRef(0);
+  useEffect(() => { revision.current += 1; return () => { revision.current += 1; }; }, [client.id]);
   const [draft, setDraft] = useState({
     clientId: client.id,
     notes: client.notes || "",
@@ -41,6 +43,9 @@ export default function ClientNotesPanel({
   const notes = draft.clientId === client.id ? draft.notes : client.notes || "";
 
   async function handleSaveNotes() {
+    if (saveLock.current) return;
+    saveLock.current = true;
+    const current = revision.current;
     try {
       setIsSaving(true);
       const payload = {
@@ -64,16 +69,19 @@ export default function ClientNotesPanel({
         access,
         trainerMe,
       );
+      if (current !== revision.current) return;
       onClientChange(updatedClient);
       showOwnerSuccess("Notatki klienta zostały zapisane.", {
         id: "owner-client-notes-success",
       });
     } catch (err) {
+      if (current !== revision.current) return;
       showOwnerError(err, "Nie udało się zapisać notatek.", {
         id: "owner-client-notes-error",
       });
     } finally {
-      setIsSaving(false);
+      saveLock.current = false;
+      if (current === revision.current) setIsSaving(false);
     }
   }
 
@@ -117,9 +125,7 @@ async function updateClientNotes(
 ) {
   if (access === "trainer") {
     const updated = await updateTrainerPortalClient(client.id, payload);
-    const me = trainerMe || (await getTrainerPortalMe().catch(() => null));
-
-    return trainerPortalClientToClient(updated, me);
+    return trainerPortalClientToClient(updated, trainerMe || null);
   }
   return updateClient(client.id, payload);
 }

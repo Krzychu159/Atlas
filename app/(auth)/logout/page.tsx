@@ -1,5 +1,7 @@
 "use client";
 
+import { clearBackendRequests, clearClientSession } from "@/app/lib/backend";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, LogOut, ShieldAlert } from "lucide-react";
@@ -47,11 +49,14 @@ export default function LogoutPage() {
         loginParams.set("next", nextPath);
       }
 
+      clearBackendRequests();
       await fetch("/api/auth/logout", {
         method: "POST",
         cache: "no-store",
+        signal: AbortSignal.timeout(5000),
       }).catch(() => undefined);
 
+      clearClientSession();
       if (!cancelled) {
         const query = loginParams.toString();
         router.replace(query ? `/login?${query}` : "/login");

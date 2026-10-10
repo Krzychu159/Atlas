@@ -1,4 +1,4 @@
-import { backendGet, backendPost } from "@/app/lib/backend";
+import { backendGet, backendPost, invalidateBackendGets } from "@/app/lib/backend";
 
 export type NotificationSeverity =
   | "Info"
@@ -33,8 +33,8 @@ export type UnreadCountResponse = {
 export type NotificationCategory = { key: string; label: string };
 export type NotificationParams = { limit?: number; category?: string; isRead?: boolean };
 
-export function getNotificationCategories() {
-  return backendGet<NotificationCategory[]>("Notifications/categories");
+export function getNotificationCategories(signal?: AbortSignal) {
+  return backendGet<NotificationCategory[]>("Notifications/categories", undefined, signal);
 }
 
 export type ReadAllResponse = {
@@ -45,12 +45,12 @@ export type NotificationRole = "owner" | "trainer" | "client";
 
 export const NOTIFICATIONS_CHANGED_EVENT = "atlas:notifications-changed";
 
-export function getNotifications(params: NotificationParams = {}) {
-  return backendGet<AppNotification[]>("Notifications", { ...params, limit: params.limit ?? 50 });
+export function getNotifications(params: NotificationParams = {}, signal?: AbortSignal) {
+  return backendGet<AppNotification[]>("Notifications", { ...params, limit: params.limit ?? 50 }, signal);
 }
 
-export function getUnreadNotificationCount(category?: string) {
-  return backendGet<UnreadCountResponse>("Notifications/unread-count", { category });
+export function getUnreadNotificationCount(category?: string, signal?: AbortSignal) {
+  return backendGet<UnreadCountResponse>("Notifications/unread-count", { category }, signal);
 }
 
 const pendingReads = new Map<number, Promise<void>>();
@@ -63,7 +63,7 @@ export function markNotificationAsRead(id: number) {
       notifyNotificationsChanged(-1);
       return result;
     })
-    .finally(() => pendingReads.delete(id));
+    .finally(() => { if (pendingReads.get(id) === request) pendingReads.delete(id); });
   pendingReads.set(id, request);
   return request;
 }
@@ -76,6 +76,7 @@ export async function markAllNotificationsAsRead(category?: string) {
 
 export function notifyNotificationsChanged(unreadCountDelta?: number) {
   if (typeof window !== "undefined") {
+    invalidateBackendGets(["Notifications", "Notifications/unread-count"]);
     window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, { detail: { unreadCountDelta } }));
   }
 }
@@ -195,6 +196,10 @@ export function getNotificationDestination(notification: AppNotification, reques
 // Keep the clicked preview available across client-side navigation if marking it
 // read moves it beyond the backend's first page. Never persist notification data.
 let preview: { item: AppNotification; expires: number } | null = null;
+export function clearNotificationMemory() {
+  pendingReads.clear();
+  preview = null;
+}
 export function rememberNotificationPreview(item: AppNotification) {
   preview = { item, expires: Date.now() + 60_000 };
 }

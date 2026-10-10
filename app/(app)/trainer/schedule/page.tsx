@@ -43,6 +43,10 @@ export default function TrainerSchedulePage() {
   const [createDate, setCreateDate] = useState(() => new Date());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const loadRevision = useRef(0);
+  const sessionController = useRef<AbortController | null>(null);
+  const detailController = useRef<AbortController | null>(null);
+  const resourceController = useRef<AbortController | null>(null);
+  const mounted = useRef(true);
   const detailRevision = useRef(0);
   const resourceRevision = useRef(0);
   const saving = useRef(false);
@@ -58,11 +62,14 @@ export default function TrainerSchedulePage() {
   })), [sessions, period, statusFilter]);
 
   const loadSessions = useCallback(async () => {
+    if (!mounted.current) return;
+    sessionController.current?.abort();
+    const controller = new AbortController(); sessionController.current = controller;
     const revision = ++loadRevision.current;
     setIsLoading(true);
     setLoadError(null);
     try {
-      const data = await getTrainerPortalSessions();
+      const data = await getTrainerPortalSessions(controller.signal);
       if (revision !== loadRevision.current) return;
       setSessions(trainerPortalSessionsToCalendarSessions({ sessions: data }));
     } catch (error) {
@@ -74,11 +81,13 @@ export default function TrainerSchedulePage() {
   }, []);
 
   const loadResources = useCallback(async () => {
+    resourceController.current?.abort();
+    const controller = new AbortController(); resourceController.current = controller;
     const revision = ++resourceRevision.current;
     setIsResourcesLoading(true);
     setResourcesError(null);
     try {
-      const [meData, clientData] = await Promise.all([getTrainerPortalMe(), getTrainerPortalClients()]);
+      const [meData, clientData] = await Promise.all([getTrainerPortalMe(controller.signal), getTrainerPortalClients(controller.signal)]);
       if (revision !== resourceRevision.current) return;
       setMe(meData);
       setClients(trainerPortalClientsToClients(clientData, meData));
@@ -89,16 +98,18 @@ export default function TrainerSchedulePage() {
   }, []);
 
   useEffect(() => {
+    mounted.current = true;
     void loadSessions();
-    return () => { loadRevision.current += 1; detailRevision.current += 1; };
+    return () => { mounted.current = false; loadRevision.current += 1; detailRevision.current += 1; sessionController.current?.abort(); detailController.current?.abort(); };
   }, [loadSessions, calendarRevision]);
-  useEffect(() => { void loadResources(); return () => { resourceRevision.current += 1; }; }, [loadResources]);
+  useEffect(() => { void loadResources(); return () => { resourceRevision.current += 1; resourceController.current?.abort(); }; }, [loadResources]);
   useEffect(() => {
     let active = true;
-    getOutlookStatus().then(data => { if (active) setOutlookStatus(data); }).catch(error => {
+    const controller = new AbortController();
+    getOutlookStatus(controller.signal).then(data => { if (active) setOutlookStatus(data); }).catch(error => {
       if (active) setOutlookError(trainerPaymentError(error, "Nie udało się sprawdzić połączenia z Outlookiem."));
     });
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, []);
 
   function openCreate(date = anchorDate) {
@@ -107,11 +118,14 @@ export default function TrainerSchedulePage() {
     setIsCreateOpen(true);
   }
   const openDetails = useCallback(async (session: Pick<CalendarSession, "id">) => {
+    if (!mounted.current) return;
+    detailController.current?.abort();
+    const controller = new AbortController(); detailController.current = controller;
     const revision = ++detailRevision.current;
     setIsDetailLoading(true);
     setSelectedSession(null);
     try {
-      const details = await getTrainerPortalSession(session.id);
+      const details = await getTrainerPortalSession(session.id, controller.signal);
       if (revision === detailRevision.current) setSelectedSession(details);
     } catch (error) {
       if (revision === detailRevision.current) showAppError(new Error(trainerPaymentError(error, "Nie udało się pobrać szczegółów zajęć.")), "Nie udało się pobrać szczegółów zajęć.");
@@ -145,10 +159,12 @@ export default function TrainerSchedulePage() {
       saving.current = true;
       setIsSaving(true);
       await createTrainerPortalSession(payload);
+      if (!mounted.current) return;
       setIsCreateOpen(false);
       showAppSuccess("Zajęcia zostały dodane.");
       await loadSessions();
     } catch (error) {
+      if (!mounted.current) return;
       const message = trainerPaymentError(error, "Nie udało się dodać zajęć. Sprawdź wpisane dane i dostępność miejsc.");
       showAppError(new Error(message), message);
       if (error instanceof ApiError) await loadSessions();
@@ -176,16 +192,26 @@ export default function TrainerSchedulePage() {
       }
       saving.current = true; setIsSaving(true);
       await updateTrainerPortalSession(session.id, { ...payload, title: values.title.trim(), correctionReason: values.correctionReason?.trim() || null });
+      if (!mounted.current) return;
       setIsEditOpen(false);
       showAppSuccess("Zmiany w zajęciach zostały zapisane.");
       await loadSessions();
       await openDetails({ id: session.id });
     } catch (error) {
+      if (!mounted.current) return;
       showAppError(new Error(trainerPaymentError(error, "Nie udało się zapisać zmian w zajęciach.")), "Nie udało się zapisać zmian w zajęciach.");
       if (error instanceof ApiError) {
         await loadSessions();
-        try { setSelectedSession(await getTrainerPortalSession(session.id)); setEditorRevision(current => current + 1); }
-        catch (refreshError) { setIsEditOpen(false); setSelectedSession(null); showAppError(new Error(trainerPaymentError(refreshError, "Nie udało się odświeżyć szczegółów zajęć.")), "Nie udało się odświeżyć szczegółów zajęć."); }
+        if (!mounted.current) return;
+        const revision = ++detailRevision.current;
+        detailController.current?.abort();
+        const controller = new AbortController(); detailController.current = controller;
+        try {
+          const refreshed = await getTrainerPortalSession(session.id, controller.signal);
+          if (revision !== detailRevision.current || !mounted.current) return;
+          setSelectedSession(refreshed); setEditorRevision(current => current + 1);
+        }
+        catch (refreshError) { if (revision !== detailRevision.current || !mounted.current) return; setIsEditOpen(false); setSelectedSession(null); showAppError(new Error(trainerPaymentError(refreshError, "Nie udało się odświeżyć szczegółów zajęć.")), "Nie udało się odświeżyć szczegółów zajęć."); }
       }
     } finally { saving.current = false; setIsSaving(false); }
   }
@@ -228,7 +254,7 @@ export default function TrainerSchedulePage() {
           {view === "week" ? <WeekSchedule days={weekDays} sessions={visibleSessions} isLoading={isLoading} onSelectSession={openDetails} onCreateSession={canCreate ? openCreate : undefined} /> : <DaySchedule date={anchorDate} sessions={visibleSessions} isLoading={isLoading} onSelectSession={openDetails} onCreateSession={canCreate ? openCreate : undefined} />}
         </>}
       </div>
-      {selectedSession && !isEditOpen ? <TrainerSessionDetailsModal session={selectedSession} onEdit={!isResourcesLoading && !resourcesError && selectedSession.trainerId === me?.trainerId ? () => { if (selectedSession.canEdit === true) setIsEditOpen(true); } : undefined} onClose={() => { detailRevision.current += 1; setSelectedSession(null); }} /> : null}
+      {selectedSession && !isEditOpen ? <TrainerSessionDetailsModal session={selectedSession} onEdit={!isResourcesLoading && !resourcesError && selectedSession.trainerId === me?.trainerId ? () => { if (selectedSession.canEdit === true) setIsEditOpen(true); } : undefined} onClose={() => { detailRevision.current += 1; detailController.current?.abort(); setSelectedSession(null); }} /> : null}
       {isEditOpen && selectedSession ? <SessionEditorModal key={"edit-" + selectedSession.id + "-" + editorRevision} open session={selectedSession} anchorDate={new Date(selectedSession.startAt)} trainers={trainers} locations={locations} clients={clients} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsEditOpen(false); }} onSubmit={handleEdit} /> : null}
       <SessionEditorModal key={isCreateOpen ? "new-" + toDateInputValue(createDate) : "closed"} open={isCreateOpen} session={null} anchorDate={createDate} trainers={trainers} locations={locations} clients={clients} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsCreateOpen(false); }} onSubmit={handleCreate} />
     </>

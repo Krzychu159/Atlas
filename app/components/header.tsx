@@ -15,11 +15,7 @@ import {
 import NotificationsPanel from "@/app/(app)/owner/components/NotificationsPanel";
 import type { AppRole } from "@/app/components/navigation";
 import { CustomSelect } from "@/app/components/ui/custom-select";
-import {
-  CURRENT_USER_CHANGED_EVENT,
-  getCurrentUser,
-  type CurrentUser,
-} from "@/app/lib/auth/current-user";
+import { useCurrentUser } from "@/app/components/current-user-provider";
 import { getClients, type Client } from "@/app/lib/owner/clients";
 import {
   matchesOwnerLocationId,
@@ -81,7 +77,7 @@ export function Header({ role, unreadNotificationCount, onUnreadCountChange }: H
     selectedLocationId,
     setSelectedLocationValue,
   } = useOwnerLocationFilter();
-  const [user, setUser] = useState<CurrentUser | null>(null);
+  const { user } = useCurrentUser();
   const [query, setQuery] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
@@ -90,30 +86,6 @@ export function Header({ role, unreadNotificationCount, onUnreadCountChange }: H
   const [directoriesLoaded, setDirectoriesLoaded] = useState(false);
 
   const notificationsHref = `/${role}/notifications`;
-
-  useEffect(() => {
-    let active = true;
-
-    const refreshUser = () => {
-      getCurrentUser()
-        .then((currentUser) => {
-          if (active) setUser(currentUser);
-        })
-        .catch(() => {
-          if (active) setUser(null);
-        });
-    };
-
-    refreshUser();
-    window.addEventListener(CURRENT_USER_CHANGED_EVENT, refreshUser);
-
-    return () => {
-      active = false;
-      window.removeEventListener(CURRENT_USER_CHANGED_EVENT, refreshUser);
-    };
-  }, []);
-
-
 
   useEffect(() => {
     if (role !== "owner") return;

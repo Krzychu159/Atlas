@@ -1,5 +1,7 @@
 "use client";
 
+import { clearClientSession } from "@/app/lib/backend";
+
 import { getErrorMessage } from "@/app/lib/backend";
 
 import { useState } from "react";
@@ -218,6 +220,7 @@ export default function LoginPage() {
         throw new Error(data?.message || "Logowanie nie powiodło się.");
       }
 
+      clearClientSession();
       const params = new URLSearchParams(window.location.search);
       const role = (data as { user?: { role?: string } })?.user?.role;
       const nextPath = getSafeRedirectPath(params.get("next"));

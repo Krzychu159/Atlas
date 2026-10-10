@@ -89,17 +89,17 @@ export function restoreMilestoneDefinition(id: number) {
   );
 }
 
-export async function getClientMilestones(access: MilestoneAccess, clientId?: number) {
+export async function getClientMilestones(access: MilestoneAccess, clientId?: number, signal?: AbortSignal) {
   let response: ClientMilestonesResponse | ClientMilestone[];
 
   if (access === "client") {
     response = await backendGet<ClientMilestonesResponse | ClientMilestone[]>(
-      "client-portal/milestones",
+      "client-portal/milestones", undefined, signal,
     );
   } else {
     const prefix = access === "owner" ? "owner" : "trainer-portal";
     response = await backendGet<ClientMilestonesResponse | ClientMilestone[]>(
-      `${prefix}/clients/${clientId}/milestones`,
+      `${prefix}/clients/${clientId}/milestones`, undefined, signal,
     );
   }
 

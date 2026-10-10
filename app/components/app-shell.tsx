@@ -8,11 +8,8 @@ import { getUnreadNotificationCount, NOTIFICATIONS_CHANGED_EVENT } from "@/app/l
 import { SidebarNav } from "@/app/components/sidebar-nav";
 import { Header } from "@/app/components/header";
 import { navigationByRole, type AppRole } from "@/app/components/navigation";
-import {
-  CURRENT_USER_CHANGED_EVENT,
-  getCurrentUser,
-  type CurrentUser,
-} from "@/app/lib/auth/current-user";
+import type { CurrentUser } from "@/app/lib/auth/current-user";
+import { useCurrentUser } from "@/app/components/current-user-provider";
 
 type AppShellProps = {
   children: ReactNode;
@@ -34,7 +31,7 @@ function getRoleSubtitle(role: AppRole) {
 
 export function AppShell({ children, role }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [user, setUser] = useState<CurrentUser | null>(null);
+  const { user } = useCurrentUser();
   const subtitle = getRoleSubtitle(role);
   const navItems = navigationByRole[role];
   const [unreadCount, setUnreadCount] = useState(0);
@@ -44,11 +41,14 @@ export function AppShell({ children, role }: AppShellProps) {
   useEffect(() => {
     let active = true;
     let revision = 0;
+    let controller: AbortController | null = null;
     const refreshUnreadCount = (event?: Event) => {
       const requestRevision = ++revision;
+      controller?.abort();
+      controller = new AbortController();
       const delta = (event as CustomEvent<{ unreadCountDelta?: number }> | undefined)?.detail?.unreadCountDelta;
       if (typeof delta === "number") setUnreadCount(count => Math.max(0, count + delta));
-      getUnreadNotificationCount()
+      getUnreadNotificationCount(undefined, controller.signal)
         .then(data => { if (active && requestRevision === revision) setUnreadCount(data.unreadCount); })
         .catch(() => {});
     };
@@ -56,6 +56,7 @@ export function AppShell({ children, role }: AppShellProps) {
     window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshUnreadCount);
     return () => {
       active = false;
+      controller?.abort();
       window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshUnreadCount);
     };
   }, [role]);
@@ -76,27 +77,6 @@ export function AppShell({ children, role }: AppShellProps) {
     };
   }, [mobileMenuOpen]);
 
-  useEffect(() => {
-    let active = true;
-
-    const refreshUser = () => {
-      getCurrentUser()
-        .then((data) => {
-          if (active) setUser(data);
-        })
-        .catch(() => {
-          if (active) setUser(null);
-        });
-    };
-
-    refreshUser();
-    window.addEventListener(CURRENT_USER_CHANGED_EVENT, refreshUser);
-
-    return () => {
-      active = false;
-      window.removeEventListener(CURRENT_USER_CHANGED_EVENT, refreshUser);
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-surface text-on-surface">

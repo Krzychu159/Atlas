@@ -66,7 +66,6 @@ import {
   getTrainerPortalClientBilling,
   getTrainerPortalClientSubscription,
   getTrainerPortalClientSubscriptionUsage,
-  getTrainerPortalMe,
   getTrainerPortalPendingPayments,
   resumeTrainerPortalClientSubscription,
   setTrainerPortalClientNextPackage,
@@ -95,6 +94,8 @@ export default function ClientPaymentsPageClient({
 }: ClientPaymentsPageClientProps) {
   const mutationLock = useRef(false);
   const loadRevision = useRef(0);
+  const trainerLoad = useRef<AbortController | null>(null);
+  const mounted = useRef(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -136,6 +137,7 @@ export default function ClientPaymentsPageClient({
   } | null>(null);
   const [reversalReason, setReversalReason] = useState("");
   useEffect(() => {
+    mounted.current = true;
     const timer = window.setTimeout(() => {
       const parsedId = Number(clientIdParam);
 
@@ -155,7 +157,7 @@ export default function ClientPaymentsPageClient({
       void loadClientPayments(parsedId);
     }, 0);
 
-    return () => { window.clearTimeout(timer); loadRevision.current += 1; };
+    return () => { window.clearTimeout(timer); mounted.current = false; loadRevision.current += 1; trainerLoad.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientIdParam, correctionRevision]);
 
@@ -190,6 +192,7 @@ export default function ClientPaymentsPageClient({
         getClientRefunds(id, { page: 1, pageSize: 25 }),
       ]);
 
+      if (revision !== loadRevision.current || !mounted.current) return;
       setClient(clientData);
       setRefunds(refundsData.items || []);
       setBilling(billingData);
@@ -231,37 +234,61 @@ export default function ClientPaymentsPageClient({
   }
 
   async function loadTrainerClientPayments(id: number, revision: number) {
-    const [clientData, meData] = await Promise.all([
-      getTrainerPortalClient(id), getTrainerPortalMe().catch(() => null),
+    const controller = new AbortController();
+    trainerLoad.current?.abort(); trainerLoad.current = controller;
+    const signal = controller.signal;
+    const [clientResult, billingResult, subscriptionResult, usageResult, catalogResult, pendingResult] = await Promise.allSettled([
+      getTrainerPortalClient(id, signal), getTrainerPortalClientBilling(id, signal),
+      getTrainerPortalClientSubscription(id, signal), getTrainerPortalClientSubscriptionUsage(id, signal),
+      getTrainerPackages(signal), getTrainerPortalPendingPayments(signal),
     ]);
-    const [billingResult, subscriptionResult, usageResult, catalogResult, pendingResult] = await Promise.allSettled([
-      getTrainerPortalClientBilling(id),
-      getTrainerPortalClientSubscription(id),
-      getTrainerPortalClientSubscriptionUsage(id),
-      getTrainerPackages(),
-      getTrainerPortalPendingPayments(),
-    ]);
-    if (revision !== loadRevision.current) return;
+    if (revision !== loadRevision.current || signal.aborted) return;
+    if (clientResult.status === "rejected") throw clientResult.reason;
     if (billingResult.status === "rejected") throw billingResult.reason;
     const billingData = billingResult.value;
     const subscriptionData = subscriptionResult.status === "fulfilled" ? subscriptionResult.value : null;
-    const mappedClient = trainerPortalClientToClient(clientData, meData);
+    const mappedClient = trainerPortalClientToClient(clientResult.value, null);
     setSubscriptionError(subscriptionResult.status === "rejected" ? trainerPaymentError(subscriptionResult.reason, "Nie udało się pobrać odnowień pakietu.") : null);
     setUsageError(usageResult.status === "rejected" ? trainerPaymentError(usageResult.reason, "Nie udało się pobrać wykorzystania pakietu.") : null);
-    setCatalogError(catalogResult.status === "rejected" ? trainerPaymentError(catalogResult.reason, "Nie udało się pobrać oferty pakietów. Odśwież widok, aby wybrać kolejny pakiet.") : null);
-    setConfirmablePaymentIds(new Set(pendingResult.status === "fulfilled" ? pendingResult.value.map((payment) => payment.id) : []));
-    setPendingPaymentsError(pendingResult.status === "rejected" ? trainerPaymentError(pendingResult.reason, "Nie udało się sprawdzić wpłat oczekujących. Odśwież widok przed potwierdzeniem wpłaty.") : null);
-    setClient(mappedClient);
-    setBilling(billingData);
-    setSubscription(subscriptionData);
+    setCatalogError(catalogResult.status === "rejected" ? trainerPaymentError(catalogResult.reason, "Nie udało się pobrać oferty pakietów.") : null);
+    setConfirmablePaymentIds(new Set(pendingResult.status === "fulfilled" ? pendingResult.value.filter(payment => payment.clientId === id).map(payment => payment.id) : []));
+    setPendingPaymentsError(pendingResult.status === "rejected" ? trainerPaymentError(pendingResult.reason, "Nie udało się sprawdzić wpłat oczekujących.") : null);
+    setClient(mappedClient); setBilling(billingData); setSubscription(subscriptionData);
     setUsage(usageResult.status === "fulfilled" ? usageResult.value : null);
-    setClientPayments(billingData.payments || []);
-    setPaymentPage(1);
-    setPackages(catalogResult.status === "fulfilled" ? catalogResult.value.filter((item) => item.isActive && packageMatchesClientLocation(item, mappedClient.locationId)) : []);
+    setClientPayments(billingData.payments || []); setPaymentPage(1);
+    setPackages(catalogResult.status === "fulfilled" ? catalogResult.value.filter(item => item.isActive && packageMatchesClientLocation(item, mappedClient.locationId)) : []);
     setPaymentAmount(typeof billingData.activePackageAmountDue === "number" ? String(Math.max(billingData.activePackageAmountDue, 0)) : "");
     setPaymentPackageId(billingData.activeClientPackageId ? String(billingData.activeClientPackageId) : "");
-    setSelectedPackageId("");
-    setSelectedNextPackageId(subscriptionData?.nextPackage?.packageId ? String(subscriptionData.nextPackage.packageId) : "");
+    setSelectedPackageId(""); setSelectedNextPackageId(subscriptionData?.nextPackage?.packageId ? String(subscriptionData.nextPackage.packageId) : "");
+  }
+
+  async function refreshTrainerBilling(id: number) {
+    if (!mounted.current) return;
+    const revision = ++loadRevision.current;
+    trainerLoad.current?.abort();
+    const controller = new AbortController(); trainerLoad.current = controller;
+    setIsLoading(true); setLoadError(null);
+    const signal = controller.signal;
+    try {
+      const [billingResult, subscriptionResult, usageResult, pendingResult] = await Promise.allSettled([
+        getTrainerPortalClientBilling(id, signal), getTrainerPortalClientSubscription(id, signal),
+        getTrainerPortalClientSubscriptionUsage(id, signal), getTrainerPortalPendingPayments(signal),
+      ]);
+      if (revision !== loadRevision.current || signal.aborted) return;
+      if (billingResult.status === "rejected") throw billingResult.reason;
+      setBilling(billingResult.value); setClientPayments(billingResult.value.payments || []);
+      setPaymentPackageId(billingResult.value.activeClientPackageId ? String(billingResult.value.activeClientPackageId) : "");
+      setPaymentPage(1);
+      setSubscription(subscriptionResult.status === "fulfilled" ? subscriptionResult.value : null);
+      setSubscriptionError(subscriptionResult.status === "rejected" ? trainerPaymentError(subscriptionResult.reason, "Nie udało się pobrać odnowień pakietu.") : null);
+      setUsage(usageResult.status === "fulfilled" ? usageResult.value : null);
+      setUsageError(usageResult.status === "rejected" ? trainerPaymentError(usageResult.reason, "Nie udało się pobrać wykorzystania pakietu.") : null);
+      setConfirmablePaymentIds(new Set(pendingResult.status === "fulfilled" ? pendingResult.value.filter(payment => payment.clientId === id).map(payment => payment.id) : []));
+      setPendingPaymentsError(pendingResult.status === "rejected" ? trainerPaymentError(pendingResult.reason, "Nie udało się sprawdzić wpłat oczekujących.") : null);
+      setPaymentAmount(typeof billingResult.value.activePackageAmountDue === "number" ? String(Math.max(billingResult.value.activePackageAmountDue, 0)) : "");
+    } catch (error) {
+      if (revision === loadRevision.current && !signal.aborted) { setBilling(null); setLoadError(trainerPaymentError(error, "Nie udało się odświeżyć rozliczeń klienta.")); }
+    } finally { if (revision === loadRevision.current) setIsLoading(false); }
   }
 
   async function handleConfirmRefund(reference: string) {
@@ -362,8 +389,10 @@ export default function ClientPaymentsPageClient({
         ? await setTrainerPortalClientNextPackage(clientId, selectedPackage.id)
         : await setClientNextPackage(clientId, selectedPackage.id);
 
+      if (!mounted.current) return;
       setSubscription(data);
-      await loadClientPayments(clientId);
+      setSubscriptionError(null);
+      if (basePath === "/owner") await loadClientPayments(clientId);
       setSelectedNextPackageId(
         data.nextPackage?.packageId
           ? String(data.nextPackage.packageId)
@@ -399,8 +428,10 @@ export default function ClientPaymentsPageClient({
         basePath === "/trainer"
           ? await cancelTrainerPortalClientSubscription(clientId)
           : await cancelClientSubscription(clientId);
+      if (!mounted.current) return;
       setSubscription(data);
-      await loadClientPayments(clientId);
+      setSubscriptionError(null);
+      if (basePath === "/owner") await loadClientPayments(clientId);
       showOwnerSuccess("Zakończenie po pakiecie zostało ustawione.", {
         id: "owner-client-cancel-after-cycle-updated",
       });
@@ -431,8 +462,10 @@ export default function ClientPaymentsPageClient({
         basePath === "/trainer"
           ? await resumeTrainerPortalClientSubscription(clientId)
           : await resumeClientSubscription(clientId);
+      if (!mounted.current) return;
       setSubscription(data);
-      await loadClientPayments(clientId);
+      setSubscriptionError(null);
+      if (basePath === "/owner") await loadClientPayments(clientId);
       showOwnerSuccess("Automatyczne przedłużanie zostało wznowione.", {
         id: "owner-client-autorenew-resumed",
       });
@@ -501,7 +534,8 @@ export default function ClientPaymentsPageClient({
       });
       setPaymentNote("");
       setIsPaymentModalOpen(false);
-      await loadClientPayments(clientId);
+      if (basePath === "/trainer") await refreshTrainerBilling(clientId);
+      else await loadClientPayments(clientId);
     } catch (err) {
       showOwnerError(basePath === "/trainer" ? new Error(trainerPaymentError(err, "Nie udało się zapisać zmian. Spróbuj ponownie.")) : err, "Nie udało się dodać wpłaty.", {
         id: "owner-client-payment-create-error",
@@ -535,7 +569,8 @@ export default function ClientPaymentsPageClient({
       showOwnerSuccess("Wpłata została potwierdzona.", {
         id: `owner-client-payment-confirmed-${payment.id}`,
       });
-      await loadClientPayments(clientId);
+      if (basePath === "/trainer") await refreshTrainerBilling(clientId);
+      else await loadClientPayments(clientId);
     } catch (err) {
       showOwnerError(basePath === "/trainer" ? new Error(trainerPaymentError(err, "Nie udało się zapisać zmian. Spróbuj ponownie.")) : err, "Nie udało się potwierdzić wpłaty.", {
         id: `owner-client-payment-confirm-error-${payment.id}`,

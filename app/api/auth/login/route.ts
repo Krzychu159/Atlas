@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getAuthCookieOptions } from "@/app/lib/server/auth-cookies";
+import { hasSameOrigin } from "@/app/lib/server/request-origin";
 
 export async function POST(req: Request) {
+  if (!hasSameOrigin(req)) return NextResponse.json({ message: "Odśwież stronę i spróbuj ponownie." }, { status: 403 });
   try {
     const body = await req.json();
     const backendUrl = process.env.BACKEND_API_URL;
@@ -23,6 +25,8 @@ export async function POST(req: Request) {
         password: body.password,
       }),
       cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
     });
 
     const data = await response.json();
@@ -35,6 +39,10 @@ export async function POST(req: Request) {
     }
 
     const role = String(data.role || "").toLowerCase();
+
+    if (typeof data.token !== "string" || !data.token || typeof data.refreshToken !== "string" || !data.refreshToken || !data.userId || !["owner", "trainer", "client"].includes(role)) {
+      return NextResponse.json({ message: "Nie udało się potwierdzić logowania. Spróbuj ponownie." }, { status: 502 });
+    }
 
     const res = NextResponse.json({
       ok: true,

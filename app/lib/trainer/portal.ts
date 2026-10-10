@@ -257,8 +257,8 @@ export type UpdateTrainerPortalProfilePayload = {
   experienceYears?: number;
 };
 
-export function getTrainerPortalDashboard() {
-  return backendGet<TrainerPortalDashboard>("trainer-portal/dashboard");
+export function getTrainerPortalDashboard(signal?: AbortSignal) {
+  return backendGet<TrainerPortalDashboard>("trainer-portal/dashboard", undefined, signal);
 }
 
 export type TrainerPortalSettlementItem = {
@@ -307,13 +307,13 @@ export function getTrainerPortalSettlement(year: number, month: number) {
   });
 }
 
-export function getTrainerPortalClients() {
-  return backendGet<TrainerPortalClient[]>("trainer-portal/clients");
+export function getTrainerPortalClients(signal?: AbortSignal) {
+  return backendGet<TrainerPortalClient[]>("trainer-portal/clients", undefined, signal);
 }
 
-export function getTrainerPortalClient(clientId: number) {
+export function getTrainerPortalClient(clientId: number, signal?: AbortSignal) {
   return backendGet<TrainerPortalClientDetails>(
-    `trainer-portal/clients/${clientId}`,
+    `trainer-portal/clients/${clientId}`, undefined, signal,
   );
 }
 
@@ -327,12 +327,12 @@ export function updateTrainerPortalClient(
   );
 }
 
-export function getTrainerPortalSessions() {
-  return backendGet<TrainerPortalSession[]>("trainer-portal/sessions");
+export function getTrainerPortalSessions(signal?: AbortSignal) {
+  return backendGet<TrainerPortalSession[]>("trainer-portal/sessions", undefined, signal);
 }
 
-export function getTrainerPortalSession(sessionId: number) {
-  return backendGet<TrainerSessionDetails>(`trainer-portal/sessions/${sessionId}`);
+export function getTrainerPortalSession(sessionId: number, signal?: AbortSignal) {
+  return backendGet<TrainerSessionDetails>(`trainer-portal/sessions/${sessionId}`, undefined, signal);
 }
 
 export function createTrainerPortalSession(payload: TrainerSessionPayload) {
@@ -357,12 +357,12 @@ export type TrainerGroupParticipantProfile = {
   locationId: number;
 };
 
-export function getTrainerGroupParticipantProfile(sessionId: number, clientId: number) {
-  return backendGet<TrainerGroupParticipantProfile>(`trainer-portal/sessions/${sessionId}/participants/${clientId}/profile`);
+export function getTrainerGroupParticipantProfile(sessionId: number, clientId: number, signal?: AbortSignal) {
+  return backendGet<TrainerGroupParticipantProfile>(`trainer-portal/sessions/${sessionId}/participants/${clientId}/profile`, undefined, signal);
 }
 
-export function getTrainerPortalMe() {
-  return backendGet<TrainerPortalMe>("trainer-portal/me");
+export function getTrainerPortalMe(signal?: AbortSignal) {
+  return backendGet<TrainerPortalMe>("trainer-portal/me", undefined, signal);
 }
 
 export function updateTrainerPortalMe(
@@ -371,9 +371,9 @@ export function updateTrainerPortalMe(
   return backendPatch<TrainerPortalMe>("trainer-portal/me", payload);
 }
 
-export function getTrainerPortalClientSubscription(clientId: number) {
+export function getTrainerPortalClientSubscription(clientId: number, signal?: AbortSignal) {
   return backendGet<ClientSubscription>(
-    `trainer-portal/clients/${clientId}/subscription`,
+    `trainer-portal/clients/${clientId}/subscription`, undefined, signal,
   );
 }
 
@@ -399,15 +399,15 @@ export function resumeTrainerPortalClientSubscription(clientId: number) {
   );
 }
 
-export function getTrainerPortalClientSubscriptionUsage(clientId: number) {
+export function getTrainerPortalClientSubscriptionUsage(clientId: number, signal?: AbortSignal) {
   return backendGet<SubscriptionUsage>(
-    `trainer-portal/clients/${clientId}/subscription/current-cycle/usage`,
+    `trainer-portal/clients/${clientId}/subscription/current-cycle/usage`, undefined, signal,
   );
 }
 
-export function getTrainerPortalClientBilling(clientId: number) {
+export function getTrainerPortalClientBilling(clientId: number, signal?: AbortSignal) {
   return backendGet<ClientBillingSummary>(
-    `trainer-portal/clients/${clientId}/billing`,
+    `trainer-portal/clients/${clientId}/billing`, undefined, signal,
   );
 }
 
@@ -421,8 +421,8 @@ export function createTrainerPortalClientPayment(
   );
 }
 
-export function getTrainerPortalPendingPayments() {
-  return backendGet<ClientPayment[]>("trainer-portal/payments/pending");
+export function getTrainerPortalPendingPayments(signal?: AbortSignal) {
+  return backendGet<ClientPayment[]>("trainer-portal/payments/pending", undefined, signal);
 }
 
 export function confirmTrainerPortalPayment(paymentId: number) {
@@ -438,9 +438,9 @@ export function rejectTrainerPortalPayment(paymentId: number, reason?: string) {
   );
 }
 
-export function getTrainerPortalClientTrainingPlan(clientId: number) {
+export function getTrainerPortalClientTrainingPlan(clientId: number, signal?: AbortSignal) {
   return backendGet<ClientTrainingPlan>(
-    `trainer-portal/clients/${clientId}/training-plan`,
+    `trainer-portal/clients/${clientId}/training-plan`, undefined, signal,
   );
 }
 

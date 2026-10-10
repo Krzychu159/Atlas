@@ -168,8 +168,8 @@ export function getSessionCorrections(id: number) {
   return backendGet<SessionCorrection[]>(`sessions/${id}/corrections`);
 }
 
-export function getClientSessions(clientId: number) {
-  return backendGet<OwnerSession[]>("Sessions/filter", { ClientId: clientId });
+export function getClientSessions(clientId: number, signal?: AbortSignal) {
+  return backendGet<OwnerSession[]>("Sessions/filter", { ClientId: clientId }, signal);
 }
 
 export function getTrainerSessions(trainerId: number) {

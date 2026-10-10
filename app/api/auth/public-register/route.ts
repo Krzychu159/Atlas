@@ -1,7 +1,9 @@
+import { hasSameOrigin } from "@/app/lib/server/request-origin";
 import { NextResponse } from "next/server";
 import { getAuthCookieOptions } from "@/app/lib/server/auth-cookies";
 
 export async function POST(request: Request) {
+  if (!hasSameOrigin(request)) return NextResponse.json({ message: "Nie można potwierdzić tej czynności. Odśwież stronę i spróbuj ponownie." }, { status: 403 });
   const backendUrl = process.env.BACKEND_API_URL;
   if (!backendUrl) return NextResponse.json({ message: "Rejestracja jest chwilowo niedostępna. Spróbuj ponownie później." }, { status: 500 });
   try {
@@ -10,6 +12,8 @@ export async function POST(request: Request) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
       body: JSON.stringify({ email: body.email, password: body.password, firstName: body.firstName,
         lastName: body.lastName, phoneNumber: body.phoneNumber, locationId: body.locationId,
         acceptTerms: body.acceptTerms, termsVersion: body.termsVersion }),

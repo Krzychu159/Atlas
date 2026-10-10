@@ -1,5 +1,7 @@
 "use client";
 
+import { safeExternalUrl } from "@/app/lib/safe-url";
+
 import { getPackagePaymentStatusLabel } from "@/app/lib/owner/billing";
 import { userMessage } from "@/app/lib/user-messages";
 
@@ -145,7 +147,7 @@ export default function ClientDashboardPage() {
 
   function openTrainingPlan() {
     const url =
-      trainingPlan?.googleDriveFolderUrl || trainingPlan?.url || undefined;
+      safeExternalUrl(trainingPlan?.googleDriveFolderUrl || trainingPlan?.url);
 
     if (!url) {
       showAppInfo("Trener nie udostępnił jeszcze planu treningowego. Poproś go o link.", {
