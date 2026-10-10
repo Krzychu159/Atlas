@@ -191,7 +191,12 @@ export default function TrainerSchedulePage() {
         });
       }
       saving.current = true; setIsSaving(true);
-      await updateTrainerPortalSession(session.id, { ...payload, title: values.title.trim(), correctionReason: values.correctionReason?.trim() || null });
+      await updateTrainerPortalSession(session.id, {
+        ...payload,
+        title: values.title.trim(),
+        status: payload.status ?? undefined,
+        correctionReason: values.correctionReason?.trim() || null,
+      });
       if (!mounted.current) return;
       setIsEditOpen(false);
       showAppSuccess("Zmiany w zajęciach zostały zapisane.");
