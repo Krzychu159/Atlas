@@ -1,5 +1,5 @@
 import type { AppRole } from "@/app/components/navigation";
-import { normalizeUser, type CurrentUser } from "@/app/lib/auth/user";
+import { normalizeUser, parseOrganizationContext, type CurrentUser } from "@/app/lib/auth/user";
 
 const backendUrl = process.env.BACKEND_API_URL;
 const validRoles = ["owner", "trainer", "client"] as const;
@@ -14,7 +14,7 @@ export type VerifiedSession =
 
 export const VERIFIED_USER_HEADER = "x-atlas-verified-user";
 
-export async function verifyBackendSession(accessToken: string): Promise<VerifiedSession> {
+export async function verifyBackendSession(accessToken: string, tokenResponse?: unknown): Promise<VerifiedSession> {
   if (!backendUrl) return { state: "unavailable" };
 
   try {
@@ -31,7 +31,12 @@ export async function verifyBackendSession(accessToken: string): Promise<Verifie
     if (response.status === 401) return { state: "unauthorized" };
     if (response.status === 403) return { state: "forbidden" };
     if (!response.ok) return { state: "unavailable" };
-    return { state: "authenticated", user: normalizeUser(await response.json()) };
+    const user = normalizeUser(await response.json());
+    // /me is authoritative, including explicit null. Only legacy /me may
+    // use context supplied by the same backend's token response.
+    const context = Object.prototype.hasOwnProperty.call(user, "organizationId")
+      ? {} : parseOrganizationContext(tokenResponse);
+    return { state: "authenticated", user: { ...user, ...context } };
   } catch {
     return { state: "unavailable" };
   }

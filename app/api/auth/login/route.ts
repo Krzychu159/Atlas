@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthCookieOptions } from "@/app/lib/server/auth-cookies";
+import { setSessionCookies } from "@/app/lib/server/auth-cookies";
 import { hasSameOrigin } from "@/app/lib/server/request-origin";
 import { verifyBackendSession } from "@/app/lib/server/session";
 
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Nie udało się potwierdzić logowania. Spróbuj ponownie." }, { status: 502 });
     }
 
-    const session = await verifyBackendSession(data.token);
+    const session = await verifyBackendSession(data.token, data);
     if (session.state !== "authenticated") {
       return NextResponse.json(
         { message: "Nie możemy teraz potwierdzić dostępu. Spróbuj zalogować się ponownie za chwilę." },
@@ -59,16 +59,12 @@ export async function POST(req: Request) {
         email,
         role,
         roles,
+        ...(session.user.organizationId !== undefined ? { organizationId: session.user.organizationId } : {}),
       },
     });
     res.headers.set("Cache-Control", "no-store");
 
-    const cookieOptions = getAuthCookieOptions();
-
-    res.cookies.set("accessToken", data.token, cookieOptions);
-    res.cookies.set("refreshToken", data.refreshToken, cookieOptions);
-    res.cookies.set("role", role, cookieOptions);
-    res.cookies.set("userId", id, cookieOptions);
+    setSessionCookies(res, data, session.user);
 
     return res;
   } catch (error) {

@@ -28,3 +28,20 @@ export function expireAuthCookies(response: NextResponse) {
     response.cookies.set(name, "", expiredCookie);
   });
 }
+
+export function setSessionCookies(
+  response: NextResponse,
+  tokens: { token: string; refreshToken: string },
+  user: { role: string; id: string },
+) {
+  const options = getAuthCookieOptions();
+  setTokenCookies(response, tokens);
+  response.cookies.set("role", user.role, options);
+  response.cookies.set("userId", user.id, options);
+}
+
+export function setTokenCookies(response: NextResponse, tokens: { token: string; refreshToken: string }) {
+  const options = getAuthCookieOptions();
+  response.cookies.set("accessToken", tokens.token, options);
+  response.cookies.set("refreshToken", tokens.refreshToken, options);
+}

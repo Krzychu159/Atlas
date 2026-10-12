@@ -32,6 +32,7 @@ export async function GET() {
       userId: session.user.id,
       role: session.user.role,
       roles: session.user.roles,
+      ...(session.user.organizationId !== undefined ? { organizationId: session.user.organizationId } : {}),
     },
   });
   response.headers.set("Cache-Control", "no-store");

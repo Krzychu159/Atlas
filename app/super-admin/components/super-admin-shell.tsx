@@ -62,17 +62,17 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
               <div className="min-w-0"><p className="text-sm font-medium">SuperAdmin</p><p className="mt-1 truncate text-xs text-on-surface-variant" title={user?.fullName}>{user?.fullName}</p></div>
             </div>
             <p className="mt-3 truncate font-[family-name:var(--font-super-admin-mono)] text-[11px] text-on-surface-muted" title={user?.email}>{user?.email}</p>
-            <div className="mt-3 text-xs text-on-surface-variant [&_button]:min-h-11 [&_button]:w-full [&_button]:rounded-lg [&_button]:bg-white/5 [&_button]:px-3 [&_button]:text-left [&_button:hover]:bg-white/10 [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-primary-light"><LogoutButton /></div>
+            <div data-discard-changes className="mt-3 text-xs text-on-surface-variant [&_button]:min-h-11 [&_button]:w-full [&_button]:rounded-lg [&_button]:bg-white/5 [&_button]:px-3 [&_button]:text-left [&_button:hover]:bg-white/10 [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-primary-light"><LogoutButton /></div>
           </div>
         </div>
       </aside>
 
-      <div className="md:ml-[260px]">
+      <div className="min-w-0 md:ml-[260px]">
         <div className="hidden h-16 items-center justify-between bg-[#0e1012] px-8 md:flex">
           <p className="text-xs text-on-surface-muted">Panel platformy</p>
           <span className="flex items-center gap-2 text-xs text-on-surface-variant"><Shield size={15} aria-hidden="true" />SuperAdmin</span>
         </div>
-        <main id="super-admin-content" tabIndex={-1} className="mx-auto max-w-[1440px] px-5 py-8 outline-none sm:px-8 md:py-10 lg:px-10">{children}</main>
+        <main id="super-admin-content" tabIndex={-1} className="mx-auto min-w-0 max-w-[1440px] px-5 py-8 outline-none sm:px-8 md:py-10 lg:px-10">{children}</main>
       </div>
     </div>
   );

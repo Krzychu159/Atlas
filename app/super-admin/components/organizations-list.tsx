@@ -7,6 +7,7 @@ import { Input } from "@/app/components/ui/input";
 import { filterOrganizations, getOrganizations } from "@/app/lib/super-admin/organizations";
 import { useOrganizationResource } from "./use-organization-resource";
 import { OrganizationEmpty, OrganizationError, OrganizationSkeleton } from "./organization-states";
+import { OrganizationStatus } from "./organization-status";
 
 export function OrganizationsList() {
   const [page, setPage] = useState(1);
@@ -18,19 +19,20 @@ export function OrganizationsList() {
 
   return (
     <div className="mt-8">
+      <div className="mb-6 flex justify-end"><Link href="/super-admin/organizations/new" className="inline-flex min-h-11 items-center rounded-xl bg-[#0052FF] px-5 text-sm font-semibold text-white hover:bg-primary-container focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-light">Nowa organizacja</Link></div>
       <label htmlFor="organization-search" className="mb-2 block text-xs text-on-surface-variant">Szukaj na aktualnej stronie</label>
-      <div className="max-w-lg"><Input id="organization-search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Nazwa, slug lub identyfikator organizacji" icon={<Search size={17} aria-hidden="true" />} aria-describedby="organization-search-note" /></div>
+      <div className="max-w-lg"><Input id="organization-search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Nazwa, kod lub identyfikator organizacji" icon={<Search size={17} aria-hidden="true" />} aria-describedby="organization-search-note" /></div>
       <p id="organization-search-note" className="mb-6 mt-2 text-xs text-on-surface-muted">Wyszukiwanie obejmuje tylko organizacje z aktualnie pobranej strony.</p>
 
       {loading ? <OrganizationSkeleton /> : error ? <OrganizationError error={error} retry={retry} returnPath="/super-admin/organizations" /> : data ? (
         <>
           <p role="status" className="mb-4 text-xs text-on-surface-variant">{filtered ? `Pasujące organizacje na stronie: ${items.length} z ${data.items.length}` : `Organizacje na stronie: ${items.length}`} · Łącznie: {data.total}</p>
           {!items.length ? <OrganizationEmpty filtered={filtered && data.items.length > 0} page={page} clear={() => setQuery("")} /> : (
-            <div className="overflow-x-auto rounded-xl bg-[#1a1c1e]">
+            <div className="max-w-full overflow-x-auto rounded-xl bg-[#1a1c1e]">
               <table className="w-full min-w-[620px] text-left text-sm">
                 <caption className="sr-only">Organizacje — strona {page}</caption>
-                <thead className="bg-white/[0.025] text-xs text-on-surface-muted"><tr><th scope="col" className="px-5 py-4 font-medium">Organizacja</th><th scope="col" className="px-5 py-4 font-medium">Slug</th><th scope="col" className="px-5 py-4 font-medium">Wariant interfejsu</th><th scope="col" className="px-5 py-4 text-right font-medium">Szczegóły</th></tr></thead>
-                <tbody>{items.map(organization => <tr key={organization.organizationId} className="border-t border-white/[0.035]"><th scope="row" className="px-5 py-5 font-normal"><p className="font-medium text-white">{organization.name}</p><p className="mt-1 max-w-56 break-all font-[family-name:var(--font-super-admin-mono)] text-[10px] text-on-surface-muted">{organization.organizationId}</p></th><td className="px-5 py-5 font-[family-name:var(--font-super-admin-mono)] text-xs text-on-surface-variant">{organization.slug}</td><td className="px-5 py-5 text-on-surface-variant">{organization.uiVariant}</td><td className="px-5 py-5 text-right"><Link href={`/super-admin/organizations/${encodeURIComponent(organization.organizationId)}`} aria-label={`Zobacz szczegóły organizacji ${organization.name}`} className="inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-lg bg-white/5 px-3 text-xs text-primary-light hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-primary-light">Zobacz szczegóły<ArrowRight size={14} aria-hidden="true" /></Link></td></tr>)}</tbody>
+                <thead className="bg-white/[0.025] text-xs text-on-surface-muted"><tr><th scope="col" className="px-5 py-4 font-medium">Organizacja</th><th scope="col" className="px-5 py-4 font-medium">Kod organizacji</th><th scope="col" className="px-5 py-4 font-medium">Status i dostęp do CRM</th><th scope="col" className="px-5 py-4 font-medium">Wariant interfejsu</th><th scope="col" className="px-5 py-4 text-right font-medium">Szczegóły</th></tr></thead>
+                <tbody>{items.map(organization => <tr key={organization.organizationId} className="border-t border-white/[0.035]"><th scope="row" className="max-w-64 break-words px-5 py-5 font-normal [overflow-wrap:anywhere]"><p className="font-medium text-white">{organization.name}</p><p className="mt-1 max-w-56 break-all font-[family-name:var(--font-super-admin-mono)] text-[10px] text-on-surface-muted">{organization.organizationId}</p></th><td className="max-w-48 break-all px-5 py-5 font-[family-name:var(--font-super-admin-mono)] text-xs text-on-surface-variant">{organization.slug}</td><td className="px-5 py-5"><OrganizationStatus organization={organization} /></td><td className="px-5 py-5 text-on-surface-variant">{organization.uiVariant}</td><td className="px-5 py-5 text-right"><Link href={`/super-admin/organizations/${encodeURIComponent(organization.organizationId)}`} aria-label={`Zobacz szczegóły organizacji ${organization.name}`} className="inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-lg bg-white/5 px-3 text-xs text-primary-light hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-primary-light">Zobacz szczegóły<ArrowRight size={14} aria-hidden="true" /></Link></td></tr>)}</tbody>
               </table>
             </div>
           )}

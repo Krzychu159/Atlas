@@ -97,13 +97,13 @@ test("organization profile shows actual values and leaves future modules without
   });
   const tree = view.OrganizationProfile({ organization });
   for (const value of Object.values(organization)) assert.ok(text(tree).includes(value));
-  for (const title of ["Informacje ogólne", "Branding", "Użytkownicy i role", "Lokalizacje", "Integracje", "Ustawienia organizacji"]) assert.ok(text(tree).includes(title));
+  for (const title of ["Dane organizacji", "Wygląd", "Lokalizacje", "Integracje", "Ustawienia organizacji"]) assert.ok(text(tree).includes(title));
   const nodes = descendants(tree);
   assert.equal(nodes.filter(node => ["button", "input", "form"].includes(node.type)).length, 0);
   const links = nodes.filter(node => node.type === "a");
-  assert.equal(links.length, 2);
+  assert.equal(links.length, 0);
   for (const link of links) assert.ok(nodes.some(node => `#${node.props?.id}` === link.props.href));
-  assert.ok(text(tree).includes("Edycja wkrótce"));
+  assert.ok(text(tree).includes("Wkrótce"));
 });
 
 test("401/403/404 show Polish messages and appropriate actions without raw errors", () => {
@@ -125,4 +125,163 @@ test("empty filtered page and empty catalog remain distinct", () => {
   assert.ok(text(empty).includes("Nie ma jeszcze organizacji"));
   assert.equal(descendants(filtered).filter(node => node.type === "button").length, 1);
   assert.equal(descendants(empty).filter(node => node.type === "button").length, 0);
+});
+
+const managed = { ...organization, uiVariant: "default", status: "Draft", revision: 0, crmAccessEnabled: false };
+const formValues = { name: "Atlas Demo", slug: "atlas-demo", uiVariant: "default", reason: "Środowisko testowe" };
+
+test("modern organization fields are validated without fabricating legacy values", () => {
+  assert.deepEqual(JSON.parse(JSON.stringify(api.parseManagedOrganization(managed))), managed);
+  assert.equal(Object.hasOwn(api.parseOrganization(organization), "status"), false);
+  assert.throws(() => api.parseManagedOrganization(organization));
+  for (const patch of [{ status: "Unknown" }, { revision: -1 }, { revision: 0.5 }, { crmAccessEnabled: "false" }]) assert.throws(() => api.parseOrganization({ ...managed, ...patch }));
+});
+
+test("creation validates lengths, whitespace, single hyphens and permitted variants", () => {
+  assert.equal(Object.keys(api.validateOrganizationForm(formValues)).length, 0);
+  for (const patch of [{ name: " " }, { name: "a".repeat(101) }, { slug: "" }, { slug: "UPPER" }, { slug: "a--b" }, { slug: "-a" }, { slug: "a-" }, { slug: "a_b" }, { slug: "a".repeat(101) }, { reason: "  " }, { reason: "a".repeat(1001) }, { uiVariant: "invented" }]) {
+    assert.ok(Object.keys(api.validateOrganizationForm({ ...formValues, ...patch })).length > 0);
+  }
+  assert.equal(Object.keys(api.validateOrganizationForm({ name: "a".repeat(100), slug: "a".repeat(100), uiVariant: "bsworkout", reason: "a".repeat(1000) })).length, 0);
+});
+
+test("POST and PATCH send only contracted fields and return confirmed API data", async () => {
+  const calls = [];
+  const client = load("app/lib/super-admin/organizations.ts", { "@/app/lib/backend": {
+    backendPost: async (path, body) => { calls.push({ path, body }); return managed; },
+    backendPatch: async (path, body) => { calls.push({ path, body }); return { ...managed, revision: 1, name: "Confirmed name" }; },
+  } });
+  assert.equal((await client.createOrganization({ ...formValues, crmAccessEnabled: true })).status, "Draft");
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[0])), { path: "super-admin/organizations", body: { ...formValues, initialOwnerUserId: null } });
+  const saved = await client.updateOrganization("org-1", 0, { ...formValues, status: "LegacyActive" });
+  assert.equal(saved.revision, 1);
+  assert.equal(saved.name, "Confirmed name");
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[1])), { path: "super-admin/organizations/org-1", body: { ...formValues, expectedRevision: 0 } });
+  await assert.rejects(() => client.updateOrganization("org-1", -1, formValues));
+  await assert.rejects(() => client.createOrganization({ ...formValues, slug: "bad--slug" }));
+  assert.equal(calls.length, 2);
+});
+
+test("201 is accepted by the existing client without exposing an activation operation", async () => {
+  const clientBackend = load("app/lib/backend.ts", { "./user-messages": load("app/lib/user-messages.ts") }, {
+    Response, URLSearchParams, fetch: async () => Response.json(managed, { status: 201 }),
+  });
+  const client = load("app/lib/super-admin/organizations.ts", { "@/app/lib/backend": clientBackend });
+  const created = await client.createOrganization(formValues);
+  assert.equal(created.status, "Draft");
+  assert.equal(created.crmAccessEnabled, false);
+  assert.equal(Object.keys(client).some(key => /activate|delete|impersonate/i.test(key)), false);
+});
+
+test("status rendering distinguishes Draft, LegacyActive and absent legacy fields", () => {
+  const status = load("app/super-admin/components/organization-status.tsx", { "react/jsx-runtime": { jsx, jsxs: jsx } });
+  assert.ok(text(status.OrganizationStatus({ organization: managed })).includes("Szkic"));
+  assert.ok(text(status.OrganizationStatus({ organization: managed })).includes("Brak aktywnego dostępu do CRM"));
+  assert.ok(text(status.OrganizationStatus({ organization: { ...managed, status: "LegacyActive", crmAccessEnabled: true } })).includes("Dostęp do CRM aktywny"));
+  const legacy = text(status.OrganizationStatus({ organization }));
+  assert.ok(legacy.includes("Status niedostępny"));
+  assert.ok(!legacy.includes("Szkic"));
+});
+
+function formHarness(dependencies) {
+  const slots = [];
+  let cursor = 0;
+  const react = {
+    useEffect() {},
+    useState(initial) {
+      const index = cursor++;
+      if (!(index in slots)) slots[index] = typeof initial === "function" ? initial() : initial;
+      return [slots[index], next => { slots[index] = typeof next === "function" ? next(slots[index]) : next; }];
+    },
+    useRef(initial) { const index = cursor++; if (!(index in slots)) slots[index] = { current: initial }; return slots[index]; },
+  };
+  const view = load("app/super-admin/components/organization-form.tsx", {
+    react, "react/jsx-runtime": { jsx, jsxs: jsx }, "@/app/lib/backend": backend,
+    "@/app/lib/super-admin/organizations": { ...load("app/lib/super-admin/organizations.ts", { "@/app/lib/backend": backend }), ...dependencies },
+    "./use-unsaved-changes": { useUnsavedChanges() {} },
+  });
+  return { render(props) { cursor = 0; return view.OrganizationForm(props); }, slots };
+}
+
+test("edit conflict blocks automatic PATCH replay and requests current organization data", async () => {
+  let patches = 0;
+  let refreshes = 0;
+  let saved = 0;
+  const harness = formHarness({ updateOrganization: async () => { patches++; throw new backend.ApiError("raw internal details", { status: 409 }); } });
+  const props = { organization: managed, onSaved() { saved++; }, onConflict(message) { refreshes++; assert.ok(message.includes("kod organizacji")); } };
+  harness.render(props);
+  harness.slots[0] = formValues;
+  await harness.render(props).props.onSubmit({ preventDefault() {} });
+  const blocked = harness.render(props);
+  assert.ok(descendants(blocked).some(node => node.type === "fieldset" && node.props.disabled));
+  assert.ok(!text(blocked).includes("raw internal details"));
+  await blocked.props.onSubmit({ preventDefault() {} });
+  assert.equal(patches, 1);
+  assert.equal(refreshes, 1);
+  assert.equal(saved, 0);
+});
+
+test("successful form uses server-confirmed values; old backend cannot enable editing", async () => {
+  const confirmed = { ...managed, name: "Server-confirmed", revision: 4 };
+  let result;
+  const harness = formHarness({ updateOrganization: async () => confirmed });
+  const props = { organization: managed, onSaved(value) { result = value; } };
+  harness.render(props);
+  harness.slots[0] = formValues;
+  await harness.render(props).props.onSubmit({ preventDefault() {} });
+  assert.equal(result, confirmed);
+  const legacy = formHarness({}).render({ organization, onSaved() {} });
+  assert.ok(descendants(legacy).some(node => node.type === "fieldset" && node.props.disabled));
+});
+
+test("mutation errors have safe Polish explanations for 400/401/403/404/409", () => {
+  const client = load("app/lib/super-admin/organizations.ts", { "@/app/lib/backend": backend });
+  for (const status of [400, 401, 403, 404, 409]) {
+    const message = client.organizationMutationMessage(new backend.ApiError("raw internal error", { status }));
+    assert.ok(message.length > 0);
+    assert.ok(!message.includes("raw internal"));
+  }
+});
+
+test("detail conflict refreshes the resource and success replaces it with confirmed data", () => {
+  let reloads = 0;
+  let replaced;
+  const details = load("app/super-admin/components/organization-details.tsx", {
+    react: { useCallback: callback => callback, useState: initial => [initial, () => {}] },
+    "react/jsx-runtime": { jsx, jsxs: jsx },
+    "./use-organization-resource": { useOrganizationResource: () => ({ data: managed, loading: false, error: null, retry() { reloads++; }, replace(value) { replaced = value; } }) },
+    "./organization-form": { OrganizationForm: "OrganizationForm" },
+  });
+  const form = descendants(details.OrganizationDetails({ organizationId: "org-1" })).find(node => node.type === "OrganizationForm");
+  form.props.onConflict("Conflict");
+  assert.equal(reloads, 1);
+  assert.equal(replaced, undefined);
+  const confirmed = { ...managed, revision: 1 };
+  form.props.onSaved(confirmed);
+  assert.equal(replaced, confirmed);
+});
+
+test("successful creation navigates to the returned organization; Draft has no activation control", () => {
+  let destination;
+  const page = load("app/super-admin/organizations/new/page.tsx", {
+    "react/jsx-runtime": { jsx, jsxs: jsx },
+    "next/navigation": { useRouter: () => ({ replace(path) { destination = path; } }) },
+    "../../components/organization-form": { OrganizationForm: "OrganizationForm" },
+  });
+  const form = descendants(page.default()).find(node => node.type === "OrganizationForm");
+  form.props.onSaved(managed);
+  assert.equal(destination, "/super-admin/organizations/org-1?created=1");
+  const draft = formHarness({}).render({ organization: managed, onSaved() {} });
+  assert.ok(!text(draft).includes("Aktywuj"));
+  assert.ok(!text(draft).includes("Zaloguj jako"));
+});
+
+test("invalid organization form focuses the first field without sending a mutation", async () => {
+  let focused;
+  let requests = 0;
+  const harness = formHarness({ createOrganization: async () => { requests++; } });
+  const form = harness.render({ onSaved() {} });
+  await form.props.onSubmit({ preventDefault() {}, currentTarget: { querySelector(selector) { return { focus() { focused = selector; } }; } } });
+  assert.equal(focused, '[name="name"]');
+  assert.equal(requests, 0);
 });

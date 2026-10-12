@@ -18,7 +18,16 @@ export type CurrentUser = {
   role: SessionRole;
   roles: SessionRole[];
   avatarUrl: string | null;
+  // Missing on legacy backends; explicit null means no organization context.
+  organizationId?: string | null;
 };
+
+export function parseOrganizationContext(data: unknown): { organizationId?: string | null } {
+  if (!data || typeof data !== "object" || !Object.prototype.hasOwnProperty.call(data, "organizationId")) return {};
+  const value = (data as Record<string, unknown>).organizationId;
+  if (value === null || (typeof value === "string" && value.trim())) return { organizationId: value };
+  throw new Error("Nie udało się potwierdzić profilu.");
+}
 
 export function normalizeUser(data: unknown): CurrentUser {
   if (!data || typeof data !== "object") throw new Error("Nie udało się potwierdzić profilu.");
@@ -45,5 +54,6 @@ export function normalizeUser(data: unknown): CurrentUser {
     fullName: text(source.fullName) || `${firstName} ${lastName}`.trim() || text(source.email) || "Użytkownik",
     email: text(source.email) || "Brak e-maila",
     avatarUrl: text(source.avatarUrl) || null,
+    ...parseOrganizationContext(source),
   };
 }

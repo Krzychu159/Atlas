@@ -22,5 +22,6 @@ export function useOrganizationResource<T>(key: string, load: (signal: AbortSign
     data: current?.data ?? null,
     error: current?.error ?? null,
     retry: () => setAttempt(value => value + 1),
+    replace: (data: T) => setResult({ key: requestKey, data, error: null }),
   };
 }
