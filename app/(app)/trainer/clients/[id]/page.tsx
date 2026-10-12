@@ -1,6 +1,6 @@
 "use client";
 
-import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
+import { useSessionCorrectionRevision, usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
@@ -43,6 +43,7 @@ export default function TrainerClientDetailsPage() {
   const [sectionErrors, setSectionErrors] = useState<string[]>([]);
   const correctionRevision = useSessionCorrectionRevision();
   const params = useParams<{ id: string }>();
+  const paymentDateRevision = usePaymentDateCorrectionRevision(Number(params.id));
   const [client, setClient] = useState<Client | null>(null);
   const [subscription, setSubscription] = useState<ClientSubscription | null>(
     null,
@@ -133,7 +134,7 @@ export default function TrainerClientDetailsPage() {
 
     return () => { window.clearTimeout(timer); loadRevision.current += 1; loadController.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id, correctionRevision]);
+  }, [params.id, correctionRevision, paymentDateRevision]);
 
   async function handleOpenTrainingPlan() {
     if (!client) return;
@@ -222,7 +223,7 @@ export default function TrainerClientDetailsPage() {
               <h2 className="text-section-title">Historia wpłat</h2>
               <Link className="text-sm font-semibold text-primary-light" href={"/trainer/clients/" + client.id + "/payments"}>Płatności i odnowienia pakietu</Link>
             </div>
-            <PaymentsList payments={payments} isLoading={false} processingId={null} showClient={false} emptyTitle="Brak wpłat klienta" emptyMessage="Wpłaty pojawią się tutaj po ich dodaniu." />
+            <PaymentsList dateCorrectionPortal="trainer" payments={payments} isLoading={false} processingId={null} showClient={false} emptyTitle="Brak wpłat klienta" emptyMessage="Wpłaty pojawią się tutaj po ich dodaniu." />
           </section> : null}
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_330px]">

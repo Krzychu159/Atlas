@@ -24,6 +24,10 @@ export type GroupSessionSettings = {
   cancellationClosesBeforeMinutes?: number | null;
 };
 
+export function isGroupTraining(session: { isPubliclyBookable?: boolean; plannedSessionType?: string | null; actualSessionType?: string | null }) {
+  return session.isPubliclyBookable === true || session.plannedSessionType === "Group" || session.actualSessionType === "Group";
+}
+
 export function groupSeatsLabel(session: GroupSessionFields) {
   if (session.bookedSeats == null) return "Liczba zapisanych niedostępna";
   return session.capacity != null ? `${session.bookedSeats}/${session.capacity}` : `${session.bookedSeats} zapisanych`;

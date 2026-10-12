@@ -2,7 +2,7 @@
 
 import SessionToggle from "@/app/components/schedule/SessionToggle";
 import SessionAccordion from "@/app/components/schedule/SessionAccordion";
-import { groupSeatsLabel } from "@/app/lib/group-sessions";
+import { groupSeatsLabel, isGroupTraining } from "@/app/lib/group-sessions";
 import { userTrainingType } from "@/app/lib/user-messages";
 import GroupSessionDetails from "@/app/components/schedule/GroupSessionDetails";
 import BookingThresholdField from "@/app/components/schedule/BookingThresholdField";
@@ -38,6 +38,7 @@ import {
 } from "../session-utils";
 import type { SessionEditorSession, SessionFormValues } from "../types";
 import SessionCorrectionHistory from "./SessionCorrectionHistory";
+import GroupEnrollmentsSection from "./GroupEnrollmentsSection";
 
 export default function SessionEditorModal({
   open,
@@ -54,6 +55,7 @@ export default function SessionEditorModal({
   isSaving,
   onClose,
   onSubmit,
+  onGroupEnrollmentChanged,
 }: {
   open: boolean;
   session: SessionEditorSession | null;
@@ -69,6 +71,7 @@ export default function SessionEditorModal({
   isSaving: boolean;
   onClose: () => void;
   onSubmit: (values: SessionFormValues, recurrence?: SessionRecurrence) => void;
+  onGroupEnrollmentChanged?: () => Promise<void>;
 }) {
   const [values, setValues] = useState<SessionFormValues>(() =>
     getDefaultFormValues({
@@ -80,6 +83,7 @@ export default function SessionEditorModal({
     }),
   );
   const [countsAgainstPackage, setCountsAgainstPackage] = useState(true);
+  const [groupEnrollmentBusy, setGroupEnrollmentBusy] = useState(false);
   const [sessionsCharged, setSessionsCharged] = useState("1");
   const [repeat, setRepeat] = useState(false);
   const [frequency, setFrequency] = useState<SessionRecurrence["frequency"]>("Weekly");
@@ -99,7 +103,7 @@ export default function SessionEditorModal({
   if (!open) return null;
 
   const readOnly = session?.canEdit === false || (trainerAccess && session != null && session.canEdit !== true);
-  const isGroupForm = values.plannedSessionType === "Group";
+  const isGroupForm = isGroupTraining({ ...session, isPubliclyBookable: values.isPubliclyBookable, plannedSessionType: values.plannedSessionType });
   const typeOptions = sessionTypeOptions.some(option => option.value === values.plannedSessionType) ? sessionTypeOptions : [...sessionTypeOptions, { value: values.plannedSessionType, label: userTrainingType(values.plannedSessionType, "Obecny rodzaj zajęć") }];
   const trainerOptions = trainers.map((trainer) => ({
     value: String(trainer.id),
@@ -194,6 +198,7 @@ export default function SessionEditorModal({
   }
 
   function toggleParticipant(clientId: string) {
+    if (isGroupForm) return;
     setValues((current) => {
       const participantIds = current.participantIds.includes(clientId)
         ? current.participantIds.filter((id) => id !== clientId)
@@ -218,13 +223,13 @@ export default function SessionEditorModal({
         type="button"
         aria-label="Zamknij"
         className="absolute inset-0 bg-black/70 backdrop-blur-[4px]"
-        onClick={onClose}
+        onClick={() => { if (!groupEnrollmentBusy && !isSaving) onClose(); }}
       />
 
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          if (isSaving || readOnly) return;
+          if (isSaving || groupEnrollmentBusy || readOnly) return;
           onSubmit(trainerAccess ? { ...values, newParticipantCountsAgainstPackage: countsAgainstPackage, newParticipantSessionsCharged: sessionsCharged } : values, allowRecurringSessions && !session && repeat ? {
             frequency,
             interval: Number(interval),
@@ -254,6 +259,7 @@ export default function SessionEditorModal({
 
             <button
               type="button"
+              disabled={isSaving || groupEnrollmentBusy}
               onClick={onClose}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-container-low text-on-surface-variant transition hover:text-on-surface"
               aria-label="Zamknij"
@@ -265,10 +271,10 @@ export default function SessionEditorModal({
           {readOnly ? <p className="mt-4 text-sm text-on-surface-variant">Te zajęcia są dostępne tylko do podglądu.</p> : null}
           {isGroupForm ? <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
             <span className="rounded-full bg-primary/15 px-3 py-1 font-semibold text-primary-light">Grupowe</span>
-            <span className="text-on-surface-variant">{session?.isGroupSession === true ? groupSeatsLabel(session) : values.participantIds.length + " wybranych" + (values.publicCapacity ? " · limit " + values.publicCapacity : "")}</span>
-            {session?.isGroupSession === true && session.isFullyBooked ? <span className="text-on-surface-variant">Brak miejsc</span> : null}
+            <span className="text-on-surface-variant">{session && isGroupTraining(session) ? groupSeatsLabel(session) : "Uczestników potwierdzisz po zapisaniu zajęć" + (values.publicCapacity ? " · limit " + values.publicCapacity : "")}</span>
+            {session && isGroupTraining(session) && session.isFullyBooked ? <span className="text-on-surface-variant">Brak miejsc</span> : null}
           </div> : null}
-          <fieldset disabled={isSaving || readOnly} className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+          <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly} className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
             <Field label="Tytuł" className="md:col-span-2">
               <input
                 value={values.title}
@@ -342,7 +348,8 @@ export default function SessionEditorModal({
           </fieldset>
           <div className="mt-4 space-y-3">
             <SessionAccordion title="Uczestnicy" summary={values.participantIds.length + (readOnly ? " osób" : " wybranych")}>
-              {!readOnly ? <fieldset disabled={isSaving} className="min-w-0 space-y-4">
+              {isGroupForm ? <p className="mb-3 text-sm text-on-surface-variant">Uczestników zajęć grupowych potwierdzaj w zgłoszeniach po opłaceniu odpowiedniego pakietu. Wybór klienta w formularzu nie jest zapisem na zajęcia.</p> : null}
+              {!readOnly && !isGroupForm ? <fieldset disabled={isSaving || groupEnrollmentBusy} className="min-w-0 space-y-4">
             <div className="space-y-3">
               {!trainerAccess && session?.status === "Completed" && (
                 <span className="mb-3 block text-xs text-on-surface-variant">
@@ -447,10 +454,10 @@ export default function SessionEditorModal({
           </> : null}
 
               </fieldset> : null}
-              {session?.isGroupSession === true && readOnly ? <GroupSessionDetails key={session.id + ":" + session.updatedAt} session={session} trainerAccess={trainerAccess} participantsOnly showSummary={false} wrapParticipants={false} /> : session?.isGroupSession === true ? <SessionAccordion title="Szczegóły zapisów" summary={session.bookedSeats != null ? session.bookedSeats + " zapisanych" : undefined}>
+              {session && isGroupTraining(session) && readOnly ? <GroupSessionDetails key={session.id + ":" + session.updatedAt} session={session} trainerAccess={trainerAccess} participantsOnly showSummary={false} wrapParticipants={false} /> : session && isGroupTraining(session) ? <SessionAccordion title="Szczegóły zapisów" summary={session.bookedSeats != null ? session.bookedSeats + " zapisanych" : undefined}>
                 <GroupSessionDetails key={session.id + ":" + session.updatedAt} session={session} trainerAccess={trainerAccess} participantsOnly showSummary={false} wrapParticipants={false} />
               </SessionAccordion> : null}
-          {session?.isGroupSession !== true && session?.participants?.length ? (
+          {session && !isGroupTraining(session) && session.participants?.length ? (
             <div className="mt-6 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
               <p className="text-label text-on-surface-muted">Uczestnicy</p>
               <div className="mt-3 grid max-h-[260px] gap-2 overflow-y-auto overscroll-contain md:grid-cols-2">
@@ -473,8 +480,9 @@ export default function SessionEditorModal({
             </div>
           ) : null}
             </SessionAccordion>
+            {!trainerAccess && session && isGroupTraining(session) ? <SessionAccordion title="Zgłoszenia grupowe"><GroupEnrollmentsSection key={session.id} sessionId={session.id} canConfirm={!readOnly && session.status !== "Cancelled" && session.status !== "Completed" && !isSaving} onChanged={onGroupEnrollmentChanged} onBusyChange={setGroupEnrollmentBusy} /></SessionAccordion> : null}
             {!readOnly || values.note.trim() ? <SessionAccordion title="Opis zajęć" summary={values.note.trim() ? "Uzupełniony" : undefined}>
-              <fieldset disabled={isSaving || readOnly} className="min-w-0">
+              <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly} className="min-w-0">
             <Field
               label={isGroupForm ? "Opis zajęć" : "Notatka"}
               className="md:col-span-2"
@@ -489,7 +497,7 @@ export default function SessionEditorModal({
               </fieldset>
             </SessionAccordion> : null}
             {isGroupForm && (!readOnly || values.eventRules.trim() || values.publicCapacity || values.isPubliclyBookable) ? <SessionAccordion title="Zasady uczestnictwa i rezerwacji">
-              <fieldset disabled={isSaving || readOnly} className="grid min-w-0 gap-4 md:grid-cols-2">
+              <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly} className="grid min-w-0 gap-4 md:grid-cols-2">
             {isGroupForm ? <>
               {!readOnly || values.publicCapacity ? <Field label={values.isPubliclyBookable ? "Limit uczestników" : "Limit uczestników (bez limitu: pozostaw puste)"}>
                 <input type="number" min="1" step="1" required={values.isPubliclyBookable} value={values.publicCapacity} onChange={event => updateValue("publicCapacity", event.target.value)} className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
@@ -505,7 +513,7 @@ export default function SessionEditorModal({
               </fieldset>
             </SessionAccordion> : null}
             {!readOnly || values.outlookCategories.trim() || (session?.status === "Completed" && !trainerAccess && (session.actualSessionType || session.plannedSessionType)) || values.isPubliclyBookable ? <SessionAccordion title="Ustawienia dodatkowe">
-              <fieldset disabled={isSaving || readOnly} className="grid min-w-0 gap-4 md:grid-cols-2">
+              <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly} className="grid min-w-0 gap-4 md:grid-cols-2">
             {session?.status === "Completed" && (
               <>
                 {!readOnly ? <Field label="Powód korekty" className="md:col-span-2">
@@ -549,7 +557,7 @@ export default function SessionEditorModal({
                       samodzielnie.
                     </span>
                   </span>
-                  <SessionToggle label="Zajęcia publiczne" checked={values.isPubliclyBookable} disabled={isSaving || readOnly} onChange={togglePublicSession} />
+                  <SessionToggle label="Zajęcia publiczne" checked={values.isPubliclyBookable} disabled={isSaving || groupEnrollmentBusy || readOnly} onChange={togglePublicSession} />
                 </label>
               </div>
             </div>
@@ -575,7 +583,7 @@ export default function SessionEditorModal({
             <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4 md:col-span-2">
               <label className="flex cursor-pointer items-center justify-between gap-4 font-semibold">
                 Powtarzaj
-                <SessionToggle label="Powtarzaj zajęcia" checked={repeat} disabled={isSaving || readOnly} onChange={setRepeat} />
+                <SessionToggle label="Powtarzaj zajęcia" checked={repeat} disabled={isSaving || groupEnrollmentBusy || readOnly} onChange={setRepeat} />
               </label>
               {repeat && (
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -634,13 +642,13 @@ export default function SessionEditorModal({
         </div>
 
         <div className="flex flex-col-reverse gap-3 border-t border-white/5 bg-surface-container px-5 py-4 sm:flex-row sm:justify-end md:px-6">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" disabled={isSaving || groupEnrollmentBusy} onClick={onClose}>
             Zamknij
           </Button>
           <Button
             type="submit"
             icon={session ? <Save size={16} /> : <Plus size={16} />}
-            disabled={isSaving || readOnly}
+            disabled={isSaving || groupEnrollmentBusy || readOnly}
           >
             {isSaving
               ? "Zapisywanie..."
@@ -686,3 +694,4 @@ function getOneHourLaterDateTimeLocal(value: string) {
 
   return toDateTimeLocalValue(start);
 }
+

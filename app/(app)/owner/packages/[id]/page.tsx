@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import {
   getPackage,
   getPackageClients,
@@ -62,7 +62,7 @@ export default function PackageDetailsPage({
   }, [packageId]);
 
   return (
-    <div className="max-w-[1400px] mx-auto pb-10">
+    <div className="mx-auto w-full min-w-0 max-w-[1400px] pb-10">
       <div className="flex items-center justify-between gap-4">
         <Link
           href="/owner/packages"
@@ -72,9 +72,6 @@ export default function PackageDetailsPage({
           <span className="text-lg font-semibold">Szczegóły pakietu</span>
         </Link>
 
-        <button className="h-10 w-10 rounded-full bg-surface-container-low flex items-center justify-center text-primary-light">
-          <Pencil size={18} />
-        </button>
       </div>
 
       {isLoading ? (
@@ -87,13 +84,13 @@ export default function PackageDetailsPage({
         <div className="mt-6 flex flex-col gap-5">
           <PackageDetailsHero item={item} clients={clients} />
 
-          <div className="grid grid-cols-1 lg:grid-cols-[390px_minmax(0,1fr)] gap-5 items-start">
+          <div className="grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(340px,0.85fr)_minmax(0,1.65fr)]">
             <div className="min-w-0">
               <PackageEditCard item={item} onUpdated={setItem} />
             </div>
 
             <div className="min-w-0">
-              <PackageClientsList clients={clients} />
+              <PackageClientsList clients={clients} packageId={item.id} />
             </div>
           </div>
         </div>

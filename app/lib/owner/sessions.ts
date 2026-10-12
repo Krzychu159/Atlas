@@ -73,6 +73,12 @@ export type SessionParticipantPayload = {
   note?: string | null;
 };
 
+export type AddSessionParticipantPayload = SessionParticipantPayload & { clientPackageId?: number | null };
+
+export function addSessionParticipant(sessionId: number, payload: AddSessionParticipantPayload) {
+  return backendPost<OwnerSessionParticipant>(`sessions/${sessionId}/participants`, payload);
+}
+
 export type SessionPayload = GroupSessionSettings & {
   correctionReason?: string;
   isPubliclyBookable?: boolean;

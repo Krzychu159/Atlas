@@ -31,6 +31,10 @@ export type PaymentDisplaySource = PaymentBreakdownSource & {
   clientId: number;
   clientName?: string | null;
   paymentDate?: string | null;
+  externalPaymentId?: string | null;
+  paymentProvider?: string | null;
+  providerPaymentId?: string | null;
+  checkoutUrl?: string | null;
   note?: string | null;
   rejectionReason?: string | null;
   reversalReason?: string | null;

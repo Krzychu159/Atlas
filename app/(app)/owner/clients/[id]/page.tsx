@@ -2,7 +2,7 @@
 
 import { safeExternalUrl } from "@/app/lib/safe-url";
 
-import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
+import { useSessionCorrectionRevision, usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -60,6 +60,7 @@ import {
 export default function OwnerClientDetailsPage() {
   const correctionRevision = useSessionCorrectionRevision();
   const params = useParams<{ id: string }>();
+  const paymentDateRevision = usePaymentDateCorrectionRevision(Number(params.id));
   const router = useRouter();
   const [client, setClient] = useState<Client | null>(null);
   const [subscription, setSubscription] = useState<ClientSubscription | null>(
@@ -423,7 +424,7 @@ export default function OwnerClientDetailsPage() {
     }
 
     loadClientDetails();
-  }, [params.id, correctionRevision]);
+  }, [params.id, correctionRevision, paymentDateRevision]);
 
   async function handleOpenTrainingPlan() {
     if (!client) return;

@@ -5,6 +5,7 @@ import { Button } from "@/app/components/ui/button";
 import { ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
 import { ApiError, getErrorMessage } from "@/app/lib/backend";
 import { dateInputToIsoDateTime } from "@/app/lib/formatters/date";
+import { localPackageInstantToUtc } from "@/app/lib/package-validity";
 import { formatMoney } from "@/app/lib/formatters/money";
 import { importClientPackage, type ImportClientPackagePayload } from "@/app/lib/owner/billing";
 import { getPackages, type Package } from "@/app/lib/owner/packages";
@@ -53,11 +54,11 @@ export default function ImportClientPackageModal({ open, clientId, onClose, onSa
       const selected = catalog.find((item) => item.id === Number(packageId));
       const sessions = Number(totalSessions), used = Number(usedSessions);
       const price = Number(totalPrice), paid = Number(amountPaid);
-      const purchaseIso = dateInputToIsoDateTime(purchaseDate), validityIso = dateInputToIsoDateTime(validUntil);
+      const purchaseIso = dateInputToIsoDateTime(purchaseDate), validityIso = localPackageInstantToUtc(validUntil);
       if (!selected) { setError("Wybierz pakiet katalogowy."); return; }
       if (!totalSessions.trim() || !Number.isSafeInteger(sessions) || sessions < 1 || !usedSessions.trim() || !Number.isSafeInteger(used) || used < 0 || used >= sessions) { setError("Podaj liczbę wejść. Pakiet musi mieć co najmniej jedno niewykorzystane wejście."); return; }
       if (!totalPrice.trim() || !amountPaid.trim() || !Number.isFinite(price) || !Number.isFinite(paid) || price < 0 || paid < 0 || paid > price) { setError("Cena i kwota opłacona nie mogą być ujemne. Kwota opłacona nie może przekroczyć ceny."); return; }
-      if (!purchaseIso || !validityIso) { setError("Podaj datę zakupu i ważności pakietu."); return; }
+      if (!purchaseIso || !validityIso) { setError("Podaj datę zakupu oraz poprawną datę i godzinę ważności pakietu."); return; }
       if (!reason.trim()) { setError("Podaj powód wprowadzenia stanu początkowego."); return; }
       attempt.current = {
         requestId: crypto.randomUUID(), reason: reason.trim(), usedSessions: used, amountPaid: paid,
@@ -105,7 +106,8 @@ export default function ImportClientPackageModal({ open, clientId, onClose, onSa
             <label className="text-sm">Cena ({selected?.currency || "PLN"})<input className={inputClass} type="number" min="0" step="0.01" required value={totalPrice} onChange={(event) => setTotalPrice(event.target.value)} /></label>
             <label className="text-sm">Opłacono ({selected?.currency || "PLN"})<input className={inputClass} type="number" min="0" max={Number(totalPrice) || 0} step="0.01" required value={amountPaid} onChange={(event) => setAmountPaid(event.target.value)} /></label>
             <label className="text-sm">Data zakupu<input className={inputClass} type="date" required value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} /></label>
-            <label className="text-sm">Ważny do<input className={inputClass} type="date" required value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label>
+            <label className="text-sm">Ważny do — data i godzina<input className={inputClass} type="datetime-local" required value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label>
+            <p className="text-xs text-on-surface-muted sm:col-span-2">Ważność kończy się dokładnie o wskazanej godzinie w Twojej lokalnej strefie czasowej.</p>
           </div>
           <label className="block text-sm">Powód wprowadzenia<textarea className={inputClass} required value={reason} onChange={(event) => setReason(event.target.value)} /></label>
         </fieldset>

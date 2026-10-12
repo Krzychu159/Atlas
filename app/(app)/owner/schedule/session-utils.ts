@@ -1,4 +1,4 @@
-import { groupSeatsLabel } from "@/app/lib/group-sessions";
+import { groupSeatsLabel, isGroupTraining } from "@/app/lib/group-sessions";
 import { userTrainingType } from "@/app/lib/user-messages";
 import type { Location } from "@/app/lib/owner/locations";
 import type {
@@ -34,6 +34,7 @@ export function sortSessions<TSession extends CalendarSession>(sessions: TSessio
 }
 
 export function getSessionType(session: CalendarSession) {
+  if (isGroupTraining(session)) return "Trening grupowy";
   return (
     (session.actualSessionType || session.plannedSessionType ? userTrainingType(session.actualSessionType || session.plannedSessionType) : null) ||
     session.primaryOutlookCategory ||
@@ -51,7 +52,7 @@ export function getSessionStatusLabel(status?: string | null) {
 }
 
 export function getParticipantsLabel(session: CalendarSession) {
-  if (session.isGroupSession === true) return groupSeatsLabel(session);
+  if (isGroupTraining(session)) return groupSeatsLabel(session);
   const count = session.actualParticipantsCount ?? session.participantsCount ?? session.participants?.length;
   if (count === undefined) return "Brak danych";
   const limit = session.publicCapacity ?? session.locationLimit;
@@ -116,7 +117,7 @@ export function getToneClasses(session: CalendarSession) {
 // The group flag determines the displayed kind; preserve the original API value
 // when the user saves without changing the kind.
 export function getSessionFormType(session: SessionEditorSession) {
-  if (session.isGroupSession === true || ["Group", "GroupTraining"].includes(session.plannedSessionType || "")) return "Group";
+  if (isGroupTraining(session) || session.plannedSessionType === "GroupTraining") return "Group";
   return session.plannedSessionType || "";
 }
 
@@ -205,7 +206,10 @@ export function toSessionPayload(
   }
 
   const preserveParticipants = Boolean(session && !values.participantsEdited);
-  const isGroupForm = values.plannedSessionType === "Group" || values.plannedSessionType === "GroupTraining";
+  const isGroupForm = isGroupTraining({ ...session, isPubliclyBookable: values.isPubliclyBookable, plannedSessionType: values.plannedSessionType }) || values.plannedSessionType === "GroupTraining";
+  if (isGroupForm && (!session ? values.participantIds.length > 0 : values.participantsEdited)) {
+    throw new Error("Zapis na zajęcia grupowe potwierdź w zgłoszeniach po opłaceniu odpowiedniego pakietu.");
+  }
   if (session?.status !== "Completed" && !isGroupForm && !preserveParticipants && !values.participantIds.length) {
     throw new Error("Wybierz przynajmniej jednego klienta.");
   }

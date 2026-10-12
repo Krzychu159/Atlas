@@ -176,6 +176,7 @@ export function trainerPortalSessionsToCalendarSessions({ sessions }: { sessions
     isPubliclyBookable: session.isPubliclyBookable,
     publicCapacity: session.publicCapacity,
     plannedSessionType: session.plannedSessionType,
+    actualSessionType: session.actualSessionType,
     participants: session.participants,
     title: session.title,
     note: session.note,

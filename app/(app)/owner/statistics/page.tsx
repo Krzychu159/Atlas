@@ -1,4 +1,5 @@
 "use client";
+import { usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
 import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 
@@ -58,6 +59,7 @@ export default function OwnerStatisticsPage() {
 }
 
 function OwnerStatisticsPageContent({ locationId }: { locationId: number | null }) {
+  const paymentDateRevision = usePaymentDateCorrectionRevision();
   const { setSelectedLocationValue } = useOwnerLocationFilter();
   const [filters, setFilters] = useState<StatisticsFiltersValue>(
     initialStatisticsFilters,
@@ -213,7 +215,7 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadData(), 250);
     return () => window.clearTimeout(timer);
-  }, [loadData]);
+  }, [loadData, paymentDateRevision]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

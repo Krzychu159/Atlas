@@ -5,12 +5,12 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/app/components/ui/button";
 import { ApiError } from "@/app/lib/backend";
-import { attendanceLabel, groupDateLabel, groupSeatsLabel, isCancelledParticipant, type GroupSessionFields } from "@/app/lib/group-sessions";
+import { attendanceLabel, groupDateLabel, groupSeatsLabel, isCancelledParticipant, isGroupTraining, type GroupSessionFields } from "@/app/lib/group-sessions";
 import { getTrainerGroupParticipantProfile, type TrainerGroupParticipantProfile } from "@/app/lib/trainer/portal";
 import { trainerPaymentError } from "@/app/lib/trainer/payment-errors";
 
 type Participant = { clientId: number; clientFullName: string | null; attendanceStatus: string | null };
-type GroupDetails = GroupSessionFields & { id: number; note: string | null; isPubliclyBookable?: boolean; participants?: Participant[] | null };
+type GroupDetails = GroupSessionFields & { id: number; note: string | null; isPubliclyBookable?: boolean; plannedSessionType?: string | null; actualSessionType?: string | null; participants?: Participant[] | null };
 
 export default function GroupSessionDetails({ session, trainerAccess = false, participantsOnly = false, showSummary = true, wrapParticipants = true }: { session: GroupDetails; trainerAccess?: boolean; participantsOnly?: boolean; showSummary?: boolean; wrapParticipants?: boolean }) {
   const [profile, setProfile] = useState<TrainerGroupParticipantProfile | null>(null);
@@ -19,12 +19,13 @@ export default function GroupSessionDetails({ session, trainerAccess = false, pa
   const [now, setNow] = useState(() => Date.now());
   const revision = useRef(0);
   const profileController = useRef<AbortController | null>(null);
+  const group = isGroupTraining(session) || session.isGroupSession === true;
   useEffect(() => {
-    if (session.isGroupSession !== true) return;
+    if (!group) return;
     const timer = window.setInterval(() => setNow(Date.now()), 30000);
     return () => { window.clearInterval(timer); revision.current += 1; profileController.current?.abort(); };
-  }, [session.isGroupSession]);
-  if (session.isGroupSession !== true) return null;
+  }, [group]);
+  if (!group) return null;
   const rules = session.bookingRules;
   const cancellationUtc = rules?.cancellationClosesAtUtc;
   const cancellationTime = cancellationUtc ? Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(cancellationUtc) ? cancellationUtc : `${cancellationUtc}Z`) : NaN;

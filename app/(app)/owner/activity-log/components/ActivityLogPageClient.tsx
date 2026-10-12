@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 import { LoaderCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { activityErrorMessage, defaultActivityFilters, getActivityLog, getActivityLogMetadata, validateActivityFilters, type ActivityFilters as Filters, type ActivityLogEntry, type ActivityLogMetadata, type ActivityLogResponse } from "@/app/lib/owner/activity-log";
@@ -11,6 +12,7 @@ import { ActivityDetails } from "./ActivityDetails";
 import { ActivityPagination } from "./ActivityPagination";
 
 export function ActivityLogPageClient() {
+  const paymentDateRevision = usePaymentDateCorrectionRevision();
   const [filters, setFilters] = useState<Filters>(defaultActivityFilters);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -63,7 +65,7 @@ export function ActivityLogPageClient() {
       }
     }, 250);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [filters, page, pageSize, revision, validation]);
+  }, [filters, page, pageSize, revision, validation, paymentDateRevision]);
 
   function changeFilters(next: Filters) {
     setFilters({ ...next }); setPage(1); setData(null); setError(null); setLoading(true);

@@ -136,3 +136,39 @@ test("login uses /me roles instead of login's Owner role and sets HttpOnly cooki
   assert.equal(response.cookies.get("role").value, "super-admin");
   assert.equal(response.cookies.get("accessToken").httpOnly, true);
 });
+
+test("login forwards .NET credential rejection without calling /me or changing values", async () => {
+  const calls = [];
+  const input = { email: " diagnostic@example.invalid ", password: " isolated-test-value ", rememberMe: true };
+  const fetch = async (url, options) => {
+    calls.push(url);
+    const body = JSON.parse(options.body);
+    assert.ok(body.email === input.email && body.password === input.password, "Credential values must stay unchanged");
+    assert.deepEqual(Object.keys(body).sort(), ["email", "password"]);
+    return Response.json({ message: "Invalid email or password." }, { status: 401 });
+  };
+  const route = load("app/api/auth/login/route.ts", {
+    "next/server": { NextResponse },
+    "@/app/lib/server/auth-cookies": cookies,
+    "@/app/lib/server/request-origin": { hasSameOrigin: () => true },
+    "@/app/lib/server/session": { verifyBackendSession() { throw new Error("Must not call /me after credential rejection"); } },
+  }, { fetch });
+  const response = await route.POST({ json: async () => input });
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).message, "Invalid email or password.");
+  assert.equal(calls.length, 1);
+  assert.equal(response.cookies.get("accessToken"), undefined);
+});
+
+test("/me rejection after successful login has a different 401 message", async () => {
+  const route = load("app/api/auth/login/route.ts", {
+    "next/server": { NextResponse },
+    "@/app/lib/server/auth-cookies": cookies,
+    "@/app/lib/server/request-origin": { hasSameOrigin: () => true },
+    "@/app/lib/server/session": { verifyBackendSession: async () => ({ state: "unauthorized" }) },
+  }, { fetch: async () => Response.json({ token: "isolated-test-token", refreshToken: "isolated-test-refresh" }) });
+  const response = await route.POST({ json: async () => ({ email: "diagnostic@example.invalid", password: "isolated-test-value" }) });
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).message, "Nie możemy teraz potwierdzić dostępu. Spróbuj zalogować się ponownie za chwilę.");
+  assert.equal(response.cookies.get("accessToken"), undefined);
+});

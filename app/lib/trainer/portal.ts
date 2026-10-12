@@ -6,7 +6,7 @@ import type {
   SubscriptionUsage,
   UpdateClientTrainingPlanPayload,
 } from "../owner/clients";
-import type { ClientBillingSummary, ClientPayment, CreateClientPaymentPayload } from "../owner/billing";
+import type { ClientBillingSummary, ClientPayment, CreateClientPaymentPayload, UpdatePaymentDatePayload } from "../owner/billing";
 import type { OutlookSessionColors } from "../calendar/outlook-colors";
 
 export type TrainerPortalMe = {
@@ -29,6 +29,7 @@ export type TrainerPortalSession = OutlookSessionColors & GroupSessionFields & {
   isPubliclyBookable?: boolean;
   publicCapacity?: number | null;
   plannedSessionType?: string | null;
+  actualSessionType?: string | null;
   participants?: TrainerPortalSessionParticipant[] | null;
   outlookCategories?: string[] | null;
   sessionId: number;
@@ -423,6 +424,10 @@ export function createTrainerPortalClientPayment(
 
 export function getTrainerPortalPendingPayments(signal?: AbortSignal) {
   return backendGet<ClientPayment[]>("trainer-portal/payments/pending", undefined, signal);
+}
+
+export function updateTrainerPaymentDate(paymentId: number, payload: UpdatePaymentDatePayload) {
+  return backendPatch<ClientPayment>(`trainer-portal/payments/${paymentId}/date`, payload);
 }
 
 export function confirmTrainerPortalPayment(paymentId: number) {

@@ -1,4 +1,5 @@
 import type { PackageType } from "@/app/lib/packageFilters";
+import type { Client } from "./clients";
 import {
   backendDelete,
   backendGet,
@@ -62,16 +63,8 @@ export type UpdatePackagePayload = {
   publicSlug?: string | null;
 };
 
-export type PackageClient = {
-  id: number;
-  fullName: string;
-  email?: string;
-  avatarUrl?: string | null;
-  joinedAt: string;
-  usedSessions: number;
-  sessionsLimit: number;
-  status?: string;
-};
+// GET Packages/{id}/clients returns ClientDto, not package membership details.
+export type PackageClient = Client;
 
 export function getPackages() {
   return backendGet<Package[]>("Packages");

@@ -2,7 +2,7 @@
 
 import SessionAccordion from "@/app/components/schedule/SessionAccordion";
 import GroupSessionDetails from "@/app/components/schedule/GroupSessionDetails";
-import { groupSeatsLabel } from "@/app/lib/group-sessions";
+import { groupSeatsLabel, isGroupTraining } from "@/app/lib/group-sessions";
 import { Button } from "@/app/components/ui/button";
 import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
 import { getSessionStatusLabel } from "@/app/(app)/owner/schedule/session-utils";
@@ -20,13 +20,13 @@ export default function TrainerSessionDetailsModal({ session, onClose, onEdit }:
             <Detail label="Trener" value={session.trainerFullName || "Brak danych"} />
             <Detail label="Lokalizacja" value={session.locationName || "Brak danych"} />
             <Detail label="Status" value={getSessionStatusLabel(session.status)} />
-            <Detail label="Rodzaj zajęć" value={session.isGroupSession === true ? "Grupowe" : userTrainingType(session.actualSessionType || session.plannedSessionType, "Brak danych")} />
-            <Detail label="Uczestnicy" value={session.isGroupSession === true ? groupSeatsLabel(session) : numberLabel(session.participantsCount)} />
+            <Detail label="Rodzaj zajęć" value={isGroupTraining(session) ? "Grupowe" : userTrainingType(session.actualSessionType || session.plannedSessionType, "Brak danych")} />
+            <Detail label="Uczestnicy" value={isGroupTraining(session) ? groupSeatsLabel(session) : numberLabel(session.participantsCount)} />
           </dl>
           {session.isLocationLimitExceeded === true ? <p className="mt-4 rounded-[var(--radius-lg)] bg-warning-container p-4 text-sm text-warning-light">Liczba uczestników przekracza limit lokalizacji.</p> : null}
           <GroupSessionDetails key={session.id + ":" + session.updatedAt} session={session} trainerAccess showSummary={false} />
-          {session.isGroupSession !== true && session.note?.trim() ? <div className="mt-4"><SessionAccordion title="Opis zajęć"><p className="whitespace-pre-wrap break-words text-sm leading-6 text-on-surface-variant">{session.note}</p></SessionAccordion></div> : null}
-          {session.isGroupSession !== true ? <div className="mt-4"><SessionAccordion title="Uczestnicy" summary={Array.isArray(participants) ? participants.length + " osób" : undefined}>
+          {!isGroupTraining(session) && session.note?.trim() ? <div className="mt-4"><SessionAccordion title="Opis zajęć"><p className="whitespace-pre-wrap break-words text-sm leading-6 text-on-surface-variant">{session.note}</p></SessionAccordion></div> : null}
+          {!isGroupTraining(session) ? <div className="mt-4"><SessionAccordion title="Uczestnicy" summary={Array.isArray(participants) ? participants.length + " osób" : undefined}>
           {Array.isArray(participants) ? participants.length ? <div className="grid max-h-[320px] gap-3 overflow-y-auto overscroll-contain md:grid-cols-2">
             {participants.map((participant) => <article key={participant.id} className="min-w-0 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
               <h3 className="break-words font-semibold">{participant.clientFullName || "Uczestnik bez nazwy"}</h3>
@@ -43,8 +43,8 @@ export default function TrainerSessionDetailsModal({ session, onClose, onEdit }:
             </article>)}
           </div> : <p className="mt-4 text-sm text-on-surface-variant">Brak zapisanych uczestników.</p> : <p className="mt-4 text-sm text-on-surface-variant">Lista uczestników jest niedostępna.</p>}
           </SessionAccordion></div> : null}
-          {(session.isGroupSession === true && (session.availableSeats != null || session.isPubliclyBookable)) || session.locationLimit > 0 ? <div className="mt-4"><SessionAccordion title="Ustawienia dodatkowe"><dl className="grid gap-3 text-sm sm:grid-cols-2">
-            {session.isGroupSession === true && session.availableSeats != null ? <ParticipantDetail label="Wolne miejsca" value={numberLabel(session.availableSeats)} /> : null}
+          {(isGroupTraining(session) && (session.availableSeats != null || session.isPubliclyBookable)) || session.locationLimit > 0 ? <div className="mt-4"><SessionAccordion title="Ustawienia dodatkowe"><dl className="grid gap-3 text-sm sm:grid-cols-2">
+            {isGroupTraining(session) && session.availableSeats != null ? <ParticipantDetail label="Wolne miejsca" value={numberLabel(session.availableSeats)} /> : null}
             {session.isPubliclyBookable ? <ParticipantDetail label="Zapisy" value="Publiczne" /> : null}
             {session.locationLimit > 0 ? <ParticipantDetail label="Limit lokalizacji" value={numberLabel(session.locationLimit)} /> : null}
           </dl></SessionAccordion></div> : null}
@@ -76,3 +76,4 @@ function dateLabel(value: string) {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat("pl-PL", { timeZone: "Europe/Warsaw", dateStyle: "medium", timeStyle: "short" }).format(date) : "Brak daty";
 }
+

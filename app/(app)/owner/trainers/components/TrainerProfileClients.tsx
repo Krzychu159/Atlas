@@ -52,7 +52,6 @@ export default function TrainerProfileClients({
         {clients.length > 0 ? (
           clients.slice(0, 5).map((client) => {
             const fullName = getClientName(client);
-            const progress = Math.max(0, Math.min(client.progressPercent ?? 0, 100));
 
             return (
               <Link
@@ -85,15 +84,9 @@ export default function TrainerProfileClients({
                 </div>
 
                 <div className="hidden min-w-[120px] sm:block">
-                  <p className="text-xs font-semibold text-tertiary-light">
-                    Postęp {progress}%
+                  <p className="text-xs text-on-surface-muted">
+                    Data dołączenia niedostępna
                   </p>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-container-lowest">
-                    <div
-                      className="h-full rounded-full bg-tertiary-light"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
                 </div>
 
                 <ArrowRight size={18} className="text-primary-light sm:hidden" />

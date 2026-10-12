@@ -91,6 +91,21 @@ function descendants(tree) {
 }
 function text(tree) { return JSON.stringify(tree); }
 
+test("organization profile shows actual values and leaves future modules without actions", () => {
+  const view = load("app/super-admin/components/organization-profile.tsx", {
+    "react/jsx-runtime": { jsx, jsxs: jsx },
+  });
+  const tree = view.OrganizationProfile({ organization });
+  for (const value of Object.values(organization)) assert.ok(text(tree).includes(value));
+  for (const title of ["Informacje ogólne", "Branding", "Użytkownicy i role", "Lokalizacje", "Integracje", "Ustawienia organizacji"]) assert.ok(text(tree).includes(title));
+  const nodes = descendants(tree);
+  assert.equal(nodes.filter(node => ["button", "input", "form"].includes(node.type)).length, 0);
+  const links = nodes.filter(node => node.type === "a");
+  assert.equal(links.length, 2);
+  for (const link of links) assert.ok(nodes.some(node => `#${node.props?.id}` === link.props.href));
+  assert.ok(text(tree).includes("Edycja wkrótce"));
+});
+
 test("401/403/404 show Polish messages and appropriate actions without raw errors", () => {
   for (const status of [401, 403, 404, 500]) {
     const tree = states.OrganizationError({ error: new backend.ApiError("Internal exception: secret", { status }), retry() {}, details: true, returnPath: "/super-admin/organizations/org-1" });

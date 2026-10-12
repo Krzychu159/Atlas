@@ -8,6 +8,7 @@ function lookup(labels: Record<string, string>, key: string) {
 const operationLabels: Record<string, string> = {
   Created: "Utworzono", Updated: "Zmieniono", Deleted: "Usunięto",
   Archived: "Zarchiwizowano", Restored: "Przywrócono",
+  PaymentDateCorrected: "Skorygowano datę wpłaty",
 };
 const entityLabels: Record<string, string> = {
   Client: "Klient", Trainer: "Trener", User: "Konto użytkownika", Session: "Trening",
@@ -43,6 +44,7 @@ const fieldLabels: Record<string, string> = {
   paymentStatus: "Status płatności", method: "Sposób płatności", source: "Źródło", note: "Notatka",
   remainingSessions: "Pozostałe wejścia", purchaseDate: "Data zakupu", validUntil: "Ważne do",
   paymentDueDate: "Termin płatności", confirmedAt: "Data potwierdzenia", rejectedAt: "Data odrzucenia",
+  expectedPaymentDate: "Poprzednia data wpłaty", reason: "Powód",
   reversedAt: "Data cofnięcia", activatedAt: "Data aktywacji", closedAt: "Data zamknięcia",
   rejectionReason: "Powód odrzucenia", reversalReason: "Powód cofnięcia", receiptNumber: "Numer paragonu",
 };
@@ -70,7 +72,7 @@ const moneyFields: Record<string, string[]> = {
   ClientBalanceTransaction: ["amount"], TrainerRate: ["rate"],
   TrainerMonthlySettlement: ["totalAmount"],
 };
-const dateFields = new Set(["startAt", "endAt", "createdAt", "updatedAt", "deletedAt", "archivedAt", "paidAt", "paymentDate", "validFrom", "validTo", "purchaseDate", "validUntil", "paymentDueDate", "confirmedAt", "rejectedAt", "reversedAt", "activatedAt", "closedAt"]);
+const dateFields = new Set(["startAt", "endAt", "createdAt", "updatedAt", "deletedAt", "archivedAt", "paidAt", "paymentDate", "expectedPaymentDate", "validFrom", "validTo", "purchaseDate", "validUntil", "paymentDueDate", "confirmedAt", "rejectedAt", "reversedAt", "activatedAt", "closedAt"]);
 
 export function scalarValue(value: unknown, field: string, entityType: string | null, snapshot?: Record<string, unknown> | null): string {
   if (value === null || value === undefined) return "Brak wartości";

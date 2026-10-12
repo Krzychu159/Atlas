@@ -1,6 +1,7 @@
 "use client";
 
 import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
+import { usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -57,6 +58,7 @@ export default function OwnerPaymentsPage() {
 }
 
 function OwnerPaymentsPageContent({ locationId }: { locationId: number | null }) {
+  const paymentDateRevision = usePaymentDateCorrectionRevision();
   const pathname = usePathname();
   const basePath = pathname.startsWith("/trainer") ? "/trainer" : "/owner";
   const eyebrow = basePath === "/trainer" ? "Panel trenera" : "Panel właściciela";
@@ -100,6 +102,7 @@ function OwnerPaymentsPageContent({ locationId }: { locationId: number | null })
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    paymentDateRevision,
     locationId,
     filters.amountMax,
     filters.amountMin,
@@ -384,6 +387,7 @@ function OwnerPaymentsPageContent({ locationId }: { locationId: number | null })
         </div>
 
         <PaymentsList
+          dateCorrectionPortal={basePath === "/trainer" ? "trainer" : "owner"}
           payments={visiblePayments}
           isLoading={isLoading}
           processingId={processingId}

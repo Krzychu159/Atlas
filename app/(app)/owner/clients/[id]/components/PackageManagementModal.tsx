@@ -5,6 +5,7 @@ import { Button } from "@/app/components/ui/button";
 import { ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
 import { ApiError, getErrorMessage } from "@/app/lib/backend";
 import { dateInputToIsoDateTime, toDateInputValue } from "@/app/lib/formatters/date";
+import { formatPackageInstant, localPackageInstantToUtc, packageInstantToLocalInput, packageTrainingKind } from "@/app/lib/package-validity";
 import { formatMoney } from "@/app/lib/formatters/money";
 import { getPackages, type Package } from "@/app/lib/owner/packages";
 import {
@@ -30,7 +31,7 @@ export default function PackageManagementModal({ clientId, packageData, onClose,
   const [step, setStep] = useState(1);
   const [sessions, setSessions] = useState(String(packageData.totalSessions));
   const [price, setPrice] = useState(String(packageData.totalPrice));
-  const [validUntil, setValidUntil] = useState(toDateInputValue(packageData.validUntil));
+  const [validUntil, setValidUntil] = useState(packageInstantToLocalInput(packageData.validUntil));
   const [dueDate, setDueDate] = useState(toDateInputValue(packageData.paymentDueDate));
   const [reason, setReason] = useState("");
   const [debt, setDebt] = useState<CloseClientPackagePayload["debtDisposition"] | "">("");
@@ -78,7 +79,7 @@ export default function PackageManagementModal({ clientId, packageData, onClose,
       setMode(next); setChanged(false); setReason("");
       if (next === "correct") {
         setSessions(String(updated.totalSessions)); setPrice(String(updated.totalPrice));
-        setValidUntil(toDateInputValue(updated.validUntil)); setDueDate(toDateInputValue(updated.paymentDueDate));
+        setValidUntil(packageInstantToLocalInput(updated.validUntil)); setDueDate(toDateInputValue(updated.paymentDueDate));
       }
       if (next === "close") { setStep(1); setDebt(""); setFunds(""); setSettlement(""); setReplace(withReplacement); setReplacementId(""); }
     } catch (err) { setPreview(null); setError(getErrorMessage(err, "Nie udało się sprawdzić dostępnych działań.")); }
@@ -108,14 +109,18 @@ export default function PackageManagementModal({ clientId, packageData, onClose,
       if (!price.trim() || !Number.isFinite(Number(price)) || Number(price) < Math.max(current.amountPaid, 0)) { setError("Cena nie może być niższa od kwoty już opłaconej."); return; }
       if (Number(sessions) !== current.totalSessions) correction.totalSessions = Number(sessions);
       if (Number(price) !== current.totalPrice) correction.totalPrice = Number(price);
-      if (validUntil && validUntil !== toDateInputValue(current.validUntil)) correction.validUntil = dateInputToIsoDateTime(validUntil)!;
+      if (validUntil && validUntil !== packageInstantToLocalInput(current.validUntil)) {
+        const utc = localPackageInstantToUtc(validUntil);
+        if (!utc) { setError("Podaj poprawną datę i godzinę ważności."); return; }
+        correction.validUntil = utc;
+      }
       if (dueDate && dueDate !== toDateInputValue(current.paymentDueDate)) correction.paymentDueDate = dateInputToIsoDateTime(dueDate)!;
       if (Object.keys(correction).length === 2) { setError("Zmień przynajmniej jedną wartość."); return; }
     }
     if (mode === "close") {
       const message = financialError();
       if (message || !debt || !funds) { setError(message); return; }
-      if (replace && !catalog.some((item) => item.id === Number(replacementId))) { setError("Wybierz nowy pakiet."); return; }
+      if (replace && !replacementCatalog.some((item) => item.id === Number(replacementId))) { setError("Wybierz nowy pakiet."); return; }
       closure = { expectedVersion: preview.version, reason: reason.trim(), debtDisposition: debt, fundsDisposition: funds,
         settlementAmount: funds === "KeepFunds" ? 0 : Number(settlement),
         ...(replace ? { replacement: { clientId, packageId: Number(replacementId), purchaseDate: new Date().toISOString() } } : {}),
@@ -173,10 +178,15 @@ export default function PackageManagementModal({ clientId, packageData, onClose,
   const comparisons = [
     ["Wszystkie wejścia", String(current.totalSessions), sessions],
     ["Cena", formatMoney(current.totalPrice, current.currency), price ? formatMoney(Number(price), current.currency) : "Podaj cenę"],
-    ["Ważny do", toDateInputValue(current.validUntil), validUntil],
+    ["Ważny do", formatPackageInstant(current.validUntil), validUntil ? formatPackageInstant(localPackageInstantToUtc(validUntil)) : "Brak daty"],
     ["Termin płatności", toDateInputValue(current.paymentDueDate), dueDate],
   ];
   const closeAllowed = Boolean(preview?.canClose);
+  const replacementCatalog = catalog.filter(item => {
+    const currentKind = packageTrainingKind(current.packageType, current.expectedBillingType);
+    const sameLocation = currentKind !== "group" || (current.locationId != null && (item.locationId === current.locationId || item.locationIds?.includes(current.locationId) === true));
+    return currentKind !== "unknown" && packageTrainingKind(item.packageType, item.billingType) === currentKind && sameLocation;
+  });
   return <ModalOverlay onClose={busy ? undefined : onClose}>
     <section role="dialog" aria-modal="true" aria-label="Zarządzanie pakietem" className="relative max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-[var(--radius-xl)] bg-surface-container p-5 md:p-6">
       <ModalHeader title={mode === "correct" ? "Korekta pakietu" : mode === "delete" ? "Usuń pakiet" : mode === "close" ? replace ? "Zmień pakiet" : "Zamknij pakiet" : "Zarządzaj pakietem"} description={current.packageName || "Pakiet klienta"} onClose={() => { if (!busy) onClose(); }} />
@@ -200,10 +210,10 @@ export default function PackageManagementModal({ clientId, packageData, onClose,
         <fieldset disabled={busy} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-sm">Wszystkie wejścia<input className={inputClass} type="number" min={current.usedSessions} step="1" required value={sessions} onChange={(event) => setSessions(event.target.value)} /></label>
           <label className="text-sm">Cena ({current.currency || "PLN"})<input className={inputClass} type="number" min={current.amountPaid} step="0.01" required value={price} onChange={(event) => setPrice(event.target.value)} /></label>
-          <label className="text-sm">Ważny do<input className={inputClass} type="date" required={Boolean(current.validUntil)} value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label>
+          <label className="text-sm">Ważny do — data i godzina<input className={inputClass} type="datetime-local" required={Boolean(current.validUntil)} value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label>
           <label className="text-sm">Termin płatności<input className={inputClass} type="date" required={Boolean(current.paymentDueDate)} value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
         </fieldset>
-        <p className="text-xs text-on-surface-muted">Możesz zmienić datę. Korekta nie usuwa wcześniej ustawionych dat.</p>
+        <p className="text-xs text-on-surface-muted">Ważność kończy się o wskazanej godzinie w Twojej lokalnej strefie czasowej. Korekta nie usuwa wcześniej ustawionych dat.</p>
         <label className="block text-sm">Powód korekty<textarea className={inputClass} required disabled={busy} value={reason} onChange={(event) => setReason(event.target.value)} /></label>
         <div className="space-y-2 rounded-lg bg-surface-container-lowest p-3 text-sm"><p className="font-semibold">Przed → Po</p>{comparisons.map(([label, before, after]) => <p key={label} className="break-words">{label}: {before || "Brak daty"} → {after || "Brak daty"}</p>)}</div>
         {changed && preview ? <Button type="button" variant="secondary" disabled={busy} onClick={() => { setChanged(false); setError(""); }}>Sprawdziłem aktualne dane</Button> : null}
@@ -228,8 +238,8 @@ export default function PackageManagementModal({ clientId, packageData, onClose,
         </> : null}
         {step === 3 ? <>
           <label className="flex items-center gap-3 text-sm"><input type="checkbox" disabled={busy} checked={replace} onChange={(event) => setReplace(event.target.checked)} />Przypisz nowy pakiet przy zamknięciu</label>
-          {replace ? <><label className="block text-sm">Nowy pakiet<select className={inputClass} disabled={busy} value={replacementId} onChange={(event) => setReplacementId(event.target.value)}><option value="">Wybierz pakiet</option>{catalog.map((item) => <option key={item.id} value={item.id}>{item.name} · {formatMoney(item.price, item.currency)}{item.locationName ? ` · ${item.locationName}` : ""}</option>)}</select></label>{catalogError ? <p role="alert" className="text-sm text-error-light">{catalogError}</p> : !catalog.length ? <p className="text-sm text-on-surface-muted">Brak dostępnych pakietów do wyboru.</p> : null}<p className="text-sm text-on-surface-muted">Zamknięcie i przypisanie nowego pakietu zostaną zapisane razem.</p></> : null}
-          <div className="space-y-2 rounded-lg bg-surface-container-lowest p-4 text-sm"><p className="font-semibold">Twoja decyzja</p><p className="break-words">Powód: {reason}</p><p>{debt === "KeepDue" ? "Należność pozostaje do zapłaty." : "Pozostała należność zostanie umorzona."}</p><p>{funds === "KeepFunds" ? "Wpłacone środki pozostają w pakiecie." : funds === "Balance" ? `Na saldo: ${formatMoney(Number(settlement), current.currency)}` : `Zwrot oczekujący: ${formatMoney(Number(settlement), current.currency)}`}</p>{replace ? <p>Nowy pakiet: {catalog.find((item) => item.id === Number(replacementId))?.name || "Wybierz pakiet"}</p> : null}</div>
+          {replace ? <><label className="block text-sm">Nowy pakiet<select className={inputClass} disabled={busy} value={replacementId} onChange={(event) => setReplacementId(event.target.value)}><option value="">Wybierz pakiet</option>{replacementCatalog.map((item) => <option key={item.id} value={item.id}>{item.name} · {formatMoney(item.price, item.currency)}{item.locationName ? ` · ${item.locationName}` : ""}</option>)}</select></label>{catalogError ? <p role="alert" className="text-sm text-error-light">{catalogError}</p> : !replacementCatalog.length ? <p className="text-sm text-on-surface-muted">Brak dostępnych pakietów do wyboru.</p> : null}<p className="text-sm text-on-surface-muted">Zamknięcie i przypisanie nowego pakietu zostaną zapisane razem.</p></> : null}
+          <div className="space-y-2 rounded-lg bg-surface-container-lowest p-4 text-sm"><p className="font-semibold">Twoja decyzja</p><p className="break-words">Powód: {reason}</p><p>{debt === "KeepDue" ? "Należność pozostaje do zapłaty." : "Pozostała należność zostanie umorzona."}</p><p>{funds === "KeepFunds" ? "Wpłacone środki pozostają w pakiecie." : funds === "Balance" ? `Na saldo: ${formatMoney(Number(settlement), current.currency)}` : `Zwrot oczekujący: ${formatMoney(Number(settlement), current.currency)}`}</p>{replace ? <p>Nowy pakiet: {replacementCatalog.find((item) => item.id === Number(replacementId))?.name || "Wybierz pakiet"}</p> : null}</div>
           {changed && preview ? <><PackageSummary packageData={current} amountDue={preview.amountDue} remaining={preview.remainingSessions} balance={balance} /><Button disabled={busy} variant="secondary" onClick={() => { setChanged(false); setError(""); }}>Sprawdziłem aktualny stan pakietu</Button></> : null}
           <div className="flex flex-wrap gap-3"><Button disabled={busy} variant="ghost" onClick={() => setStep(2)}>Wróć</Button><Button disabled={busy || changed || !closeAllowed || (replace && !replacementId)} onClick={() => void save()}>{busy ? "Zapisywanie…" : replace ? "Zatwierdź zmianę pakietu" : "Zatwierdź zamknięcie"}</Button></div>
         </> : null}
@@ -245,6 +255,7 @@ function Decision({ checked, name, label, description, onChange }: { checked: bo
 
 function PackageSummary({ packageData, amountDue, remaining, balance }: { packageData: ClientPackageBilling; amountDue?: number; remaining?: number; balance: number | null }) {
   const fields = [
+    ["Ważny do", formatPackageInstant(packageData.validUntil)],
     ["Wykorzystane wejścia", `${packageData.usedSessions} / ${packageData.totalSessions}`],
     ["Pozostałe wejścia", remaining === undefined ? "Niedostępne" : String(remaining)],
     ["Opłacono", formatMoney(packageData.amountPaid, packageData.currency)],
@@ -255,3 +266,4 @@ function PackageSummary({ packageData, amountDue, remaining, balance }: { packag
   ];
   return <dl className="grid min-w-0 grid-cols-1 gap-3 rounded-lg bg-surface-container-lowest p-4 text-sm sm:grid-cols-2">{fields.filter(([, value]) => value !== null).map(([label, value]) => <div key={label}><dt className="text-on-surface-muted">{label}</dt><dd className="mt-1 break-words font-semibold">{value}</dd></div>)}</dl>;
 }
+

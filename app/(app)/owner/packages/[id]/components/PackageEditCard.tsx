@@ -63,7 +63,7 @@ export default function PackageEditCard({
       const updated = await updatePackage(item.id, payload);
       onUpdated(updated);
 
-      showOwnerSuccess("Pakiet został zaktualizowany.", {
+      showOwnerSuccess("Zmiany w pakiecie zostały zapisane.", {
         id: "owner-package-update-success",
       });
     } catch (err) {
@@ -76,10 +76,10 @@ export default function PackageEditCard({
   }
 
   return (
-    <div className="card-shell p-6">
+    <div className="card-shell min-w-0 p-5 sm:p-6 [&_label]:block [&_input]:min-w-0 [&_textarea]:resize-y">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-section-title">Edytuj Pakiet</p>
+          <p className="text-section-title">Edytuj pakiet</p>
           <p className="mt-2 text-sm text-on-surface-variant">
             Zmieniaj nazwę, cenę oraz limity pakietu.
           </p>
@@ -137,7 +137,7 @@ export default function PackageEditCard({
         <PackagePublicationFields form={form} onChange={updateField} />
       </div>
 
-      <label className="mt-5 flex items-center gap-3 cursor-pointer">
+      <label className="mt-5 !flex cursor-pointer items-center gap-3">
         <input
           type="checkbox"
           checked={form.isActive}

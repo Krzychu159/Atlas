@@ -38,7 +38,8 @@ export function userTrainingType(value: string | null | undefined, fallback = "T
   const labels: Record<string, string> = {
     PersonalTraining: "Trening personalny", DuoTraining: "Trening 2:1",
     GroupTraining: "Trening grupowy", Consultation: "Konsultacja",
-    Group: "Trening grupowy", TwoToOne: "Trening 2:1",
+    Group: "Trening grupowy", OneToOne: "Trening 1:1", TwoToOne: "Trening 2:1",
+    ThreeToOne: "Trening 3:1", FourToOne: "Trening 4:1",
   };
   return value ? (Object.hasOwn(labels, value) ? labels[value] : userMessage(value, fallback)) : fallback;
 }

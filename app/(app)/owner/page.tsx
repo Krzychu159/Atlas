@@ -14,8 +14,10 @@ import DashboardSessionsSection from "./components/DashboardSessionsSection";
 import DashboardClientRow from "./components/DashboardClientRow";
 import DashboardRevenueCard from "./components/DashboardRevenueCard";
 import { showOwnerError } from "./components/owner-toast";
+import { usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
 export default function DashboardPage() {
+  const paymentDateRevision = usePaymentDateCorrectionRevision();
   const [dashboard, setDashboard] = useState<OwnerDashboard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -34,7 +36,7 @@ export default function DashboardPage() {
     }
 
     loadDashboard();
-  }, []);
+  }, [paymentDateRevision]);
 
   const todaySessions: OwnerSession[] = dashboard?.todaySessions ?? [];
   const tomorrowSessions: OwnerSession[] = dashboard?.tomorrowSessions ?? [];

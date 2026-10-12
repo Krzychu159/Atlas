@@ -13,10 +13,12 @@ import { showAppError, showAppSuccess } from "@/app/components/ui/app-toast";
 import { paymentMethodOptions, type ClientPayment } from "@/app/lib/owner/billing";
 import { confirmTrainerPortalPayment, getTrainerPortalPendingPayments, rejectTrainerPortalPayment } from "@/app/lib/trainer/portal";
 import { trainerPaymentError } from "@/app/lib/trainer/payment-errors";
+import { usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
 const PAGE_SIZE = 10;
 
 export default function TrainerPaymentsPage() {
+  const paymentDateRevision = usePaymentDateCorrectionRevision();
   const [payments, setPayments] = useState<ClientPayment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -52,7 +54,7 @@ export default function TrainerPaymentsPage() {
   useEffect(() => {
     void loadPayments();
     return () => { loadRevision.current += 1; };
-  }, [loadPayments]);
+  }, [loadPayments, paymentDateRevision]);
 
   const filteredPayments = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("pl-PL");
@@ -110,7 +112,7 @@ export default function TrainerPaymentsPage() {
       </div>
       <section className="overflow-hidden rounded-[var(--radius-xl)] bg-surface-container-low shadow-soft">
         {loadError && !isLoading ? <div role="alert" className="p-6 text-on-surface-variant">{loadError}<Button className="mt-4" variant="secondary" onClick={() => void loadPayments()}>Spróbuj ponownie</Button></div> : <>
-          <PaymentsList payments={filteredPayments.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)} isLoading={isLoading} processingId={processingId}
+          <PaymentsList dateCorrectionPortal="trainer" payments={filteredPayments.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)} isLoading={isLoading} processingId={processingId}
             getDetailsHref={(payment) => "/trainer/clients/" + payment.clientId + "/payments"}
             emptyTitle={payments.length ? "Brak pasujących wpłat" : "Brak wpłat oczekujących"}
             emptyMessage={payments.length ? "Zmień wyszukiwanie lub metodę płatności." : "Wszystkie wpłaty wymagające ręcznego potwierdzenia zostały obsłużone."}

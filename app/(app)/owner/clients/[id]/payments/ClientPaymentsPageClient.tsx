@@ -1,8 +1,9 @@
 "use client";
 
 import { userTrainingType } from "@/app/lib/user-messages";
+import { packageTrainingKind } from "@/app/lib/package-validity";
 
-import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
+import { useSessionCorrectionRevision, usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -103,6 +104,7 @@ export default function ClientPaymentsPageClient({
   const [pendingPaymentsError, setPendingPaymentsError] = useState<string | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const correctionRevision = useSessionCorrectionRevision();
+  const paymentDateRevision = usePaymentDateCorrectionRevision(Number(clientIdParam));
   const [clientId, setClientId] = useState<number | null>(null);
   const [client, setClient] = useState<Client | null>(null);
   const [billing, setBilling] = useState<ClientBillingSummary | null>(null);
@@ -123,6 +125,7 @@ export default function ClientPaymentsPageClient({
   const [paymentPackageId, setPaymentPackageId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("2");
   const [paymentNote, setPaymentNote] = useState("");
+  const [paymentDate, setPaymentDate] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [processingPaymentId, setProcessingPaymentId] = useState<number | null>(
@@ -135,6 +138,7 @@ export default function ClientPaymentsPageClient({
     type: PaymentAction;
     payment: ClientPayment;
   } | null>(null);
+  const paymentLinkHandled = useRef("");
   const [reversalReason, setReversalReason] = useState("");
   useEffect(() => {
     mounted.current = true;
@@ -159,7 +163,7 @@ export default function ClientPaymentsPageClient({
 
     return () => { window.clearTimeout(timer); mounted.current = false; loadRevision.current += 1; trainerLoad.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientIdParam, correctionRevision]);
+  }, [clientIdParam, correctionRevision, paymentDateRevision]);
 
   async function loadClientPayments(id = clientId, propagateError = false) {
     if (!id) return;
@@ -214,6 +218,21 @@ export default function ClientPaymentsPageClient({
         : "";
 
       setPaymentPackageId(activeClientPackageId);
+      const query = new URLSearchParams(window.location.search);
+      const requestedId = Number(query.get("clientPackageId"));
+      const linkKey = `${id}:${requestedId}`;
+      if (query.get("addPayment") === "1" && Number.isSafeInteger(requestedId) && requestedId > 0 && paymentLinkHandled.current !== linkKey) {
+        paymentLinkHandled.current = linkKey;
+        const target = billingData.packages?.find(item => item.clientPackageId === requestedId);
+        if (target) {
+          setPaymentPackageId(String(target.clientPackageId));
+          setPaymentAmount(typeof target.amountDue === "number" ? String(Math.max(target.amountDue, 0)) : "");
+          setPaymentDate(localToday());
+          setIsPaymentModalOpen(true);
+        } else {
+          showOwnerError(new Error("Nie znaleziono pakietu przypisanego do zgłoszenia. Sprawdź aktualne dane klienta."), "");
+        }
+      }
       setSelectedPackageId("");
       setSelectedNextPackageId(
         subscriptionData.nextPackage?.packageId
@@ -307,19 +326,20 @@ export default function ClientPaymentsPageClient({
   }
 
   async function handleAssignPackage() {
-    if (!clientId || !selectedPackageId || basePath !== "/owner") return;
+    if (!clientId || !selectedPackageId || basePath !== "/owner" || mutationLock.current || isLoading) return;
 
     const selectedPackage = packages.find(
       (item) => item.id === Number(selectedPackageId),
     );
 
-    if (!selectedPackage || selectedPackage.billingType === 5) {
+    if (!selectedPackage || packageTrainingKind(selectedPackage.packageType, selectedPackage.billingType) !== "individual" || !Number.isInteger(selectedPackage.billingType)) {
       showOwnerError(new Error("Wybierz pakiet indywidualny z lokalizacji klienta."), "", {
         id: "owner-client-package-location-required",
       });
       return;
     }
 
+    mutationLock.current = true;
     try {
       setIsSaving(true);
       const existingPackageIds = new Set(
@@ -336,7 +356,7 @@ export default function ClientPaymentsPageClient({
         name: selectedPackage.name,
         totalSessions: selectedPackage.sessionsLimit,
         totalPrice: selectedPackage.price,
-        expectedBillingType: selectedPackage.billingType || 1,
+        expectedBillingType: selectedPackage.billingType!,
         purchaseDate: purchaseDate.toISOString(),
         validUntil: validUntil.toISOString(),
         paymentDueDate: null,
@@ -364,6 +384,7 @@ export default function ClientPaymentsPageClient({
         id: "owner-client-package-error",
       });
     } finally {
+      mutationLock.current = false;
       setIsSaving(false);
     }
   }
@@ -375,7 +396,7 @@ export default function ClientPaymentsPageClient({
       (item) => item.id === Number(selectedNextPackageId),
     );
 
-    if (!selectedPackage || selectedPackage.billingType === 5) {
+    if (!selectedPackage || packageTrainingKind(selectedPackage.packageType, selectedPackage.billingType) !== "individual") {
       showOwnerError(new Error("Wybierz pakiet indywidualny z lokalizacji klienta."), "", {
         id: "owner-client-next-package-location-required",
       });
@@ -513,6 +534,12 @@ export default function ClientPaymentsPageClient({
       return;
     }
 
+    const paymentDateTime = localPaymentDateToIso(paymentDate);
+    if (!paymentDateTime) {
+      showOwnerError(new Error("Wybierz poprawną datę wpłaty."), "");
+      return;
+    }
+
     mutationLock.current = true;
     try {
       setIsSaving(true);
@@ -521,7 +548,7 @@ export default function ClientPaymentsPageClient({
         clientPackageId: Number(paymentPackageId),
         amount,
         method: Number(paymentMethod) as PaymentMethod,
-        paymentDate: new Date().toISOString(),
+        paymentDate: paymentDateTime,
         note: paymentNote.trim() || null,
       };
       const createdPayment =
@@ -664,7 +691,7 @@ export default function ClientPaymentsPageClient({
   const packageOptions = useMemo(
     () => [
       { value: "", label: "Wybierz pakiet" },
-      ...packages.map((item) => ({
+      ...packages.filter(item => packageTrainingKind(item.packageType, item.billingType) === "individual" && Number.isInteger(item.billingType)).map((item) => ({
         value: String(item.id),
         label: `${item.name} · ${formatMoney(item.price, item.currency)}`,
       })),
@@ -709,7 +736,7 @@ export default function ClientPaymentsPageClient({
   const mainUsage = usage?.clientPackageId === mainPackage?.clientPackageId ? usage : null;
   const mainSubscription = subscription;
   const activeCurrency = mainPackage?.currency || "PLN";
-  const nextPackageOptions = [{ value: "", label: "Wybierz pakiet" }, ...packages.filter((item) => item.billingType !== 5).map((item) => ({ value: String(item.id), label: item.name }))];
+  const nextPackageOptions = [{ value: "", label: "Wybierz pakiet" }, ...packages.filter((item) => packageTrainingKind(item.packageType, item.billingType) === "individual").map((item) => ({ value: String(item.id), label: item.name }))];
   const paymentTotalPages = Math.max(
     1,
     Math.ceil(payments.length / CLIENT_PAYMENTS_PER_PAGE),
@@ -804,7 +831,10 @@ export default function ClientPaymentsPageClient({
               <Button
                 size="lg"
                 icon={<ReceiptText size={17} />}
-                onClick={() => setIsPaymentModalOpen(true)}
+                onClick={() => {
+                  setPaymentDate(localToday());
+                  setIsPaymentModalOpen(true);
+                }}
                 disabled={isSaving || processingPaymentId !== null || isLoading || packagesBilling.length === 0}
                 className="w-full md:w-auto"
               >
@@ -828,6 +858,7 @@ export default function ClientPaymentsPageClient({
 
               {pendingPaymentsError ? <p role="alert" className="px-5 pb-4 text-sm text-on-surface-variant">{pendingPaymentsError}</p> : null}
               <PaymentsList
+                dateCorrectionPortal={basePath === "/trainer" ? "trainer" : "owner"}
                 payments={visiblePayments}
                 isLoading={false}
                 processingId={processingPaymentId}
@@ -906,6 +937,8 @@ export default function ClientPaymentsPageClient({
         packageId={paymentPackageId}
         method={paymentMethod}
         note={paymentNote}
+        paymentDate={paymentDate}
+        onPaymentDateChange={setPaymentDate}
         packageOptions={clientPackageOptions}
         methodOptions={paymentMethodOptions}
         isSubmitting={isSaving}
@@ -1252,6 +1285,22 @@ function BillingStat({
   );
 }
 
+function localToday() {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+}
+
+function localPaymentDateToIso(value: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  if (year < 1000) return null;
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  // The input is a local calendar day; serialize its local midnight as an instant.
+  // Do not parse YYYY-MM-DD directly, which would interpret it as UTC.
+  return date.toISOString();
+}
+
 function UsageCard({ usage }: { usage: SubscriptionUsage | null }) {
   const [showAllSessions, setShowAllSessions] = useState(false);
   const totalSessions = usage?.totalSessions;
@@ -1312,7 +1361,7 @@ function UsageCard({ usage }: { usage: SubscriptionUsage | null }) {
             <div className="mt-4 flex flex-col gap-2">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-label text-on-surface-muted">
-                  Różnice w pakiecie
+                  Treningi rozliczone z pakietu
                 </p>
                 <p className="text-xs font-semibold text-on-surface-muted">
                   {sessions.length} z {allSessions.length}

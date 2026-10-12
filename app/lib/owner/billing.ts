@@ -1,4 +1,4 @@
-import { backendDelete, backendGet, backendPost } from "../backend";
+import { backendDelete, backendGet, backendPost, backendPatch } from "../backend";
 
 export type PaymentMethod = 1 | 2 | 3 | 4;
 export type ClientPaymentStatus = 1 | 2 | 3 | 4 | 5;
@@ -24,6 +24,10 @@ export type ClientPayment = {
   method: PaymentMethod;
   status: ClientPaymentStatus;
   source: ClientPaymentSource;
+  externalPaymentId?: string | null;
+  paymentProvider?: string | null;
+  providerPaymentId?: string | null;
+  checkoutUrl?: string | null;
   paymentDate: string;
   createdAt: string;
   confirmedAt: string | null;
@@ -198,6 +202,12 @@ export function createClientPayment(payload: CreateClientPaymentPayload) {
   return backendPost<ClientPayment>("billing/payments", payload);
 }
 
+export type UpdatePaymentDatePayload = { paymentDate: string; expectedPaymentDate: string; reason: string };
+
+export function updateClientPaymentDate(paymentId: number, payload: UpdatePaymentDatePayload) {
+  return backendPatch<ClientPayment>(`billing/payments/${paymentId}/date`, payload);
+}
+
 export function confirmClientPayment(paymentId: number) {
   return backendPost<ClientPayment>(`billing/payments/${paymentId}/confirm`);
 }
@@ -342,6 +352,19 @@ export function getClientPackageManagementPreview(clientId: number, clientPackag
 export function correctClientPackage(clientId: number, clientPackageId: number, payload: CorrectClientPackagePayload) {
   return backendPost<void>(
     `client-packages/clients/${clientId}/packages/${clientPackageId}/correct`, payload,
+  );
+}
+
+export type PackageExpiryDecision = {
+  action: "Extend" | "End";
+  expectedVersion: unknown;
+  reason: string;
+  validUntil?: string;
+};
+
+export function decideClientPackageExpiry(clientId: number, clientPackageId: number, payload: PackageExpiryDecision) {
+  return backendPost<{ replacementClientPackageId?: number | null } | undefined>(
+    `client-packages/clients/${clientId}/packages/${clientPackageId}/expiry-decision`, payload,
   );
 }
 

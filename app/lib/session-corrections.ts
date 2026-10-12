@@ -32,3 +32,28 @@ export function useSessionCorrectionRevision() {
   }, []);
   return revision;
 }
+
+const paymentDateEvent = "atlas-payment-date-corrected";
+
+export function notifyPaymentDateCorrected(clientId: number) {
+  window.dispatchEvent(new CustomEvent(paymentDateEvent, { detail: { clientId } }));
+  if (typeof BroadcastChannel !== "undefined") {
+    try {
+      const channel = new BroadcastChannel(paymentDateEvent);
+      channel.postMessage({ clientId }); channel.close();
+    } catch { /* A notification failure must not invalidate a saved correction. */ }
+  }
+}
+
+export function usePaymentDateCorrectionRevision(clientId?: number) {
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const refresh = (changedClientId?: number) => { if (clientId === undefined || changedClientId === clientId) setRevision(value => value + 1); };
+    const listener = (event: Event) => refresh((event as CustomEvent<{ clientId: number }>).detail?.clientId);
+    window.addEventListener(paymentDateEvent, listener);
+    const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(paymentDateEvent) : null;
+    if (channel) channel.onmessage = event => refresh(event.data?.clientId);
+    return () => { window.removeEventListener(paymentDateEvent, listener); channel?.close(); };
+  }, [clientId]);
+  return revision;
+}

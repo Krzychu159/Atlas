@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 import { Button } from "@/app/components/ui/button";
 import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { getErrorMessage } from "@/app/lib/backend";
@@ -10,6 +11,7 @@ import { getPackageClosureLabel, getPackageOriginLabel, getPackagePaymentStatusL
 import { userMessage, userTrainingType } from "@/app/lib/user-messages";
 
 const actionLabels: Record<string, string> = {
+  PaymentDateCorrected: "Skorygowano datę wpłaty",
   ProfileUpdated: "Zmieniono profil klienta", Archived: "Zarchiwizowano klienta",
   Restored: "Przywrócono klienta", TrainerChanged: "Zmieniono trenera opiekuna",
   PortalBlocked: "Zablokowano dostęp do panelu", PortalUnblocked: "Przywrócono dostęp do panelu",
@@ -22,6 +24,7 @@ const actionLabels: Record<string, string> = {
 };
 
 const fieldLabels: Record<string, string> = {
+  paymentdate: "Data wpłaty", expectedpaymentdate: "Poprzednia data wpłaty",
   firstname: "Imię", lastname: "Nazwisko", fullname: "Imię i nazwisko", email: "E-mail",
   loginemail: "Adres do logowania", phonenumber: "Telefon", goal: "Cel", notes: "Notatki",
   trainerid: "Trener (numer)", trainername: "Trener", trainerfullname: "Trener",
@@ -40,6 +43,7 @@ const fieldLabels: Record<string, string> = {
 };
 
 export default function ClientAuditSection({ clientId, revision = 0 }: { clientId: number; revision?: number }) {
+  const paymentDateRevision = usePaymentDateCorrectionRevision(clientId);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [data, setData] = useState<ClientAuditResponse | null>(null);
@@ -59,7 +63,7 @@ export default function ClientAuditSection({ clientId, revision = 0 }: { clientI
       }).finally(() => { if (!cancelled) setLoading(false); });
     }, 0);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [clientId, page, pageSize, revision, retry]);
+  }, [clientId, page, pageSize, revision, retry, paymentDateRevision]);
 
   return <section className="card-shell min-w-0 p-5 md:p-6">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -115,7 +119,7 @@ function displayValue(key: string, value: unknown): string {
   if (typeof value === "number") return value.toLocaleString("pl-PL");
   if (Array.isArray(value)) return `Liczba pozycji: ${value.length}`;
   if (typeof value !== "string") return "Szczegóły poniżej";
-  if (/^(purchasedate|validuntil|paymentduedate|closedat|refundconfirmedat)$/.test(key)) return formatDateTime(value);
+  if (/^(paymentdate|expectedpaymentdate|purchasedate|validuntil|paymentduedate|closedat|refundconfirmedat)$/.test(key)) return formatDateTime(value);
   if (key === "expectedbillingtype") return userTrainingType(value);
   const choices: Record<string, string> = { Immediately: "Od razu", AfterCurrentPackage: "Po bieżącym pakiecie", KeepDue: "Należność pozostaje", WaiveDue: "Należność umorzona", KeepFunds: "Środki pozostają w pakiecie", Balance: "Środki na saldo", Refund: "Zwrot oczekuje", NoAccount: "Brak konta", Invited: "Zaproszony", Active: "Aktywny", Blocked: "Zablokowany" };
   if (["activationmode", "debtdisposition", "fundsdisposition", "portalaccessstatus"].includes(key)) return Object.hasOwn(choices, value) ? choices[value] : "Szczegóły niedostępne";

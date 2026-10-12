@@ -1,8 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import PaymentDateCorrectionModal from "./PaymentDateCorrectionModal";
+import { canCorrectPaymentDate } from "@/app/lib/payments/date-correction";
 import {
   Banknote,
+  CalendarClock,
   Check,
   ChevronRight,
   CircleX,
@@ -29,6 +33,7 @@ type PaymentsListProps<TPayment extends PaymentDisplaySource> = {
   payments: TPayment[];
   isLoading: boolean;
   processingId: number | null;
+  dateCorrectionPortal?: "owner" | "trainer";
   showClient?: boolean;
   getDetailsHref?: (payment: TPayment) => string | undefined;
   emptyTitle?: string;
@@ -45,6 +50,7 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
   payments,
   isLoading,
   processingId,
+  dateCorrectionPortal,
   showClient = true,
   getDetailsHref,
   emptyTitle = "Brak płatności",
@@ -56,28 +62,31 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
   onCancelReceipt,
   onReverse,
 }: PaymentsListProps<TPayment>) {
+  const [datePayment, setDatePayment] = useState<TPayment | null>(null);
+  const correctionModal = datePayment && dateCorrectionPortal ? <PaymentDateCorrectionModal key={datePayment.id} payment={datePayment} portal={dateCorrectionPortal} onClose={() => setDatePayment(null)} /> : null;
   if (isLoading) {
     return (
-      <div className="flex min-h-56 items-center justify-center gap-2 bg-surface-container-lowest px-5 text-sm text-on-surface-muted">
+      <><div className="flex min-h-56 items-center justify-center gap-2 bg-surface-container-lowest px-5 text-sm text-on-surface-muted">
         <LoaderCircle size={18} className="animate-spin" />
         Ładowanie płatności...
-      </div>
+      </div>{correctionModal}</>
     );
   }
 
   if (payments.length === 0) {
     return (
-      <div className="flex min-h-56 flex-col items-center justify-center bg-surface-container-lowest px-5 text-center">
+      <><div className="flex min-h-56 flex-col items-center justify-center bg-surface-container-lowest px-5 text-center">
         <CreditCard size={28} className="text-on-surface-muted" />
         <p className="mt-4 text-sm font-semibold text-on-surface">
           {emptyTitle}
         </p>
         <p className="mt-1 text-sm text-on-surface-muted">{emptyMessage}</p>
-      </div>
+      </div>{correctionModal}</>
     );
   }
 
   const hasActions = Boolean(
+    dateCorrectionPortal ||
     getDetailsHref ||
     onConfirm ||
     onReject ||
@@ -88,7 +97,7 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
   const gridClass = getGridClass(showClient, hasActions);
 
   return (
-    <div className="bg-surface-container-lowest">
+    <><div className="bg-surface-container-lowest">
       <div
         className={`hidden gap-3 bg-surface-container-low px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted xl:grid ${gridClass}`}
       >
@@ -106,7 +115,7 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
           <PaymentListRow
             key={payment.id}
             payment={payment}
-            processing={processingId === payment.id}
+            processing={processingId !== null || datePayment !== null}
             showClient={showClient}
             showActions={hasActions}
             gridClass={gridClass}
@@ -120,10 +129,11 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
               onCancelReceipt ? () => onCancelReceipt(payment) : undefined
             }
             onReverse={onReverse ? () => onReverse(payment) : undefined}
+            onCorrectDate={dateCorrectionPortal && canCorrectPaymentDate(payment) ? () => setDatePayment(payment) : undefined}
           />
         ))}
       </div>
-    </div>
+    </div>{correctionModal}</>
   );
 }
 
@@ -139,6 +149,7 @@ type PaymentListRowProps = {
   onIssueReceipt?: () => void;
   onCancelReceipt?: () => void;
   onReverse?: () => void;
+  onCorrectDate?: () => void;
 };
 
 function PaymentListRow(props: PaymentListRowProps) {
@@ -250,6 +261,7 @@ function PaymentListRow(props: PaymentListRowProps) {
 
         {props.showActions ? (
           <div className="mt-4 flex flex-wrap gap-2">
+            {props.onCorrectDate ? <Button type="button" size="sm" variant="secondary" icon={<CalendarClock size={15} />} disabled={props.processing} onClick={props.onCorrectDate}>Zmień datę wpłaty</Button> : null}
             {pending && (props.onConfirm || props.onReject) ? (
               <>
                 {props.onConfirm ? (
@@ -337,7 +349,8 @@ function RowActions(props: PaymentListRowProps) {
   const receiptIssued = isPaymentReceiptIssued(props.payment);
 
   return (
-    <div className="flex justify-end gap-1.5">
+    <div className="flex flex-wrap justify-end gap-1.5">
+      {props.onCorrectDate ? <IconAction label="Zmień datę wpłaty" onClick={props.onCorrectDate} disabled={props.processing}><CalendarClock size={16} /></IconAction> : null}
       {pending && (props.onConfirm || props.onReject) ? (
         <>
           {props.onConfirm ? (

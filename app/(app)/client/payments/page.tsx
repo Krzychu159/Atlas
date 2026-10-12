@@ -1,4 +1,5 @@
 "use client";
+import { usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, CreditCard, Dumbbell, Wallet } from "lucide-react";
@@ -48,6 +49,7 @@ type CheckoutTerms = {
 };
 
 export default function ClientPaymentsPage() {
+  const paymentDateRevision = usePaymentDateCorrectionRevision();
   const [billing, setBilling] = useState<ClientBillingSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -98,7 +100,7 @@ export default function ClientPaymentsPage() {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [paymentDateRevision]);
 
   const payments = useMemo(
     () => [...(billing?.payments || [])].sort(sortPaymentsByDate),

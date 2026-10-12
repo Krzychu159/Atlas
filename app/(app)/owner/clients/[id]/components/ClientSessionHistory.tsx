@@ -1,6 +1,7 @@
 "use client";
 
 import { userTrainingType } from "@/app/lib/user-messages";
+import { isGroupTraining } from "@/app/lib/group-sessions";
 
 import { userStatus } from "@/app/lib/user-messages";
 
@@ -154,7 +155,7 @@ function SessionRow({
           <MetaChip label={userStatus(session.status)} />
           <MetaChip
             label={
-              userTrainingType(session.actualSessionType || session.plannedSessionType, "Typ nieokreślony")
+              isGroupTraining(session) ? "Trening grupowy" : userTrainingType(session.actualSessionType || session.plannedSessionType, "Typ nieokreślony")
             }
           />
           {participant ? <BillingChip participant={participant} /> : null}

@@ -439,6 +439,11 @@ export default function SchedulePage() {
           setSelectedSession(null);
         }}
         onSubmit={handleSaveSession}
+        onGroupEnrollmentChanged={async () => {
+          if (!selectedSession) return;
+          const [updated] = await Promise.all([getSession(selectedSession.id), loadSessions()]);
+          setSelectedSession(updated);
+        }}
       />
     </>
   );

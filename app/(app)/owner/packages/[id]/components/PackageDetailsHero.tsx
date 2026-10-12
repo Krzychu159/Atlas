@@ -16,10 +16,9 @@ export default function PackageDetailsHero({
   item: Package;
   clients: PackageClient[];
 }) {
-  const usedSessions = clients.reduce(
-    (sum, client) => sum + client.usedSessions,
-    0,
-  );
+  const usedSessions = clients.every(client => client.activePackageId === item.id && typeof client.activePackageUsedSessions === "number" && Number.isFinite(client.activePackageUsedSessions))
+    ? clients.reduce((sum, client) => sum + client.activePackageUsedSessions!, 0)
+    : null;
 
   const estimatedRevenue = clients.length * item.price;
 
@@ -28,7 +27,7 @@ export default function PackageDetailsHero({
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,82,255,0.13),transparent_55%)]" />
 
       <div className="relative z-10">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span
             className={`px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.05em] ${
               item.isActive
@@ -44,13 +43,13 @@ export default function PackageDetailsHero({
           </span>
         </div>
 
-        <div className="mt-5 grid md:grid-cols-[1fr_auto] gap-5">
-          <div>
-            <h1 className="text-[2.5rem] md:text-[3rem] leading-[0.95] font-semibold font-display tracking-tight">
+        <div className="mt-5 grid gap-5 md:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="min-w-0">
+            <h1 className="break-words font-display text-3xl font-semibold leading-tight tracking-tight sm:text-4xl xl:text-5xl">
               {item.name}
             </h1>
 
-            <p className="mt-4 max-w-[520px] text-base leading-7 text-on-surface-variant">
+            <p className="mt-3 max-w-[640px] break-words text-sm leading-6 text-on-surface-variant sm:text-base">
               {item.description || "Pakiet bez opisu."}
             </p>
           </div>
@@ -86,15 +85,15 @@ export default function PackageDetailsHero({
 
           <div className="bg-surface-container-low rounded-[var(--radius-lg)] p-4">
             <TrendingUp size={18} className="text-tertiary-light" />
-            <p className="mt-4 text-label text-on-surface-muted">Przychód</p>
+            <p className="mt-4 text-label text-on-surface-muted">Szacowana wartość</p>
             <p className="mt-1 text-2xl font-semibold">
               {new Intl.NumberFormat("pl-PL", {
                 notation: "compact",
                 maximumFractionDigits: 1,
-              }).format(estimatedRevenue)}
+              }).format(estimatedRevenue)} {item.currency || "PLN"}
             </p>
             <p className="mt-1 text-xs text-on-surface-muted">
-              {usedSessions} wykorzystanych sesji
+              {usedSessions === null ? "Brak danych o wykorzystaniu" : `${usedSessions} wykorzystanych sesji`}
             </p>
           </div>
         </div>

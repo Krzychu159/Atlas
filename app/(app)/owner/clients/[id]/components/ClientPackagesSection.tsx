@@ -8,6 +8,8 @@ import { formatMoney as formatKnownMoney } from "@/app/lib/formatters/money";
 import { userTrainingType } from "@/app/lib/user-messages";
 import PackageManagementModal from "./PackageManagementModal";
 import ImportClientPackageModal from "./ImportClientPackageModal";
+import PackageExpiryDecisionModal from "./PackageExpiryDecisionModal";
+import { canDecidePackageExpiry, formatPackageInstant, isPackageExpired, packageTrainingKind } from "@/app/lib/package-validity";
 
 export function isGroupClientPackage(
   packageData: Pick<ClientPackageBilling, "packageType" | "expectedBillingType">,
@@ -18,26 +20,8 @@ export function isGroupClientPackage(
 function getClientPackageKind(
   packageData: Pick<ClientPackageBilling, "packageType" | "expectedBillingType">,
 ) {
-  const packageType = packageData.packageType?.trim().toLowerCase();
-
-  if (packageType) {
-    return packageType.includes("group") ? "group" : "main";
-  }
-  if (
-    packageData.expectedBillingType === null ||
-    packageData.expectedBillingType === undefined ||
-    packageData.expectedBillingType === ""
-  ) {
-    return "unknown";
-  }
-
-  const billingType = String(packageData.expectedBillingType)
-    .trim()
-    .toLowerCase();
-
-  return billingType === "5" || billingType.includes("group")
-    ? "group"
-    : "main";
+  const kind = packageTrainingKind(packageData.packageType, packageData.expectedBillingType);
+  return kind === "individual" ? "main" : kind;
 }
 
 export function getClientGroupLocationNames(
@@ -73,6 +57,7 @@ export default function ClientPackagesSection({
   audience?: "staff" | "client";
 }) {
   const [managedPackage, setManagedPackage] = useState<ClientPackageBilling | null>(null);
+  const [expiryPackage, setExpiryPackage] = useState<ClientPackageBilling | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [highlightedId, setHighlightedId] = useState<number | null>(null);
   const [visibleCount, setVisibleCount] = useState(6);
@@ -84,7 +69,7 @@ export default function ClientPackagesSection({
       ),
     [packages],
   );
-  const mainPackage = sortedPackages.find((item) => item.clientPackageId === activeClientPackageId);
+  const mainPackage = sortedPackages.find((item) => item.clientPackageId === activeClientPackageId && !isGroupClientPackage(item));
   const groupPackages = sortedPackages.filter(isGroupClientPackage);
   const history = sortedPackages.filter((item) => item !== mainPackage && !isGroupClientPackage(item));
   const visiblePackages = history.slice(0, Math.max(visibleCount, history.findIndex((item) => item.clientPackageId === highlightedId) + 1));
@@ -106,9 +91,10 @@ export default function ClientPackagesSection({
       </div>
       {clientId && onSaved ? <Button variant="secondary" className="mt-4 w-full sm:w-auto" onClick={() => setIsImportOpen(true)}>Wprowadź trwający pakiet</Button> : null}
 
-      {mainPackage ? <div className="mt-5"><ClientPackageCard packageData={mainPackage} highlighted={mainPackage.clientPackageId === highlightedId} onManage={clientId && onSaved ? () => setManagedPackage(mainPackage) : undefined} /></div> : <p className="mt-4 text-sm text-on-surface-variant">{audience === "client" ? "Nie masz bieżącego pakietu indywidualnego. Twoje pakiety grupowe pozostają dostępne niezależnie." : "Klient nie ma bieżącego pakietu indywidualnego. Pakiety grupowe pozostają dostępne niezależnie."}</p>}
+      {mainPackage ? <div className="mt-5"><ClientPackageCard packageData={mainPackage} highlighted={mainPackage.clientPackageId === highlightedId} onManage={clientId && onSaved ? () => setManagedPackage(mainPackage) : undefined} onExpiry={clientId && onSaved ? () => setExpiryPackage(mainPackage) : undefined} /></div> : <p className="mt-4 text-sm text-on-surface-variant">{audience === "client" ? "Nie masz bieżącego pakietu indywidualnego. Twoje pakiety grupowe pozostają dostępne niezależnie." : "Klient nie ma bieżącego pakietu indywidualnego. Pakiety grupowe pozostają dostępne niezależnie."}</p>}
       <h2 className="mt-6 text-section-title">Pakiety grupowe</h2>
-      {groupPackages.length ? <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{groupPackages.map((item) => <ClientPackageCard key={item.clientPackageId} packageData={item} highlighted={item.clientPackageId === highlightedId} onManage={clientId && onSaved ? () => setManagedPackage(item) : undefined} />)}</div> : <p className="mt-4 text-sm text-on-surface-variant">Brak pakietów grupowych.</p>}
+      <p className="mt-2 text-xs text-on-surface-muted">Pakiety grupowe nie odnawiają się automatycznie.</p>
+      {groupPackages.length ? <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{groupPackages.map((item) => <ClientPackageCard key={item.clientPackageId} packageData={item} highlighted={item.clientPackageId === highlightedId} onManage={clientId && onSaved ? () => setManagedPackage(item) : undefined} onExpiry={clientId && onSaved ? () => setExpiryPackage(item) : undefined} />)}</div> : <p className="mt-4 text-sm text-on-surface-variant">Brak pakietów grupowych.</p>}
       <h2 className="mt-6 text-section-title">Pozostałe pakiety indywidualne</h2>
 
       {visiblePackages.length ? (
@@ -120,6 +106,7 @@ export default function ClientPackagesSection({
                 packageData={packageData}
                 highlighted={packageData.clientPackageId === highlightedId}
                 onManage={clientId && onSaved ? () => setManagedPackage(packageData) : undefined}
+                onExpiry={clientId && onSaved ? () => setExpiryPackage(packageData) : undefined}
               />
             ))}
           </div>
@@ -141,6 +128,7 @@ export default function ClientPackagesSection({
         </div>
       )}
       {managedPackage && clientId && onSaved ? <PackageManagementModal key={managedPackage.clientPackageId} clientId={clientId} packageData={managedPackage} onClose={() => setManagedPackage(null)} onSaved={handleSaved} /> : null}
+      {expiryPackage && clientId && onSaved ? <PackageExpiryDecisionModal key={expiryPackage.clientPackageId} clientId={clientId} packageData={expiryPackage} onClose={() => setExpiryPackage(null)} onSaved={handleSaved} /> : null}
       {clientId && onSaved ? <ImportClientPackageModal key={clientId} open={isImportOpen} clientId={clientId} onClose={() => setIsImportOpen(false)} onSaved={handleSaved} /> : null}
     </section>
   );
@@ -149,10 +137,12 @@ export default function ClientPackagesSection({
 function ClientPackageCard({
   packageData,
   onManage,
+  onExpiry,
   highlighted = false,
 }: {
   packageData: ClientPackageBilling;
   onManage?: () => void;
+  onExpiry?: () => void;
   highlighted?: boolean;
 }) {
   const packageKind = getClientPackageKind(packageData);
@@ -191,7 +181,7 @@ function ClientPackageCard({
         <div><dt className="text-on-surface-muted">Typ</dt><dd>{userTrainingType(String(packageData.expectedBillingType), packageKind === "group" ? "Grupowy" : packageKind === "main" ? "Indywidualny / semi" : "Brak danych")}</dd></div>
         <div><dt className="text-on-surface-muted">Cena</dt><dd>{formatMoney(packageData.totalPrice, packageData.currency || "PLN")}</dd></div>
         <div><dt className="text-on-surface-muted">Pozostałe wejścia</dt><dd>{packageData.remainingSessions ?? "Brak danych"}</dd></div>
-        <div><dt className="text-on-surface-muted">Ważność</dt><dd>{formatPackageDate(packageData.validUntil)}</dd></div>
+        <div><dt className="text-on-surface-muted">Ważność</dt><dd>{formatPackageInstant(packageData.validUntil)}</dd></div>
         <div><dt className="text-on-surface-muted">Termin płatności</dt><dd>{formatPackageDate(packageData.paymentDueDate)}</dd></div>
         <div><dt className="text-on-surface-muted">Płatność</dt><dd>{getPackagePaymentStatusLabel(packageData.paymentStatus)}</dd></div>
         {packageData.closureReason ? <div className="sm:col-span-2"><dt className="text-on-surface-muted">Powód zamknięcia</dt><dd className="break-words">{packageData.closureReason}</dd></div> : null}
@@ -229,6 +219,8 @@ function ClientPackageCard({
           </p>
         </div>
       </div>
+      {isPackageExpired(packageData.validUntil) ? <p className="mt-4 text-sm text-on-surface-variant">Ważność pakietu minęła. Trening odbyty przed końcem ważności nadal może zostać rozliczony.</p> : null}
+      {onExpiry && canDecidePackageExpiry(packageData) ? <Button className="mt-4 w-full" onClick={onExpiry}>Przedłuż / Zakończ pakiet</Button> : null}
       {onManage ? <Button className="mt-4 w-full" variant="secondary" onClick={onManage}>Zarządzaj pakietem</Button> : null}
     </article>
   );
@@ -253,6 +245,8 @@ function getTime(value?: string | null) {
 }
 
 function getPackageStatusLabel(packageData: ClientPackageBilling) {
+  if (packageData.closedAt || packageData.closureDisposition) return "Zamknięty";
+  if (isPackageExpired(packageData.validUntil)) return "Wygasły";
   return typeof packageData.isActive === "boolean" ? packageData.isActive ? "Aktywny" : "Nieaktywny" : "Brak danych";
 }
 

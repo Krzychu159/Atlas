@@ -25,6 +25,8 @@ type PaymentEntryModalProps = {
   packageId: string;
   method: string;
   note: string;
+  paymentDate?: string;
+  onPaymentDateChange?: (value: string) => void;
   packageOptions: PaymentPackageOption[];
   methodOptions: SelectOption[];
   isSubmitting: boolean;
@@ -49,6 +51,8 @@ export function PaymentEntryModal({
   packageId,
   method,
   note,
+  paymentDate,
+  onPaymentDateChange,
   packageOptions,
   methodOptions,
   isSubmitting,
@@ -85,6 +89,7 @@ export function PaymentEntryModal({
     /^\d+(?:[.,]\d{1,2})?$/.test(amount.trim()) &&
     Number.isFinite(parsedAmount) &&
     parsedAmount > 0 &&
+    (!onPaymentDateChange || Boolean(paymentDate)) &&
     !isSubmitting;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -156,6 +161,17 @@ export function PaymentEntryModal({
               options={methodOptions}
               icon={<Landmark size={16} />}
             />
+
+            {onPaymentDateChange ? (
+              <TextField
+                label="Data wpłaty"
+                type="date"
+                value={paymentDate || ""}
+                onChange={onPaymentDateChange}
+                required
+                disabled={isSubmitting}
+              />
+            ) : null}
 
             <TextArea
               label="Notatka"
