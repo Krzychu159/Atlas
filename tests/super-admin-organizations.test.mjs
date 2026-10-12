@@ -91,19 +91,19 @@ function descendants(tree) {
 }
 function text(tree) { return JSON.stringify(tree); }
 
-test("organization profile shows actual values and leaves future modules without actions", () => {
+test("organization profile retains actual values without placeholder modules", () => {
   const view = load("app/super-admin/components/organization-profile.tsx", {
     "react/jsx-runtime": { jsx, jsxs: jsx },
   });
   const tree = view.OrganizationProfile({ organization });
   for (const value of Object.values(organization)) assert.ok(text(tree).includes(value));
-  for (const title of ["Dane organizacji", "Wygląd", "Lokalizacje", "Integracje", "Ustawienia organizacji"]) assert.ok(text(tree).includes(title));
+  assert.ok(text(tree).includes("Dane organizacji"));
   const nodes = descendants(tree);
   assert.equal(nodes.filter(node => ["button", "input", "form"].includes(node.type)).length, 0);
   const links = nodes.filter(node => node.type === "a");
   assert.equal(links.length, 0);
   for (const link of links) assert.ok(nodes.some(node => `#${node.props?.id}` === link.props.href));
-  assert.ok(text(tree).includes("Wkrótce"));
+  assert.ok(!text(tree).includes("Wkrótce"));
 });
 
 test("401/403/404 show Polish messages and appropriate actions without raw errors", () => {
@@ -247,7 +247,7 @@ test("detail conflict refreshes the resource and success replaces it with confir
   let reloads = 0;
   let replaced;
   const details = load("app/super-admin/components/organization-details.tsx", {
-    react: { useCallback: callback => callback, useState: initial => [initial, () => {}] },
+    react: { useCallback: callback => callback, useState: initial => [initial === false ? true : initial, () => {}] },
     "react/jsx-runtime": { jsx, jsxs: jsx },
     "./use-organization-resource": { useOrganizationResource: () => ({ data: managed, loading: false, error: null, retry() { reloads++; }, replace(value) { replaced = value; } }) },
     "./organization-form": { OrganizationForm: "OrganizationForm" },
@@ -284,4 +284,106 @@ test("invalid organization form focuses the first field without sending a mutati
   await form.props.onSubmit({ preventDefault() {}, currentTarget: { querySelector(selector) { return { focus() { focused = selector; } }; } } });
   assert.equal(focused, '[name="name"]');
   assert.equal(requests, 0);
+});
+
+test("SuperAdmin root redirects to organizations", () => {
+  let destination;
+  const page = load("app/super-admin/page.tsx", { "next/navigation": { redirect(path) { destination = path; } } });
+  page.default();
+  assert.equal(destination, "/super-admin/organizations");
+});
+
+test("details open editing on demand and return to data after cancel, save or conflict", () => {
+  const slots = [];
+  let cursor = 0;
+  let reloads = 0;
+  let replaced;
+  const view = load("app/super-admin/components/organization-details.tsx", {
+    react: { useCallback: fn => fn, useState(initial) {
+      const index = cursor++;
+      if (!(index in slots)) slots[index] = initial;
+      return [slots[index], next => { slots[index] = next; }];
+    } },
+    "react/jsx-runtime": { jsx, jsxs: jsx },
+    "./use-organization-resource": { useOrganizationResource: () => ({ data: managed, loading: false, retry() { reloads++; }, replace(value) { replaced = value; } }) },
+    "./organization-profile": { OrganizationProfile: "Profile" },
+    "./organization-form": { OrganizationForm: "Form" },
+  });
+  const render = () => { cursor = 0; return descendants(view.OrganizationDetails({ organizationId: "org-1" })); };
+  const initial = render();
+  assert.ok(initial.some(node => node.type === "Profile"));
+  assert.ok(!initial.some(node => node.type === "Form"));
+  for (const action of ["onCancel", "onSaved", "onConflict"]) {
+    render().find(node => node.type === "Profile").props.onEdit();
+    const edit = render();
+    assert.ok(!edit.some(node => node.type === "Profile"));
+    const form = edit.find(node => node.type === "Form");
+    form.props[action](action === "onSaved" ? managed : "Conflict");
+    assert.ok(render().some(node => node.type === "Profile"));
+  }
+  assert.equal(replaced, managed);
+  assert.equal(reloads, 2);
+});
+
+test("organization list has four main columns and no UUID or interface variant cells", () => {
+  const view = load("app/super-admin/components/organizations-list.tsx", {
+    react: { useCallback: fn => fn, useState: initial => [initial, () => {}] },
+    "react/jsx-runtime": { jsx, jsxs: jsx },
+    "@/app/lib/super-admin/organizations": api,
+    "./use-organization-resource": { useOrganizationResource: () => ({ data: { items: [managed], total: 1, totalPages: 1 } }) },
+  });
+  const tree = view.OrganizationsList();
+  assert.equal(descendants(tree).filter(node => node.type === "th" && node.props.scope === "col").length, 4);
+  assert.ok(!descendants(tree).some(node => node.props?.children === managed.organizationId));
+  assert.ok(!text(tree).includes("Wariant interfejsu"));
+  assert.ok(text(tree).includes("aktualnie pobranej strony"));
+});
+
+test("sidebar keeps Organizations active on list, details and creation with mobile menu intact", () => {
+  for (const path of ["/super-admin/organizations", "/super-admin/organizations/org-1", "/super-admin/organizations/new"]) {
+    const view = load("app/super-admin/components/super-admin-shell.tsx", {
+      react: { useState: initial => [initial, () => {}] },
+      "react/jsx-runtime": { jsx, jsxs: jsx },
+      "next/link": { default: "Link" },
+      "next/navigation": { usePathname: () => path },
+      "@/app/components/current-user-provider": { useCurrentUser: () => ({ user: { fullName: "Test", email: "test@example.test" } }) },
+    });
+    const tree = view.SuperAdminShell({ children: "Page" });
+    const all = descendants(tree);
+    assert.equal(all.filter(node => node.props?.["aria-current"] === "page").length, 1);
+    assert.ok(all.find(node => node.type === "aside").props.className.includes("md:flex"));
+    assert.ok(all.some(node => node.props?.["aria-controls"] === "super-admin-navigation"));
+    assert.ok(!text(tree).includes("Wkrótce"));
+    assert.ok(!text(tree).includes("Przegląd"));
+  }
+});
+
+test("UUID copy reports success and clipboard failure without replacing organization data", async () => {
+  for (const success of [true, false]) {
+    let message;
+    let copied;
+    const view = load("app/super-admin/components/copy-organization-id.tsx", {
+      react: { useState: () => ["", value => { message = value; }] },
+      "react/jsx-runtime": { jsx, jsxs: jsx },
+      "@/app/components/ui/button": { Button: "Button" },
+    }, { navigator: { clipboard: { async writeText(value) { copied = value; if (!success) throw new Error("Permission denied"); } } } });
+    descendants(view.CopyOrganizationId({ organizationId: "org-1" })).find(node => node.type === "Button").props.onClick();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(copied, "org-1");
+    assert.ok(message.includes(success ? "skopiowany" : "Nie udało"));
+  }
+});
+
+test("edit cancellation is guarded and remains available after an uncertain write", async () => {
+  const harness = formHarness({ updateOrganization: async () => { throw new backend.ApiError("Unavailable", { status: 503 }); } });
+  let cancelled = 0;
+  const props = { organization: managed, onSaved() {}, onCancel() { cancelled++; } };
+  harness.render(props);
+  harness.slots[0] = formValues;
+  await harness.render(props).props.onSubmit({ preventDefault() {} });
+  const tree = harness.render(props);
+  const cancel = descendants(tree).find(node => node.props?.["data-discard-changes"]);
+  assert.equal(cancel.props.disabled, false);
+  cancel.props.onClick();
+  assert.equal(cancelled, 1);
 });

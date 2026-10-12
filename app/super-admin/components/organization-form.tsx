@@ -8,10 +8,11 @@ import Link from "next/link";
 import { useUnsavedChanges } from "./use-unsaved-changes";
 import { createOrganization, updateOrganization, validateOrganizationForm, organizationMutationMessage, type Organization, type ManagedOrganization, type OrganizationFormValues } from "@/app/lib/super-admin/organizations";
 
-export function OrganizationForm({ organization, onSaved, onConflict }: {
+export function OrganizationForm({ organization, onSaved, onConflict, onCancel }: {
   organization?: Organization;
   onSaved: (organization: ManagedOrganization) => void;
   onConflict?: (message: string) => void;
+  onCancel?: () => void;
 }) {
   const [values, setValues] = useState<OrganizationFormValues>(() => ({ name: organization?.name ?? "", slug: organization?.slug ?? "", uiVariant: organization?.uiVariant ?? "default", reason: "" }));
   const [errors, setErrors] = useState<Partial<Record<keyof OrganizationFormValues, string>>>({});
@@ -78,7 +79,8 @@ export function OrganizationForm({ organization, onSaved, onConflict }: {
       <div><TextField label="Kod organizacji" name="slug" value={values.slug} onChange={value => change("slug", value)} maxLength={100} required aria-invalid={Boolean(errors.slug)} aria-describedby="organization-slug-note" /><p id="organization-slug-note" className={`mt-2 text-xs ${errors.slug ? "text-error-light" : "text-on-surface-muted"}`}>{errors.slug ?? "Małe litery, cyfry i pojedyncze myślniki, np. atlas-demo."}</p></div>
       <FormField label="Wariant interfejsu"><select name="uiVariant" required value={values.uiVariant} onChange={event => change("uiVariant", event.target.value)} aria-invalid={Boolean(errors.uiVariant)} aria-describedby={errors.uiVariant ? "organization-variant-error" : undefined} className="mt-2 h-12 w-full rounded-xl bg-[#121416] px-4 text-sm focus:outline-2 focus:outline-primary-light"><option value="default">Domyślny</option><option value="bsworkout">BSworkout</option>{!["default", "bsworkout"].includes(values.uiVariant) && <option value={values.uiVariant}>Obecny: {values.uiVariant}</option>}</select>{errors.uiVariant && <p id="organization-variant-error" className="mt-2 text-xs text-error-light">{errors.uiVariant}</p>}</FormField>
       <div className="sm:col-span-2"><TextArea label={organization ? "Powód zmiany" : "Powód utworzenia"} name="reason" value={values.reason} onChange={value => change("reason", value)} maxLength={1000} required aria-invalid={Boolean(errors.reason)} aria-describedby={errors.reason ? "organization-reason-error" : undefined} />{errors.reason && <p id="organization-reason-error" className="mt-2 text-xs text-error-light">{errors.reason}</p>}</div>
-      <div className="flex flex-wrap items-center gap-3 sm:col-span-2"><Button type="submit" disabled={busy || !editable || blocked}>{busy ? "Zapisywanie…" : organization ? "Zapisz zmiany" : "Utwórz organizację"}</Button><Link href="/super-admin/organizations" className="inline-flex min-h-11 items-center rounded-xl px-4 text-sm text-on-surface-variant hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-primary-light">Anuluj</Link></div>
+      <div className="flex flex-wrap items-center gap-3 sm:col-span-2"><Button type="submit" disabled={busy || !editable || blocked}>{busy ? "Zapisywanie…" : organization ? "Zapisz zmiany" : "Utwórz organizację"}</Button></div>
     </fieldset>
+    <div className="mt-3">{onCancel ? <Button type="button" variant="secondary" data-discard-changes disabled={busy} onClick={onCancel}>Anuluj</Button> : <Link href="/super-admin/organizations" className="inline-flex min-h-11 items-center rounded-xl px-4 text-sm text-on-surface-variant hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-primary-light">Anuluj</Link>}</div>
   </form>;
 }
