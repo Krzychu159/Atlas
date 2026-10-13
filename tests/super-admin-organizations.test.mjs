@@ -128,6 +128,29 @@ test("empty filtered page and empty catalog remain distinct", () => {
 });
 
 const managed = { ...organization, uiVariant: "default", status: "Draft", revision: 0, crmAccessEnabled: false };
+
+test("mixed Active/LegacyActive/Draft API page parses and respects configuration-only access", () => {
+  const items = [
+    { organizationId: "24c277c6-d22e-4039-bd71-801aa7da38fc", name: "Atlas Demo", slug: "atlas-demo", uiVariant: "default", status: "Active", revision: 2, crmAccessEnabled: true, accessMode: "SetupOnly" },
+    { organizationId: "b5100000-0000-4000-8000-000000000002", name: "BSworkout", slug: "bsworkout", uiVariant: "bsworkout", status: "LegacyActive", revision: 0, crmAccessEnabled: true, accessMode: "FullCrm" },
+    { organizationId: "cfe0cc18-6cd1-4413-8d12-7f03309b312f", name: "test", slug: "test", uiVariant: "default", status: "Draft", revision: 4, crmAccessEnabled: false, accessMode: "Unavailable" },
+  ];
+  const page = api.parseOrganizationPage({ items, total: 3, page: 1, pageSize: 25 }, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(page.items)), items);
+  assert.equal(api.parseManagedOrganization(items[0]).status, "Active");
+  const status = load("app/super-admin/components/organization-status.tsx", { "react/jsx-runtime": { jsx, jsxs: jsx } });
+  const active = text(status.OrganizationStatus({ organization: page.items[0] }));
+  assert.ok(active.includes("Aktywna"));
+  assert.ok(active.includes("Dostęp tylko do konfiguracji"));
+  assert.ok(!active.includes("Dostęp do CRM aktywny"));
+  assert.ok(text(status.OrganizationStatus({ organization: page.items[1] })).includes("Dostęp do CRM aktywny"));
+  assert.ok(text(status.OrganizationStatus({ organization: page.items[2] })).includes("Szkic"));
+  const users = load("app/lib/super-admin/organization-users.ts");
+  assert.equal(users.canAssignOwner(page.items[0]), false);
+  assert.equal(users.canAssignOwner(page.items[1]), false);
+  assert.equal(users.canAssignOwner(page.items[2]), true);
+  assert.throws(() => api.parseOrganization({ ...items[0], accessMode: "Unknown" }));
+});
 const formValues = { name: "Atlas Demo", slug: "atlas-demo", uiVariant: "default", reason: "Środowisko testowe" };
 
 test("modern organization fields are validated without fabricating legacy values", () => {

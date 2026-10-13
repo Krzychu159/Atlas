@@ -7,9 +7,10 @@ export type Organization = {
   name: string;
   slug: string;
   uiVariant: string;
-  status?: "Draft" | "LegacyActive";
+  status?: "Draft" | "Active" | "LegacyActive";
   revision?: number;
   crmAccessEnabled?: boolean;
+  accessMode?: "SetupOnly" | "FullCrm" | "Unavailable";
 };
 
 export type OrganizationPage = {
@@ -41,9 +42,10 @@ export function parseOrganization(value: unknown): Organization {
   if (!validId || !requiredText(source.name) || !requiredText(source.slug) || !requiredText(source.uiVariant)) {
     throw new Error("Nie udało się odczytać danych organizacji. Spróbuj ponownie później.");
   }
-  if (("status" in source && source.status !== "Draft" && source.status !== "LegacyActive") ||
+  if (("status" in source && source.status !== "Draft" && source.status !== "Active" && source.status !== "LegacyActive") ||
       ("revision" in source && (!Number.isSafeInteger(source.revision) || (source.revision as number) < 0)) ||
-      ("crmAccessEnabled" in source && typeof source.crmAccessEnabled !== "boolean")) {
+      ("crmAccessEnabled" in source && typeof source.crmAccessEnabled !== "boolean") ||
+      ("accessMode" in source && !["SetupOnly", "FullCrm", "Unavailable"].includes(String(source.accessMode)))) {
     throw new Error("Nie udało się odczytać danych organizacji. Spróbuj ponownie później.");
   }
   return {
@@ -54,11 +56,12 @@ export function parseOrganization(value: unknown): Organization {
     ...("status" in source ? { status: source.status as Organization["status"] } : {}),
     ...("revision" in source ? { revision: source.revision as number } : {}),
     ...("crmAccessEnabled" in source ? { crmAccessEnabled: source.crmAccessEnabled as boolean } : {}),
+    ...("accessMode" in source ? { accessMode: source.accessMode as Organization["accessMode"] } : {}),
   };
 }
 
 export type OrganizationFormValues = { name: string; slug: string; uiVariant: string; reason: string };
-export type ManagedOrganization = Organization & { status: "Draft" | "LegacyActive"; revision: number; crmAccessEnabled: boolean };
+export type ManagedOrganization = Organization & { status: "Draft" | "Active" | "LegacyActive"; revision: number; crmAccessEnabled: boolean };
 
 export function validateOrganizationForm(values: OrganizationFormValues) {
   const errors: Partial<Record<keyof OrganizationFormValues, string>> = {};
