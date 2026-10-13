@@ -3,7 +3,7 @@
 import SessionToggle from "@/app/components/schedule/SessionToggle";
 import SessionAccordion from "@/app/components/schedule/SessionAccordion";
 import { groupSeatsLabel, isGroupTraining } from "@/app/lib/group-sessions";
-import { userTrainingType } from "@/app/lib/user-messages";
+import { userTrainingType, getSessionTrainingTypeValue } from "@/app/lib/user-messages";
 import GroupSessionDetails from "@/app/components/schedule/GroupSessionDetails";
 import BookingThresholdField from "@/app/components/schedule/BookingThresholdField";
 import { NativeDateInput } from "@/app/components/ui/native-date-input";
@@ -29,7 +29,7 @@ import {
   normalizeSearch,
 } from "../client-utils";
 import { toDateTimeLocalValue } from "../date-utils";
-import { sessionTypeOptions, statusOptions } from "../options";
+import { sessionBillingTypeOptions, sessionTypeOptions, statusOptions } from "../options";
 import {
   getDefaultFormValues,
   generatePublicSessionSlug,
@@ -103,7 +103,12 @@ export default function SessionEditorModal({
   if (!open) return null;
 
   const readOnly = session?.canEdit === false || (trainerAccess && session != null && session.canEdit !== true);
+  const ownerGroupSession = !trainerAccess && session != null && (session.isGroupSession === true || isGroupTraining(session));
   const isGroupForm = isGroupTraining({ ...session, isPubliclyBookable: values.isPubliclyBookable, plannedSessionType: values.plannedSessionType });
+  const billingType = values.actualSessionType ?? getSessionTrainingTypeValue(session || {});
+  const billingTypeOptions = sessionBillingTypeOptions.some(option => option.value === billingType)
+    ? sessionBillingTypeOptions
+    : [{ value: billingType, label: billingType ? userTrainingType(billingType, "Obecny typ rozliczenia") : "Wybierz typ rozliczenia" }, ...sessionBillingTypeOptions];
   const typeOptions = sessionTypeOptions.some(option => option.value === values.plannedSessionType) ? sessionTypeOptions : [...sessionTypeOptions, { value: values.plannedSessionType, label: userTrainingType(values.plannedSessionType, "Obecny rodzaj zajęć") }];
   const trainerOptions = trainers.map((trainer) => ({
     value: String(trainer.id),
@@ -347,8 +352,8 @@ export default function SessionEditorModal({
             </Field>
           </fieldset>
           <div className="mt-4 space-y-3">
-            <SessionAccordion title="Uczestnicy" summary={values.participantIds.length + (readOnly ? " osób" : " wybranych")}>
-              {isGroupForm ? <p className="mb-3 text-sm text-on-surface-variant">Uczestników zajęć grupowych potwierdzaj w zgłoszeniach po opłaceniu odpowiedniego pakietu. Wybór klienta w formularzu nie jest zapisem na zajęcia.</p> : null}
+            {ownerGroupSession && session ? <GroupEnrollmentsSection key={session.id + ":" + session.locationId} session={session} canConfirm={!readOnly && !isSaving} onChanged={onGroupEnrollmentChanged} onBusyChange={setGroupEnrollmentBusy} /> : <SessionAccordion title="Uczestnicy" summary={values.participantIds.length + (readOnly ? " osób" : " wybranych")}>
+              {isGroupForm && !session ? <p className="mb-3 text-sm text-on-surface-variant">Dodaj zajęcia, aby zapisać uczestników.</p> : null}
               {!readOnly && !isGroupForm ? <fieldset disabled={isSaving || groupEnrollmentBusy} className="min-w-0 space-y-4">
             <div className="space-y-3">
               {!trainerAccess && session?.status === "Completed" && (
@@ -479,8 +484,7 @@ export default function SessionEditorModal({
               </div>
             </div>
           ) : null}
-            </SessionAccordion>
-            {!trainerAccess && session && isGroupTraining(session) ? <SessionAccordion title="Zgłoszenia grupowe"><GroupEnrollmentsSection key={session.id} sessionId={session.id} canConfirm={!readOnly && session.status !== "Cancelled" && session.status !== "Completed" && !isSaving} onChanged={onGroupEnrollmentChanged} onBusyChange={setGroupEnrollmentBusy} /></SessionAccordion> : null}
+            </SessionAccordion>}
             {!readOnly || values.note.trim() ? <SessionAccordion title="Opis zajęć" summary={values.note.trim() ? "Uzupełniony" : undefined}>
               <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly} className="min-w-0">
             <Field
@@ -512,7 +516,7 @@ export default function SessionEditorModal({
             </> : null}
               </fieldset>
             </SessionAccordion> : null}
-            {!readOnly || values.outlookCategories.trim() || (session?.status === "Completed" && !trainerAccess && (session.actualSessionType || session.plannedSessionType)) || values.isPubliclyBookable ? <SessionAccordion title="Ustawienia dodatkowe">
+            {!readOnly || values.outlookCategories.trim() || (session?.status === "Completed" && (session.actualSessionType || session.plannedSessionType)) || values.isPubliclyBookable ? <SessionAccordion title="Ustawienia dodatkowe">
               <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly} className="grid min-w-0 gap-4 md:grid-cols-2">
             {session?.status === "Completed" && (
               <>
@@ -522,12 +526,9 @@ export default function SessionEditorModal({
                     className="w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3 text-sm outline-none" />
                   <span className="mt-2 block text-xs text-on-surface-variant">Korekta dotyczy tylko tego wystąpienia sesji. Rozliczenie zostanie przeliczone przez system.</span>
                 </Field> : null}
-                {values.status === "Completed" && !trainerAccess && (!readOnly || values.actualSessionType || session.actualSessionType || session.plannedSessionType) && (
+                {values.status === "Completed" && (!readOnly || values.actualSessionType || session.actualSessionType || session.plannedSessionType) && (
                   <Field label="Typ rozliczenia" className="md:col-span-2">
-                    <input value={values.actualSessionType ?? session.actualSessionType ?? session.plannedSessionType ?? ""}
-                      onChange={(event) => updateValue("actualSessionType", event.target.value)}
-                      placeholder="Np. TwoToOne"
-                      className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none" />
+                    <CustomSelect value={billingType} options={billingTypeOptions} onChange={value => updateValue("actualSessionType", value)} />
                   </Field>
                 )}
               </>
@@ -694,4 +695,3 @@ function getOneHourLaterDateTimeLocal(value: string) {
 
   return toDateTimeLocalValue(start);
 }
-

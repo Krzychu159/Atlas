@@ -47,6 +47,7 @@ export default function DashboardClientRow({
       </div>
 
       <div className="text-right shrink-0 max-w-[112px]">
+        <p className="mb-1 text-[10px] text-on-surface-muted">Dodano do listy</p>
         <p className="text-xs text-on-surface-muted whitespace-nowrap">
           {formatRelativeDate(client.createdAt)}
         </p>

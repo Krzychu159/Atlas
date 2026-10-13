@@ -1,5 +1,8 @@
 "use client";
 
+import { getGroupEnrollment } from "@/app/lib/owner/group-enrollments";
+import { notifyClientPaymentChanged } from "@/app/lib/session-corrections";
+
 import { userTrainingType } from "@/app/lib/user-messages";
 import { packageTrainingKind } from "@/app/lib/package-validity";
 
@@ -556,6 +559,8 @@ export default function ClientPaymentsPageClient({
           ? await createTrainerPortalClientPayment(clientId, paymentPayload)
           : await createClientPayment(paymentPayload);
 
+      notifyClientPaymentChanged(clientId);
+      void refreshLinkedEnrollment();
       showOwnerSuccess(getCreatedPaymentMessage(createdPayment), {
         id: "owner-client-payment-created",
       });
@@ -571,6 +576,14 @@ export default function ClientPaymentsPageClient({
       mutationLock.current = false;
       setIsSaving(false);
     }
+  }
+
+  async function refreshLinkedEnrollment() {
+    if (basePath !== "/owner") return;
+    const id = Number(new URLSearchParams(window.location.search).get("groupEnrollmentId"));
+    if (!Number.isSafeInteger(id) || id <= 0) return;
+    try { await getGroupEnrollment(id); }
+    catch { showOwnerError(new Error("Wpłata została zapisana, ale nie udało się odświeżyć zgłoszenia na zajęcia. Sprawdź zgłoszenie przed potwierdzeniem udziału."), "Nie udało się odświeżyć zgłoszenia."); }
   }
 
   async function handleConfirmPayment(payment: ClientPayment) {
@@ -593,6 +606,8 @@ export default function ClientPaymentsPageClient({
       } else {
         await confirmClientPayment(payment.id);
       }
+      notifyClientPaymentChanged(payment.clientId);
+      void refreshLinkedEnrollment();
       showOwnerSuccess("Wpłata została potwierdzona.", {
         id: `owner-client-payment-confirmed-${payment.id}`,
       });

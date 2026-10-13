@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { ClientListItem } from "@/app/lib/owner/clients";
+import { formatTrainingStartDate } from "@/app/lib/formatters/date";
 import {
   formatClientBalance,
   getClientName,
@@ -74,6 +75,7 @@ export default function ClientListRow({
 
       <div className="min-w-0">
         <p className="text-base font-semibold truncate">{fullName}</p>
+        <p className="mt-1 text-xs text-on-surface-muted">Rozpoczęcie treningów: {formatTrainingStartDate(client.trainingStartDate)}</p>
         <p className="text-label text-on-surface-variant mt-1 truncate">
           {client.email || "Brak adresu email"}
         </p>

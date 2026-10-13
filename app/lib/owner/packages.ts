@@ -66,8 +66,8 @@ export type UpdatePackagePayload = {
 // GET Packages/{id}/clients returns ClientDto, not package membership details.
 export type PackageClient = Client;
 
-export function getPackages() {
-  return backendGet<Package[]>("Packages");
+export function getPackages(query?: { locationId?: number; isActive?: boolean }, signal?: AbortSignal) {
+  return backendGet<Package[]>("Packages", query, signal);
 }
 
 export function getPackage(id: number) {

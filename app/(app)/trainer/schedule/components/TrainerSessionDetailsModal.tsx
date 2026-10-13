@@ -6,7 +6,7 @@ import { groupSeatsLabel, isGroupTraining } from "@/app/lib/group-sessions";
 import { Button } from "@/app/components/ui/button";
 import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
 import { getSessionStatusLabel } from "@/app/(app)/owner/schedule/session-utils";
-import { userTrainingType } from "@/app/lib/user-messages";
+import { sessionTrainingType } from "@/app/lib/user-messages";
 import type { TrainerSessionDetails } from "@/app/lib/trainer/portal";
 
 export default function TrainerSessionDetailsModal({ session, onClose, onEdit }: { session: TrainerSessionDetails; onClose: () => void; onEdit?: () => void }) {
@@ -20,7 +20,7 @@ export default function TrainerSessionDetailsModal({ session, onClose, onEdit }:
             <Detail label="Trener" value={session.trainerFullName || "Brak danych"} />
             <Detail label="Lokalizacja" value={session.locationName || "Brak danych"} />
             <Detail label="Status" value={getSessionStatusLabel(session.status)} />
-            <Detail label="Rodzaj zajęć" value={isGroupTraining(session) ? "Grupowe" : userTrainingType(session.actualSessionType || session.plannedSessionType, "Brak danych")} />
+            <Detail label="Rodzaj zajęć" value={sessionTrainingType(session)} />
             <Detail label="Uczestnicy" value={isGroupTraining(session) ? groupSeatsLabel(session) : numberLabel(session.participantsCount)} />
           </dl>
           {session.isLocationLimitExceeded === true ? <p className="mt-4 rounded-[var(--radius-lg)] bg-warning-container p-4 text-sm text-warning-light">Liczba uczestników przekracza limit lokalizacji.</p> : null}

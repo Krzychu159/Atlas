@@ -1,4 +1,5 @@
 "use client";
+import { formatTrainingStartDate } from "@/app/lib/formatters/date";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -227,6 +228,7 @@ export default function TrainerClientsPage() {
                     <p className="mt-4 text-label text-primary-light">
                       Trener: {client.trainerFullName || "Brak danych"}
                     </p>
+                    <p className="mt-2 text-xs text-on-surface-muted">Rozpoczęcie treningów: {formatTrainingStartDate(client.trainingStartDate)}</p>
                   </div>
 
                   <Link

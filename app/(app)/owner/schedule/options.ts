@@ -1,4 +1,7 @@
 import type { SessionStatusFilter } from "./types";
+import { userTrainingType } from "@/app/lib/user-messages";
+
+export const sessionBillingTypeOptions = ["OneToOne", "TwoToOne", "ThreeToOne", "FourToOne", "Group"].map(value => ({ value, label: userTrainingType(value) }));
 
 export const statusOptions = [
   { value: "", label: "Domyślnie" },
@@ -22,8 +25,6 @@ export const scheduleStatusFilterOptions: {
 
 export const sessionTypeOptions = [
   { value: "", label: "Domyślnie" },
-  { value: "PersonalTraining", label: "Trening personalny" },
-  { value: "DuoTraining", label: "Trening 2:1" },
-  { value: "Group", label: "Grupowe" },
+  ...sessionBillingTypeOptions,
   { value: "Consultation", label: "Konsultacja" },
 ];

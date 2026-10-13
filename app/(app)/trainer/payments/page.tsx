@@ -1,5 +1,7 @@
 "use client";
 
+import { notifyClientPaymentChanged } from "@/app/lib/session-corrections";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw, Search } from "lucide-react";
 import { PaymentsList } from "@/app/components/payments/PaymentsList";
@@ -76,6 +78,7 @@ export default function TrainerPaymentsPage() {
     try {
       if (action.type === "confirm") await confirmTrainerPortalPayment(action.payment.id);
       else await rejectTrainerPortalPayment(action.payment.id, reason.trim());
+      notifyClientPaymentChanged(action.payment.clientId);
       showAppSuccess(action.type === "confirm" ? "Wpłata została potwierdzona." : "Wpłata została odrzucona.");
       setAction(null);
       setReason("");

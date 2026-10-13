@@ -15,6 +15,7 @@ import {
   UserRoundX,
 } from "lucide-react";
 import type { Client } from "@/app/lib/owner/clients";
+import { formatTrainingStartDate } from "@/app/lib/formatters/date";
 import ClientRewardProgress from "@/app/components/clients/ClientRewardProgress";
 import type { MilestoneAccess } from "@/app/lib/milestones";
 import {
@@ -142,6 +143,7 @@ export default function ClientProfileHero({
 
           <div className="mt-7 grid grid-cols-2 gap-4 border-t border-secondary/30 pt-6 md:grid-cols-3">
             <HeroStat label="Trener" value={client.trainerFullName || "Brak"} />
+            <HeroStat label="Rozpoczęcie treningów" value={formatTrainingStartDate(client.trainingStartDate)} />
             <HeroStat
               label={groupLocationNames ? "Lokalizacja główna" : "Lokalizacja"}
               value={

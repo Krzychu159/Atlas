@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Users } from "lucide-react";
 import type { Client } from "@/app/lib/owner/clients";
+import { formatTrainingStartDate } from "@/app/lib/formatters/date";
 
 function getClientName(client: Client) {
   const name = client.fullName || `${client.firstName} ${client.lastName}`;
@@ -81,12 +82,14 @@ export default function TrainerProfileClients({
                   <p className="mt-1 truncate text-xs text-on-surface-muted">
                     {client.goal || client.email || "Brak celu"}
                   </p>
+                  <p className="mt-1 text-xs text-on-surface-muted sm:hidden">Rozpoczęcie treningów: {formatTrainingStartDate(client.trainingStartDate)}</p>
                 </div>
 
                 <div className="hidden min-w-[120px] sm:block">
                   <p className="text-xs text-on-surface-muted">
-                    Data dołączenia niedostępna
+                    Rozpoczęcie treningów
                   </p>
+                  <p className="mt-1 text-xs font-semibold text-primary-light">{formatTrainingStartDate(client.trainingStartDate)}</p>
                 </div>
 
                 <ArrowRight size={18} className="text-primary-light sm:hidden" />

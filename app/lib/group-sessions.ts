@@ -25,7 +25,7 @@ export type GroupSessionSettings = {
 };
 
 export function isGroupTraining(session: { isPubliclyBookable?: boolean; plannedSessionType?: string | null; actualSessionType?: string | null }) {
-  return session.isPubliclyBookable === true || session.plannedSessionType === "Group" || session.actualSessionType === "Group";
+  return session.isPubliclyBookable === true || ["Group", "GroupTraining"].includes(session.plannedSessionType?.trim() || "") || ["Group", "GroupTraining"].includes(session.actualSessionType?.trim() || "");
 }
 
 export function groupSeatsLabel(session: GroupSessionFields) {

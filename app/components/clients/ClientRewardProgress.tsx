@@ -15,6 +15,7 @@ import { TextArea } from "@/app/components/ui/input";
 import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
 import { showAppError, showAppSuccess } from "@/app/components/ui/app-toast";
 import { getClientRewardProgress } from "@/app/lib/clients/rewards";
+import { formatTrainingStartDate } from "@/app/lib/formatters/date";
 import {
   claimClientMilestone,
   getClientMilestones,
@@ -194,6 +195,7 @@ export default function ClientRewardProgress({
               <h2 className="mt-2 font-display text-[1.8rem] font-semibold">
                 Twój postęp i nagrody
               </h2>
+              <p className="mt-2 text-sm text-on-surface-variant">Rozpoczęcie treningów: {formatTrainingStartDate(effectiveStartDate)}</p>
             </div>
             <ChevronRight className="mt-2 text-primary-light transition group-hover:translate-x-1" />
           </div>
@@ -228,6 +230,7 @@ export default function ClientRewardProgress({
           progressPercent={progressPercent}
           claimedCount={claimedCount}
           hasTrainingStartDate={hasTrainingStartDate}
+          trainingStartDate={effectiveStartDate}
           selected={selected}
           note={note}
           isSaving={isSaving}
@@ -323,6 +326,7 @@ function RewardsOverviewModal({
   progressPercent,
   claimedCount,
   hasTrainingStartDate,
+  trainingStartDate,
   selected,
   note,
   isSaving,
@@ -340,6 +344,7 @@ function RewardsOverviewModal({
   progressPercent: number;
   claimedCount: number;
   hasTrainingStartDate: boolean;
+  trainingStartDate?: string | null;
   selected: ClientMilestone | null;
   note: string;
   isSaving: boolean;
@@ -363,6 +368,7 @@ function RewardsOverviewModal({
             icon={<Gift size={21} />}
             onClose={onClose}
           />
+          <p className="mt-3 text-sm text-on-surface-variant">Rozpoczęcie treningów: {formatTrainingStartDate(trainingStartDate)}</p>
 
           <div className="mt-7 rounded-[var(--radius-xl)] bg-surface-container-low p-5 md:p-6">
             <div className="flex items-end justify-between gap-3">

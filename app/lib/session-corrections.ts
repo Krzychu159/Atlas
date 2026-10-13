@@ -57,3 +57,30 @@ export function usePaymentDateCorrectionRevision(clientId?: number) {
   }, [clientId]);
   return revision;
 }
+
+const paymentChangedEvent = "atlas-client-payment-changed";
+
+export function notifyClientPaymentChanged(clientId: number) {
+  window.dispatchEvent(new CustomEvent(paymentChangedEvent, { detail: { clientId } }));
+  if (typeof BroadcastChannel !== "undefined") {
+    try {
+      const channel = new BroadcastChannel(paymentChangedEvent);
+      channel.postMessage({ clientId }); channel.close();
+    } catch { /* Keep a successful payment independent of cross-tab notifications. */ }
+  }
+}
+
+export function useClientPaymentRevision(clientId?: number) {
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const refresh = (changedId?: number) => { if (clientId === undefined || changedId === clientId) setRevision(value => value + 1); };
+    const listener = (event: Event) => refresh((event as CustomEvent<{ clientId: number }>).detail?.clientId);
+    window.addEventListener(paymentChangedEvent, listener);
+    let channel: BroadcastChannel | null = null;
+    try { if (typeof BroadcastChannel !== "undefined") channel = new BroadcastChannel(paymentChangedEvent); }
+    catch { /* Same-tab updates still work when cross-tab communication is unavailable. */ }
+    if (channel) channel.onmessage = event => refresh(event.data?.clientId);
+    return () => { window.removeEventListener(paymentChangedEvent, listener); channel?.close(); };
+  }, [clientId]);
+  return revision;
+}

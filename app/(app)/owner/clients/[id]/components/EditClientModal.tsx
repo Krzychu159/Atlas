@@ -44,10 +44,7 @@ import {
   uploadTrainerClientAvatar,
 } from "@/app/lib/avatars";
 
-import {
-  dateInputToIsoDateTime,
-  toDateInputValue,
-} from "@/app/lib/formatters/date";
+import { toDateInputValue } from "@/app/lib/formatters/date";
 
 import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
@@ -234,7 +231,7 @@ export default function EditClientModal({
       progressPercent: access === "trainer" ? undefined : currentClient.progressPercent ?? 0,
       billingStatus: currentClient.billingStatus || (access === "trainer" ? undefined : null),
       status: currentClient.status || (access === "trainer" ? undefined : null),
-      trainingStartDate: dateInputToIsoDateTime(trainingStartDate),
+      trainingStartDate: trainingStartDate ? `${trainingStartDate}T00:00:00` : null,
       nextSessionAt: currentClient.nextSessionAt || null,
     };
 
@@ -530,7 +527,7 @@ export default function EditClientModal({
             ) : null}
 
             <DateInput
-              label="Data rozpoczęcia treningów"
+              label="Rozpoczęcie treningów"
               value={trainingStartDate}
               onChange={setTrainingStartDate}
             />

@@ -194,8 +194,8 @@ export function getClientActivePackage(clientId: number) {
   );
 }
 
-export function getClientBilling(clientId: number) {
-  return backendGet<ClientBillingSummary>(`billing/clients/${clientId}`);
+export function getClientBilling(clientId: number, signal?: AbortSignal) {
+  return backendGet<ClientBillingSummary>(`billing/clients/${clientId}`, undefined, signal);
 }
 
 export function createClientPayment(payload: CreateClientPaymentPayload) {

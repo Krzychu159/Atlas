@@ -1,3 +1,5 @@
+import { isGroupTraining } from "./group-sessions";
+
 const knownMessages: Record<string, string> = {
   "current terms for this location must be accepted before continuing": "Przed kontynuowaniem zaakceptuj aktualny regulamin studia.",
   "client profile not found": "Nie znaleziono Twojego profilu klienta. Skontaktuj się ze studiem.",
@@ -34,12 +36,26 @@ export function userStatus(value: string | null | undefined, fallback = "Status 
   return value ? (Object.hasOwn(labels, value) ? labels[value] : userMessage(value, "Status niedostępny")) : fallback;
 }
 
-export function userTrainingType(value: string | null | undefined, fallback = "Typ treningu niedostępny") {
+export function trainingTypeLabel(value: string | null | undefined): string | null {
   const labels: Record<string, string> = {
     PersonalTraining: "Trening personalny", DuoTraining: "Trening 2:1",
     GroupTraining: "Trening grupowy", Consultation: "Konsultacja",
     Group: "Trening grupowy", OneToOne: "Trening 1:1", TwoToOne: "Trening 2:1",
     ThreeToOne: "Trening 3:1", FourToOne: "Trening 4:1",
   };
-  return value ? (Object.hasOwn(labels, value) ? labels[value] : userMessage(value, fallback)) : fallback;
+  const key = typeof value === "string" ? value.trim() : "";
+  return key && Object.hasOwn(labels, key) ? labels[key] : null;
+}
+
+export function userTrainingType(value: string | null | undefined, fallback = "Typ treningu niedostępny") {
+  return trainingTypeLabel(value) ?? userMessage(value, fallback);
+}
+
+export function getSessionTrainingTypeValue(session: { plannedSessionType?: string | null; actualSessionType?: string | null }) {
+  return session.actualSessionType?.trim() || session.plannedSessionType?.trim() || "";
+}
+
+export function sessionTrainingType(session: { plannedSessionType?: string | null; actualSessionType?: string | null; isPubliclyBookable?: boolean }, fallback = "Typ treningu niedostępny") {
+  if (isGroupTraining(session)) return userTrainingType("Group");
+  return trainingTypeLabel(getSessionTrainingTypeValue(session)) ?? fallback;
 }

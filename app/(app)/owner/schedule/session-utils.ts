@@ -1,8 +1,7 @@
 import { groupSeatsLabel, isGroupTraining } from "@/app/lib/group-sessions";
-import { userTrainingType } from "@/app/lib/user-messages";
+import { sessionTrainingType } from "@/app/lib/user-messages";
 import type { Location } from "@/app/lib/owner/locations";
 import type {
-  OwnerSession,
   SessionParticipantPayload,
   SessionPayload,
 } from "@/app/lib/owner/sessions";
@@ -34,12 +33,7 @@ export function sortSessions<TSession extends CalendarSession>(sessions: TSessio
 }
 
 export function getSessionType(session: CalendarSession) {
-  if (isGroupTraining(session)) return "Trening grupowy";
-  return (
-    (session.actualSessionType || session.plannedSessionType ? userTrainingType(session.actualSessionType || session.plannedSessionType) : null) ||
-    session.primaryOutlookCategory ||
-    "Sesja"
-  );
+  return sessionTrainingType(session);
 }
 
 export function getSessionTitle(session: CalendarSession) {
@@ -114,10 +108,10 @@ export function getToneClasses(session: CalendarSession) {
   return "border-white/8 bg-surface-container-low";
 }
 
-// The group flag determines the displayed kind; preserve the original API value
+// Explicit group fields determine the displayed kind; preserve the original API value
 // when the user saves without changing the kind.
 export function getSessionFormType(session: SessionEditorSession) {
-  if (isGroupTraining(session) || session.plannedSessionType === "GroupTraining") return "Group";
+  if (isGroupTraining(session)) return "Group";
   return session.plannedSessionType || "";
 }
 
@@ -206,7 +200,7 @@ export function toSessionPayload(
   }
 
   const preserveParticipants = Boolean(session && !values.participantsEdited);
-  const isGroupForm = isGroupTraining({ ...session, isPubliclyBookable: values.isPubliclyBookable, plannedSessionType: values.plannedSessionType }) || values.plannedSessionType === "GroupTraining";
+  const isGroupForm = isGroupTraining({ ...session, isPubliclyBookable: values.isPubliclyBookable, plannedSessionType: values.plannedSessionType });
   if (isGroupForm && (!session ? values.participantIds.length > 0 : values.participantsEdited)) {
     throw new Error("Zapis na zajęcia grupowe potwierdź w zgłoszeniach po opłaceniu odpowiedniego pakietu.");
   }
@@ -294,7 +288,7 @@ export function toSessionPayload(
   return payload;
 }
 
-export async function correctCompletedSession(session: OwnerSession, values: SessionFormValues) {
+export async function correctCompletedSession(session: SessionEditorSession, values: SessionFormValues, complete: (id: number, payload: Parameters<typeof completeSession>[1]) => Promise<unknown> = completeSession) {
   const correctionReason = values.correctionReason?.trim();
   if (!correctionReason) throw new Error("Podaj powód korekty.");
   if (!["Completed", "Planned", "Cancelled"].includes(values.status)) {
@@ -315,7 +309,7 @@ export async function correctCompletedSession(session: OwnerSession, values: Ses
       throw new Error("Zapisz korektę uczestników lub typu rozliczenia osobno od zmian pozostałych danych sesji.");
     }
     if (!actualSessionType) throw new Error("Podaj typ rozliczenia sesji.");
-    await completeSession(session.id, {
+    await complete(session.id, {
       actualSessionType,
       correctionReason,
       participants: values.participantIds.map((id) => {

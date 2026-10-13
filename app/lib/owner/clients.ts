@@ -54,7 +54,8 @@ export type Client = {
   billingBalance?: number | null;
   currency?: string | null;
   balanceCurrency?: string | null;
-  trainingStartDate?: string | null;
+  // Calendar day supplied by ClientDto; do not interpret it as a UTC instant.
+  trainingStartDate: string | null;
   nextSessionAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -248,8 +249,8 @@ export type UpdateClientPayload = {
   locationId?: number;
 };
 
-export function getClients() {
-  return backendGet<Client[]>("Clients");
+export function getClients(signal?: AbortSignal) {
+  return backendGet<Client[]>("Clients", undefined, signal);
 }
 
 export function getClient(id: number) {

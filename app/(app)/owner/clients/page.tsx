@@ -1,4 +1,5 @@
 "use client";
+import { formatTrainingStartDate } from "@/app/lib/formatters/date";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -346,6 +347,7 @@ function ClientsContent() {
                           <span className="mt-2 inline-flex rounded-full bg-surface-container-lowest px-2 py-1 text-[10px] font-semibold text-primary-light">
                             {getPortalAccessLabel(client.portalAccessStatus)}
                           </span>
+                          <p className="mt-2 text-xs text-on-surface-muted">Rozpoczęcie treningów: {formatTrainingStartDate(client.trainingStartDate)}</p>
                           <p className="mt-4 text-label text-primary-light">
                             Trener: {client.trainerFullName || "Nie przypisano"}
                           </p>

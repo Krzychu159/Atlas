@@ -5,7 +5,7 @@ import { usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections"
 import { Button } from "@/app/components/ui/button";
 import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { getErrorMessage } from "@/app/lib/backend";
-import { formatDateTime } from "@/app/lib/formatters/date";
+import { formatDateTime, formatTrainingStartDate } from "@/app/lib/formatters/date";
 import { getClientAudit, type ClientAuditDto, type ClientAuditResponse } from "@/app/lib/owner/clients";
 import { getPackageClosureLabel, getPackageOriginLabel, getPackagePaymentStatusLabel } from "@/app/lib/owner/billing";
 import { userMessage, userTrainingType } from "@/app/lib/user-messages";
@@ -25,6 +25,7 @@ const actionLabels: Record<string, string> = {
 
 const fieldLabels: Record<string, string> = {
   paymentdate: "Data wpłaty", expectedpaymentdate: "Poprzednia data wpłaty",
+  trainingstartdate: "Rozpoczęcie treningów",
   firstname: "Imię", lastname: "Nazwisko", fullname: "Imię i nazwisko", email: "E-mail",
   loginemail: "Adres do logowania", phonenumber: "Telefon", goal: "Cel", notes: "Notatki",
   trainerid: "Trener (numer)", trainername: "Trener", trainerfullname: "Trener",
@@ -119,6 +120,7 @@ function displayValue(key: string, value: unknown): string {
   if (typeof value === "number") return value.toLocaleString("pl-PL");
   if (Array.isArray(value)) return `Liczba pozycji: ${value.length}`;
   if (typeof value !== "string") return "Szczegóły poniżej";
+  if (key === "trainingstartdate") return formatTrainingStartDate(value);
   if (/^(paymentdate|expectedpaymentdate|purchasedate|validuntil|paymentduedate|closedat|refundconfirmedat)$/.test(key)) return formatDateTime(value);
   if (key === "expectedbillingtype") return userTrainingType(value);
   const choices: Record<string, string> = { Immediately: "Od razu", AfterCurrentPackage: "Po bieżącym pakiecie", KeepDue: "Należność pozostaje", WaiveDue: "Należność umorzona", KeepFunds: "Środki pozostają w pakiecie", Balance: "Środki na saldo", Refund: "Zwrot oczekuje", NoAccount: "Brak konta", Invited: "Zaproszony", Active: "Aktywny", Blocked: "Zablokowany" };

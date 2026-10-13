@@ -1,5 +1,7 @@
 import type { ActivityLogEntry } from "./activity-log";
 import { getPaymentMethodLabel, getPaymentSourceLabel, getPaymentStatusLabel } from "../payments/display";
+import { formatTrainingStartDate } from "../formatters/date";
+import { userTrainingType } from "../user-messages";
 
 function lookup(labels: Record<string, string>, key: string) {
   return Object.prototype.hasOwnProperty.call(labels, key) ? labels[key] : undefined;
@@ -42,6 +44,8 @@ const fieldLabels: Record<string, string> = {
   balanceApplied: "Wykorzystane saldo", amountPaid: "Opłacona kwota", amountDue: "Do zapłaty",
   appliedToPackageAmount: "Kwota na pakiet", balanceCreditAmount: "Kwota na saldo", refundAmount: "Kwota zwrotu",
   paymentStatus: "Status płatności", method: "Sposób płatności", source: "Źródło", note: "Notatka",
+  trainingStartDate: "Rozpoczęcie treningów", plannedSessionType: "Planowany typ treningu", actualSessionType: "Faktyczny typ treningu",
+  plannedBillingType: "Planowany typ rozliczenia", actualBillingType: "Faktyczny typ rozliczenia", expectedBillingType: "Typ pakietu",
   remainingSessions: "Pozostałe wejścia", purchaseDate: "Data zakupu", validUntil: "Ważne do",
   paymentDueDate: "Termin płatności", confirmedAt: "Data potwierdzenia", rejectedAt: "Data odrzucenia",
   expectedPaymentDate: "Poprzednia data wpłaty", reason: "Powód",
@@ -95,6 +99,8 @@ export function scalarValue(value: unknown, field: string, entityType: string | 
     return new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 20 }).format(value);
   }
   if (typeof value === "string") {
+    if (key === "trainingStartDate") return formatTrainingStartDate(value);
+    if (["plannedSessionType", "actualSessionType", "plannedBillingType", "actualBillingType", "expectedBillingType", "sessionType"].includes(key)) return userTrainingType(value);
     if (dateFields.has(key) && /^\d{4}-\d{2}-\d{2}T/.test(value)) return activityDate(value);
     if (dateFields.has(key) && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value.split("-").reverse().join(".");
     return value === "" ? "Pusty tekst" : value;

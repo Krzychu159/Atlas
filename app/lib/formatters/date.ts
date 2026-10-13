@@ -14,6 +14,22 @@ export function formatDateTime(value?: string | null) {
   }).format(date);
 }
 
+// trainingStartDate represents a calendar day, even when serialized as DateTime.
+export function parseTrainingStartDate(value?: string | null) {
+  const match = value?.trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:T|$)/);
+  if (!match) return null;
+  const [year, month, day] = match.slice(1).map(Number);
+  const date = new Date(0);
+  date.setHours(12, 0, 0, 0);
+  date.setFullYear(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null;
+}
+
+export function formatTrainingStartDate(value?: string | null) {
+  const date = parseTrainingStartDate(value);
+  return date ? new Intl.DateTimeFormat("pl-PL", { day: "2-digit", month: "short", year: "numeric" }).format(date) : "Nie podano daty";
+}
+
 export function formatRelativeDate(value?: string | null) {
   if (!value) return "Brak daty";
 

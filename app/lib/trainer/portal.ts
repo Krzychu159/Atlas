@@ -8,6 +8,11 @@ import type {
 } from "../owner/clients";
 import type { ClientBillingSummary, ClientPayment, CreateClientPaymentPayload, UpdatePaymentDatePayload } from "../owner/billing";
 import type { OutlookSessionColors } from "../calendar/outlook-colors";
+import type { completeSession } from "../owner/sessions";
+
+export function correctTrainerSessionBilling(sessionId: number, payload: Parameters<typeof completeSession>[1]) {
+  return backendPost<unknown>(`trainer-portal/sessions/${sessionId}/complete`, payload);
+}
 
 export type TrainerPortalMe = {
   trainerId: number;
@@ -168,7 +173,7 @@ export type TrainerPortalClient = {
   billingBalance?: number | null;
   currency?: string | null;
   balanceCurrency?: string | null;
-  trainingStartDate?: string | null;
+  trainingStartDate: string | null;
   locationName: string | null;
   createdAt: string;
 };
@@ -213,7 +218,7 @@ export type TrainerPortalClientDetails = {
   billingBalance?: number | null;
   currency?: string | null;
   balanceCurrency?: string | null;
-  trainingStartDate?: string | null;
+  trainingStartDate: string | null;
   nextSessionAt: string | null;
   createdAt: string;
   updatedAt: string;

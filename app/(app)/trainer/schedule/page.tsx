@@ -7,6 +7,9 @@ import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { showAppError, showAppSuccess } from "@/app/components/ui/app-toast";
 import { ApiError } from "@/app/lib/backend";
+import { correctCompletedSession } from "@/app/(app)/owner/schedule/session-utils";
+import { correctTrainerSessionBilling } from "@/app/lib/trainer/portal";
+import { notifySessionCorrected } from "@/app/lib/session-corrections";
 import { trainerPaymentError } from "@/app/lib/trainer/payment-errors";
 import { getOutlookStatus, type OutlookStatus } from "@/app/lib/calendar/outlook";
 import { updateTrainerPortalSession, createTrainerPortalSession, getTrainerPortalClients, getTrainerPortalMe, getTrainerPortalSession, getTrainerPortalSessions, type TrainerPortalMe, type TrainerSessionDetails, type TrainerSessionPayload } from "@/app/lib/trainer/portal";
@@ -191,7 +194,10 @@ export default function TrainerSchedulePage() {
         });
       }
       saving.current = true; setIsSaving(true);
-      await updateTrainerPortalSession(session.id, {
+      if (session.status === "Completed" && values.status === "Completed" && values.actualSessionType !== undefined && values.actualSessionType !== (session.actualSessionType || session.plannedSessionType || "")) {
+        await correctCompletedSession(session, values, correctTrainerSessionBilling);
+        notifySessionCorrected();
+      } else await updateTrainerPortalSession(session.id, {
         ...payload,
         title: values.title.trim(),
         status: payload.status ?? undefined,

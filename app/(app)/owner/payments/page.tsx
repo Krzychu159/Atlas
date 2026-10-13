@@ -1,5 +1,7 @@
 "use client";
 
+import { notifyClientPaymentChanged } from "@/app/lib/session-corrections";
+
 import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 import { usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
@@ -166,6 +168,7 @@ function OwnerPaymentsPageContent({ locationId }: { locationId: number | null })
         if (basePath !== "/trainer" || !isForbiddenError(err)) throw err;
         await confirmTrainerPortalPayment(payment.id);
       }
+      notifyClientPaymentChanged(payment.clientId);
       showOwnerSuccess("Wpłata została potwierdzona.", {
         id: `owner-payment-confirmed-${payment.id}`,
       });

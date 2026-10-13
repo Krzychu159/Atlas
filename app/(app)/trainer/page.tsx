@@ -1,5 +1,7 @@
 "use client";
 
+import { formatTrainingStartDate } from "@/app/lib/formatters/date";
+import { sessionTrainingType } from "@/app/lib/user-messages";
 import { userMessage } from "@/app/lib/user-messages";
 
 import { useEffect, useMemo, useState } from "react";
@@ -214,6 +216,7 @@ function TodaySessionRow({ session, nearest }: { session: TrainerPortalSession; 
     </div>
     <div className="col-start-2 flex flex-wrap items-center gap-2 sm:col-start-auto sm:justify-end">
       <StatusPill label={getSessionStatusLabel(session.status)} tone={sessionTone(session.status)} />
+      <StatusPill label={sessionTrainingType(session)} />
       {nearest ? <span className="text-[9px] font-semibold text-primary-light">Najbliższy</span> : null}
       <SessionDetailsLink session={session} highlighted={nearest} />
     </div>
@@ -224,7 +227,7 @@ function UpcomingSessionsPanel({ sessions, loading, error }: { sessions: Trainer
   return <section className="min-w-0 rounded-xl bg-surface-container-low p-4 lg:p-5"><h2 className="text-sm font-semibold">Nadchodzące sesje</h2><p className="mt-1 text-[10px] text-on-surface-muted">Kolejne zaplanowane treningi w Twoim grafiku</p>
     <div className="mt-3">{loading ? <PanelSkeleton label="Ładowanie nadchodzących sesji" /> : error ? <EmptyState label={error} /> : !sessions.length ? <EmptyState label="Brak nadchodzących zajęć." /> : <div className="max-w-full overflow-x-auto"><table className="w-full min-w-[540px] table-fixed text-left text-[10px]">
       <thead className="text-[9px] uppercase tracking-wider text-on-surface-muted"><tr><th className="w-[16%] pb-2 font-medium">Termin</th><th className="w-[25%] pb-2 pr-2 font-medium">Klient / grupa</th><th className="w-[16%] pb-2 font-medium">Typ sesji</th><th className="w-[17%] pb-2 pr-2 font-medium">Lokalizacja</th><th className="w-[15%] pb-2 font-medium">Status</th><th className="w-[11%] pb-2 text-right font-medium">Akcja</th></tr></thead>
-      <tbody>{sessions.map(session => <tr key={session.sessionId} className="border-t border-white/5"><td className="py-3 pr-2 align-top"><p className="font-semibold">{formatSessionDate(session.startAt)}</p><p className="mt-1 text-on-surface-muted">{formatTime(session.startAt)}</p></td><td className="break-words py-3 pr-2 align-top font-semibold">{session.title || session.clientFullName || "Sesja treningowa"}</td><td className="py-3 pr-2 align-top text-on-surface-muted"><span aria-label="Typ sesji niedostępny">—</span></td><td className="break-words py-3 pr-2 align-top text-on-surface-variant">{session.locationName || "—"}</td><td className="py-3 pr-2 align-top"><StatusPill label={getSessionStatusLabel(session.status)} tone={sessionTone(session.status)} /></td><td className="py-3 text-right align-top"><SessionDetailsLink session={session} /></td></tr>)}</tbody>
+      <tbody>{sessions.map(session => <tr key={session.sessionId} className="border-t border-white/5"><td className="py-3 pr-2 align-top"><p className="font-semibold">{formatSessionDate(session.startAt)}</p><p className="mt-1 text-on-surface-muted">{formatTime(session.startAt)}</p></td><td className="break-words py-3 pr-2 align-top font-semibold">{session.title || session.clientFullName || "Sesja treningowa"}</td><td className="py-3 pr-2 align-top text-on-surface-muted">{sessionTrainingType(session)}</td><td className="break-words py-3 pr-2 align-top text-on-surface-variant">{session.locationName || "—"}</td><td className="py-3 pr-2 align-top"><StatusPill label={getSessionStatusLabel(session.status)} tone={sessionTone(session.status)} /></td><td className="py-3 text-right align-top"><SessionDetailsLink session={session} /></td></tr>)}</tbody>
     </table></div>}</div>
   </section>;
 }
@@ -246,7 +249,7 @@ function ClientRow({ client }: { client: TrainerPortalClient }) {
   const packageInfo = noPackage ? "Bez aktywnego pakietu" : [packageName, typeof remaining === "number" && Number.isFinite(remaining) ? "Pozostało wejść: " + remaining : null].filter(Boolean).join(" · ");
   return <Link href={"/trainer/clients/" + client.clientId} prefetch={false} className="flex min-w-0 items-center gap-2 rounded-lg px-1 py-2 transition hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-primary-light">
     <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container text-[10px] font-semibold text-primary-light">{client.avatarUrl ? <img src={client.avatarUrl} alt="" className="h-full w-full object-cover" /> : getInitials(client.fullName)}</span>
-    <span className="min-w-0 flex-1"><span className="block truncate text-[11px] font-semibold">{client.fullName || "Klient #" + client.clientId}</span>{packageInfo ? <span className="mt-0.5 block break-words text-[9px] leading-4 text-on-surface-muted">{packageInfo}</span> : null}</span>
+    <span className="min-w-0 flex-1"><span className="block truncate text-[11px] font-semibold">{client.fullName || "Klient #" + client.clientId}</span>{packageInfo ? <span className="mt-0.5 block break-words text-[9px] leading-4 text-on-surface-muted">{packageInfo}</span> : null}<span className="mt-0.5 block text-[9px] leading-4 text-on-surface-muted">Rozpoczęcie treningów: {formatTrainingStartDate(client.trainingStartDate)}</span></span>
     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-container-lowest/50 text-primary-light"><ArrowRight size={12} /></span>
   </Link>;
 }
@@ -288,3 +291,5 @@ function sessionCountLabel(count: number) {
   const suffix = count === 1 ? "sesja" : count % 10 >= 2 && count % 10 <= 4 && !(count % 100 >= 12 && count % 100 <= 14) ? "sesje" : "sesji";
   return count + " " + suffix;
 }
+
+

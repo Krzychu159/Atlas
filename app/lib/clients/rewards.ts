@@ -1,3 +1,5 @@
+import { parseTrainingStartDate } from "../formatters/date";
+
 export const CLIENT_REWARD_MILESTONES = [6, 12, 18, 24] as const;
 
 export type ClientRewardProgress = {
@@ -10,7 +12,8 @@ export function getClientRewardProgress(
   trainingStartDate?: string | null,
   now = new Date(),
 ): ClientRewardProgress {
-  const startDate = parseLocalDate(trainingStartDate);
+  const startDate = parseTrainingStartDate(trainingStartDate);
+  if (startDate) startDate.setHours(0, 0, 0, 0);
 
   if (!startDate || now.getTime() <= startDate.getTime()) {
     return {
@@ -53,16 +56,3 @@ function getCompletedMonths(startDate: Date, now: Date) {
   return Math.max(0, months);
 }
 
-function parseLocalDate(value?: string | null) {
-  const match = value?.match(/^(\d{4})-(\d{2})-(\d{2})/);
-
-  if (!match) return null;
-
-  const date = new Date(
-    Number(match[1]),
-    Number(match[2]) - 1,
-    Number(match[3]),
-  );
-
-  return Number.isNaN(date.getTime()) ? null : date;
-}
