@@ -1,5 +1,6 @@
 import type { PackageType } from "@/app/lib/packageFilters";
 import type { Client } from "./clients";
+import type { PackageBillingMode } from "../period-packages";
 import {
   backendDelete,
   backendGet,
@@ -8,6 +9,7 @@ import {
 } from "../backend";
 
 export type Package = {
+  billingMode?: PackageBillingMode | null;
   id: number;
   name: string;
   description: string | null;
@@ -31,28 +33,30 @@ export type Package = {
 };
 
 export type CreatePackagePayload = {
+  billingMode?: PackageBillingMode;
   name: string;
   description: string;
   price: number;
   currency: string;
-  sessionsLimit: number;
+  sessionsLimit?: number;
   sessionsPerWeek?: number;
   durationDays: number;
   billingType?: number;
   participantsCount?: number | null;
   locationId?: number | null;
   isActive: boolean;
-  createdBy: number;
+  createdBy?: number | null;
   isPubliclyAvailable?: boolean;
   publicSlug?: string | null;
 };
 
 export type UpdatePackagePayload = {
+  billingMode?: PackageBillingMode;
   name: string;
   description: string;
   price: number;
   currency: string;
-  sessionsLimit: number;
+  sessionsLimit?: number;
   durationDays: number;
   isActive: boolean;
   billingType?: number;
@@ -70,8 +74,8 @@ export function getPackages(query?: { locationId?: number; isActive?: boolean },
   return backendGet<Package[]>("Packages", query, signal);
 }
 
-export function getPackage(id: number) {
-  return backendGet<Package>(`Packages/${id}`);
+export function getPackage(id: number, signal?: AbortSignal) {
+  return backendGet<Package>(`Packages/${id}`, undefined, signal);
 }
 
 export function createPackage(payload: CreatePackagePayload) {

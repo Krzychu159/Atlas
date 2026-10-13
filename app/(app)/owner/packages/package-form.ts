@@ -1,4 +1,5 @@
 import type { Package, UpdatePackagePayload } from "@/app/lib/owner/packages";
+import { isPeriodPackage, type PackageBillingMode } from "@/app/lib/period-packages";
 
 export function generatePackageSlug(name: string) {
   return name.toLowerCase().replace(/ł/g, "l").normalize("NFD")
@@ -7,6 +8,7 @@ export function generatePackageSlug(name: string) {
 
 export function createPackageForm(item?: Package, defaultLocationId: number | null = null) {
   return {
+    billingMode: (item && isPeriodPackage(item) ? "PeriodBased" : "SessionBased") as PackageBillingMode,
     name: item?.name ?? "",
     description: item?.description ?? "",
     price: item ? String(item.price) : "",
@@ -28,6 +30,7 @@ export type PackageForm = ReturnType<typeof createPackageForm>;
 
 export function changePackageField<K extends keyof PackageForm>(form: PackageForm, field: K, value: PackageForm[K]): PackageForm {
   const next = { ...form, [field]: value };
+  if (next.billingMode === "PeriodBased") { next.isPubliclyAvailable = false; next.publicSlug = ""; return next; }
   if (field === "publicSlug") next.slugEdited = true;
   if (field === "billingType" && value !== "5") next.isPubliclyAvailable = false;
   if (!next.slugEdited && next.billingType === "5" && (field === "name" || field === "isPubliclyAvailable" || field === "billingType")) {
@@ -37,6 +40,15 @@ export function changePackageField<K extends keyof PackageForm>(form: PackageFor
 }
 
 export function packageFormPayload(form: PackageForm): UpdatePackagePayload {
+  if (form.billingMode === "PeriodBased") {
+    if (!form.name.trim()) throw new Error("Podaj nazwę usługi.");
+    if (!form.price.trim() || !Number.isFinite(Number(form.price)) || Number(form.price) < 0) throw new Error("Cena usługi musi być równa lub większa od zera.");
+    const durationDays = Number(form.durationDays);
+    if (!Number.isInteger(durationDays) || durationDays < 1 || durationDays > 3660) throw new Error("Czas trwania musi wynosić od 1 do 3660 dni.");
+    if (!form.currency.trim()) throw new Error("Podaj walutę usługi.");
+    if (!Number.isSafeInteger(Number(form.locationId)) || Number(form.locationId) <= 0) throw new Error("Wybierz lokalizację usługi.");
+    return { name: form.name.trim(), description: form.description, billingMode: "PeriodBased", price: Number(form.price), currency: form.currency.trim().toUpperCase(), durationDays, locationId: Number(form.locationId), isActive: form.isActive, isPubliclyAvailable: false, publicSlug: null };
+  }
   if (form.isPubliclyAvailable) {
     if (form.billingType !== "5") throw new Error("Publiczny pakiet musi być grupowy.");
     if (!form.name.trim()) throw new Error("Podaj nazwę pakietu.");
@@ -47,6 +59,7 @@ export function packageFormPayload(form: PackageForm): UpdatePackagePayload {
     if (!form.publicSlug.trim()) throw new Error("Podaj końcówkę linku.");
   }
   return {
+    billingMode: "SessionBased",
     name: form.name,
     description: form.description,
     price: Number(form.price || 0),

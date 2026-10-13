@@ -48,6 +48,7 @@ import ClientPackagesSection, {
 } from "./components/ClientPackagesSection";
 import EndCooperationModal from "./components/EndCooperationModal";
 import ClientRefundsSection from "./components/ClientRefundsSection";
+import ClientPeriodPackagesSection from "./components/ClientPeriodPackagesSection";
 import RefundConfirmationModal from "./components/RefundConfirmationModal";
 import ClientAuditSection from "./components/ClientAuditSection";
 import { ApiError } from "@/app/lib/backend";
@@ -501,6 +502,7 @@ export default function OwnerClientDetailsPage() {
             billing={billing}
           />
           <ClientPackagesSection key={client.id} packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} clientId={!client.isArchived ? client.id : undefined} onSaved={() => refreshCooperationData(client.id, true)} />
+          <ClientPeriodPackagesSection key={`period:${client.id}`} clientId={client.id} canManage={!client.isArchived} onSaved={() => refreshCooperationData(client.id, true)} />
           <ClientAuditSection key={client.id} clientId={client.id} revision={auditRevision} />
 
           {!client.isArchived ? (

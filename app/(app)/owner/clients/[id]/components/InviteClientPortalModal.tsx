@@ -33,11 +33,15 @@ export default function InviteClientPortalModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingInvitations, setIsLoadingInvitations] = useState(false);
   const isInvited = client.portalAccessStatus === "Invited";
+  const invitationKey = `${open}:${client.id}:${client.email}:${isInvited}`;
+  const [previousInvitationKey, setPreviousInvitationKey] = useState("");
+  if (previousInvitationKey !== invitationKey) {
+    setPreviousInvitationKey(invitationKey);
+    if (open) { setEmail(client.email || ""); setIsLoadingInvitations(isInvited); }
+  }
 
   const loadInvitations = useCallback(async () => {
-    try {
-      setIsLoadingInvitations(true);
-      const data = await getInvitations({ role: "Client" });
+    return getInvitations({ role: "Client" }).then(data => {
       const clientEmail = (client.email || "").trim().toLowerCase();
 
       setInvitations(
@@ -50,19 +54,18 @@ export default function InviteClientPortalModal({
                 invitation.email.trim().toLowerCase() === clientEmail)),
         ),
       );
-    } catch (err) {
+    }).catch(err => {
       showOwnerError(err, "Nie udało się pobrać zaproszenia.", {
         id: "owner-existing-client-invitation-load-error",
       });
-    } finally {
+    }).finally(() => {
       setIsLoadingInvitations(false);
-    }
+    });
   }, [client.email, client.id]);
 
   useEffect(() => {
     if (!open) return;
 
-    setEmail(client.email || "");
     if (isInvited) void loadInvitations();
   }, [client.email, isInvited, loadInvitations, open]);
 
@@ -103,6 +106,7 @@ export default function InviteClientPortalModal({
     try {
       setIsSubmitting(true);
       const invitation = await resendInvitation(id);
+      setIsLoadingInvitations(true);
       await loadInvitations();
 
       if (invitation.lastSendError) {

@@ -6,7 +6,7 @@ import { groupSeatsLabel, isGroupTraining } from "@/app/lib/group-sessions";
 import { Button } from "@/app/components/ui/button";
 import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
 import { getSessionStatusLabel } from "@/app/(app)/owner/schedule/session-utils";
-import { sessionTrainingType } from "@/app/lib/user-messages";
+import { sessionTrainingType, userTrainingType } from "@/app/lib/user-messages";
 import type { TrainerSessionDetails } from "@/app/lib/trainer/portal";
 
 export default function TrainerSessionDetailsModal({ session, onClose, onEdit }: { session: TrainerSessionDetails; onClose: () => void; onEdit?: () => void }) {

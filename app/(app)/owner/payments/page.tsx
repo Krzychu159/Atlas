@@ -29,10 +29,7 @@ import {
   type ClientPaymentSource,
   type ClientPaymentStatus,
 } from "@/app/lib/owner/billing";
-import {
-  showOwnerError,
-  showOwnerSuccess,
-} from "../components/owner-toast";
+import { showOwnerError, showOwnerSuccess } from "../components/owner-toast";
 import { isForbiddenError } from "@/app/lib/backend";
 import {
   confirmTrainerPortalPayment,
@@ -45,30 +42,40 @@ import {
   type PaymentFiltersValue,
 } from "./components/PaymentFilters";
 
-type PaymentAction =
-  | "confirm"
-  | "issueReceipt"
-  | "cancelReceipt";
+type PaymentAction = "confirm" | "issueReceipt" | "cancelReceipt";
 
 const PAYMENTS_PER_PAGE = 8;
 
 export default function OwnerPaymentsPage() {
   const { selectedLocationId } = useOwnerLocationFilter();
   const pathname = usePathname();
-  const locationId = pathname.startsWith("/trainer") ? null : selectedLocationId;
-  return <OwnerPaymentsPageContent key={locationId ?? "all"} locationId={locationId} />;
+  const locationId = pathname.startsWith("/trainer")
+    ? null
+    : selectedLocationId;
+  return (
+    <OwnerPaymentsPageContent
+      key={locationId ?? "all"}
+      locationId={locationId}
+    />
+  );
 }
 
-function OwnerPaymentsPageContent({ locationId }: { locationId: number | null }) {
+function OwnerPaymentsPageContent({
+  locationId,
+}: {
+  locationId: number | null;
+}) {
   const paymentDateRevision = usePaymentDateCorrectionRevision();
   const pathname = usePathname();
   const basePath = pathname.startsWith("/trainer") ? "/trainer" : "/owner";
-  const eyebrow = basePath === "/trainer" ? "Panel trenera" : "Panel właściciela";
+  const eyebrow =
+    basePath === "/trainer" ? "Panel trenera" : "Panel właściciela";
   const [payments, setPayments] = useState<ClientPayment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
-  const [paymentToReject, setPaymentToReject] =
-    useState<ClientPayment | null>(null);
+  const [paymentToReject, setPaymentToReject] = useState<ClientPayment | null>(
+    null,
+  );
   const [paymentToReverse, setPaymentToReverse] =
     useState<ClientPayment | null>(null);
   const [paymentAction, setPaymentAction] = useState<{
@@ -127,15 +134,31 @@ function OwnerPaymentsPageContent({ locationId }: { locationId: number | null })
         } else {
           const [clients, billing] = await Promise.all([
             getClients(),
-            Promise.all([...new Set(items.map((payment) => payment.clientId))].map(getClientBilling)),
+            Promise.all(
+              [...new Set(items.map((payment) => payment.clientId))].map(
+                (clientId) => getClientBilling(clientId),
+              ),
+            ),
           ]);
-          const packageIds = new Set(billing.flatMap((summary) =>
-            (summary.packages || []).filter((pkg) => pkg.locationId === locationId).map((pkg) => pkg.clientPackageId),
-          ));
-          const clientIds = new Set(clients.filter((client) => matchesOwnerLocationId(client, locationId)).map((client) => client.id));
-          setPayments(items.filter((payment) => payment.clientPackageId !== null
-            ? packageIds.has(payment.clientPackageId)
-            : clientIds.has(payment.clientId)));
+          const packageIds = new Set(
+            billing.flatMap((summary) =>
+              (summary.packages || [])
+                .filter((pkg) => pkg.locationId === locationId)
+                .map((pkg) => pkg.clientPackageId),
+            ),
+          );
+          const clientIds = new Set(
+            clients
+              .filter((client) => matchesOwnerLocationId(client, locationId))
+              .map((client) => client.id),
+          );
+          setPayments(
+            items.filter((payment) =>
+              payment.clientPackageId !== null
+                ? packageIds.has(payment.clientPackageId)
+                : clientIds.has(payment.clientId),
+            ),
+          );
         }
       } catch (err) {
         if (basePath !== "/trainer" || !isForbiddenError(err)) throw err;
@@ -354,10 +377,7 @@ function OwnerPaymentsPageContent({ locationId }: { locationId: number | null })
         <Button
           variant="secondary"
           icon={
-            <RefreshCw
-              size={16}
-              className={isLoading ? "animate-spin" : ""}
-            />
+            <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
           }
           onClick={loadPayments}
           disabled={isLoading}
@@ -384,7 +404,8 @@ function OwnerPaymentsPageContent({ locationId }: { locationId: number | null })
           </div>
           {!isLoading ? (
             <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-muted">
-              {filteredPayments.length} {pluralizePayments(filteredPayments.length)}
+              {filteredPayments.length}{" "}
+              {pluralizePayments(filteredPayments.length)}
             </p>
           ) : null}
         </div>

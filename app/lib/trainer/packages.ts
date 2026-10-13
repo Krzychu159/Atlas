@@ -1,7 +1,9 @@
 import type { PackageType } from "@/app/lib/packageFilters";
 import { backendGet } from "@/app/lib/backend";
+import type { PackageBillingMode } from "@/app/lib/period-packages";
 
 export type TrainerPackage = {
+  billingMode?: PackageBillingMode | null;
   id: number;
   name: string;
   description: string | null;

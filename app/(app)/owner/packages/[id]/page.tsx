@@ -12,6 +12,7 @@ import {
 import PackageDetailsHero from "./components/PackageDetailsHero";
 import PackageEditCard from "./components/PackageEditCard";
 import PackageClientsList from "./components/PackageClientsList";
+import { isPeriodPackage } from "@/app/lib/period-packages";
 import { showOwnerError } from "../../components/owner-toast";
 
 export default function PackageDetailsPage({
@@ -90,7 +91,7 @@ export default function PackageDetailsPage({
             </div>
 
             <div className="min-w-0">
-              <PackageClientsList clients={clients} packageId={item.id} />
+              <PackageClientsList clients={clients} packageId={item.id} periodBased={isPeriodPackage(item)} />
             </div>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import ClientMetricCards from "@/app/(app)/owner/clients/[id]/components/ClientMetricCards";
 import ClientPackagesSection from "@/app/(app)/owner/clients/[id]/components/ClientPackagesSection";
+import ClientPeriodPackagesSection from "@/app/(app)/owner/clients/[id]/components/ClientPeriodPackagesSection";
 import ClientNotesPanel from "@/app/(app)/owner/clients/[id]/components/ClientNotesPanel";
 import ClientProfileHero from "@/app/(app)/owner/clients/[id]/components/ClientProfileHero";
 import ClientSessionsPanel from "@/app/(app)/owner/clients/[id]/components/ClientSessionsPanel";
@@ -218,6 +219,7 @@ export default function TrainerClientDetailsPage() {
             billing={billing}
           />
           {sectionLoading.billing ? <p role="status" className="card-shell p-5">Pobieranie rozliczeń klienta…</p> : billingError ? <div role="alert" className="card-shell p-5 text-on-surface-variant">{billingError}<Button variant="secondary" className="mt-3" onClick={() => void loadClientDetails()}>Spróbuj ponownie</Button></div> : <ClientPackagesSection packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} />}
+          {billing && !sectionLoading.billing && !billingError ? <ClientPeriodPackagesSection clientId={client.id} portal="trainer" packages={billing.packages} /> : null}
           {billing ? <section className="card-shell overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 p-5">
               <h2 className="text-section-title">Historia wpłat</h2>

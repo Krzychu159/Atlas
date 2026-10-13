@@ -11,8 +11,10 @@ import {
 import Link from "next/link";
 import { formatParticipantsLabel, type PackageType } from "@/app/lib/packageFilters";
 import { formatMoney } from "@/app/lib/formatters/money";
+import { isPeriodPackage, type PackageBillingMode } from "@/app/lib/period-packages";
 
 export type PackageCardItem = {
+  billingMode?: PackageBillingMode | null;
   id: number;
   name: string | null;
   description: string | null;
@@ -43,17 +45,18 @@ export default function PackageCard<TItem extends PackageCardItem>({
   detailsHref = `/owner/packages/${item.id}`,
   onDeleteRequest,
 }: PackageCardProps<TItem>) {
+  const periodBased = isPeriodPackage(item);
   return (
     <div className="card-shell relative flex min-h-[260px] flex-col overflow-hidden p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-high text-primary-light">
-          <Dumbbell size={22} />
+          {periodBased ? <CalendarDays size={22} /> : <Dumbbell size={22} />}
         </div>
 
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-2 rounded-full bg-tertiary-container px-3 py-1 text-[11px] font-bold text-tertiary-light">
-            <UsersRound size={13} />
-            {formatParticipantsLabel(item.participantsCount, item.packageType)}
+            {periodBased ? <CalendarDays size={13} /> : <UsersRound size={13} />}
+            {periodBased ? "Usługa okresowa" : formatParticipantsLabel(item.participantsCount, item.packageType)}
           </span>
 
           {onDeleteRequest ? (
@@ -79,9 +82,9 @@ export default function PackageCard<TItem extends PackageCardItem>({
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3">
-        <Metric icon={<CalendarDays size={15} />} label="Sesje">
+        {!periodBased ? <Metric icon={<CalendarDays size={15} />} label="Sesje">
           {item.sessionsLimit} sesji
-        </Metric>
+        </Metric> : null}
         <Metric icon={<Clock3 size={15} />} label="Czas">
           {item.durationDays} dni
         </Metric>
@@ -89,7 +92,7 @@ export default function PackageCard<TItem extends PackageCardItem>({
 
       <div className="mt-6 flex items-end justify-between gap-4 border-t border-white/5 pt-6">
         <div>
-          <p className="text-label text-on-surface-muted">Cena pakietu</p>
+          <p className="text-label text-on-surface-muted">{periodBased ? "Cena usługi" : "Cena pakietu"}</p>
           <p className="mt-2 text-[1.7rem] font-semibold leading-none tracking-tight">
             {formatMoney(item.price, item.currency)}
           </p>

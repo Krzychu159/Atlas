@@ -1,7 +1,7 @@
 "use client";
 
 import SessionAccordion from "./SessionAccordion";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { Button } from "@/app/components/ui/button";
 import { ApiError } from "@/app/lib/backend";
@@ -25,11 +25,11 @@ export default function GroupSessionDetails({ session, trainerAccess = false, pa
     const timer = window.setInterval(() => setNow(Date.now()), 30000);
     return () => { window.clearInterval(timer); revision.current += 1; profileController.current?.abort(); };
   }, [group]);
-  if (!group) return null;
   const rules = session.bookingRules;
   const cancellationUtc = rules?.cancellationClosesAtUtc;
   const cancellationTime = cancellationUtc ? Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(cancellationUtc) ? cancellationUtc : `${cancellationUtc}Z`) : NaN;
-  async function openProfile(clientId: number) {
+  const openProfile = useCallback(async (event: MouseEvent<HTMLButtonElement>) => {
+    const clientId = Number(event.currentTarget.dataset.clientId);
     const current = ++revision.current;
     profileController.current?.abort();
     const controller = new AbortController(); profileController.current = controller;
@@ -42,7 +42,8 @@ export default function GroupSessionDetails({ session, trainerAccess = false, pa
         ? "Ten uczestnik jest niedostępny lub nie masz dostępu do jego profilu."
         : trainerPaymentError(error, "Nie udało się otworzyć profilu uczestnika."));
     } finally { if (current === revision.current) setLoading(false); }
-  }
+  }, [session.id]);
+  if (!group) return null;
   const participantContent = <>
     <div className="max-h-[320px] space-y-4 overflow-y-auto overscroll-contain">
     {session.participants ? [false, true].map(cancelled => {
@@ -52,7 +53,7 @@ export default function GroupSessionDetails({ session, trainerAccess = false, pa
         {participants.length ? <ul className="mt-3 grid gap-3 sm:grid-cols-2">{participants.map(participant => <li key={participant.clientId} className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">
           <p className="break-words font-semibold">{participant.clientFullName || "Uczestnik bez nazwy"}</p>
           <p className="mt-1 text-sm text-on-surface-variant">{attendanceLabel(participant.attendanceStatus)}</p>
-          {trainerAccess ? <Button type="button" variant="secondary" className="mt-3" disabled={loading} onClick={() => void openProfile(participant.clientId)}>Zobacz uczestnika</Button> : <Link href={`/owner/clients/${participant.clientId}`} className="mt-3 inline-block text-sm font-semibold text-primary-light">Zobacz profil klienta</Link>}
+          {trainerAccess ? <Button type="button" variant="secondary" className="mt-3" disabled={loading} data-client-id={participant.clientId} onClick={openProfile}>Zobacz uczestnika</Button> : <Link href={`/owner/clients/${participant.clientId}`} className="mt-3 inline-block text-sm font-semibold text-primary-light">Zobacz profil klienta</Link>}
         </li>)}</ul> : <p className="mt-2 text-sm text-on-surface-muted">{cancelled ? "Brak anulowanych zapisów." : "Brak zapisanych uczestników."}</p>}
       </section>;
     }) : <p className="text-sm text-on-surface-muted">Lista uczestników jest niedostępna.</p>}

@@ -22,7 +22,7 @@ export function useNotifications(open = true, initialCategory = "", initialRead 
   const [categoryAttempt, setCategoryAttempt] = useState(0);
   const categoryFailed = useRef(false);
   const view = useRef("");
-  view.current = `${open}:${category}:${readFilter}`;
+  useEffect(() => { view.current = `${open}:${category}:${readFilter}`; }, [open, category, readFilter]);
   useEffect(() => () => { view.current = "unmounted"; }, []);
   const loadNotifications = useCallback(() => {
     setRevision(value => value + 1);

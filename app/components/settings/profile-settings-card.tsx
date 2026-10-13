@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { useCurrentUser } from "@/app/components/current-user-provider";
 import { Save, User } from "lucide-react";
 import AvatarFilePicker from "@/app/components/ui/avatar-file-picker";
@@ -39,12 +39,13 @@ export default function ProfileSettingsCard({
   const [profile, setProfile] = useState<ProfileForm>(emptyProfile);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    if (!user) return;
+  const [previousUser, setPreviousUser] = useState<typeof user>(null);
+  if (user && previousUser !== user) {
+    setPreviousUser(user);
     const names = getUserNames(user);
     setProfile({ firstName: names.firstName, lastName: names.lastName,
       email: user.email === "Brak e-maila" ? "" : user.email, avatarUrl: user.avatarUrl || "" });
-  }, [user]);
+  }
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

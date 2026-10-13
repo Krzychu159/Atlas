@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Save } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { TextArea, TextField } from "@/app/components/ui/input";
 import {
   updatePackage,
+  getPackage,
   type Package,
 } from "@/app/lib/owner/packages";
 import {
@@ -17,6 +18,8 @@ import { CustomSelect } from "@/app/components/ui/custom-select";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { createPackageForm, changePackageField, packageFormPayload, type PackageForm } from "../../package-form";
 import PackagePublicationFields from "../../components/PackagePublicationFields";
+import { isPeriodPackage, packageBillingModeOptions, periodPackageError } from "@/app/lib/period-packages";
+import { ApiError } from "@/app/lib/backend";
 
 export default function PackageEditCard({
   item,
@@ -28,6 +31,7 @@ export default function PackageEditCard({
   const [form, setForm] = useState(() => createPackageForm(item));
   const [locations, setLocations] = useState<Location[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const saving = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -55,10 +59,12 @@ export default function PackageEditCard({
   }
 
   async function handleSave() {
+    if (saving.current) return;
+    saving.current = true;
     try {
       setIsSaving(true);
 
-      const payload = packageFormPayload(form);
+      const payload = packageFormPayload({ ...form, billingMode: isPeriodPackage(item) ? "PeriodBased" : "SessionBased" });
 
       const updated = await updatePackage(item.id, payload);
       onUpdated(updated);
@@ -67,10 +73,15 @@ export default function PackageEditCard({
         id: "owner-package-update-success",
       });
     } catch (err) {
-      showOwnerError(err, "Nie udało się zapisać zmian.", {
+      if (err instanceof ApiError && err.status === 409) {
+        try { onUpdated(await getPackage(item.id)); }
+        catch { showOwnerError(new Error("Nie udało się odświeżyć oferty. Otwórz ją ponownie przed kolejną zmianą."), ""); }
+      }
+      showOwnerError(isPeriodPackage(item) ? new Error(periodPackageError(err)) : err, "Nie udało się zapisać zmian.", {
         id: "owner-package-update-error",
       });
     } finally {
+      saving.current = false;
       setIsSaving(false);
     }
   }
@@ -79,19 +90,21 @@ export default function PackageEditCard({
     <div className="card-shell min-w-0 p-5 sm:p-6 [&_label]:block [&_input]:min-w-0 [&_textarea]:resize-y">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-section-title">Edytuj pakiet</p>
+          <p className="text-section-title">{form.billingMode === "PeriodBased" ? "Edytuj ofertę usługi" : "Edytuj pakiet"}</p>
           <p className="mt-2 text-sm text-on-surface-variant">
-            Zmieniaj nazwę, cenę oraz limity pakietu.
+            {form.billingMode === "PeriodBased" ? "Zmieniaj warunki oferty dla nowych okresów. Przypisane okresy zachowują swoją cenę i daty." : "Zmieniaj nazwę, cenę oraz limity pakietu."}
           </p>
         </div>
       </div>
 
       <TextField
-        label="Nazwa pakietu"
+        label={form.billingMode === "PeriodBased" ? "Nazwa usługi" : "Nazwa pakietu"}
         value={form.name}
         onChange={(value) => updateField("name", value)}
         className="mt-6"
       />
+      <fieldset disabled className="mt-4"><CustomSelect label="Sposób rozliczenia" value={form.billingMode} options={packageBillingModeOptions} onChange={() => {}} /></fieldset>
+      <p className="mt-2 text-xs text-on-surface-muted">Aby zmienić sposób rozliczenia, dodaj nową ofertę.</p>
 
       <TextArea
         label="Opis"
@@ -108,33 +121,35 @@ export default function PackageEditCard({
             value={form.price}
             onChange={(value) => updateField("price", value)}
             type="number"
+            min={form.billingMode === "PeriodBased" ? 0 : undefined}
+            step="0.01"
           />
         </div>
 
-        <div>
+        {form.billingMode === "SessionBased" ? <div>
           <TextField
             label={form.billingType === "5" ? "Liczba wejść" : "Sesje"}
             value={form.sessionsLimit}
             onChange={(value) => updateField("sessionsLimit", value)}
             type="number"
           />
-        </div>
+        </div> : null}
       </div>
 
       <div className="mt-4 grid gap-4">
-        <TextField label="Ważność w dniach" type="number" value={form.durationDays}
+        <TextField label={form.billingMode === "PeriodBased" ? "Czas trwania w dniach (1–3660)" : "Ważność w dniach"} type="number" min={form.billingMode === "PeriodBased" ? 1 : undefined} max={form.billingMode === "PeriodBased" ? 3660 : undefined} step="1" value={form.durationDays}
           onChange={(value) => updateField("durationDays", value)} />
         <TextField label="Waluta" value={form.currency} onChange={(value) => updateField("currency", value)} />
-        <TextField label="Sesje / tydzień" type="number" value={form.sessionsPerWeek}
-          onChange={(value) => updateField("sessionsPerWeek", value)} />
-        <TextField label="Uczestnicy" type="number" value={form.participantsCount}
-          onChange={(value) => updateField("participantsCount", value)} />
+        {form.billingMode === "SessionBased" ? <>
+          <TextField label="Sesje / tydzień" type="number" value={form.sessionsPerWeek} onChange={(value) => updateField("sessionsPerWeek", value)} />
+          <TextField label="Uczestnicy" type="number" value={form.participantsCount} onChange={(value) => updateField("participantsCount", value)} />
+        </> : null}
         <label>
           <span className="text-label text-on-surface-muted">Lokalizacja</span>
           <CustomSelect className="mt-2" value={form.locationId} options={locationOptions}
             onChange={(value) => updateField("locationId", value)} />
         </label>
-        <PackagePublicationFields form={form} onChange={updateField} />
+        {form.billingMode === "SessionBased" ? <PackagePublicationFields form={form} onChange={updateField} /> : null}
       </div>
 
       <label className="mt-5 !flex cursor-pointer items-center gap-3">
@@ -144,7 +159,7 @@ export default function PackageEditCard({
           onChange={(event) => updateField("isActive", event.target.checked)}
           className="h-5 w-5 accent-blue-600"
         />
-        <span className="text-sm text-on-surface-variant">Pakiet aktywny</span>
+        <span className="text-sm text-on-surface-variant">{form.billingMode === "PeriodBased" ? "Oferta aktywna" : "Pakiet aktywny"}</span>
       </label>
 
       <Button

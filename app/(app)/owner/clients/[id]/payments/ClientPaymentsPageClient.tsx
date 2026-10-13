@@ -78,6 +78,8 @@ import { getTrainerPackages } from "@/app/lib/trainer/packages";
 import { trainerPaymentError } from "@/app/lib/trainer/payment-errors";
 import { trainerPortalClientToClient } from "@/app/lib/trainer/portal-mappers";
 import ClientPackagesSection from "../components/ClientPackagesSection";
+import ClientPeriodPackagesSection from "../components/ClientPeriodPackagesSection";
+import { isSessionPackage } from "@/app/lib/period-packages";
 import ClientAuditSection from "../components/ClientAuditSection";
 import ClientRefundsSection from "../components/ClientRefundsSection";
 import RefundConfirmationModal from "../components/RefundConfirmationModal";
@@ -335,7 +337,7 @@ export default function ClientPaymentsPageClient({
       (item) => item.id === Number(selectedPackageId),
     );
 
-    if (!selectedPackage || packageTrainingKind(selectedPackage.packageType, selectedPackage.billingType) !== "individual" || !Number.isInteger(selectedPackage.billingType)) {
+    if (!selectedPackage || !isSessionPackage(selectedPackage) || packageTrainingKind(selectedPackage.packageType, selectedPackage.billingType) !== "individual" || !Number.isInteger(selectedPackage.billingType)) {
       showOwnerError(new Error("Wybierz pakiet indywidualny z lokalizacji klienta."), "", {
         id: "owner-client-package-location-required",
       });
@@ -399,7 +401,7 @@ export default function ClientPaymentsPageClient({
       (item) => item.id === Number(selectedNextPackageId),
     );
 
-    if (!selectedPackage || packageTrainingKind(selectedPackage.packageType, selectedPackage.billingType) !== "individual") {
+    if (!selectedPackage || !isSessionPackage(selectedPackage) || packageTrainingKind(selectedPackage.packageType, selectedPackage.billingType) !== "individual") {
       showOwnerError(new Error("Wybierz pakiet indywidualny z lokalizacji klienta."), "", {
         id: "owner-client-next-package-location-required",
       });
@@ -706,7 +708,7 @@ export default function ClientPaymentsPageClient({
   const packageOptions = useMemo(
     () => [
       { value: "", label: "Wybierz pakiet" },
-      ...packages.filter(item => packageTrainingKind(item.packageType, item.billingType) === "individual" && Number.isInteger(item.billingType)).map((item) => ({
+      ...packages.filter(item => isSessionPackage(item) && packageTrainingKind(item.packageType, item.billingType) === "individual" && Number.isInteger(item.billingType)).map((item) => ({
         value: String(item.id),
         label: `${item.name} · ${formatMoney(item.price, item.currency)}`,
       })),
@@ -747,11 +749,11 @@ export default function ClientPaymentsPageClient({
       ),
     [clientPayments],
   );
-  const mainPackage = packagesBilling.find((item) => item.clientPackageId === billing?.activeClientPackageId) || null;
+  const mainPackage = packagesBilling.find((item) => isSessionPackage(item) && item.clientPackageId === billing?.activeClientPackageId) || null;
   const mainUsage = usage?.clientPackageId === mainPackage?.clientPackageId ? usage : null;
   const mainSubscription = subscription;
   const activeCurrency = mainPackage?.currency || "PLN";
-  const nextPackageOptions = [{ value: "", label: "Wybierz pakiet" }, ...packages.filter((item) => packageTrainingKind(item.packageType, item.billingType) === "individual").map((item) => ({ value: String(item.id), label: item.name }))];
+  const nextPackageOptions = [{ value: "", label: "Wybierz pakiet" }, ...packages.filter((item) => isSessionPackage(item) && packageTrainingKind(item.packageType, item.billingType) === "individual").map((item) => ({ value: String(item.id), label: item.name }))];
   const paymentTotalPages = Math.max(
     1,
     Math.ceil(payments.length / CLIENT_PAYMENTS_PER_PAGE),
@@ -827,6 +829,10 @@ export default function ClientPaymentsPageClient({
           </section>
 
           <ClientPackagesSection key={`${basePath}:${clientId}`} packages={billing.packages} activeClientPackageId={billing.activeClientPackageId} clientId={basePath === "/owner" ? clientId || undefined : undefined} onSaved={() => loadClientPayments(clientId, true)} />
+          {clientId ? <ClientPeriodPackagesSection key={`period:${basePath}:${clientId}`} clientId={clientId} portal={basePath === "/trainer" ? "trainer" : "owner"} packages={billing.packages} canManage={basePath === "/owner" && !client?.isArchived} onSaved={() => loadClientPayments(clientId, true)} onPayment={item => {
+            if (mutationLock.current || isSaving || processingPaymentId !== null) return;
+            setPaymentPackageId(String(item.clientPackageId)); setPaymentAmount(String(Math.max(item.amountDue, 0))); setPaymentDate(localToday()); setPaymentNote(""); setIsPaymentModalOpen(true);
+          }} /> : null}
           {basePath === "/owner" && clientId ? <><ClientRefundsSection refunds={refunds} loading={isLoading} onConfirm={setRefundToConfirm} /><ClientAuditSection key={clientId} clientId={clientId} revision={auditRevision} /></> : null}
 
           <section className="grid gap-5">

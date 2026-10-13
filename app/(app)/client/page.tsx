@@ -4,6 +4,7 @@ import { safeExternalUrl } from "@/app/lib/safe-url";
 
 import { getPackagePaymentStatusLabel } from "@/app/lib/owner/billing";
 import { userMessage } from "@/app/lib/user-messages";
+import { isSessionPackage } from "@/app/lib/period-packages";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -871,11 +872,13 @@ function SkeletonBlock({ className }: { className: string }) {
 }
 
 type PackageKindSource = {
+  billingMode?: string | null;
   expectedBillingType?: string | number | null;
   packageType?: string | null;
 };
 
 function getPackageKind(source: PackageKindSource) {
+  if (!isSessionPackage(source)) return null;
   const packageType = source.packageType?.trim().toLowerCase();
 
   if (packageType) {
@@ -902,7 +905,7 @@ function getMainPackage(
   packages: ClientPackageBilling[] | null | undefined,
   activeClientPackageId: number | null | undefined,
 ): PackageDisplayData | null {
-  const activePackages = packages?.filter((item) => item.isActive) || [];
+  const activePackages = packages?.filter((item) => item.isActive && isSessionPackage(item)) || [];
   const cycleIsMain =
     currentCycle?.clientPackageId === activeClientPackageId && currentCycle?.isActive && getPackageKind(currentCycle) === "main";
 
@@ -948,7 +951,7 @@ function getGroupPackages(
 ) {
   return (packages || [])
     .filter(
-      (item) => item.isActive && getPackageKind(item) === "group",
+      (item) => item.isActive && isSessionPackage(item) && getPackageKind(item) === "group",
     )
     .slice(0, 3);
 }

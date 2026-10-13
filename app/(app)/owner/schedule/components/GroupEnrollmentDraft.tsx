@@ -39,12 +39,22 @@ export default function GroupEnrollmentDraft({ sessionId, sessionStartAt, locati
   const query = search.trim();
   const hasLocation = locationId !== null && Number.isSafeInteger(locationId) && locationId > 0;
   const optionsKey = `${sessionId}:${locationId}:${clientId}:${sessionStartAt}:${paymentRevision}:${packagesRetry}`;
+  const clientsKey = `${choosingClient}:${locationId}:${query}:${clientsRetry}`;
+  const [previousClientsKey, setPreviousClientsKey] = useState("");
+  const [previousOptionsKey, setPreviousOptionsKey] = useState("");
+  if (previousClientsKey !== clientsKey) {
+    setPreviousClientsKey(clientsKey); setClientsPending(choosingClient && hasLocation); setClientsError("");
+    if (!choosingClient || !hasLocation) setClientsLoading(false);
+  }
+  if (previousOptionsKey !== optionsKey) {
+    setPreviousOptionsKey(optionsKey);
+    if (clientId && hasLocation) { setOptionsError(""); setOptionsLoading(true); }
+  }
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   useEffect(() => {
-    if (!choosingClient || !hasLocation || locationId === null) { setClientsLoading(false); setClientsPending(false); return; }
+    if (!choosingClient || !hasLocation || locationId === null) return;
     const controller = new AbortController();
-    setClientsPending(true); setClientsError("");
     const timer = setTimeout(() => {
       setClientsLoading(true);
       void getGroupEnrollmentClients(locationId, query, controller.signal).then(result => {
@@ -60,7 +70,6 @@ export default function GroupEnrollmentDraft({ sessionId, sessionStartAt, locati
   useEffect(() => {
     if (!clientId || !hasLocation) return;
     const controller = new AbortController();
-    setOptionsError(""); setOptionsLoading(true);
     void getGroupPackageOptions(sessionId, clientId, controller.signal).then(result => {
       if (controller.signal.aborted) return;
       if (result.sessionId !== sessionId || result.clientId !== clientId || result.locationId !== locationId || !Array.isArray(result.offers) || !Array.isArray(result.ownedPackages)) throw new Error("Nie udało się sprawdzić pakietów dla tych zajęć.");

@@ -17,6 +17,7 @@ import { isNotFoundLikeError } from "@/app/lib/backend";
 import { formatMoney } from "@/app/lib/formatters/money";
 import { getPackagePaymentStatusLabel } from "@/app/lib/owner/billing";
 import ClientPackagesSection from "@/app/(app)/owner/clients/[id]/components/ClientPackagesSection";
+import ClientPeriodPackagesSection from "@/app/(app)/owner/clients/[id]/components/ClientPeriodPackagesSection";
 import {
   createClientPortalPayment,
   getClientPortalBilling,
@@ -412,6 +413,10 @@ export default function ClientPaymentsPage() {
       ) : null}
 
       <ClientPackagesSection audience="client" packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} />
+      {billing && !isLoading ? <ClientPeriodPackagesSection clientId={billing.clientId} portal="client" packages={billing.packages} onPayment={item => {
+        if (isSubmitting) return;
+        setSelectedPackageId(String(item.clientPackageId)); setAmount(String(Math.max(item.amountDue, 0))); setNote(""); setIsPaymentModalOpen(true);
+      }} /> : null}
       <ClientPaymentHistory payments={payments} isLoading={isLoading} />
 
       <PaymentEntryModal

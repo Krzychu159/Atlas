@@ -4,7 +4,8 @@ export function isPackageExpired(value?: string | null, now = Date.now()) {
   return Number.isFinite(instant) && instant <= now;
 }
 
-export function packageTrainingKind(packageType?: string | null, billingType?: string | number | null): "group" | "individual" | "unknown" {
+export function packageTrainingKind(packageType?: string | null, billingType?: string | number | null, billingMode?: string | null): "group" | "individual" | "unknown" {
+  if (packageType === "PeriodBased" || (billingMode != null && billingMode !== "SessionBased")) return "unknown";
   if (packageType === "Group") return "group";
   if (packageType === "Individual" || packageType === "SemiPersonal") return "individual";
   if ([5, "5", "Group", "GroupTraining"].includes(billingType ?? "")) return "group";
@@ -12,8 +13,8 @@ export function packageTrainingKind(packageType?: string | null, billingType?: s
   return "unknown";
 }
 
-export function canDecidePackageExpiry(item: { isActive: boolean; validUntil: string | null; closedAt: string | null; closureDisposition: string | null }) {
-  return item.isActive === true && !item.closedAt && !item.closureDisposition && isPackageExpired(item.validUntil);
+export function canDecidePackageExpiry(item: { billingMode?: string | null; packageType?: string | null; isActive: boolean; validUntil: string | null; closedAt: string | null; closureDisposition: string | null }) {
+  return item.billingMode !== "PeriodBased" && item.packageType !== "PeriodBased" && item.isActive === true && !item.closedAt && !item.closureDisposition && isPackageExpired(item.validUntil);
 }
 
 export function formatPackageInstant(value?: string | null) {

@@ -1,4 +1,5 @@
 import { backendDelete, backendGet, backendPost, backendPatch } from "../backend";
+import type { PackageBillingMode } from "../period-packages";
 
 export type PaymentMethod = 1 | 2 | 3 | 4;
 export type ClientPaymentStatus = 1 | 2 | 3 | 4 | 5;
@@ -61,6 +62,11 @@ export type PackageClosureFields = {
 };
 
 export type ClientPackageBilling = PackageClosureFields & {
+  billingMode?: PackageBillingMode | null;
+  periodStartsAt?: string | null;
+  periodDurationDays?: number;
+  periodAutoRenewEnabled?: boolean;
+  periodStatus?: string | null;
   origin: PackageOrigin | null;
   clientPackageId: number;
   packageId: number;
@@ -113,17 +119,30 @@ export type CreateClientPaymentPayload = {
   note?: string | null;
 };
 
-export type CreateClientPackagePayload = {
+type ClientPackageAssignmentFields = {
   clientId: number;
   packageId: number;
+  paymentDueDate?: string | null;
+};
+
+export type CreateClientPackagePayload = ClientPackageAssignmentFields & ({
   name?: string | null;
   totalSessions?: number | null;
   totalPrice?: number | null;
   expectedBillingType: number;
   purchaseDate: string;
+  startsOn?: never;
+  autoRenew?: never;
   validUntil?: string | null;
-  paymentDueDate?: string | null;
-};
+} | {
+  startsOn: string;
+  autoRenew: boolean;
+  expectedBillingType?: never;
+  purchaseDate?: never;
+  validUntil?: never;
+  totalSessions?: never;
+  totalPrice?: number | null;
+});
 
 export type PagedResult<T> = {
   page: number;
@@ -240,7 +259,15 @@ export function reverseClientPayment(paymentId: number, reason?: string) {
 }
 
 export function createClientPackage(payload: CreateClientPackagePayload) {
-  return backendPost<void>("client-packages", payload);
+  return backendPost<{ id: number } | void>("client-packages", payload);
+}
+
+export function getClientPeriodPackages(clientId: number, page = 1, signal?: AbortSignal) {
+  return backendGet<PagedResult<ClientPackageBilling>>(`clients/${clientId}/period-packages`, { page, pageSize: 25 }, signal);
+}
+
+export function setClientPeriodRenewal(clientId: number, clientPackageId: number, enabled: boolean) {
+  return backendPatch<void>(`clients/${clientId}/period-packages/${clientPackageId}/renewal`, { enabled });
 }
 
 export function activateClientPackage(clientId: number, clientPackageId: number) {

@@ -4,10 +4,12 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { Input } from "@/app/components/ui/input";
 
-import type { ParticipantsFilter, SessionsFilter, DurationFilter, PackageSort } from "@/app/lib/packageFilters";
+import type { ParticipantsFilter, SessionsFilter, DurationFilter, PackageSort, PackageModeFilter } from "@/app/lib/packageFilters";
 export type { ParticipantsFilter, SessionsFilter, DurationFilter, PackageSort } from "@/app/lib/packageFilters";
 
 type PackageFiltersProps = {
+  billingModeFilter?: PackageModeFilter;
+  onBillingModeFilterChange?: (value: PackageModeFilter) => void;
   search: string;
   participantsFilter: ParticipantsFilter;
   sessionsFilter: SessionsFilter;
@@ -21,6 +23,8 @@ type PackageFiltersProps = {
 };
 
 export default function PackageFilters({
+  billingModeFilter = "all",
+  onBillingModeFilterChange,
   search,
   participantsFilter,
   sessionsFilter,
@@ -34,7 +38,7 @@ export default function PackageFilters({
 }: PackageFiltersProps) {
   return (
     <div className="card-shell p-4">
-      <div className="grid gap-3 lg:grid-cols-[1fr_190px_190px_190px_190px]">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Input
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
@@ -43,7 +47,8 @@ export default function PackageFilters({
           className="h-12"
         />
 
-        <CustomSelect
+        {onBillingModeFilterChange ? <CustomSelect label="Rodzaj oferty" value={billingModeFilter} onChange={value => onBillingModeFilterChange(value as PackageModeFilter)} options={[{ value: "all", label: "Wszystkie oferty" }, { value: "SessionBased", label: "Pakiety treningowe" }, { value: "PeriodBased", label: "Usługi okresowe" }]} /> : null}
+        {billingModeFilter !== "PeriodBased" ? <CustomSelect
           icon={<SlidersHorizontal size={16} />}
           label="Uczestnicy"
           value={participantsFilter}
@@ -58,8 +63,8 @@ export default function PackageFilters({
             { value: "four", label: "4 osoby" },
             { value: "group", label: "Grupowe" },
           ]}
-        />
-        <CustomSelect
+        /> : null}
+        {billingModeFilter !== "PeriodBased" ? <CustomSelect
           label="Sesje"
           value={sessionsFilter}
           onChange={(value) => onSessionsFilterChange(value as SessionsFilter)}
@@ -70,7 +75,7 @@ export default function PackageFilters({
             { value: "9-12", label: "9–12" },
             { value: "13+", label: "13+" },
           ]}
-        />
+        /> : null}
         <CustomSelect
           label="Czas"
           value={durationFilter}

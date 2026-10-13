@@ -48,8 +48,8 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
   const prepared = useRef<GroupEnrollment | null>(null);
   const observedPaymentRevision = useRef(0);
   const changed = useRef(onChanged);
-  changed.current = onChanged;
-  const labels = useRef<Record<number, { clientName: string; packageName: string }>>({});
+  useEffect(() => { changed.current = onChanged; }, [onChanged]);
+  const [labels, setLabels] = useState<Record<number, { clientName: string; packageName: string }>>({});
   const sessionId = session.id;
   const closed = ["completed", "cancelled"].includes((session.status || "").toLowerCase());
   const full = session.isFullyBooked === true || session.availableSeats === 0;
@@ -57,16 +57,19 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
   const hasLocation = Number.isSafeInteger(session.locationId) && Number(session.locationId) > 0;
   const editable = canConfirm && !closed;
   const canAdd = editable && hasSession && hasLocation && !full;
+  const loadKey = `${sessionId}:${page}:${paymentRevision}:${revision}:${session.startAt}`;
+  const [previousLoadKey, setPreviousLoadKey] = useState(loadKey);
+  if (previousLoadKey !== loadKey) {
+    setPreviousLoadKey(loadKey); setLoading(true); setError(""); setBillingError("");
+  }
 
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => { onBusyChange(busy || paymentItem !== null || paymentToConfirm !== null); }, [busy, paymentItem, paymentToConfirm, onBusyChange]);
   useEffect(() => () => onBusyChange(false), [onBusyChange]);
 
   const load = useCallback(async (signal: AbortSignal) => {
-    setLoading(true); setError(""); setBillingError("");
-    try {
-      if (!Number.isSafeInteger(sessionId) || sessionId <= 0) throw new Error("Otwórz zajęcia ponownie, aby sprawdzić zgłoszenia.");
-      const result = await getGroupEnrollments(sessionId, page, signal);
+    const request = Number.isSafeInteger(sessionId) && sessionId > 0 ? getGroupEnrollments(sessionId, page, signal) : Promise.reject(new Error("Otwórz zajęcia ponownie, aby sprawdzić zgłoszenia."));
+    return request.then(async result => {
       if (!result || (result.items !== null && !Array.isArray(result.items)) || !Number.isSafeInteger(result.page) || result.page < 1 || !Number.isSafeInteger(result.pageSize) || result.pageSize < 1 || !Number.isSafeInteger(result.totalPages) || result.totalPages < 0 || !Number.isSafeInteger(result.totalCount) || result.totalCount < 0) throw new Error("Nie udało się pobrać zgłoszeń.");
       if (signal.aborted) return;
       // The list already supplies current enrollments. Re-read awaiting rows after
@@ -93,8 +96,7 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
       setBilling(next); setData({ ...result, items: rows });
       if (prepared.current) { const latest = rows.find(item => item.id === prepared.current?.id); if (latest) { prepared.current = latest; setRecent(latest); } }
       if (snapshots.some(snapshot => snapshot.status === "rejected")) setBillingError("Nie udało się pobrać wszystkich płatności.");
-    } catch (err) { if (!signal.aborted) { setData(null); setBilling({}); setError(groupEnrollmentError(err)); } }
-    finally { if (!signal.aborted) setLoading(false); }
+    }).catch(err => { if (!signal.aborted) { setData(null); setBilling({}); setError(groupEnrollmentError(err)); } }).finally(() => { if (!signal.aborted) setLoading(false); });
   }, [sessionId, page, paymentRevision]);
 
   useEffect(() => {
@@ -122,7 +124,7 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
     try {
       const result = await prepareGroupEnrollment(sessionId, payload);
       prepared.current = result;
-      if (names) labels.current[result.id] = names;
+      if (names) setLabels(current => ({ ...current, [result.id]: names }));
       if (alive.current) {
         setRecent(result); setDraftOpen(false); setPage(1);
         setNotice(result.status === "ReadyToBook" ? "Zgłoszenie jest gotowe. Potwierdź udział poniżej." : groupEnrollmentStatus(result.status));
@@ -201,7 +203,7 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
       const pkg = snapshot?.packages?.find(pkg => pkg.clientPackageId === item.clientPackageId);
       const payments = snapshot?.payments?.filter(payment => payment.clientPackageId === item.clientPackageId && isPaymentPending(payment)) || [];
       return <li key={item.id} className="rounded-[var(--radius-lg)] bg-surface-container-low p-3">
-        <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="break-words text-sm font-semibold">{snapshot?.clientName || labels.current[item.id]?.clientName || `Klient #${item.clientId}`}</p><p className="mt-1 text-xs text-on-surface-muted">{pkg?.packageName || labels.current[item.id]?.packageName || "Pakiet klienta"}</p></div><span className="rounded-full bg-surface-container px-2 py-1 text-xs text-primary-light">{groupEnrollmentStatus(item.status)}</span></div>
+        <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="break-words text-sm font-semibold">{snapshot?.clientName || labels[item.id]?.clientName || `Klient #${item.clientId}`}</p><p className="mt-1 text-xs text-on-surface-muted">{pkg?.packageName || labels[item.id]?.packageName || "Pakiet klienta"}</p></div><span className="rounded-full bg-surface-container px-2 py-1 text-xs text-primary-light">{groupEnrollmentStatus(item.status)}</span></div>
         {item.status === "AwaitingPayment" && pkg ? <p className="mt-2 text-sm text-on-surface-variant">Do opłacenia: {pkg.currency ? formatMoney(pkg.amountDue, pkg.currency) : pkg.amountDue.toFixed(2)}</p> : null}
         <div className="mt-3 flex flex-wrap gap-2">
           {editable && item.status === "ReadyToBook" ? <Button type="button" size="sm" disabled={busy || full} onClick={() => void confirm(item)}>Potwierdź udział</Button> : null}

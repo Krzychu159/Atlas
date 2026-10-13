@@ -1,13 +1,17 @@
 import { ApiError, backendGet, backendPost, getErrorMessage } from "../backend";
 import type { PagedResult } from "./billing";
 import type { Client } from "./clients";
+import { isSessionPackage, type PackageBillingMode } from "../period-packages";
+import { getPackage, getPackages, type Package } from "./packages";
 
 export type GroupPackageOffer = {
+  billingMode?: PackageBillingMode | null; packageType?: string | null;
   packageId: number; name: string | null; price: number; currency: string | null;
   sessionsLimit: number; durationDays: number; canSelect: boolean; reasons: string[] | null;
 };
 
 export type GroupOwnedPackage = {
+  billingMode?: PackageBillingMode | null; packageType?: string | null;
   clientPackageId: number; packageId: number; name: string | null; price: number; currency: string | null;
   amountDue: number; locationId: number | null; validUntil: string | null; paymentStatus: string | null;
   isActive: boolean; totalEntries: number; usedEntries: number; reservedEntries: number;
@@ -25,8 +29,22 @@ export function getGroupEnrollmentClients(locationId: number, search: string, si
   return backendGet<Client[]>("clients/filter", { locationId, groupAccessEnabled: true, search }, signal);
 }
 
-export function getGroupPackageOptions(sessionId: number, clientId: number, signal?: AbortSignal) {
-  return backendGet<GroupPackageOptions>(`group-enrollments/sessions/${sessionId}/package-options`, { clientId }, signal);
+export async function getGroupPackageOptions(sessionId: number, clientId: number, signal?: AbortSignal) {
+  const result = await backendGet<GroupPackageOptions>(`group-enrollments/sessions/${sessionId}/package-options`, { clientId }, signal);
+  if (!Array.isArray(result.offers) || !Array.isArray(result.ownedPackages)) return result;
+  // The group-options DTO omits billingMode. Join actual offer metadata by packageId,
+  // never by the owned clientPackageId or by entry counts/name.
+  const missingIds = [...new Set([...result.offers, ...result.ownedPackages].filter(item => item.billingMode == null && item.packageType == null).map(item => item.packageId))];
+  const metadata = new Map<number, Package>();
+  if (missingIds.length) {
+    const catalog = await getPackages(undefined, signal);
+    catalog.forEach(item => metadata.set(item.id, item));
+    const absent = missingIds.filter(id => !metadata.has(id));
+    const details = await Promise.all(absent.map(id => getPackage(id, signal)));
+    details.forEach(item => metadata.set(item.id, item));
+  }
+  const sessionBased = (item: GroupPackageOffer | GroupOwnedPackage) => isSessionPackage(metadata.get(item.packageId) || item);
+  return { ...result, offers: result.offers.filter(sessionBased), ownedPackages: result.ownedPackages.filter(sessionBased) };
 }
 
 export function groupPackageReason(code: string) {

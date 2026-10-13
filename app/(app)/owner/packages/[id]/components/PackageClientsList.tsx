@@ -9,7 +9,7 @@ function getInitials(name: string) {
   return name.trim().split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "K";
 }
 
-export default function PackageClientsList({ clients, packageId }: { clients: PackageClient[]; packageId: number }) {
+export default function PackageClientsList({ clients, packageId, periodBased = false }: { clients: PackageClient[]; packageId: number; periodBased?: boolean }) {
   const [showAll, setShowAll] = useState(false);
   const visibleClients = showAll ? clients : clients.slice(0, 3);
 
@@ -36,13 +36,13 @@ export default function PackageClientsList({ clients, packageId }: { clients: Pa
                   {client.email ? <p className="mt-1 break-all text-xs text-on-surface-muted">{client.email}</p> : null}
                 </div>
               </div>
-              <div className="col-span-2 min-w-0 border-t border-white/5 pt-3 2xl:col-span-1 2xl:col-start-2 2xl:row-start-1 2xl:border-0 2xl:pt-0">
+              {!periodBased ? <div className="col-span-2 min-w-0 border-t border-white/5 pt-3 2xl:col-span-1 2xl:col-start-2 2xl:row-start-1 2xl:border-0 2xl:pt-0">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="text-on-surface-muted">Wykorzystane wejścia</span>
                   <span className={knownUsage ? "font-semibold text-primary-light" : "text-on-surface-muted"}>{knownUsage ? `${used}/${total}` : "Brak danych"}</span>
                 </div>
                 {progress !== null ? <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-container-lowest"><div className="h-full rounded-full bg-primary-light" style={{ width: `${progress}%` }} /></div> : null}
-              </div>
+              </div> : null}
               <span className="col-start-2 row-start-1 rounded-full bg-surface-container-high px-2.5 py-1 text-xs font-medium text-on-surface-variant 2xl:col-start-3">{client.status === "active" ? "Aktywny" : client.status === "suspended" ? "Wstrzymany" : client.status === "new" ? "Nowy" : userStatus(client.status)}</span>
             </article>
           );

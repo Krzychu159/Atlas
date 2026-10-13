@@ -1,5 +1,7 @@
 "use client";
 
+import { isSessionPackage } from "@/app/lib/period-packages";
+
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
@@ -40,7 +42,7 @@ export default function ImportClientPackageModal({ open, clientId, onClose, onSa
     let cancelled = false;
     const timer = window.setTimeout(() => {
       setCatalogLoading(true); setCatalogError("");
-      getPackages().then((data) => { if (!cancelled) setCatalog(data.filter((item) => item.isActive)); })
+      getPackages().then((data) => { if (!cancelled) setCatalog(data.filter((item) => item.isActive && isSessionPackage(item))); })
         .catch((err) => { if (!cancelled) setCatalogError(getErrorMessage(err, "Nie udało się pobrać dostępnych pakietów.")); })
         .finally(() => { if (!cancelled) setCatalogLoading(false); });
     }, 0);
@@ -55,7 +57,7 @@ export default function ImportClientPackageModal({ open, clientId, onClose, onSa
       const sessions = Number(totalSessions), used = Number(usedSessions);
       const price = Number(totalPrice), paid = Number(amountPaid);
       const purchaseIso = dateInputToIsoDateTime(purchaseDate), validityIso = localPackageInstantToUtc(validUntil);
-      if (!selected) { setError("Wybierz pakiet katalogowy."); return; }
+      if (!selected || !isSessionPackage(selected)) { setError("Wybierz pakiet treningowy z katalogu."); return; }
       if (!totalSessions.trim() || !Number.isSafeInteger(sessions) || sessions < 1 || !usedSessions.trim() || !Number.isSafeInteger(used) || used < 0 || used >= sessions) { setError("Podaj liczbę wejść. Pakiet musi mieć co najmniej jedno niewykorzystane wejście."); return; }
       if (!totalPrice.trim() || !amountPaid.trim() || !Number.isFinite(price) || !Number.isFinite(paid) || price < 0 || paid < 0 || paid > price) { setError("Cena i kwota opłacona nie mogą być ujemne. Kwota opłacona nie może przekroczyć ceny."); return; }
       if (!purchaseIso || !validityIso) { setError("Podaj datę zakupu oraz poprawną datę i godzinę ważności pakietu."); return; }

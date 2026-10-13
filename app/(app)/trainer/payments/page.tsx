@@ -33,25 +33,27 @@ export default function TrainerPaymentsPage() {
   const [processingId, setProcessingId] = useState<number | null>(null);
   const submitting = useRef(false);
   const loadRevision = useRef(0);
+  const [previousPaymentDateRevision, setPreviousPaymentDateRevision] = useState(paymentDateRevision);
+  if (previousPaymentDateRevision !== paymentDateRevision) {
+    setPreviousPaymentDateRevision(paymentDateRevision); setIsLoading(true); setLoadError(null);
+  }
 
   const loadPayments = useCallback(async () => {
     const revision = ++loadRevision.current;
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const data = await getTrainerPortalPendingPayments();
+    return getTrainerPortalPendingPayments().then(data => {
       if (revision !== loadRevision.current) return;
       setPayments(data);
       setPage(1);
-    } catch (error) {
+    }).catch(error => {
       if (revision !== loadRevision.current) return;
       const message = trainerPaymentError(error, "Nie udało się pobrać wpłat oczekujących. Spróbuj ponownie.");
       setLoadError(message);
       showAppError(new Error(message), message);
-    } finally {
+    }).finally(() => {
       if (revision === loadRevision.current) setIsLoading(false);
-    }
+    });
   }, []);
+  function reloadPayments() { setIsLoading(true); setLoadError(null); return loadPayments(); }
 
   useEffect(() => {
     void loadPayments();
@@ -82,7 +84,7 @@ export default function TrainerPaymentsPage() {
       showAppSuccess(action.type === "confirm" ? "Wpłata została potwierdzona." : "Wpłata została odrzucona.");
       setAction(null);
       setReason("");
-      await loadPayments();
+      await reloadPayments();
     } catch (error) {
       const message = trainerPaymentError(error, "Nie udało się zapisać zmiany wpłaty. Spróbuj ponownie.");
       showAppError(new Error(message), message);
@@ -106,7 +108,7 @@ export default function TrainerPaymentsPage() {
           <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-tight tracking-tight">Wpłaty oczekujące</h1>
           <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">Wpłaty wymagające ręcznego potwierdzenia. Historię wpłat i rozliczenia znajdziesz w profilu klienta.</p>
         </div>
-        <Button variant="secondary" icon={<RefreshCw size={16} />} disabled={isLoading || processingId !== null} onClick={() => void loadPayments()}>Odśwież</Button>
+        <Button variant="secondary" icon={<RefreshCw size={16} />} disabled={isLoading || processingId !== null} onClick={() => void reloadPayments()}>Odśwież</Button>
       </section>
       <div className="card-shell grid gap-3 p-4 md:grid-cols-[1fr_220px_220px]">
         <Input aria-label="Szukaj wpłaty" placeholder="Szukaj klienta lub pakietu..." icon={<Search size={16} />} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
@@ -114,7 +116,7 @@ export default function TrainerPaymentsPage() {
         <CustomSelect label="Sortowanie" value={sort} onChange={(value) => { setSort(value); setPage(1); }} options={[{ value: "newest", label: "Od najnowszych" }, { value: "oldest", label: "Od najstarszych" }, { value: "amount", label: "Od największej kwoty" }]} />
       </div>
       <section className="overflow-hidden rounded-[var(--radius-xl)] bg-surface-container-low shadow-soft">
-        {loadError && !isLoading ? <div role="alert" className="p-6 text-on-surface-variant">{loadError}<Button className="mt-4" variant="secondary" onClick={() => void loadPayments()}>Spróbuj ponownie</Button></div> : <>
+        {loadError && !isLoading ? <div role="alert" className="p-6 text-on-surface-variant">{loadError}<Button className="mt-4" variant="secondary" onClick={() => void reloadPayments()}>Spróbuj ponownie</Button></div> : <>
           <PaymentsList dateCorrectionPortal="trainer" payments={filteredPayments.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)} isLoading={isLoading} processingId={processingId}
             getDetailsHref={(payment) => "/trainer/clients/" + payment.clientId + "/payments"}
             emptyTitle={payments.length ? "Brak pasujących wpłat" : "Brak wpłat oczekujących"}

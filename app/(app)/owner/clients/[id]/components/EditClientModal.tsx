@@ -141,16 +141,23 @@ export default function EditClientModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentClientId, open]);
 
-  useEffect(() => {
-    if (!client || !open) return;
-    setLocationId(value => value || resolveClientLocationId(client, locations));
-  }, [client, locations, open]);
+  const resolvedLocationId = client && open ? resolveClientLocationId(client, locations) : "";
+  const [previousLocationContext, setPreviousLocationContext] = useState({ client, locations, open });
+  if (previousLocationContext.client !== client || previousLocationContext.locations !== locations || previousLocationContext.open !== open) {
+    setPreviousLocationContext({ client, locations, open });
+    if (!locationId && resolvedLocationId) setLocationId(resolvedLocationId);
+  }
+  const planKey = `${access}:${currentClientId}:${open}`;
+  const [previousPlanKey, setPreviousPlanKey] = useState(planKey);
+  if (previousPlanKey !== planKey) {
+    setPreviousPlanKey(planKey);
+    if (currentClientId && open) { setTrainingPlan(null); setTrainingPlanUrl(""); setPlanReady(false); setPlanError(null); }
+  }
 
   useEffect(() => {
     if (!currentClientId || !open) return;
     let active = true;
     const controller = new AbortController();
-    setTrainingPlan(null); setTrainingPlanUrl(""); setPlanReady(false); setPlanError(null);
     getTrainingPlanForEditModal(currentClientId, access, controller.signal)
       .then(plan => { if (active) { setTrainingPlan(plan); setTrainingPlanUrl(plan.url || plan.googleDriveFolderUrl || ""); setPlanReady(true); } })
       .catch(error => { if (active) { setTrainingPlan(null); setTrainingPlanUrl(""); if (isNotFoundError(error)) setPlanReady(true); else setPlanError("Nie udało się pobrać linku do plików. Zamknij edycję i spróbuj ponownie."); } });

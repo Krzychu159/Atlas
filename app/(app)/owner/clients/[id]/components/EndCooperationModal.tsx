@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle, CreditCard, ShieldAlert } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { OwnerTextArea } from "../../../components/OwnerFormControls";
@@ -51,8 +51,10 @@ export default function EndCooperationModal({
   );
   const [validationMessage, setValidationMessage] = useState("");
 
-  useEffect(() => {
-    if (!open || !preview) return;
+  const [previous, setPrevious] = useState<{ open: boolean; preview: ClientClosurePreview | null }>({ open: false, preview: null });
+  if (previous.open !== open || previous.preview !== preview) {
+    setPrevious({ open, preview });
+    if (open && preview) {
 
     setReason("");
     setValidationMessage("");
@@ -69,7 +71,8 @@ export default function EndCooperationModal({
           ]),
       ),
     );
-  }, [open, preview]);
+    }
+  }
 
   const decisionPackages = useMemo(
     () => preview?.packages.filter((item) => item.requiresDecision) || [],

@@ -1,5 +1,6 @@
 import { CalendarDays, Dumbbell, TrendingUp, Users } from "lucide-react";
 import type { Package, PackageClient } from "@/app/lib/owner/packages";
+import { isPeriodPackage } from "@/app/lib/period-packages";
 
 function formatPrice(value: number, currency: string) {
   return new Intl.NumberFormat("pl-PL", {
@@ -16,6 +17,7 @@ export default function PackageDetailsHero({
   item: Package;
   clients: PackageClient[];
 }) {
+  const periodBased = isPeriodPackage(item);
   const usedSessions = clients.every(client => client.activePackageId === item.id && typeof client.activePackageUsedSessions === "number" && Number.isFinite(client.activePackageUsedSessions))
     ? clients.reduce((sum, client) => sum + client.activePackageUsedSessions!, 0)
     : null;
@@ -39,7 +41,7 @@ export default function PackageDetailsHero({
           </span>
 
           <span className="text-label text-on-surface-variant">
-            Pakiet treningowy
+            {periodBased ? "Usługa okresowa" : "Pakiet treningowy"}
           </span>
         </div>
 
@@ -50,24 +52,24 @@ export default function PackageDetailsHero({
             </h1>
 
             <p className="mt-3 max-w-[640px] break-words text-sm leading-6 text-on-surface-variant sm:text-base">
-              {item.description || "Pakiet bez opisu."}
+              {item.description || (periodBased ? "Usługa bez opisu." : "Pakiet bez opisu.")}
             </p>
           </div>
 
           <div className="md:text-right">
-            <p className="text-label text-on-surface-variant">Cena pakietu</p>
+            <p className="text-label text-on-surface-variant">{periodBased ? "Cena usługi" : "Cena pakietu"}</p>
             <p className="mt-2 text-[2.2rem] leading-none font-semibold text-primary-light">
               {formatPrice(item.price, item.currency)}
             </p>
           </div>
         </div>
 
-        <div className="mt-7 grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-surface-container-low rounded-[var(--radius-lg)] p-4">
+        <div className={`mt-7 grid grid-cols-2 gap-3 ${periodBased ? "md:grid-cols-3" : "md:grid-cols-4"}`}>
+          {!periodBased ? <div className="bg-surface-container-low rounded-[var(--radius-lg)] p-4">
             <Dumbbell size={18} className="text-primary-light" />
             <p className="mt-4 text-label text-on-surface-muted">Limit sesji</p>
             <p className="mt-1 text-2xl font-semibold">{item.sessionsLimit}</p>
-          </div>
+          </div> : null}
 
           <div className="bg-surface-container-low rounded-[var(--radius-lg)] p-4">
             <CalendarDays size={18} className="text-primary-light" />
@@ -92,9 +94,9 @@ export default function PackageDetailsHero({
                 maximumFractionDigits: 1,
               }).format(estimatedRevenue)} {item.currency || "PLN"}
             </p>
-            <p className="mt-1 text-xs text-on-surface-muted">
+            {!periodBased ? <p className="mt-1 text-xs text-on-surface-muted">
               {usedSessions === null ? "Brak danych o wykorzystaniu" : `${usedSessions} wykorzystanych sesji`}
-            </p>
+            </p> : null}
           </div>
         </div>
       </div>

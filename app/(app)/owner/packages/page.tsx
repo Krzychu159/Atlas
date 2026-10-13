@@ -16,7 +16,9 @@ import {
   matchesOwnerLocationId,
   useOwnerLocationFilter,
 } from "@/app/lib/owner/location-filter";
-import { filterPackages } from "@/app/lib/packageFilters";
+import { filterPackages, type PackageModeFilter } from "@/app/lib/packageFilters";
+import { ApiError } from "@/app/lib/backend";
+import { periodPackageError } from "@/app/lib/period-packages";
 import PackageCard from "@/app/components/packages/PackageCard";
 import PackageFilters, {
   type DurationFilter,
@@ -32,6 +34,7 @@ export default function PackagesPage() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [search, setSearch] = useState("");
+  const [billingModeFilter, setBillingModeFilter] = useState<PackageModeFilter>("all");
   const [participantsFilter, setParticipantsFilter] =
     useState<ParticipantsFilter>("all");
   const [sessionsFilter, setSessionsFilter] = useState<SessionsFilter>("all");
@@ -83,9 +86,9 @@ export default function PackagesPage() {
 
   const filteredPackages = useMemo(
     () => filterPackages(locationPackages, {
-      search, participantsFilter, sessionsFilter, durationFilter, sort,
+      search, participantsFilter, sessionsFilter, durationFilter, sort, billingModeFilter,
     }),
-    [locationPackages, search, participantsFilter, sessionsFilter, durationFilter, sort],
+    [locationPackages, search, participantsFilter, sessionsFilter, durationFilter, sort, billingModeFilter],
   );
 
   const handleCreatePackage = async (payload: CreatePackagePayload) => {
@@ -100,12 +103,13 @@ export default function PackagesPage() {
       });
       await loadPackages();
       setIsModalOpen(false);
-      showOwnerSuccess("Pakiet został dodany.", {
+      showOwnerSuccess(payload.billingMode === "PeriodBased" ? "Oferta usługi jest dostępna w katalogu." : "Pakiet został dodany.", {
         id: "owner-package-create-success",
       });
       return true;
     } catch (err) {
-      showOwnerError(err, "Nie udało się dodać pakietu", {
+      if (err instanceof ApiError && err.status === 409) await loadPackages();
+      showOwnerError(payload.billingMode === "PeriodBased" ? new Error(periodPackageError(err)) : err, "Nie udało się dodać pakietu", {
         id: "owner-package-create-error",
       });
       return false;
@@ -142,10 +146,10 @@ export default function PackagesPage() {
                   Zarządzanie pakietami
                 </p>
                 <h1 className="mt-2 text-[2.25rem] leading-[0.95] font-semibold font-display tracking-tight">
-                  Pakiety <span className="text-primary-light">Treningowe</span>
+                  Pakiety <span className="text-primary-light">i usługi</span>
                 </h1>
                 <p className="mt-3 text-base text-on-surface-variant">
-                  Definiuj i optymalizuj ofertę treningową swojego studia.
+                  Zarządzaj pakietami treningowymi i usługami okresowymi studia.
                 </p>
               </div>
 
@@ -159,7 +163,7 @@ export default function PackagesPage() {
               </Button>
             </div>
 
-            <PackageFilters
+            <PackageFilters billingModeFilter={billingModeFilter} onBillingModeFilterChange={value => { setBillingModeFilter(value); if (value === "PeriodBased") { setParticipantsFilter("all"); setSessionsFilter("all"); } }}
               search={search}
               participantsFilter={participantsFilter}
               sessionsFilter={sessionsFilter}
@@ -204,7 +208,7 @@ export default function PackagesPage() {
                     Utwórz nową ofertę
                   </span>
                   <span className="mt-2 text-sm leading-6 max-w-[220px]">
-                    Zdefiniuj unikalny pakiet treningowy dla swoich klientów.
+                    Dodaj pakiet treningowy lub usługę okresową.
                   </span>
                 </button>
               </div>
@@ -222,7 +226,7 @@ export default function PackagesPage() {
               <div>
                 <p className="text-page-title">Pakiety</p>
                 <p className="mt-3 text-label text-primary-light">
-                  Zarządzaj ofertą treningową
+                  Zarządzaj ofertą studia
                 </p>
               </div>
 
@@ -234,7 +238,7 @@ export default function PackagesPage() {
               </button>
             </div>
 
-            <PackageFilters
+            <PackageFilters billingModeFilter={billingModeFilter} onBillingModeFilterChange={value => { setBillingModeFilter(value); if (value === "PeriodBased") { setParticipantsFilter("all"); setSessionsFilter("all"); } }}
               search={search}
               participantsFilter={participantsFilter}
               sessionsFilter={sessionsFilter}

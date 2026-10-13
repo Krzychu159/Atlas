@@ -10,17 +10,18 @@ import PackageManagementModal from "./PackageManagementModal";
 import ImportClientPackageModal from "./ImportClientPackageModal";
 import PackageExpiryDecisionModal from "./PackageExpiryDecisionModal";
 import { canDecidePackageExpiry, formatPackageInstant, isPackageExpired, packageTrainingKind } from "@/app/lib/package-validity";
+import { isSessionPackage } from "@/app/lib/period-packages";
 
 export function isGroupClientPackage(
-  packageData: Pick<ClientPackageBilling, "packageType" | "expectedBillingType">,
+  packageData: Pick<ClientPackageBilling, "packageType" | "expectedBillingType" | "billingMode">,
 ) {
   return getClientPackageKind(packageData) === "group";
 }
 
 function getClientPackageKind(
-  packageData: Pick<ClientPackageBilling, "packageType" | "expectedBillingType">,
+  packageData: Pick<ClientPackageBilling, "packageType" | "expectedBillingType" | "billingMode">,
 ) {
-  const kind = packageTrainingKind(packageData.packageType, packageData.expectedBillingType);
+  const kind = packageTrainingKind(packageData.packageType, packageData.expectedBillingType, packageData.billingMode);
   return kind === "individual" ? "main" : kind;
 }
 
@@ -63,7 +64,7 @@ export default function ClientPackagesSection({
   const [visibleCount, setVisibleCount] = useState(6);
   const sortedPackages = useMemo(
     () =>
-      [...(packages || [])].sort(
+      [...(packages || [])].filter(isSessionPackage).sort(
         (first, second) =>
           getTime(second.purchaseDate) - getTime(first.purchaseDate),
       ),

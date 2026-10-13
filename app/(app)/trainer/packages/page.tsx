@@ -9,7 +9,7 @@ import {
   getTrainerPackages,
   type TrainerPackage,
 } from "@/app/lib/trainer/packages";
-import { filterPackages } from "@/app/lib/packageFilters";
+import { filterPackages, type PackageModeFilter } from "@/app/lib/packageFilters";
 import PackageCard from "@/app/components/packages/PackageCard";
 import PackageFilters, {
   type DurationFilter,
@@ -21,6 +21,7 @@ import PackageFilters, {
 export default function TrainerPackagesPage() {
   const [packages, setPackages] = useState<TrainerPackage[]>([]);
   const [search, setSearch] = useState("");
+  const [billingModeFilter, setBillingModeFilter] = useState<PackageModeFilter>("all");
   const [participantsFilter, setParticipantsFilter] =
     useState<ParticipantsFilter>("all");
   const [sessionsFilter, setSessionsFilter] = useState<SessionsFilter>("all");
@@ -56,9 +57,9 @@ export default function TrainerPackagesPage() {
 
   const filteredPackages = useMemo(
     () => filterPackages(packages, {
-      search, participantsFilter, sessionsFilter, durationFilter, sort,
+      search, participantsFilter, sessionsFilter, durationFilter, sort, billingModeFilter,
     }),
-    [packages, search, participantsFilter, sessionsFilter, durationFilter, sort],
+    [packages, search, participantsFilter, sessionsFilter, durationFilter, sort, billingModeFilter],
   );
 
   return (
@@ -79,7 +80,7 @@ export default function TrainerPackagesPage() {
         </div>
       </section>
 
-      <PackageFilters
+      <PackageFilters billingModeFilter={billingModeFilter} onBillingModeFilterChange={value => { setBillingModeFilter(value); if (value === "PeriodBased") { setParticipantsFilter("all"); setSessionsFilter("all"); } }}
         search={search}
         participantsFilter={participantsFilter}
         sessionsFilter={sessionsFilter}
