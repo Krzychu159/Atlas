@@ -1,9 +1,9 @@
 "use client";
 
-import { Search, SlidersHorizontal } from "lucide-react";
-import { Button } from "@/app/components/ui/button";
+import { Search } from "lucide-react";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { DateRangeFilter } from "@/app/components/ui/date-range-filter";
+import { FilterToolbar } from "@/app/components/ui/list/FilterToolbar";
 
 export type PaymentFiltersValue = {
   client: string;
@@ -50,77 +50,63 @@ export function PaymentFilters({
   ) => onChange({ ...value, [key]: nextValue });
 
   return (
-    <section className="card-shell p-4 md:p-5">
-      <div className="grid gap-3 xl:grid-cols-[minmax(280px,1fr)_260px_220px_auto_auto] xl:items-end">
-        <PaymentSearchField
-          value={value.client}
-          onChange={(nextValue) => update("client", nextValue)}
-        />
-        <DateRangeFilter
-          value={{ from: value.dateFrom, to: value.dateTo }}
-          onChange={(range) =>
-            onChange({ ...value, dateFrom: range.from, dateTo: range.to })
-          }
-        />
-        <CustomSelect
-          label="Sortuj"
-          value={value.sortBy}
-          onChange={(nextValue) => update("sortBy", nextValue)}
-          options={paymentSortOptions}
-        />
-        <Button
-          variant={advancedOpen ? "primary" : "secondary"}
-          icon={<SlidersHorizontal size={16} />}
-          onClick={() => onAdvancedOpenChange(!advancedOpen)}
-          className="w-full xl:w-auto"
-          aria-expanded={advancedOpen}
-          aria-controls="payment-advanced-filters"
-        >
-          Filtry
-        </Button>
-        <Button variant="ghost" onClick={onClear} className="w-full xl:w-auto">
-          Wyczyść
-        </Button>
-      </div>
-
-      {advancedOpen ? (
-        <div
-          id="payment-advanced-filters"
-          className="mt-4 rounded-[var(--radius-lg)] bg-surface-container-low p-3"
-        >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_minmax(180px,1fr)_minmax(150px,0.75fr)_minmax(150px,0.75fr)]">
-            <CustomSelect
-              label="Status"
-              value={value.status}
-              onChange={(nextValue) => update("status", nextValue)}
-              options={paymentStatusOptions}
-            />
-            <CustomSelect
-              label="Źródło"
-              value={value.source}
-              onChange={(nextValue) => update("source", nextValue)}
-              options={paymentSourceOptions}
-            />
-            <CustomSelect
-              label="Nadpłata"
-              value={value.overpayment}
-              onChange={(nextValue) => update("overpayment", nextValue)}
-              options={overpaymentOptions}
-            />
-            <MoneyFilterField
-              label="Kwota od"
-              value={value.amountMin}
-              onChange={(nextValue) => update("amountMin", nextValue)}
-            />
-            <MoneyFilterField
-              label="Kwota do"
-              value={value.amountMax}
-              onChange={(nextValue) => update("amountMax", nextValue)}
-            />
-          </div>
-        </div>
-      ) : null}
-    </section>
+    <FilterToolbar
+      gridClassName="xl:grid-cols-[minmax(280px,1fr)_260px_220px_auto_auto]"
+      advancedId="payment-advanced-filters"
+      advancedGridClassName="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_minmax(180px,1fr)_minmax(150px,0.75fr)_minmax(150px,0.75fr)]"
+      advancedOpen={advancedOpen}
+      onAdvancedOpenChange={onAdvancedOpenChange}
+      onClear={onClear}
+      advanced={
+        <>
+          <CustomSelect
+            label="Status"
+            value={value.status}
+            onChange={(nextValue) => update("status", nextValue)}
+            options={paymentStatusOptions}
+          />
+          <CustomSelect
+            label="Źródło"
+            value={value.source}
+            onChange={(nextValue) => update("source", nextValue)}
+            options={paymentSourceOptions}
+          />
+          <CustomSelect
+            label="Nadpłata"
+            value={value.overpayment}
+            onChange={(nextValue) => update("overpayment", nextValue)}
+            options={overpaymentOptions}
+          />
+          <MoneyFilterField
+            label="Kwota od"
+            value={value.amountMin}
+            onChange={(nextValue) => update("amountMin", nextValue)}
+          />
+          <MoneyFilterField
+            label="Kwota do"
+            value={value.amountMax}
+            onChange={(nextValue) => update("amountMax", nextValue)}
+          />
+        </>
+      }
+    >
+      <PaymentSearchField
+        value={value.client}
+        onChange={(nextValue) => update("client", nextValue)}
+      />
+      <DateRangeFilter
+        value={{ from: value.dateFrom, to: value.dateTo }}
+        onChange={(range) =>
+          onChange({ ...value, dateFrom: range.from, dateTo: range.to })
+        }
+      />
+      <CustomSelect
+        label="Sortuj"
+        value={value.sortBy}
+        onChange={(nextValue) => update("sortBy", nextValue)}
+        options={paymentSortOptions}
+      />
+    </FilterToolbar>
   );
 }
 

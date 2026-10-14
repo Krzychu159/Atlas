@@ -13,6 +13,7 @@ import { PaymentReasonModal } from "@/app/components/payments/PaymentReasonModal
 import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { PaymentsList } from "@/app/components/payments/PaymentsList";
 import { Button } from "@/app/components/ui/button";
+import { ListSection } from "@/app/components/ui/list/ListSection";
 import { getClients } from "@/app/lib/owner/clients";
 import { matchesOwnerLocationId } from "@/app/lib/owner/location-filter";
 import { getPaymentBreakdown } from "@/app/lib/payments/display";
@@ -394,22 +395,15 @@ function OwnerPaymentsPageContent({
         onClear={clearFilters}
       />
 
-      <section className="overflow-hidden rounded-[var(--radius-xl)] bg-surface-container-low shadow-soft">
-        <div className="flex flex-col gap-2 px-4 py-5 md:flex-row md:items-end md:justify-between md:px-5">
-          <div>
-            <p className="text-section-title">Operacje płatnicze</p>
-            <p className="mt-2 text-sm text-on-surface-variant">
-              Kwota, sposób rozliczenia i najważniejsze akcje w jednym wierszu.
-            </p>
-          </div>
-          {!isLoading ? (
-            <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-muted">
-              {filteredPayments.length}{" "}
-              {pluralizePayments(filteredPayments.length)}
-            </p>
-          ) : null}
-        </div>
-
+      <ListSection
+        title="Operacje płatnicze"
+        description="Kwota, sposób rozliczenia i najważniejsze akcje w jednym wierszu."
+        meta={
+          !isLoading
+            ? `${filteredPayments.length} ${pluralizePayments(filteredPayments.length)}`
+            : null
+        }
+      >
         <PaymentsList
           dateCorrectionPortal={basePath === "/trainer" ? "trainer" : "owner"}
           payments={visiblePayments}
@@ -445,7 +439,7 @@ function OwnerPaymentsPageContent({
             onPageChange={setPage}
           />
         ) : null}
-      </section>
+      </ListSection>
 
       {paymentToReject ? (
         <PaymentReasonModal
