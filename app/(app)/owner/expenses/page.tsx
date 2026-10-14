@@ -31,6 +31,8 @@ import ExpenseFilters, {
 import ExpenseFormModal from "./components/ExpenseFormModal";
 import ExpensesList from "./components/ExpensesList";
 import ExpenseStats from "./components/ExpenseStats";
+import { useOwnerRead } from "../components/use-owner-read";
+import { OwnerReadState } from "../components/OwnerReadState";
 import {
   deriveLegalEntities,
   fallbackCategories,
@@ -81,17 +83,11 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
   const [filters, setFilters] = useState<ExpenseFiltersValue>(initialExpenseFilters);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(25);
-  const [expenses, setExpenses] = useState<CompanyExpense[]>([]);
-  const [statistics, setStatistics] = useState<ExpenseStatistics>(emptyStatistics);
   const [categories, setCategories] = useState<DictionaryOption[]>(fallbackCategories);
   const [paymentStatuses, setPaymentStatuses] = useState<DictionaryOption[]>(fallbackPaymentStatuses);
   const [recurrenceEditScopes, setRecurrenceEditScopes] = useState<DictionaryOption[]>(fallbackRecurrenceEditScopes);
   const [locations, setLocations] = useState<Location[]>([]);
   const [legalEntities, setLegalEntities] = useState<LegalEntityOption[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<CompanyExpense | null>(null);
@@ -100,7 +96,7 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteRecurrenceScope, setDeleteRecurrenceScope] = useState("0");
 
-  const query = useMemo<ExpenseQuery>(
+  const summaryQuery = useMemo<ExpenseQuery>(
     () => ({
       legalEntityId: numberFilter(filters.legalEntityId),
       locationId,
@@ -115,47 +111,36 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
       search: nullable(filters.search.trim()),
       isRecurring: view === "recurring" ? true : null,
       isOverdue: booleanFilter(filters.isOverdue),
-      page,
-      pageSize,
     }),
-    [filters, locationId, page, pageSize, view],
+    [filters, locationId, view],
   );
 
-  const loadData = useCallback(
-    async (showRefreshState = false) => {
-      try {
-        if (showRefreshState) setIsRefreshing(true);
-        else setIsLoading(true);
+  const query = useMemo<ExpenseQuery>(() => ({ ...summaryQuery, page, pageSize }), [summaryQuery, page, pageSize]);
+  const loadList = useCallback((signal: AbortSignal) => getExpenses(query, signal), [query]);
+  const loadSummary = useCallback((signal: AbortSignal) => getExpenseStatistics(summaryQuery, signal), [summaryQuery]);
+  const list = useOwnerRead(JSON.stringify(query), loadList, "Nie udało się pobrać wydatków.", 0, 300);
+  const summary = useOwnerRead(JSON.stringify(summaryQuery), loadSummary, "Nie udało się pobrać podsumowania wydatków.", 0, 300);
+  const expenses = list.data?.items ?? [];
+  const statistics = summary.data ?? emptyStatistics;
+  const totalCount = list.data?.totalCount ?? expenses.length;
+  const totalPages = Math.max(1, list.data?.totalPages || Math.ceil(totalCount / pageSize));
+  const isLoading = list.loading;
+  const isRefreshing = list.loading || summary.loading;
 
-        const [list, stats] = await Promise.all([
-          getExpenses(query),
-          getExpenseStatistics(query),
-        ]);
-        const items = list.items || [];
-
-        setExpenses(items);
-        setStatistics(stats);
-        setTotalCount(list.totalCount ?? items.length);
-        setTotalPages(
-          Math.max(
-            1,
-            list.totalPages || Math.ceil((list.totalCount || items.length) / pageSize),
-          ),
-        );
-        setLegalEntities((current) =>
-          mergeLegalEntities(current, deriveLegalEntities(items, stats, locations)),
-        );
-      } catch (error) {
-        showOwnerError(error, "Nie udało się pobrać wydatków.", { id: "expenses-load-error" });
-      } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
-      }
-    },
-    [locations, pageSize, query],
-  );
+  async function loadData() {
+    await Promise.allSettled([list.reload(), summary.reload()]);
+  }
 
   useEffect(() => {
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) setLegalEntities(current => mergeLegalEntities(current, deriveLegalEntities(list.data?.items ?? [], summary.data ?? null, locations)));
+    });
+    return () => { active = false; };
+  }, [list.data, summary.data, locations]);
+
+  useEffect(() => {
+    let active = true;
     const timer = window.setTimeout(() => {
       Promise.allSettled([
         getExpenseCategories(),
@@ -163,6 +148,7 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
         getExpenseRecurrenceEditScopes(),
         getLocations(),
       ]).then(([categoriesResult, statusesResult, scopesResult, locationsResult]) => {
+        if (!active) return;
         if (categoriesResult.status === "fulfilled") {
           setCategories(normalizeDictionary(categoriesResult.value, fallbackCategories));
         }
@@ -184,13 +170,8 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
       });
     }, 0);
 
-    return () => window.clearTimeout(timer);
+    return () => { active = false; window.clearTimeout(timer); };
   }, []);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => void loadData(), 300);
-    return () => window.clearTimeout(timer);
-  }, [loadData]);
 
   function updateFilter<K extends keyof ExpenseFiltersValue>(
     key: K,
@@ -241,7 +222,7 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
       showOwnerSuccess("Wydatek został oznaczony jako opłacony.", {
         id: `expense-paid-${expense.id}`,
       });
-      await loadData(true);
+      await loadData();
     } catch (error) {
       showOwnerError(error, "Nie udało się oznaczyć wydatku jako opłaconego.", {
         id: `expense-paid-error-${expense.id}`,
@@ -287,7 +268,7 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
         });
       }
       setDeleteTarget(null);
-      await loadData(true);
+      await loadData();
     } catch (error) {
       showOwnerError(
         error,
@@ -323,7 +304,7 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
             variant="secondary"
             size="icon"
             aria-label="Odśwież wydatki"
-            onClick={() => void loadData(true)}
+            onClick={() => void loadData()}
             disabled={isRefreshing}
             icon={<RefreshCw size={17} className={isRefreshing ? "animate-spin" : ""} />}
           />
@@ -366,7 +347,7 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
       </div>
 
       {/* Sekcja: Podsumowanie wydatków */}
-      <ExpenseStats statistics={statistics} isLoading={isLoading} />
+      <OwnerReadState loading={summary.loading} error={summary.error} retry={summary.retry} label="Ładowanie podsumowania wydatków...">{summary.data !== undefined ? <ExpenseStats statistics={statistics} isLoading={summary.loading} /> : null}</OwnerReadState>
 
       {/* Sekcja: Filtry wydatków */}
       <ExpenseFilters
@@ -386,7 +367,8 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
       />
 
       {/* Sekcja: Dokumenty kosztowe */}
-      <ExpensesList
+      <OwnerReadState loading={false} error={list.error} retry={list.retry} label="Ładowanie wydatków..." />
+      {list.data !== undefined || list.loading ? <ExpensesList
         expenses={expenses}
         categories={categories}
         paymentStatuses={paymentStatuses}
@@ -413,7 +395,7 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
           setDeleteRecurrenceScope("0");
           setDeleteTarget({ type: "attachment", expense });
         }}
-      />
+      /> : null}
 
       {/* Sekcja: Formularz i potwierdzenia */}
       <ExpenseFormModal
@@ -429,7 +411,7 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
           setFormOpen(false);
           setEditingExpense(null);
         }}
-        onSaved={() => void loadData(true)}
+        onSaved={() => void loadData()}
       />
       <ExpenseConfirmModal
         open={deleteTarget !== null}

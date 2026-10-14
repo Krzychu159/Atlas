@@ -3,17 +3,15 @@ import { usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections"
 
 import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CircleAlert, RefreshCw } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import {
   getRevenueStatistics,
-  getTrainerCostSessions,
   getTrainerCostStatistics,
   type AnalyticsBreakdown,
   type RevenueQuery,
   type RevenueStatistics,
-  type TrainerCostSession,
   type TrainerCostsQuery,
   type TrainerCostStatistics,
 } from "@/app/lib/owner/analytics";
@@ -37,7 +35,6 @@ import {
 } from "../expenses/expense-config";
 import FinanceAndTrainers from "./components/FinanceAndTrainers";
 import RevenueCostsBreakdowns from "./components/RevenueCostsBreakdowns";
-import SessionsProfitability from "./components/SessionsProfitability";
 import StatisticsFilters, {
   initialStatisticsFilters,
   type StatisticsFiltersValue,
@@ -74,10 +71,6 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
   const [trainerCosts, setTrainerCosts] = useState<TrainerCostStatistics>(
     emptyTrainerCostStatistics,
   );
-  const [sessions, setSessions] = useState<TrainerCostSession[]>([]);
-  const [sessionsPage, setSessionsPage] = useState(1);
-  const [sessionsTotalPages, setSessionsTotalPages] = useState(1);
-  const [sessionsTotalCount, setSessionsTotalCount] = useState(0);
   const [locations, setLocations] = useState<Location[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -89,6 +82,7 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
   const [failedSections, setFailedSections] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const activeLoad = useRef<AbortController | null>(null);
 
   const commonQuery = useMemo(
     () => ({
@@ -129,6 +123,9 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
 
   const loadData = useCallback(
     async (refresh = false) => {
+      activeLoad.current?.abort();
+      const controller = new AbortController();
+      activeLoad.current = controller;
       if (refresh) setIsRefreshing(true);
       else setIsLoading(true);
 
@@ -157,21 +154,14 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
       };
 
       const results = await Promise.allSettled([
-        getRevenueStatistics(revenueQuery),
-        getExpenseStatistics(expenseQuery),
-        getTrainerCostStatistics(trainerQuery),
-        getTrainerCostSessions({
-          from: commonQuery.from,
-          to: commonQuery.to,
-          trainerId: commonQuery.trainerId,
-          locationId: commonQuery.locationId,
-          page: sessionsPage,
-          pageSize: 25,
-        }),
+        getRevenueStatistics(revenueQuery, controller.signal),
+        getExpenseStatistics(expenseQuery, controller.signal),
+        getTrainerCostStatistics(trainerQuery, controller.signal),
       ]);
+      if (controller.signal.aborted) return;
 
       const failed: string[] = [];
-      const [revenueResult, expenseResult, trainerResult, sessionsResult] =
+      const [revenueResult, expenseResult, trainerResult] =
         results;
 
       if (revenueResult.status === "fulfilled") {
@@ -189,15 +179,6 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
       } else {
         failed.push("rentowność trenerów");
       }
-      if (sessionsResult.status === "fulfilled") {
-        const value = sessionsResult.value;
-        setSessions(value.items || []);
-        setSessionsTotalCount(value.totalCount ?? value.items?.length ?? 0);
-        setSessionsTotalPages(Math.max(1, value.totalPages || 1));
-      } else {
-        failed.push("sesje");
-      }
-
       setFailedSections(failed);
       if (failed.length === results.length) {
         showOwnerError(
@@ -209,15 +190,16 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
       setIsLoading(false);
       setIsRefreshing(false);
     },
-    [commonQuery, filters, sessionsPage],
+    [commonQuery, filters],
   );
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadData(), 250);
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); activeLoad.current?.abort(); };
   }, [loadData, paymentDateRevision]);
 
   useEffect(() => {
+    let active = true;
     const timer = window.setTimeout(() => {
       Promise.allSettled([
         getLocations(),
@@ -233,6 +215,7 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
           categoryResult,
           statusResult,
         ]) => {
+          if (!active) return;
           if (locationResult.status === "fulfilled") {
             setLocations(locationResult.value.filter((item) => item.isActive));
           }
@@ -255,7 +238,7 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
         },
       );
     }, 0);
-    return () => window.clearTimeout(timer);
+    return () => { active = false; window.clearTimeout(timer); };
   }, []);
 
   function updateFilter<K extends keyof StatisticsFiltersValue>(
@@ -264,7 +247,6 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
   ) {
     if (key === "locationId") setSelectedLocationValue(value);
     else setFilters((current) => ({ ...current, [key]: value }));
-    setSessionsPage(1);
   }
 
   const monthlyData = combineMonthlyData(revenue.byMonth, expenses.byMonth);
@@ -314,15 +296,12 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
         onChange={updateFilter}
         onDateRangeChange={(from, to) => {
           setFilters((current) => ({ ...current, from, to }));
-          setSessionsPage(1);
         }}
         onPayoutRangeChange={(payoutFrom, payoutTo) => {
           setFilters((current) => ({ ...current, payoutFrom, payoutTo }));
-          setSessionsPage(1);
         }}
         onClear={() => {
           setFilters(initialStatisticsFilters);
-          setSessionsPage(1);
         }}
       />
 
@@ -359,15 +338,6 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
         categories={categories}
       />
 
-      {/* Sekcja: Rentowność sesji */}
-      {/* <SessionsProfitability
-        sessions={sessions}
-        page={sessionsPage}
-        totalPages={sessionsTotalPages}
-        totalCount={sessionsTotalCount}
-        isLoading={isLoading}
-        onPageChange={setSessionsPage}
-      /> */}
     </div>
   );
 }

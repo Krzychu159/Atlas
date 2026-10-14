@@ -96,7 +96,7 @@ export type SessionPayload = GroupSessionSettings & {
   participants?: SessionParticipantPayload[] | null;
 };
 
-export function getOwnerSessions(params?: SessionFilterParams) {
+export function getOwnerSessions(params?: SessionFilterParams, signal?: AbortSignal) {
   return backendGet<OwnerSession[]>("sessions/filter", {
     TrainerId: params?.trainerId,
     ClientId: params?.clientId,
@@ -104,7 +104,7 @@ export function getOwnerSessions(params?: SessionFilterParams) {
     Status: params?.status,
     From: params?.from,
     To: params?.to,
-  });
+  }, signal);
 }
 
 export function createSession(payload: SessionPayload) {
@@ -146,8 +146,8 @@ export function deleteSessionSeries(recurringGroupId: string) {
   return backendDelete<unknown>(`sessions/series/${encodeURIComponent(recurringGroupId)}`);
 }
 
-export function getSession(id: number) {
-  return backendGet<OwnerSession>(`sessions/${id}`);
+export function getSession(id: number, signal?: AbortSignal) {
+  return backendGet<OwnerSession>(`sessions/${id}`, undefined, signal);
 }
 
 export function completeSession(id: number, payload: {
@@ -178,8 +178,8 @@ export function getClientSessions(clientId: number, signal?: AbortSignal) {
   return backendGet<OwnerSession[]>("Sessions/filter", { ClientId: clientId }, signal);
 }
 
-export function getTrainerSessions(trainerId: number) {
+export function getTrainerSessions(trainerId: number, signal?: AbortSignal) {
   return backendGet<OwnerSession[]>("Sessions/filter", {
     TrainerId: trainerId,
-  });
+  }, signal);
 }

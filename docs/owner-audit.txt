@@ -1,0 +1,330 @@
+ATLAS — audyt panelu Ownera, 14.10.2026
+
+FAZA A — USTALENIA PRZED ZMIANAMI
+Zakres: Dashboard, trenerzy i profile, klienci i profile, grafik, pakiety,
+płatności, wydatki, statystyki, rozliczenia, historia zmian, ustawienia;
+także wspólne mechanizmy sesji, BFF, komunikatów, dat i modali.
+Stan początkowy: main, git status --short bez zmian. Bez builda, commitów i push.
+Poniższe liczby są analizą wywołań w kodzie, a nie pomiarem produkcyjnym.
+Nie ma tutaj kodu backendu ani dowodu na działające lub niedziałające IDOR.
+
+TOP 10 (kolejność uwzględnia wydajność i wiarygodność danych)
+
+1. Płatności: duży zbiór i N+1 dla lokalizacji [wysoki]
+   app/(app)/owner/payments/page.tsx: loadPayments, buildBackendPaymentQuery.
+   pageSize: 1000, a ekran dzieli pobrane items po 8. totalCount backendu
+   nie steruje paginacją. Po przekroczeniu limitu lista może być niepełna.
+   Lokalizacja: odczyt wpłat, następnie cała lista klientów i U rozliczeń
+   dla U różnych klientów. 1 odczyt bez lokalizacji; 2+U z lokalizacją.
+   Naprawa: paginacja i filtrowanie lokalizacji na serwerze, wraz z wyszukiwaniem,
+   filtrem nadpłat i wartościami używanymi przez getPaymentBreakdown.
+   Korzyść: ograniczenie transferu, liczby odczytów i pełne wyniki.
+   Bez zmiany kontraktu nie przerabiać paginacji ani pobierać dalszych 1000.
+   Plik jest używany także przez panel trenera — pozostawiony bez zmian.
+
+2. Rozliczenia: N+1 oraz błędy zamieniane na kwotę 0 [wysoki]
+   app/lib/owner/settlements.ts: getOwnerTrainerSettlements, emptySettlement.
+   1 lista trenerów + T rozliczeń. Każde odrzucenie, także 403/5xx,
+   staje się rozliczeniem z zerami; przy lokalizacji taki trener znika.
+   Naprawa: zbiorcze podsumowanie z jawnie oznaczoną niedostępnością;
+   nie utożsamiać awarii z brakiem sesji. Korzyść: wiarygodność kwot i 1 odczyt.
+   Wymaga decyzji o prezentacji częściowych danych oraz kontraktu backendu.
+
+3. Wyścigi odczytów [wysoki, potwierdzony brak ochrony]
+   statistics/page.tsx: loadData; expenses/page.tsx: loadData;
+   schedule/page.tsx: loadSessions; clients/[id]/page.tsx: loadClientDetails;
+   trainers/[id]/page.tsx: loadTrainer; payments/page.tsx: loadPayments.
+   Debounce usuwa timer, ale nie trwające pobieranie. Wolniejsza stara odpowiedź
+   może zastąpić dane nowego filtra, a jej finally zakończyć nowy loading.
+   Naprawa: AbortSignal i ochrona publikowania wyniku również po unmount.
+   Korzyść: poprawne wyniki przy szybkim przełączaniu i wolnej sieci.
+   Małe etapy na froncie; nie dotykać mutacji przy okazji.
+
+4. Statystyki pobierają dane niewidocznej sekcji [średni]
+   statistics/page.tsx: getTrainerCostSessions w loadData, zakomentowany
+   SessionsProfitability na końcu JSX. Dane sesji nie są używane poza tą sekcją.
+   4 odczyty raportów mimo wyświetlania tylko 3. Stan sesji i paginacji jest martwy.
+   Naprawa: usunąć odczyt i stan niewidocznej sekcji; nie włączać sekcji.
+   Korzyść: o 1 odczyt raportu mniej na pobranie oraz brak oczekiwania na niego.
+   Pierwotna hipoteza o paginacji została doprecyzowana: obecnie użytkownik
+   nie może zmieniać strony sesji, ponieważ cała sekcja jest wyłączona.
+
+5. Wydatki ponawiają odczyty po pobraniu lokalizacji [średni]
+   expenses/page.tsx: loadData zależy od locations; efekt słowników setLocations.
+   Jeśli słowniki kończą się po starcie loadData, zmiana callbacku uruchamia
+   następną parę odczytów. Paginacja też pobiera niezmienione podsumowanie.
+   Naprawa: niezależne scalanie działalności z lokalizacji (już obecne w efekcie)
+   i z listy/podsumowania; usunąć locations z zależności pobierania.
+   Korzyść: brak ponowienia dwóch odczytów tylko przez słownik lokalizacji.
+   Rozdzielenie podsumowania i listy podczas paginacji — kolejny etap.
+
+6. Profil klienta: wspólne oczekiwanie i szeroka invalidacja [średni]
+   clients/[id]/page.tsx: loadClientDetails, refreshCooperationData,
+   useSessionCorrectionRevision. 8 niezależnych odczytów razem; główny profil
+   czeka na najwolniejszy. Korekta dowolnej sesji odświeża cały profil.
+   ClientAuditSection i ClientPeriodPackagesSection dokładają własne odczyty.
+   Naprawa: stan per sekcja, selektywne odświeżanie dla danego klienta,
+   paginacja historii sesji. Korzyść: szybsze pierwsze dane i mniej odczytów.
+   Zakres wymaga osobnego etapu/testów, paginacja wymaga backendu.
+
+7. Pełne listy i podwójne drzewo klientów [średni]
+   clients/page.tsx: getClients, filteredClients.map w obu wariantach;
+   trainers/page.tsx: getTrainers; trainers/[id]/page.tsx: getTrainerSessions.
+   CSS hidden nie wyłącza renderowania React; obie listy klientów istnieją.
+   Sortowanie/filtrowanie pełnego zbioru przy każdym wpisaniu tekstu.
+   Naprawa: paginacja i opcje wyszukiwania na serwerze; wspólne responsywne
+   wiersze zamiast dwóch drzew po zaakceptowaniu rozwiązania UX.
+   Korzyść: mniej transferu i DOM. Czas renderów wymaga profilowania.
+
+8. Szczegóły pakietu: waterfall i pozornie pusta lista [średni]
+   packages/[id]/page.tsx: loadData. getPackage -> getPackageClients,
+   mimo znanego packageId. Błąd klientów staje się pustą listą, brak cleanup.
+   Naprawa: oba odczyty równolegle, osobny komunikat i ponowienie klientów,
+   anulowanie przy zmianie id; nie pokazywać danych poprzedniego pakietu.
+   Korzyść: długość oczekiwania max(P,C) zamiast P+C, bez gwarancji ms.
+
+9. Mutacje finansowe: niepewny wynik i podwójne wywołanie [wysoki]
+   payments/page.tsx: handleConfirm, handleRejectPayment, handleIssueReceipt,
+   handleCancelReceipt; clients/[id]/page.tsx: handleConfirmRefund;
+   trainers/[id]/settlements/page.tsx: mark/reopen.
+   processingId/isConfirming... są stanem UI, a nie gwarancją idempotencji.
+   Po utracie odpowiedzi nie można wiedzieć, czy zapis doszedł do skutku.
+   Naprawa: idempotencja i atomowe przejścia na serwerze, konflikty wersji;
+   klient powinien zweryfikować wynik przed kolejną świadomą próbą.
+   Korzyść: brak podwójnych księgowań. Nie dodawać automatycznych retry zapisu.
+   ImportClientPackageModal już zachowuje identyfikator próby — dobry wzorzec.
+
+10. Odporność UI, dostępność i daty [średni]
+   app/lib/owner/location-filter.ts: readStoredLocationValue i zapis;
+   clients/page.tsx: pływający przycisk Plus, etykieta Balance;
+   app/components/ui/modal.tsx: ModalOverlay nie zapewnia semantyki dialogu,
+   focus trap, Escape ani przywrócenia focus; część modali dodaje własne.
+   app/lib/formatters/date.ts: Intl bez timeZone; schedule/date-utils.ts
+   oraz settlements/page.tsx: daty zależą od strefy urządzenia.
+   Naprawa: obsłużyć brak storage, nadać nazwę przycisku i polską etykietę.
+   Dialogi i daty poprawiać osobno z testami DST i przeglądem wszystkich użyć.
+   Korzyść: ekran nie przerywa działania i przycisk jest rozpoznawalny.
+   Nie zmieniać globalnie strefy czasu dat reprezentujących dzień kalendarzowy.
+
+PRZEGLĄD WIDOKÓW I DOBRE ISTNIEJĄCE ROZWIĄZANIA
+Dashboard: 4 niezależne zasoby, sygnały anulowania, retry i skeletony per sekcja.
+Nie pobiera pełnych list do obliczania agregatów; zakres wszystkie lokalizacje
+jest jawny. Nie proponuję cache ani memo bez wykazanego problemu.
+Trenerzy: pełna lista; profil 4 odczyty równolegle, błędy sekcji stają się [];
+Inactive pasuje do includes("active") w liczniku aktywnych — kontrakt statusów
+trzeba ustalić przed zmianą licznika. Modale zapisu danych i stawek mogą
+zapisać tylko pierwszą część — wymagają oddzielnych testów częściowego zapisu.
+Klienci: wyszukiwanie lokalne (nie wysyła requestów), duplikacja renderowania;
+profil ma flagi dostępności części danych, ale nie wszystkich.
+Grafik: zakres dat/trener/lokalizacja/status są przekazywane serwerowi.
+Po statusie Outlook równolegle ruszają sesje i zasoby. Utrzymuję ten warunek
+biznesowy. GroupEnrollmentsSection: lista -> szczegóły nie-Booked -> billing
+każdego unikalnego klienta; wymaga zbiorczej odpowiedzi, bez dalszych obejść.
+Pakiety: lista i lokalizacje równolegle; edycja obsługuje konflikty.
+Płatności: potwierdzenia i powody istnieją, ale skala listy wymaga backendu.
+Wydatki: prawdziwa paginacja, debounce 300 ms, podsumowanie serwerowe.
+Statystyki: agregaty serwerowe, niezależne błędy części; niewidoczne sesje zbędne.
+Rozliczenia: wymagają agregacji i jawnego błędu zamiast zgadywanego zera.
+Historia zmian: paginacja, debounce 250 ms, AbortSignal, walidacja i retry.
+activity-log/page.tsx dodatkowo czyta cookie role; główne wejście weryfikuje
+sesję w proxy/layout. Cookie nie zastępuje zweryfikowanej autoryzacji.
+Ustawienia: visitedTabs zachowuje formularze i nie montuje nieodwiedzonych
+sekcji; statyczne importy nadal obejmują kod wszystkich sekcji. Lazy loading
+możliwy, ale zysk w bajtach wymaga analizy bundla; nie zmieniam na ślepo.
+Obrazy: zwykłe img bez lazy w kilku listach; brak danych o ich rozmiarach.
+Nawigacja: Link/router, brak dowodu na pełne przeładowanie przy normalnej
+nawigacji. window.history służy do parametrów miesiąca, nie przeładowuje strony.
+Typowanie: brak użycia typu any w przejrzanych plikach Ownera; "step=any"
+jest atrybutem formularza. Nie proponuję szerokiej abstrakcji.
+
+BEZPIECZEŃSTWO — WAGA I GRANICE AUDYTU
+Potwierdzone zabezpieczenia: proxy.ts verifyBackendSession + kontrola roli,
+nadpisywanie nagłówka zweryfikowanego użytkownika; layout ponownie sprawdza
+zakres roli. BFF używa tokena z HttpOnly cookie; produkcyjne Secure,
+SameSite=Lax; mutacje sprawdzają Origin i Sec-Fetch-Site; no-store, blokada
+przekierowań upstream, walidacja segmentów ścieżki, timeout, nosniff i sandbox.
+backend.ts ma deduplikację tylko trwających GET, osobne subskrypcje i czyszczenie
+przy zmianie sesji. Brak globalnego cache gotowych danych biznesowych.
+localStorage filtra zawiera identyfikator lokalizacji, a nie token lub profil.
+Nie wykryto dangerouslySetInnerHTML ani logowania danych Ownera w tym zakresie.
+Linki planów i OAuth mają istniejącą walidację safe-url.
+401 przekierowuje do logowania, 403 daje polski błąd. owner-toast tłumaczy
+błędy przez user-messages. 400/404/409/5xx zależą od sekcji; część błędów jest
+maskowana pustym wynikiem, a rozliczenia maskują je zerem (problem 2).
+
+Wysokie, do weryfikacji na backendzie: BFF jest proxy z tokenem, nie sprawdza
+roli Ownera dla każdej ścieżki. Serwer MUSI egzekwować rolę, organizację i
+dozwolone lokalizacje przy odczycie, zapisie, plikach, eksporcie, agregatach.
+Przykłady: Clients/{id}, billing/payments/{id}, Trainers/{id}/settlement,
+Packages/{id}/clients, grupowe zapisy i potwierdzanie zwrotów.
+Nie jest to potwierdzona luka IDOR: kod serwera nie jest dostępny.
+Filtr matchesOwnerLocationId jest wyborem widoku, nigdy autoryzacją.
+Wysokie: idempotencja, walidacja kwoty/waluty/udziału w pakiecie i atomowość
+operacji finansowych — nie da się potwierdzić z kodu klienta.
+Średnie: kontrola konfliktów ETag/version przy zmianach danych, jednolita
+polityka niepewnego wyniku; częściowe zapisy trenera i pozostałe modale.
+Średnie: URL avatarów mogą kierować do zewnętrznych hostów; sprawdzić dozwolone
+źródła i politykę prywatności, nie oznacza to dowodu wykonania skryptu.
+Nie znaleziono podstaw do przebudowy autoryzacji ani osłabienia BFF.
+
+KONKRETNE WYMAGANIA DLA BACKENDU (PROPOZYCJE, NIE WDROŻONE KONTRAKTY)
+A. GET /api/billing/payments: page, pageSize (limit <=100), locationId,
+   search, clientId, status, source, from, to, amountMin, amountMax,
+   overpayment; sort i order. Filtry przed paginacją, stabilny tie-breaker id.
+   Odpowiedź: {items:[ClientPayment z wyjaśnieniem rozliczenia i lokalizacją],
+   page,pageSize,totalCount,totalPages}. Zwrócone kwoty i nadpłaty oblicza serwer.
+B. GET /api/owner/trainer-settlements: year, month, locationId, search,
+   page,pageSize. Odpowiedź {items:[{trainerId,trainerFullName,totalHours,
+   totalSessions,totalAmount,isPaid,paidAt}],page,pageSize,totalCount,
+   totalPages,summary:{totalAmount,paidAmount,unpaidAmount},asOf,timeZone}.
+   Bez całej listy items poszczególnych sesji na ekranie podsumowań.
+   Błąd nie jest kwotą 0; ewentualne częściowe wyniki mają jawny stan dostępności.
+C. GET /api/Clients: search,trainerId,locationId,isArchived,packageStatus,
+   sort,order,page,pageSize -> {items,page,pageSize,totalCount,totalPages,
+   summary:{activeClientsCount}}. Listy opcji: GET /api/owner/filter-options
+   z locationId, search, limit dla klientów/trenerów; minimalne id i nazwa.
+D. GET /api/Sessions/filter: istniejące ClientId,TrainerId,LocationId,From,To,
+   Status + page,pageSize dla historii. Odpowiedź paginowana. Grafik ma
+   jednoznaczny ograniczony zakres, bez frontendowego pobierania wszystkich stron.
+E. GET /api/group-enrollments/sessions/{id}: page,pageSize -> istniejące
+   dane plus stan rozliczenia, aktualny stan zapisu i dozwolone akcje;
+   eliminate dodatkowe GET szczegółu/billing dla każdego uczestnika.
+   Package-options powinno zawierać komplet wymaganych pól oferty,
+   bez pobierania całego katalogu i jego brakujących szczegółów.
+F. Finansowe POST: nagłówek Idempotency-Key, trwałe powiązanie organizacja/
+   użytkownik/rodzaj operacji, hash payloadu, zwrot tej samej odpowiedzi dla
+   tej samej próby; 409 przy innym payloadzie pod tym samym kluczem;
+   GET /api/owner/operations/{key} -> {state,result,updatedAt} dla niepewnego
+   wyniku. Atomowe przejścia, audyt i kontrola wersji na serwerze.
+Każda propozycja wymaga uzgodnienia nazw z istniejącym serwerem i testów
+kontraktowych. Wszystkie sumy, uprawnienia i lokalizacje wylicza/weryfikuje serwer.
+
+DECYZJE UX/UI — BEZ SAMODZIELNEGO REDESIGNU
+1. Jak pokazywać częściowo niedostępne rozliczenia i które akcje blokować.
+2. Czy profil klienta otwiera dane per sekcja/zakładka; co jest kluczowe od razu.
+3. Jeden responsywny wiersz klienta i docelowa liczba kolumn/filtrów.
+4. Los sekcji rentowności sesji: obecnie wyłączona; przywrócenie wymaga decyzji.
+5. Ostrzeganie o utracie formularza przy zmianie lokalizacji (key remount),
+   nawigacji i zamknięciu modala, także częściowo zapisane zmiany trenera.
+6. Ujednolicenie dialogów z focus trap/Escape, bez zmiany potwierdzeń finansowych.
+7. Licznik aktywnych trenerów: uzgodnić zamknięty zestaw statusów.
+8. OperatingProfit w statistics/page.tsx używa || i przy 0 liczy fallback;
+   uzgodnić kontrakt dostępności wartości, nie zmieniać znaczenia kwot w audycie.
+
+PLAN MAŁYCH ETAPÓW
+I. Front: równoległe odczyty pakietu, ich anulowanie i jawne błędy/retry;
+   anulowanie raportów i wydatków; usunięcie niewidocznego odczytu sesji;
+   usunięcie zależności od lokalizacji jako słownika; odporność storage i a11y.
+II. Front: wyścigi w grafiku i profilach, selektywne odświeżenia, osobne błędy
+   i retry w sekcjach, testy mutacji i częściowych zapisów (osobne małe zmiany).
+III. Backend: płatności i rozliczenia; testy IDOR i idempotencji finansowej.
+IV. Backend + front: paginacja klientów/historii, opcje filtrów, zapisy grupowe.
+V. Po decyzjach UX: responsive lista, spójne dialogi i ochrona formularzy.
+Profilowanie: nagrać zimne/ciepłe wejście, zmianę lokalizacji i filtrów,
+otwarcie profilu, zapis, powrót do listy; Network i React Profiler dla
+10/100/1000 klientów oraz 5/50 trenerów. Porównać p50/p95 i transfer.
+Nie przypisywać obecnie żadnych zysków w ms lub liczbie renderów.
+
+FAZA B — WYKONANE POPRAWKI I RAPORT KOŃCOWY
+
+1. Faktycznie poprawione
+   - statistics/page.tsx: usunięty odczyt rentowności niewidocznych sesji,
+     nieużywane stany i zakomentowane wywołanie komponentu. Sekcja nadal
+     nie jest wyświetlana; komponent pozostaje w repo na przyszłą decyzję.
+     Trzy raporty pobierane równolegle z AbortSignal; stara odpowiedź,
+     błąd i zakończenie loadingu nie zmieniają nowego widoku.
+   - expenses/page.tsx: anulowanie poprzedniego odczytu listy/podsumowania
+     przy filtrach, ponowieniu i opuszczeniu widoku; ochrona wyników i finally.
+     Pobranie słowników nie aktualizuje stanu po unmount. Słownik lokalizacji
+     nie uruchamia ponownie pobierania. Ref przechowuje ostatnie lokalizacje
+     dla istniejącej kolejności scalania nazw działalności — bez zmiany nazw.
+   - packages/[id]/page.tsx: oba odczyty ruszają równolegle; anulowanie przy
+     zmianie id/unmount i ignorowanie późnych wyników. Nieprawidłowe id
+     (zero, ujemne, ułamkowe, poza bezpiecznym zakresem) nie wysyła odczytu.
+     Jawne błędy i ponowienie zamiast pustego ekranu/pustej listy po błędzie.
+     Ponowienie klientów pobiera tylko klientów, zachowuje tożsamość item
+     i zamontowany formularz edycji; nie usuwa wpisanych zmian.
+   - PackageDetailsHero: brak danych klientów pokazuje — zamiast liczby 0,
+     zerowej szacowanej wartości i zerowego wykorzystania.
+   - location-filter.ts: brak dostępu do localStorage nie przerywa ekranu;
+     wybrany filtr działa w bieżącej karcie i emituje istniejące zdarzenie.
+   - clients/page.tsx: mobilny Plus ma nazwę „Dodaj klienta” i type=button;
+     „Balance” zastąpione „Saldo”. Bez zmiany layoutu i motywu BSworkout.
+   - Adaptery expenses/analytics/packages: opcjonalny AbortSignal, te same
+     URL, parametry i typy odpowiedzi. Żadnego nowego cache, memo lub biblioteki.
+
+2. Co wymaga backendu
+   Paginacja/filtrowanie płatności i klientów, zbiorcze rozliczenia,
+   paginowana historia sesji i komplet danych zapisów grupowych;
+   idempotencja, kontrola organizacji/lokalizacji/roli i wersji finansowych.
+   Dokładne propozycje parametrów i odpowiedzi: sekcja A–F powyżej.
+
+3. Co wymaga decyzji UX/UI
+   Lista decyzji powyżej pozostaje aktualna. Nie zmieniono struktury ekranów,
+   ważnych procesów, mechanizmu autoryzacji ani znaczenia kwot.
+   Dodatkowe potwierdzone obliczenie do uzgodnienia:
+   packages/[id]/components/PackageDetailsHero.tsx: estimatedRevenue =
+   clients.length * item.price. To szacunek wartości oferty, NIE przychód;
+   nie uwzględnia rabatów, zwrotów, zmian cen i liczby zakupów. Jeśli biznes
+   oczekuje faktycznej wartości, potrzebny agregat serwera oraz zmiana etykiety.
+
+4. Co nadal spowalnia
+   Płatności 1000 + N+1, rozliczenia 1+T, pełne listy i oba drzewa klientów,
+   szerokie odczyty profili, zapisy grupowe z dodatkowymi odczytami,
+   ponowne pobieranie podsumowania wydatków przy samej paginacji.
+   Pozostają wyścigi w grafiku, profilach i płatnościach (problem 3).
+   Rozmiary bundla/obrazów i koszt renderów nie zostały zmierzone.
+
+5. Pozostałe ryzyka bezpieczeństwa i wiarygodności
+   Niepotwierdzone serwerowe kontrole IDOR/organizacji i idempotencji;
+   pozornie zerowe rozliczenia przy awarii; niepewne wyniki mutacji;
+   lokalne strefy dat, częściowe zapisy i utrata formularza przy remount.
+   Główne zabezpieczenia sesji/BFF pozostały bez zmian.
+   Nie stwierdzam luki krytycznej bez dowodu po stronie serwera.
+
+6. Weryfikacja i pomiary
+   - tests/owner-audit.test.mjs: 9 nowych testów, 9 przechodzi.
+     Obejmują faktyczne wykonanie adapterów i funkcji komponentów w VM,
+     cleanup efektów, opóźnione odpowiedzi ignorujące AbortSignal,
+     starsze filtry, unmount, retry, nieprawidłowe id, brak storage
+     i statyczny render braku danych w hero. Nie są testami przeglądarkowymi.
+   - Zestaw owner-audit + owner-dashboard + super-admin-auth: 51/51 przechodzi.
+     Ostatni plik uruchomiono dla wspólnej sesji/BFF, bez edycji SuperAdmina.
+   - Szerszy istniejący zestaw (owner-public-packages, owner-public-sessions,
+     public-group-classes, notifications): 26 pozycji, 6 przechodzi,
+     19 błędów, 1 skip. Te same 19 błędów potwierdzone na źródłach HEAD.
+     Do porównania readFileSync podstawiał w pamięci oryginały z git show;
+     katalog roboczy nigdy nie został zresetowany. Tymczasowy loader usunięty.
+     Przyczyny: brak require dla importowanego period-packages/user-messages,
+     brak isGroupTraining w atrapach sesji, brak AbortController/usePathname
+     w atrapach powiadomień. Pozostawione poza zakresem tych poprawek.
+   - TypeScript: npx tsc --noEmit --incremental false — PASS.
+   - ESLint zmienionych źródeł i nowego pliku testów — PASS, bez ostrzeżeń.
+   - git diff --check — PASS (Git informuje o przyszłej konwersji LF/CRLF).
+   - Liczba odczytów potwierdzona testami kontrolowanego wykonania:
+     statystyki 4 -> 3 raporty (ze słownikami 9 -> 8);
+     późny słownik lokalizacji w wydatkach: nadal 2 odczyty danych,
+     zamiast potencjalnej dodatkowej pary. Nie gwarantuję redukcji w każdym
+     wejściu: wcześniejszy debounce lub deduplikacja mogły już unikać części.
+     Pakiet: nadal 2 odczyty, teraz równoległe; retry klientów: tylko 1.
+   - Brak pomiarów czasu, transferu i liczby renderów w żywej aplikacji.
+   - Responsywność: przegląd klas/layoutu; błędy pakietu mają flex-col
+     na telefonie oraz sm:flex-row, min-w-0 i zawijanie komunikatów.
+     Kontrola wizualna 360/768/1440 oraz dotyku/focus pozostaje niewykonana:
+     inwentarz przeglądarki nie zawierał sesji ATLAS, nie znaleziono
+     działającego serwera na 3000/3001. Nie uruchamiano pełnego builda.
+
+7. Kolejne etapy
+   Najpierw backend płatności/rozliczeń i testy uprawnień oraz idempotencji.
+   Równolegle osobny etap frontu dla wyścigów w grafiku/profilach i jawnych
+   błędów rozliczeń, po decyzji prezentacji częściowych danych.
+   Potem testowa sesja Ownera: wolna sieć, granice lokalizacji i Warszawa/DST,
+   puste dane, 400/401/403/404/409/5xx, responsywność, fokus i profiler.
+   Naprawa istniejących atrap testowych jako oddzielna, uzgodniona grupa.
+
+Wpływ poza Ownerem: location-filter jest używany także przez wspólny header
+i ponownie używaną stronę płatności trenera; poprawka tylko toleruje brak
+storage, bez zmiany wartości filtra lub autoryzacji. Opcjonalne argumenty
+adapterów zachowują dotychczasowe zachowanie innych wywołań.
+Nie edytowano plików paneli Trenera, Klienta ani SuperAdmina.
+Praca pozostaje lokalnie na main, bez commitów/push/merge i bez pełnego builda.

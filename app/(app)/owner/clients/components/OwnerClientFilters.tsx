@@ -1,0 +1,95 @@
+"use client";
+
+import { useState } from "react";
+import { CustomSelect } from "@/app/components/ui/custom-select";
+import { FilterSearchField, FilterToolbar } from "@/app/components/ui/list/FilterToolbar";
+import type { ClientPackageFilter, ClientSort } from "./ClientFilters";
+
+export type OwnerClientFiltersValue = {
+  search: string;
+  packageFilter: ClientPackageFilter;
+  trainerFilter: string;
+  sort: ClientSort;
+};
+
+export const defaultOwnerClientFilters: OwnerClientFiltersValue = {
+  search: "",
+  packageFilter: "all",
+  trainerFilter: "all",
+  sort: "package-usage",
+};
+
+type OwnerClientFiltersProps = {
+  value: OwnerClientFiltersValue;
+  trainerOptions: string[];
+  onChange: (value: OwnerClientFiltersValue) => void;
+};
+
+export default function OwnerClientFilters({ value, trainerOptions, onChange }: OwnerClientFiltersProps) {
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const update = <Key extends keyof OwnerClientFiltersValue>(
+    key: Key,
+    nextValue: OwnerClientFiltersValue[Key],
+  ) => onChange({ ...value, [key]: nextValue });
+
+  return (
+    <FilterToolbar
+      gridClassName="md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_220px_240px_auto_auto]"
+      advancedId="client-advanced-filters"
+      advancedOpen={advancedOpen}
+      advancedActiveCount={value.trainerFilter !== defaultOwnerClientFilters.trainerFilter ? 1 : 0}
+      onAdvancedOpenChange={setAdvancedOpen}
+      advanced={
+        <CustomSelect
+          label="Trener"
+          value={value.trainerFilter}
+          onChange={(nextValue) => update("trainerFilter", nextValue)}
+          options={[
+            { value: "all", label: "Wszyscy trenerzy" },
+            ...trainerOptions.map((trainer) => ({ value: trainer, label: trainer })),
+          ]}
+        />
+      }
+      canClear={
+        value.search !== defaultOwnerClientFilters.search ||
+        value.packageFilter !== defaultOwnerClientFilters.packageFilter ||
+        value.trainerFilter !== defaultOwnerClientFilters.trainerFilter ||
+        value.sort !== defaultOwnerClientFilters.sort
+      }
+      onClear={() => onChange(defaultOwnerClientFilters)}
+    >
+      <FilterSearchField
+        value={value.search}
+        onChange={(nextValue) => update("search", nextValue)}
+        placeholder="Imię, nazwisko, e-mail lub telefon"
+      />
+      <CustomSelect
+        label="Pakiet"
+        value={value.packageFilter}
+        onChange={(nextValue) => update("packageFilter", nextValue as ClientPackageFilter)}
+        options={packageOptions}
+      />
+      <CustomSelect
+        label="Sortuj"
+        value={value.sort}
+        onChange={(nextValue) => update("sort", nextValue as ClientSort)}
+        options={sortOptions}
+      />
+    </FilterToolbar>
+  );
+}
+
+const packageOptions = [
+  { value: "all", label: "Wszyscy" },
+  { value: "active-package", label: "Aktywny pakiet" },
+  { value: "inactive-package", label: "Bez aktywnego" },
+];
+
+const sortOptions = [
+  { value: "package-usage", label: "Wykorzystanie pakietu" },
+  { value: "newest", label: "Najnowsi" },
+  { value: "name", label: "Alfabetycznie" },
+  { value: "trainer", label: "Po trenerze" },
+  { value: "balance-desc", label: "Saldo malejąco" },
+  { value: "balance-asc", label: "Saldo rosnąco" },
+];

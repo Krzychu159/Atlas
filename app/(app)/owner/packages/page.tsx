@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { PackageOpen, Plus, SearchX } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
+import { ListSection } from "@/app/components/ui/list/ListSection";
+import { ListState } from "@/app/components/ui/list/ListState";
 import {
   createPackage,
   deletePackage,
@@ -16,34 +18,29 @@ import {
   matchesOwnerLocationId,
   useOwnerLocationFilter,
 } from "@/app/lib/owner/location-filter";
-import { filterPackages, type PackageModeFilter } from "@/app/lib/packageFilters";
+import { filterPackages } from "@/app/lib/packageFilters";
 import { ApiError } from "@/app/lib/backend";
 import { periodPackageError } from "@/app/lib/period-packages";
-import PackageCard from "@/app/components/packages/PackageCard";
-import PackageFilters, {
-  type DurationFilter,
-  type PackageSort,
-  type ParticipantsFilter,
-  type SessionsFilter,
-} from "@/app/components/packages/PackageFilters";
 import AddPackageModal from "./components/AddPackageModal";
+import PackageList from "./components/PackageList";
+import PackageListFilters, {
+  defaultPackageListFilters,
+  type PackageListFiltersValue,
+} from "./components/PackageListFilters";
+import { pluralizePackages } from "./package-list-display";
 import { showOwnerError, showOwnerSuccess } from "../components/owner-toast";
 
 export default function PackagesPage() {
   const { selectedLocationId } = useOwnerLocationFilter();
   const [packages, setPackages] = useState<Package[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [search, setSearch] = useState("");
-  const [billingModeFilter, setBillingModeFilter] = useState<PackageModeFilter>("all");
-  const [participantsFilter, setParticipantsFilter] =
-    useState<ParticipantsFilter>("all");
-  const [sessionsFilter, setSessionsFilter] = useState<SessionsFilter>("all");
-  const [durationFilter, setDurationFilter] = useState<DurationFilter>("all");
-  const [sort, setSort] = useState<PackageSort>("newest");
+  const [filters, setFilters] = useState<PackageListFiltersValue>(defaultPackageListFilters);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [packageToDelete, setPackageToDelete] = useState<Package | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function loadPackages() {
     try {
@@ -58,12 +55,14 @@ export default function PackagesPage() {
       }
 
       setPackages(packagesResult.value);
+      setLoadFailed(false);
       setLocations(
         locationsResult.status === "fulfilled"
           ? locationsResult.value.filter((location) => location.isActive)
           : [],
       );
     } catch (err) {
+      setLoadFailed(true);
       showOwnerError(err, "Błąd ładowania pakietów", {
         id: "owner-packages-load-error",
       });
@@ -85,10 +84,8 @@ export default function PackagesPage() {
   );
 
   const filteredPackages = useMemo(
-    () => filterPackages(locationPackages, {
-      search, participantsFilter, sessionsFilter, durationFilter, sort, billingModeFilter,
-    }),
-    [locationPackages, search, participantsFilter, sessionsFilter, durationFilter, sort, billingModeFilter],
+    () => filterPackages(locationPackages, filters),
+    [locationPackages, filters],
   );
 
   const handleCreatePackage = async (payload: CreatePackagePayload) => {
@@ -119,7 +116,10 @@ export default function PackagesPage() {
   };
 
   async function handleDeletePackage(id: number) {
+    if (isDeleting) return;
+
     try {
+      setIsDeleting(true);
       await deletePackage(id);
 
       setPackages((current) => current.filter((item) => item.id !== id));
@@ -132,175 +132,100 @@ export default function PackagesPage() {
       showOwnerError(err, "Nie udało się usunąć pakietu.", {
         id: "owner-package-delete-error",
       });
+    } finally {
+      setIsDeleting(false);
     }
+  }
+
+  function renderList() {
+    if (isLoading && packages.length === 0) {
+      return <ListState variant="loading" label="Ładowanie pakietów..." />;
+    }
+
+    if (loadFailed && packages.length === 0) {
+      return (
+        <ListState
+          variant="error"
+          icon={<PackageOpen size={28} />}
+          title="Nie udało się wczytać pakietów"
+          message="Sprawdź połączenie i spróbuj ponownie."
+          action={
+            <Button variant="secondary" size="sm" onClick={() => void loadPackages()} disabled={isLoading}>
+              Spróbuj ponownie
+            </Button>
+          }
+        />
+      );
+    }
+
+    if (locationPackages.length === 0) {
+      return (
+        <ListState
+          variant="empty"
+          icon={<PackageOpen size={28} />}
+          title="Nie masz jeszcze pakietów"
+          message="Dodaj pakiet treningowy lub usługę okresową, aby klienci mogli z nich korzystać."
+          action={
+            <Button size="sm" icon={<Plus size={15} />} onClick={() => setIsModalOpen(true)}>
+              Dodaj nowy pakiet
+            </Button>
+          }
+        />
+      );
+    }
+
+    if (filteredPackages.length === 0) {
+      return (
+        <ListState
+          variant="empty"
+          icon={<SearchX size={28} />}
+          title="Brak pakietów spełniających wybrane kryteria"
+          message="Zmień lub wyczyść filtry, aby zobaczyć więcej wyników."
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setFilters(defaultPackageListFilters)}>
+              Wyczyść filtry
+            </Button>
+          }
+        />
+      );
+    }
+
+    return <PackageList packages={filteredPackages} onDeleteRequest={setPackageToDelete} />;
   }
 
   return (
     <>
-      <div className="max-w-[1400px] mx-auto">
-        <div className="hidden md:block">
-          <div className="flex flex-col gap-5">
-            <div className="flex items-start justify-between gap-4">
-              <div className="max-w-[560px]">
-                <p className="text-label text-primary-light">
-                  Zarządzanie pakietami
-                </p>
-                <h1 className="mt-2 text-[2.25rem] leading-[0.95] font-semibold font-display tracking-tight">
-                  Pakiety <span className="text-primary-light">i usługi</span>
-                </h1>
-                <p className="mt-3 text-base text-on-surface-variant">
-                  Zarządzaj pakietami treningowymi i usługami okresowymi studia.
-                </p>
-              </div>
-
-              <Button
-                variant="primary"
-                icon={<Plus size={16} />}
-                className="h-14"
-                onClick={() => setIsModalOpen(true)}
-              >
-                Dodaj nowy pakiet
-              </Button>
-            </div>
-
-            <PackageFilters billingModeFilter={billingModeFilter} onBillingModeFilterChange={value => { setBillingModeFilter(value); if (value === "PeriodBased") { setParticipantsFilter("all"); setSessionsFilter("all"); } }}
-              search={search}
-              participantsFilter={participantsFilter}
-              sessionsFilter={sessionsFilter}
-              durationFilter={durationFilter}
-              sort={sort}
-              onSearchChange={setSearch}
-              onParticipantsFilterChange={setParticipantsFilter}
-              onSessionsFilterChange={setSessionsFilter}
-              onDurationFilterChange={setDurationFilter}
-              onSortChange={setSort}
-            />
-
-            <div className="flex items-center justify-between">
-              <p className="text-section-title">Lista Pakietów</p>
-              <p className="text-label text-on-surface-variant">
-                Wyświetlono {filteredPackages.length} pakietów
-              </p>
-            </div>
-
-            {isLoading ? (
-              <div className="card-shell p-5 text-on-surface-variant">
-                Ładowanie pakietów...
-              </div>
-            ) : filteredPackages.length > 0 ? (
-              <div className="grid grid-cols-2 gap-4 xl:grid-cols-3 2xl:grid-cols-4">
-                {filteredPackages.map((item) => (
-                  <PackageCard
-                    key={item.id}
-                    item={item}
-                    onDeleteRequest={setPackageToDelete}
-                  />
-                ))}
-
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="min-h-[260px] rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:border-primary/40 transition-colors flex flex-col items-center justify-center text-center p-6"
-                >
-                  <span className="h-16 w-16 rounded-full bg-surface-container flex items-center justify-center">
-                    <Plus size={28} />
-                  </span>
-                  <span className="mt-6 text-base font-semibold">
-                    Utwórz nową ofertę
-                  </span>
-                  <span className="mt-2 text-sm leading-6 max-w-[220px]">
-                    Dodaj pakiet treningowy lub usługę okresową.
-                  </span>
-                </button>
-              </div>
-            ) : (
-              <div className="card-shell p-8 text-center text-on-surface-variant">
-                Brak pakietów spełniających wybrane kryteria.
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="md:hidden px-1 pb-6">
-          <div className="flex flex-col gap-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-page-title">Pakiety</p>
-                <p className="mt-3 text-label text-primary-light">
-                  Zarządzaj ofertą studia
-                </p>
-              </div>
-
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="h-14 w-14 rounded-[var(--radius-lg)] bg-primary text-on-primary flex items-center justify-center shadow-soft"
-              >
-                <Plus size={24} />
-              </button>
-            </div>
-
-            <PackageFilters billingModeFilter={billingModeFilter} onBillingModeFilterChange={value => { setBillingModeFilter(value); if (value === "PeriodBased") { setParticipantsFilter("all"); setSessionsFilter("all"); } }}
-              search={search}
-              participantsFilter={participantsFilter}
-              sessionsFilter={sessionsFilter}
-              durationFilter={durationFilter}
-              sort={sort}
-              onSearchChange={setSearch}
-              onParticipantsFilterChange={setParticipantsFilter}
-              onSessionsFilterChange={setSessionsFilter}
-              onDurationFilterChange={setDurationFilter}
-              onSortChange={setSort}
-            />
-
-            <div className="flex items-center justify-between">
-              <p className="text-section-title">Lista Pakietów</p>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="text-label text-primary-light"
-              >
-                Dodaj nowy pakiet
-              </button>
-            </div>
-
-            <p className="text-label text-on-surface-variant">
-              Wyświetlono {filteredPackages.length} pakietów
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-[560px]">
+            <p className="text-label text-primary-light">Zarządzanie pakietami</p>
+            <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
+              Pakiety <span className="text-primary-light">i usługi</span>
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+              Zarządzaj pakietami treningowymi i usługami okresowymi studia.
             </p>
-
-            <div className="flex flex-col gap-4">
-              {isLoading ? (
-                <div className="card-shell p-5 text-on-surface-variant">
-                  Ładowanie pakietów...
-                </div>
-              ) : filteredPackages.length > 0 ? (
-                filteredPackages.map((item) => (
-                  <PackageCard
-                    key={item.id}
-                    item={item}
-                    onDeleteRequest={setPackageToDelete}
-                  />
-                ))
-              ) : (
-                <div className="card-shell p-8 text-center text-on-surface-variant">
-                  Brak pakietów spełniających wybrane kryteria.
-                </div>
-              )}
-
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="min-h-[180px] rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest text-on-surface-variant flex flex-col items-center justify-center text-center p-6"
-              >
-                <span className="h-14 w-14 rounded-full bg-surface-container flex items-center justify-center">
-                  <Plus size={24} />
-                </span>
-                <span className="mt-5 text-base font-semibold">
-                  Brakuje pakietu?
-                </span>
-                <span className="mt-2 text-sm leading-6 max-w-[260px]">
-                  Stwórz nową ofertę dopasowaną do potrzeb klientów.
-                </span>
-              </button>
-            </div>
           </div>
+
+          <Button
+            variant="primary"
+            icon={<Plus size={16} />}
+            className="w-full sm:w-auto"
+            onClick={() => setIsModalOpen(true)}
+          >
+            Dodaj nowy pakiet
+          </Button>
         </div>
+
+        <PackageListFilters value={filters} onChange={setFilters} />
+
+        <ListSection
+          title="Lista pakietów"
+          description="Rodzaj, limit, cena i status oferty w jednym wierszu."
+          meta={!isLoading && !loadFailed ? pluralizePackages(filteredPackages.length) : null}
+        >
+          {renderList()}
+        </ListSection>
       </div>
 
       <AddPackageModal
@@ -341,9 +266,10 @@ export default function PackagesPage() {
               </Button>
               <Button
                 variant="danger"
+                disabled={isDeleting}
                 onClick={() => handleDeletePackage(packageToDelete.id)}
               >
-                Usuń pakiet
+                {isDeleting ? "Usuwanie..." : "Usuń pakiet"}
               </Button>
             </ModalFooter>
           </div>

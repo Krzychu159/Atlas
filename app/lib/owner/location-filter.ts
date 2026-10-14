@@ -51,9 +51,13 @@ export function matchesOwnerLocationId(
 function readStoredLocationValue() {
   if (typeof window === "undefined") return OWNER_LOCATION_ALL;
 
-  return normalizeOwnerLocationFilterValue(
-    window.localStorage.getItem(OWNER_LOCATION_STORAGE_KEY),
-  );
+  try {
+    return normalizeOwnerLocationFilterValue(
+      window.localStorage.getItem(OWNER_LOCATION_STORAGE_KEY),
+    );
+  } catch {
+    return OWNER_LOCATION_ALL;
+  }
 }
 
 export function useOwnerLocationFilter() {
@@ -104,7 +108,9 @@ export function useOwnerLocationFilter() {
 
       if (typeof window === "undefined") return;
 
-      window.localStorage.setItem(OWNER_LOCATION_STORAGE_KEY, normalized);
+      try {
+        window.localStorage.setItem(OWNER_LOCATION_STORAGE_KEY, normalized);
+      } catch { /* Keep the filter usable when browser storage is unavailable. */ }
       window.dispatchEvent(
         new CustomEvent(OWNER_LOCATION_CHANGED_EVENT, {
           detail: { value: normalized },

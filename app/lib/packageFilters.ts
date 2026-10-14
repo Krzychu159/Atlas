@@ -1,6 +1,7 @@
 import { isPeriodPackage, isSessionPackage } from "./period-packages";
 
 export type PackageModeFilter = "all" | "SessionBased" | "PeriodBased";
+export type PackageActivityFilter = "all" | "active" | "inactive";
 export type ParticipantsFilter = "all" | "solo" | "duo" | "trio" | "four" | "group";
 export type SessionsFilter = "all" | "1-4" | "5-8" | "9-12" | "13+";
 export type DurationFilter = "all" | "up-to-30" | "31-60" | "61-90" | "over-90";
@@ -18,6 +19,7 @@ type FilterablePackage = {
   durationDays: number;
   price: number;
   createdAt: string;
+  isActive?: boolean;
 };
 
 export function isGroupPackage(packageType?: PackageType | null) {
@@ -42,6 +44,7 @@ export function filterPackages<T extends FilterablePackage>(
     durationFilter: DurationFilter;
     sort: PackageSort;
     billingModeFilter?: PackageModeFilter;
+    activityFilter?: PackageActivityFilter;
   },
 ): T[] {
   const query = filters.search.toLocaleLowerCase("pl").trim();
@@ -50,6 +53,8 @@ export function filterPackages<T extends FilterablePackage>(
   const result = packages.filter((item) => {
     if (filters.billingModeFilter === "PeriodBased" && !isPeriodPackage(item)) return false;
     if (filters.billingModeFilter === "SessionBased" && !isSessionPackage(item)) return false;
+    if (filters.activityFilter === "active" && item.isActive !== true) return false;
+    if (filters.activityFilter === "inactive" && item.isActive !== false) return false;
     if (isPeriodPackage(item) && (filters.participantsFilter !== "all" || filters.sessionsFilter !== "all")) return false;
     if (query && ![item.name, item.description, item.locationName, item.packageType]
       .some((value) => value?.toLocaleLowerCase("pl").includes(query))) return false;

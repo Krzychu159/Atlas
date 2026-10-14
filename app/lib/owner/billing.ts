@@ -188,10 +188,11 @@ export function getOwnerPayments(query?: PaymentsQuery) {
   );
 }
 
-export function getClientPayments(clientId: number, query?: PaymentsQuery) {
+export function getClientPayments(clientId: number, query?: PaymentsQuery, signal?: AbortSignal) {
   return backendGet<PagedResult<ClientPayment>>(
     `billing/clients/${clientId}/payments`,
     toPaymentsQuery(query),
+    signal,
   );
 }
 

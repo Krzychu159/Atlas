@@ -1,11 +1,12 @@
 "use client";
-import { formatTrainingStartDate } from "@/app/lib/formatters/date";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Archive, ArrowRight, Plus, UserPlus } from "lucide-react";
+import { Archive, SearchX, UserPlus, UsersRound } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import { ListSection } from "@/app/components/ui/list/ListSection";
+import { ListState } from "@/app/components/ui/list/ListState";
 import {
   getClients,
   type Client,
@@ -15,17 +16,18 @@ import {
   useOwnerLocationFilter,
 } from "@/app/lib/owner/location-filter";
 import AddClientModal from "@/app/(app)/owner/clients/components/AddClientModal";
-import ClientFilters, {
-  type ClientPackageFilter,
-  type ClientSort,
-} from "@/app/(app)/owner/clients/components/ClientFilters";
-import ClientListRow from "@/app/(app)/owner/clients/components/ClientListRow";
+import type { ClientPackageFilter } from "@/app/(app)/owner/clients/components/ClientFilters";
+import OwnerClientFilters, {
+  defaultOwnerClientFilters,
+  type OwnerClientFiltersValue,
+} from "@/app/(app)/owner/clients/components/OwnerClientFilters";
+import OwnerClientList from "@/app/(app)/owner/clients/components/OwnerClientList";
+import OwnerClientListRow from "@/app/(app)/owner/clients/components/OwnerClientListRow";
+import { pluralizeClients } from "@/app/(app)/owner/clients/components/client-list-display";
 import {
-  formatClientBalance,
   getClientBalance,
   getClientName,
   getClientPackageUsage,
-  getPortalAccessLabel,
   hasActiveClientPackage,
 } from "@/app/(app)/owner/clients/components/client-display";
 import { showOwnerError } from "@/app/(app)/owner/components/owner-toast";
@@ -58,29 +60,34 @@ function ClientsContent() {
   const showInvitations = searchParams.get("invitations") === "true";
   const [clients, setClients] = useState<Client[]>([]);
   const { selectedLocationId } = useOwnerLocationFilter();
-  const [search, setSearch] = useState("");
-  const [packageFilter, setPackageFilter] =
-    useState<ClientPackageFilter>("all");
-  const [trainerFilter, setTrainerFilter] = useState("all");
-  const [sort, setSort] = useState<ClientSort>("package-usage");
+  const [filters, setFilters] = useState<OwnerClientFiltersValue>(defaultOwnerClientFilters);
+  const { search, packageFilter, trainerFilter, sort } = filters;
   const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const loadRequestRef = useRef(0);
 
   useEffect(() => {
     if (showInvitations) void Promise.resolve().then(() => setIsModalOpen(true));
   }, [showInvitations]);
 
   async function loadClients() {
+    const requestId = ++loadRequestRef.current;
+
     try {
       setIsLoading(true);
       const data = await getClients();
+      if (requestId !== loadRequestRef.current) return;
       setClients(data);
+      setLoadFailed(false);
     } catch (err) {
+      if (requestId !== loadRequestRef.current) return;
+      setLoadFailed(true);
       showOwnerError(err, "Błąd ładowania klientów", {
         id: "owner-clients-load-error",
       });
     } finally {
-      setIsLoading(false);
+      if (requestId === loadRequestRef.current) setIsLoading(false);
     }
   }
 
@@ -114,7 +121,9 @@ function ClientsContent() {
     if (trainerFilter === "all") return;
 
     if (!trainerOptions.includes(trainerFilter)) {
-      void Promise.resolve().then(() => setTrainerFilter("all"));
+      void Promise.resolve().then(() =>
+        setFilters((current) => ({ ...current, trainerFilter: "all" })),
+      );
     }
   }, [trainerFilter, trainerOptions]);
 
@@ -175,242 +184,129 @@ function ClientsContent() {
 
   const activeClientsCount = scopedClients.filter(hasActiveClientPackage).length;
 
+  function renderList() {
+    if (isLoading && clients.length === 0) {
+      return <ListState variant="loading" label="Ładowanie klientów..." />;
+    }
+
+    if (loadFailed && clients.length === 0) {
+      return (
+        <ListState
+          variant="error"
+          icon={<UsersRound size={28} />}
+          title="Nie udało się wczytać klientów"
+          message="Sprawdź połączenie i spróbuj ponownie."
+          action={
+            <Button variant="secondary" size="sm" onClick={() => void loadClients()} disabled={isLoading}>
+              Spróbuj ponownie
+            </Button>
+          }
+        />
+      );
+    }
+
+    if (scopedClients.length === 0) {
+      return (
+        <ListState
+          variant="empty"
+          icon={<UsersRound size={28} />}
+          title="Brak klientów"
+          message="Dodaj pierwszego klienta lub wyślij mu zaproszenie do panelu."
+          action={
+            <Button size="sm" icon={<UserPlus size={15} />} onClick={() => setIsModalOpen(true)}>
+              Dodaj klienta
+            </Button>
+          }
+        />
+      );
+    }
+
+    if (filteredClients.length === 0) {
+      return (
+        <ListState
+          variant="empty"
+          icon={<SearchX size={28} />}
+          title="Brak klientów spełniających wybrane kryteria"
+          message="Zmień lub wyczyść filtry, aby zobaczyć więcej wyników."
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setFilters(defaultOwnerClientFilters)}>
+              Wyczyść filtry
+            </Button>
+          }
+        />
+      );
+    }
+
+    return (
+      <OwnerClientList>
+        {filteredClients.map((client) => (
+          <OwnerClientListRow key={client.id} client={client} />
+        ))}
+      </OwnerClientList>
+    );
+  }
+
+  const countsReady = !(isLoading && clients.length === 0) && !(loadFailed && clients.length === 0);
+
   return (
     <>
-      <div className="max-w-[1400px] mx-auto">
-        {/* Desktop */}
-        <div className="hidden md:block">
-          <div className="flex flex-col gap-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-[2.25rem] leading-[0.95] font-semibold font-display tracking-tight">
-                    Klienci
-                  </h1>
-                  <span className="px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-sm">
-                    {scopedClients.length} łącznie
-                  </span>
-                </div>
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-[560px]">
+            <p className="text-label text-primary-light">Baza klientów</p>
+            <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
+              Klienci
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+              Zarządzaj bazą klientów, trenerami i aktywnymi pakietami.
+            </p>
+          </div>
 
-                <p className="mt-3 text-base text-on-surface-variant">
-                  Zarządzaj bazą klientów, trenerami i aktywnymi pakietami.
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+            <div className="flex gap-3">
+              <div className="flex flex-1 items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3 sm:flex-none">
+                <p className="text-2xl font-semibold leading-none">
+                  {countsReady ? scopedClients.length : "–"}
                 </p>
+                <p className="text-sm text-on-surface-variant">łącznie</p>
               </div>
-
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/owner/clients/archived"
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-on-surface transition hover:bg-surface-container-high"
-                >
-                  <Archive size={16} />
-                  Archiwum
-                </Link>
-                <Button
-                  variant="primary"
-                  icon={<UserPlus size={16} />}
-                  className="h-16"
-                  onClick={() => setIsModalOpen(true)}
-                >
-                  Dodaj klienta
-                </Button>
+              <div className="flex flex-1 items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3 sm:flex-none">
+                <p className="text-2xl font-semibold leading-none text-tertiary-light">
+                  {countsReady ? activeClientsCount : "–"}
+                </p>
+                <p className="text-sm text-on-surface-variant">z aktywnym pakietem</p>
               </div>
             </div>
 
-            <ClientFilters
-              search={search}
-              packageFilter={packageFilter}
-              trainerFilter={trainerFilter}
-              sort={sort}
-              trainerOptions={trainerOptions}
-              onSearchChange={setSearch}
-              onPackageFilterChange={setPackageFilter}
-              onTrainerFilterChange={setTrainerFilter}
-              onSortChange={setSort}
-            />
-
-            <div className="flex flex-col gap-3">
-              {isLoading ? (
-                <div className="card-shell p-5 text-on-surface-variant">
-                  Ładowanie klientów...
-                </div>
-              ) : filteredClients.length > 0 ? (
-                filteredClients.map((client) => (
-                  <ClientListRow key={client.id} client={client} />
-                ))
-              ) : (
-                <div className="card-shell p-8 text-center text-on-surface-variant">
-                  Brak klientów dla wybranego filtra.
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-[330px_1fr] gap-4">
-              <div className="card-shell p-5">
-                <p className="text-label text-on-surface-variant">
-                  Ostatnia aktywność
-                </p>
-
-                <div className="mt-5 flex flex-col gap-4">
-                  <div className="flex gap-3">
-                    <div className="w-1 rounded-full bg-tertiary-light" />
-                    <div>
-                      <p className="text-sm">
-                        Aktywni klienci: {activeClientsCount}
-                      </p>
-                      <p className="text-label text-on-surface-muted mt-1">
-                        Z aktywnym pakietem
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="card-shell p-5 flex items-center justify-between gap-6">
-                <div>
-                  <p className="text-label text-on-surface-variant">
-                    Liczba klientów
-                  </p>
-                  <p className="mt-4 text-[2.6rem] leading-none font-semibold text-primary-light">
-                    {scopedClients.length}
-                  </p>
-                  <p className="mt-3 text-sm text-on-surface-variant">
-                    Liczba klientów w aktualnym widoku lokalizacji.
-                  </p>
-                </div>
-
-                <div className="flex items-end gap-2 shrink-0">
-                  <div className="w-4 h-8 rounded-full bg-primary/40" />
-                  <div className="w-4 h-12 rounded-full bg-primary/50" />
-                  <div className="w-4 h-16 rounded-full bg-primary/65" />
-                  <div className="w-4 h-20 rounded-full bg-primary/80" />
-                  <div className="w-4 h-24 rounded-full bg-primary-light" />
-                </div>
-              </div>
+            <div className="flex gap-3">
+              <Link
+                href="/owner/clients/archived"
+                className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-on-surface transition hover:bg-surface-container-high sm:flex-none"
+              >
+                <Archive size={16} />
+                Archiwum
+              </Link>
+              <Button
+                variant="primary"
+                icon={<UserPlus size={16} />}
+                className="flex-1 sm:flex-none"
+                onClick={() => setIsModalOpen(true)}
+              >
+                Dodaj klienta
+              </Button>
             </div>
           </div>
         </div>
 
-        {/* Mobile */}
-        <div className="md:hidden px-1 pb-6">
-          <div className="flex flex-col gap-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-page-title">Klienci</p>
-                <div className="mt-3 h-1 w-24 rounded-full bg-primary" />
-              </div>
+        <OwnerClientFilters value={filters} trainerOptions={trainerOptions} onChange={setFilters} />
 
-              <p className="pt-3 text-label text-on-surface-variant">
-                {activeClientsCount} aktywnych
-              </p>
-            </div>
-
-            <ClientFilters
-              search={search}
-              packageFilter={packageFilter}
-              trainerFilter={trainerFilter}
-              sort={sort}
-              trainerOptions={trainerOptions}
-              onSearchChange={setSearch}
-              onPackageFilterChange={setPackageFilter}
-              onTrainerFilterChange={setTrainerFilter}
-              onSortChange={setSort}
-            />
-
-            <Link
-              href="/owner/clients/archived"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low text-sm font-semibold text-primary-light"
-            >
-              <Archive size={16} />
-              Archiwum klientów
-            </Link>
-
-            <div className="flex flex-col gap-4">
-              {isLoading ? (
-                <div className="card-shell p-5 text-on-surface-variant">
-                  Ładowanie klientów...
-                </div>
-              ) : filteredClients.length > 0 ? (
-                filteredClients.map((client) => {
-                  const packageUsage = getClientPackageUsage(client);
-                  const fullName = getClientName(client);
-
-                  return (
-                    <div key={client.id} className="card-shell p-5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-lg font-semibold truncate">
-                            {fullName}
-                          </p>
-                          <p className="mt-2 text-sm text-on-surface-variant truncate">
-                            {client.email || "Brak adresu email"}
-                          </p>
-                          <span className="mt-2 inline-flex rounded-full bg-surface-container-lowest px-2 py-1 text-[10px] font-semibold text-primary-light">
-                            {getPortalAccessLabel(client.portalAccessStatus)}
-                          </span>
-                          <p className="mt-2 text-xs text-on-surface-muted">Rozpoczęcie treningów: {formatTrainingStartDate(client.trainingStartDate)}</p>
-                          <p className="mt-4 text-label text-primary-light">
-                            Trener: {client.trainerFullName || "Nie przypisano"}
-                          </p>
-                        </div>
-
-                        <Link
-                          href={`/owner/clients/${client.id}`}
-                          prefetch={false}
-                          aria-label={`Przejdź do profilu klienta ${fullName}`}
-                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container-high text-primary-light"
-                        >
-                          <ArrowRight size={18} />
-                        </Link>
-                      </div>
-
-                      <div className="mt-5 grid grid-cols-[1fr_auto] items-end gap-4">
-                        <div className="min-w-0">
-                          <p className="text-label text-on-surface-variant">
-                            Wykorzystanie pakietu
-                          </p>
-                          <div className="mt-2 flex items-center gap-3">
-                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-container-lowest">
-                              <div
-                                className="h-full rounded-full bg-primary-gradient"
-                                style={{ width: `${packageUsage.percent}%` }}
-                              />
-                            </div>
-                            <p className="text-sm font-semibold text-primary-light">
-                              {packageUsage.label}
-                            </p>
-                          </div>
-                          <p className="mt-2 truncate text-xs text-on-surface-muted">
-                            {packageUsage.packageName}
-                          </p>
-                        </div>
-
-                        <div className="text-right">
-                          <p className="text-label text-on-surface-variant">
-                            Balance
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-tertiary-light">
-                            {formatClientBalance(client)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="card-shell p-8 text-center text-on-surface-variant">
-                  Brak klientów.
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="fixed right-5 bottom-24 h-16 w-16 rounded-full bg-primary-gradient text-white shadow-ambient flex items-center justify-center z-20"
-            >
-              <Plus size={30} />
-            </button>
-          </div>
-        </div>
+        <ListSection
+          title="Lista klientów"
+          description="Trener, pakiet, saldo i status klienta w jednym wierszu."
+          meta={countsReady ? pluralizeClients(filteredClients.length) : null}
+        >
+          {renderList()}
+        </ListSection>
       </div>
 
       <AddClientModal
