@@ -3,7 +3,7 @@ import { Banknote, TrendingUp } from "lucide-react";
 export default function DashboardRevenueCard() {
   return (
     <div className="card-shell p-6 relative overflow-hidden">
-      <div className="absolute right-0 top-0 h-full w-[55%] bg-[radial-gradient(circle_at_top_right,rgba(0,82,255,0.14),transparent_60%)]" />
+      <div className="absolute right-0 top-0 h-full w-[55%] bg-[radial-gradient(circle_at_top_right,color-mix(in_srgb,var(--color-primary)_14%,transparent),transparent_60%)]" />
 
       <div className="relative z-10">
         <div className="flex items-center gap-3">

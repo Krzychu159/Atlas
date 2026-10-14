@@ -12,7 +12,7 @@ function getStatusStyles(status?: string | null) {
 
   if (normalized.includes("cancel")) return "text-error-light";
 
-  return "text-primary-light";
+  return "text-info-light";
 }
 
 export default function ClientSessionsPanel({

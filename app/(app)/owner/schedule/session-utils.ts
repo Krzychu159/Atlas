@@ -102,7 +102,7 @@ export function getToneClasses(session: CalendarSession) {
   }
 
   if (tone === "primary") {
-    return "border-primary/35 bg-primary/15";
+    return "border-info/35 bg-info/15";
   }
 
   return "border-white/8 bg-surface-container-low";

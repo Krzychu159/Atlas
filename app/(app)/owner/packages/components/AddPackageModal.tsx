@@ -174,7 +174,7 @@ export default function AddPackageModal({
               disabled={isSubmitting}
               checked={form.isActive}
               onChange={(event) => updateField("isActive", event.target.checked)}
-              className="h-5 w-5 accent-blue-600"
+              className="h-5 w-5 atlas-brand-checkbox"
             />
             <span className="text-sm text-on-surface-variant">
               {form.billingMode === "PeriodBased" ? "Oferta aktywna" : "Pakiet aktywny"}

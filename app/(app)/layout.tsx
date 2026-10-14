@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/app/components/app-shell";
 import { CurrentUserProvider } from "@/app/components/current-user-provider";
+import { getOrganizationTheme } from "@/app/lib/organization-theme";
 import { normalizeUser, type CurrentUser } from "@/app/lib/auth/user";
 import {
   verifyBackendSession,
@@ -42,5 +43,5 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   if (!isValidAppRole(user.role)) redirect("/login");
   const pathRole = currentPath?.split(/[/?]/)[1];
   if (!pathRole || pathRole !== user.role) redirect(`/${user.role}`);
-  return <CurrentUserProvider key={`${user.id}:${user.role}`} initialUser={user}><AppShell role={user.role}>{children}</AppShell></CurrentUserProvider>;
+  return <CurrentUserProvider key={`${user.id}:${user.role}`} initialUser={user}><AppShell role={user.role} theme={getOrganizationTheme(user)}>{children}</AppShell></CurrentUserProvider>;
 }

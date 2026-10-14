@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./styles/organization-themes.css";
 
 button {
   cursor: pointer;
@@ -23,6 +24,12 @@ button {
   --color-primary-container: #0036b3;
   --color-on-primary: #ffffff;
   --color-on-primary-container: #dde4ff;
+
+  /* Informational statuses stay blue independently of organization branding. */
+  --color-info: #0052ff;
+  --color-info-light: #b7c4ff;
+  --color-info-container: #0036b3;
+  --color-on-info-container: #dde4ff;
 
   /* Secondary */
   --color-secondary: #434656;
@@ -125,6 +132,10 @@ button {
   --color-primary-container: var(--color-primary-container);
   --color-on-primary: var(--color-on-primary);
   --color-on-primary-container: var(--color-on-primary-container);
+  --color-info: var(--color-info);
+  --color-info-light: var(--color-info-light);
+  --color-info-container: var(--color-info-container);
+  --color-on-info-container: var(--color-on-info-container);
 
   --color-secondary: var(--color-secondary);
   --color-secondary-light: var(--color-secondary-light);

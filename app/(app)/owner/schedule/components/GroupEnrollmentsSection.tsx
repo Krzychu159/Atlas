@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus, RefreshCw, Users } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import { OrganizationPortalScope } from "@/app/components/organization-theme";
 import SessionAccordion from "@/app/components/schedule/SessionAccordion";
 import { PaymentEntryModal } from "@/app/components/payments/PaymentEntryModal";
 import { PaymentActionConfirmModal } from "@/app/components/payments/PaymentActionConfirmModal";
@@ -203,7 +204,7 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
       const pkg = snapshot?.packages?.find(pkg => pkg.clientPackageId === item.clientPackageId);
       const payments = snapshot?.payments?.filter(payment => payment.clientPackageId === item.clientPackageId && isPaymentPending(payment)) || [];
       return <li key={item.id} className="rounded-[var(--radius-lg)] bg-surface-container-low p-3">
-        <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="break-words text-sm font-semibold">{snapshot?.clientName || labels[item.id]?.clientName || `Klient #${item.clientId}`}</p><p className="mt-1 text-xs text-on-surface-muted">{pkg?.packageName || labels[item.id]?.packageName || "Pakiet klienta"}</p></div><span className="rounded-full bg-surface-container px-2 py-1 text-xs text-primary-light">{groupEnrollmentStatus(item.status)}</span></div>
+        <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="break-words text-sm font-semibold">{snapshot?.clientName || labels[item.id]?.clientName || `Klient #${item.clientId}`}</p><p className="mt-1 text-xs text-on-surface-muted">{pkg?.packageName || labels[item.id]?.packageName || "Pakiet klienta"}</p></div><span className="rounded-full bg-surface-container px-2 py-1 text-xs text-info-light">{groupEnrollmentStatus(item.status)}</span></div>
         {item.status === "AwaitingPayment" && pkg ? <p className="mt-2 text-sm text-on-surface-variant">Do opłacenia: {pkg.currency ? formatMoney(pkg.amountDue, pkg.currency) : pkg.amountDue.toFixed(2)}</p> : null}
         <div className="mt-3 flex flex-wrap gap-2">
           {editable && item.status === "ReadyToBook" ? <Button type="button" size="sm" disabled={busy || full} onClick={() => void confirm(item)}>Potwierdź udział</Button> : null}
@@ -217,10 +218,10 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
     {cancelled.length ? <SessionAccordion title="Anulowane zapisy" summary={cancelled.length}><ul className="space-y-2">{cancelled.map(participantRow)}</ul></SessionAccordion> : null}
     {data && data.totalPages > 1 ? <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-on-surface-muted"><span>Strona {data.page} z {data.totalPages}</span><div className="flex gap-2"><Button type="button" size="sm" variant="secondary" disabled={busy || loading || page <= 1} onClick={() => setPage(value => value - 1)}>Poprzednia</Button><Button type="button" size="sm" variant="secondary" disabled={busy || loading || page >= data.totalPages} onClick={() => setPage(value => value + 1)}>Następna</Button></div></div> : null}
     {!loading && !error ? <Button type="button" variant="ghost" size="sm" icon={<RefreshCw size={14} />} disabled={busy} onClick={() => { setRevision(value => value + 1); void refreshSession(); }}>Odśwież</Button> : null}
-    {paymentItem && typeof document !== "undefined" ? createPortal(<div onSubmit={event => event.stopPropagation()}>
+    {paymentItem && typeof document !== "undefined" ? createPortal(<OrganizationPortalScope onSubmit={event => event.stopPropagation()}>
       <PaymentEntryModal open eyebrow="Wpłata do pakietu" title="Dodaj wpłatę" description={billing[paymentItem.clientId]?.clientName || "Wpłata za pakiet uczestnika"} amount={amount} packageId={String(paymentItem.clientPackageId)} method={method} note={note} packageOptions={paymentPackage ? [{ value: String(paymentPackage.clientPackageId), label: paymentPackage.packageName || "Pakiet klienta", amountDue: paymentPackage.amountDue, currency: paymentPackage.currency }] : []} methodOptions={paymentMethodOptions.filter(option => option.value !== "4")} isSubmitting={busy} submitLabel="Dodaj wpłatę" submittingLabel="Zapisywanie…" emptyPackagesMessage="Nie udało się pobrać pakietu." onAmountChange={setAmount} onPackageChange={() => {}} onMethodChange={setMethod} onNoteChange={setNote} onClose={() => { if (!lock.current) setPaymentItem(null); }} onSubmit={() => void savePayment()} />
       {actionError ? <p role="alert" className="fixed bottom-4 left-4 right-4 z-[60] rounded-lg bg-error-container p-3 text-sm text-error-light">{actionError}</p> : null}
-    </div>, document.body) : null}
-    {paymentToConfirm && typeof document !== "undefined" ? createPortal(<div><PaymentActionConfirmModal payment={paymentToConfirm} title="Potwierdź otrzymaną wpłatę" description="Potwierdź tylko pieniądze, które studio już otrzymało." confirmLabel="Potwierdź wpłatę" processing={busy} onClose={() => { if (!lock.current) setPaymentToConfirm(null); }} onConfirm={() => void confirmPayment()} />{actionError ? <p role="alert" className="fixed bottom-4 left-4 right-4 z-[60] rounded-lg bg-error-container p-3 text-sm text-error-light">{actionError}</p> : null}</div>, document.body) : null}
+    </OrganizationPortalScope>, document.body) : null}
+    {paymentToConfirm && typeof document !== "undefined" ? createPortal(<OrganizationPortalScope><PaymentActionConfirmModal payment={paymentToConfirm} title="Potwierdź otrzymaną wpłatę" description="Potwierdź tylko pieniądze, które studio już otrzymało." confirmLabel="Potwierdź wpłatę" processing={busy} onClose={() => { if (!lock.current) setPaymentToConfirm(null); }} onConfirm={() => void confirmPayment()} />{actionError ? <p role="alert" className="fixed bottom-4 left-4 right-4 z-[60] rounded-lg bg-error-container p-3 text-sm text-error-light">{actionError}</p> : null}</OrganizationPortalScope>, document.body) : null}
   </section>;
 }

@@ -259,7 +259,7 @@ function SettlementMetric({ label, value }: { label: string; value: string }) {
 }
 
 function StatusPill({ label, tone = "neutral" }: { label: string; tone?: "success" | "danger" | "primary" | "neutral" }) {
-  const colors = { success: "bg-tertiary/10 text-tertiary-light", danger: "bg-error/10 text-error-light", primary: "bg-primary/15 text-primary-light", neutral: "bg-surface-container-high text-on-surface-variant" };
+  const colors = { success: "bg-tertiary/10 text-tertiary-light", danger: "bg-error/10 text-error-light", primary: "bg-info/15 text-info-light", neutral: "bg-surface-container-high text-on-surface-variant" };
   return <span className={"inline-block rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-4 " + colors[tone]}>{label}</span>;
 }
 function sessionTone(status: string | null): "success" | "danger" | "primary" | "neutral" {

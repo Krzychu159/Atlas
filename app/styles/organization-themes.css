@@ -1,0 +1,43 @@
+/* Scoped to organization panels and their portal hosts. ATLAS is unchanged. */
+[data-atlas-theme="atlas"] {
+  --color-primary: #0052ff;
+  --color-primary-light: #b7c4ff;
+  --color-primary-container: #0036b3;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #dde4ff;
+}
+
+[data-atlas-theme="bsworkout"] {
+  --color-primary: #c52121;
+  --color-primary-light: #ff7070;
+  --color-primary-container: #991b1b;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #ffe4e4;
+}
+
+[data-atlas-theme="bsworkout"] [data-atlas-sidebar-nav] [aria-current="page"] {
+  background-color: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface-container-low));
+  color: var(--color-on-surface);
+}
+
+[data-atlas-theme="bsworkout"] [data-atlas-sidebar-nav] [aria-current="page"] svg {
+  color: var(--color-primary-light);
+}
+
+/* Keep the existing ATLAS platform mark blue inside a customized panel. */
+[data-atlas-platform-brand] {
+  --color-primary: #0052ff;
+  --color-primary-light: #b7c4ff;
+  --color-primary-container: #0036b3;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #dde4ff;
+}
+
+/* Preserve the previous blue-600 checkbox appearance for other organizations. */
+.atlas-brand-checkbox {
+  accent-color: #2563eb;
+}
+
+[data-atlas-theme="bsworkout"] .atlas-brand-checkbox {
+  accent-color: var(--color-primary);
+}

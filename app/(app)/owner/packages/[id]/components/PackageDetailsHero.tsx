@@ -26,7 +26,7 @@ export default function PackageDetailsHero({
 
   return (
     <div className="card-shell p-6 md:p-7 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,82,255,0.13),transparent_55%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,color-mix(in_srgb,var(--color-primary)_13%,transparent),transparent_55%)]" />
 
       <div className="relative z-10">
         <div className="flex flex-wrap items-center gap-3">

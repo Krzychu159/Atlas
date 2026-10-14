@@ -10,10 +10,15 @@ import { Header } from "@/app/components/header";
 import { navigationByRole, type AppRole } from "@/app/components/navigation";
 import type { CurrentUser } from "@/app/lib/auth/current-user";
 import { useCurrentUser } from "@/app/components/current-user-provider";
+import { OrganizationThemeScope } from "@/app/components/organization-theme";
+import { BsworkoutLogo, BsworkoutOrganizationPanel } from "@/app/components/bsworkout-logo";
+import { AppToaster } from "@/app/components/app-toaster";
+import type { OrganizationTheme } from "@/app/lib/organization-theme";
 
 type AppShellProps = {
   children: ReactNode;
   role: AppRole;
+  theme?: OrganizationTheme;
 };
 
 function getRoleSubtitle(role: AppRole) {
@@ -29,7 +34,7 @@ function getRoleSubtitle(role: AppRole) {
   }
 }
 
-export function AppShell({ children, role }: AppShellProps) {
+export function AppShell({ children, role, theme = "atlas" }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user } = useCurrentUser();
   const subtitle = getRoleSubtitle(role);
@@ -79,7 +84,8 @@ export function AppShell({ children, role }: AppShellProps) {
 
 
   return (
-    <div className="min-h-screen bg-surface text-on-surface">
+    <OrganizationThemeScope theme={theme} className="min-h-screen bg-surface text-on-surface">
+      <AppToaster organizationPanel />
       <div className="min-h-screen md:grid md:grid-cols-[280px_1fr]">
         <aside
           id="mobile-navigation"
@@ -108,7 +114,7 @@ export function AppShell({ children, role }: AppShellProps) {
           ].join(" ")}
         >
           <div className="mb-4 flex shrink-0 items-center justify-between gap-3 pt-2">
-            <div className="flex items-center gap-3">
+            <div data-atlas-platform-brand className="flex items-center gap-3">
               <div className="rounded bg-primary p-3 text-on-primary">
                 <Dumbbell className="h-6 w-6" />
               </div>
@@ -144,6 +150,7 @@ export function AppShell({ children, role }: AppShellProps) {
             <Link href="/logout" prefetch={false} onClick={() => setMobileMenuOpen(false)} className="mb-2 flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm text-on-surface-variant hover:bg-surface-container">
               <LogOut size={20} /> Wyloguj się
             </Link>
+            {theme === "bsworkout" ? <div className="mb-3"><BsworkoutOrganizationPanel /></div> : null}
             <div className="rounded-xl bg-surface-container p-4 shadow-soft">
               <div className="flex items-center gap-3">
                 <MobileUserAvatar user={user} />
@@ -162,7 +169,7 @@ export function AppShell({ children, role }: AppShellProps) {
 
         <aside className="hidden md:block">
           <div className="sticky top-0 flex h-screen flex-col bg-surface-container-low px-4 py-4">
-            <div className="mb-10 mt-4 flex items-center gap-3 pt-2">
+            <div data-atlas-platform-brand className="mb-10 mt-4 flex items-center gap-3 pt-2">
               <div className="rounded bg-primary p-3 text-on-primary">
                 <Dumbbell className="h-6 w-6" />
               </div>
@@ -178,20 +185,20 @@ export function AppShell({ children, role }: AppShellProps) {
               <SidebarNav items={navItems} />
             </div>
 
-            <div className="px-3 pb-2 pt-6">
-              <div className="rounded-xl bg-surface-container p-4 shadow-soft">
+            <div className={`${theme === "bsworkout" ? "shrink-0 " : ""}px-3 pb-2 pt-6`}>
+              {theme === "bsworkout" ? <BsworkoutOrganizationPanel /> : <div className="rounded-xl bg-surface-container p-4 shadow-soft">
                 <p className="text-label text-on-surface-muted">Status</p>
                 <p className="mt-2 text-sm text-on-surface-variant">
                   ATLAS
                 </p>
-              </div>
+              </div>}
             </div>
           </div>
         </aside>
 
         <div className="min-w-0">
           <header className="sticky top-0 z-30 mb-3 flex max-w-full items-center justify-between gap-2 bg-surface-container-low px-3 py-2 md:hidden">
-            <div className="flex items-center justify-center gap-2">
+            <div className={`flex items-center justify-center ${theme === "bsworkout" ? "gap-1" : "gap-2"}`}>
               <button
                 type="button"
                 aria-label={mobileMenuOpen ? "Zamknij menu" : "Otwórz menu"}
@@ -206,10 +213,11 @@ export function AppShell({ children, role }: AppShellProps) {
                   <Menu className="h-7 w-7" />
                 )}
               </button>
-              <p className="text-2xl font-bold uppercase tracking-widest text-primary-light">
+              <p data-atlas-platform-brand className={`font-bold uppercase text-primary-light ${theme === "bsworkout" ? "text-xl tracking-wider" : "text-2xl tracking-widest"}`}>
                 Atlas
               </p>
             </div>
+            {theme === "bsworkout" ? <BsworkoutLogo className="h-6 w-16 min-w-12 shrink" /> : null}
             <div className="flex shrink-0 items-center gap-1">
               <Link href={`/${role}/notifications`} aria-label={unreadCount > 0 ? `Powiadomienia, nieprzeczytane: ${unreadCount}` : "Powiadomienia"} className="relative flex h-11 w-11 items-center justify-center rounded-full text-primary-light hover:bg-surface-container-high">
                 <Bell size={21} />
@@ -239,7 +247,7 @@ export function AppShell({ children, role }: AppShellProps) {
           className="fixed inset-0 z-40 bg-black/50 md:hidden"
         />
       )}
-    </div>
+    </OrganizationThemeScope>
   );
 }
 

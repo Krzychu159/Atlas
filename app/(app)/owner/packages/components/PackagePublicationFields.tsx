@@ -19,7 +19,7 @@ export default function PackagePublicationFields({ form, onChange }: {
       value={form.billingType} onChange={(value) => onChange("billingType", value)} /> : <>
       <label className="flex cursor-pointer items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
         <input type="checkbox" role="switch" checked={form.isPubliclyAvailable}
-          onChange={(event) => onChange("isPubliclyAvailable", event.target.checked)} className="h-5 w-5 accent-blue-600" />
+          onChange={(event) => onChange("isPubliclyAvailable", event.target.checked)} className="h-5 w-5 atlas-brand-checkbox" />
         <span className="text-sm text-on-surface-variant">Publicznie dostępny</span>
       </label>
       {form.isPubliclyAvailable ? <OwnerTextField label="Końcówka linku do pakietu" value={form.publicSlug}

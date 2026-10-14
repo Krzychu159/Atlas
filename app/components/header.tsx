@@ -16,6 +16,8 @@ import NotificationsPanel from "@/app/(app)/owner/components/NotificationsPanel"
 import type { AppRole } from "@/app/components/navigation";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { useCurrentUser } from "@/app/components/current-user-provider";
+import { useOrganizationTheme } from "@/app/components/organization-theme";
+import { BsworkoutLogo } from "@/app/components/bsworkout-logo";
 import { getClients, type Client } from "@/app/lib/owner/clients";
 import {
   matchesOwnerLocationId,
@@ -70,6 +72,7 @@ function getRoleLabel(role: string) {
 }
 
 export function Header({ role, unreadNotificationCount, onUnreadCountChange }: HeaderProps) {
+  const theme = useOrganizationTheme();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const {
@@ -212,7 +215,7 @@ export function Header({ role, unreadNotificationCount, onUnreadCountChange }: H
   return (
     <>
       <header className="mx-auto mb-8 mt-4 flex w-full max-w-[1400px] items-center justify-between gap-4">
-        <div className="relative hidden min-w-[280px] max-w-[640px] flex-1 md:block">
+        <div className={`relative hidden max-w-[640px] flex-1 md:block ${theme === "bsworkout" ? "min-w-0" : "min-w-[280px]"}`}>
           <Search
             className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-muted"
             size={17}
@@ -267,6 +270,7 @@ export function Header({ role, unreadNotificationCount, onUnreadCountChange }: H
         </div>
 
         <div className="flex min-w-0 items-center gap-3">
+          {theme === "bsworkout" ? <BsworkoutLogo className="hidden h-7 w-20 shrink-0 lg:flex xl:h-8 xl:w-24" /> : null}
           {role === "owner" ? (
             <CustomSelect
               value={selectedLocationValue}

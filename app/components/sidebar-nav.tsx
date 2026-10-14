@@ -13,7 +13,7 @@ export function SidebarNav({ items, onNavigate }: SidebarNavProps) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-col gap-2">
+    <nav data-atlas-sidebar-nav className="flex flex-col gap-2">
       {items.map((item) => {
         const isDashboard =
           item.href === "/owner" ||
