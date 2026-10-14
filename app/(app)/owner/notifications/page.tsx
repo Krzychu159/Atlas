@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { BellOff, CheckCheck, LoaderCircle, RefreshCw } from "lucide-react";
 import NotificationItem from "../components/Notification";
+import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { Button } from "@/app/components/ui/button";
 import { findNotificationInList, getNotificationPreview, type AppNotification, type NotificationRole } from "@/app/lib/notifications";
 import { getErrorMessage } from "@/app/lib/backend";
@@ -142,6 +143,7 @@ function NotificationsList({ initialCategory, initialRead, notificationId }: { i
             ))}
           </div>
         ) : null}
+        {!loading && !error && state.totalCount > 0 ? <PaymentPagination page={state.page} pageSize={state.pageSize} totalItems={state.totalCount} onPageChange={page => { resetSelection(); state.setPage(page); }} itemLabel="powiadomień" ariaLabel="Paginacja powiadomień" /> : null}
       </div>
     </div>
   );

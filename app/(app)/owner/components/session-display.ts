@@ -1,6 +1,6 @@
 import type { OwnerSession } from "@/app/lib/owner/sessions";
 
-export function getOwnerSessionPackageName(session: OwnerSession) {
+export function getOwnerSessionPackageName(session: { participants?: OwnerSession["participants"] }) {
   const packageNames = Array.from(
     new Set(
       session.participants

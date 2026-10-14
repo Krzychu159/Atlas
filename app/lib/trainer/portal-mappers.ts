@@ -73,10 +73,10 @@ export function trainerPortalClientsToClients(
         nextSessionAt: null,
         updatedAt: client.createdAt,
         createdBy: null,
-        trainerId: me?.trainerId ?? null,
-        trainerFullName: me?.fullName ?? null,
+        trainerId: client.trainerId ?? me?.trainerId ?? null,
+        trainerFullName: client.trainerFullName ?? me?.fullName ?? null,
         activePackageId: client.activePackageId ?? null,
-        locationId: resolveLocationId(client.locationName, me),
+        locationId: client.locationId ?? resolveLocationId(client.locationName, me),
       },
       me,
     ),
@@ -151,6 +151,8 @@ export function trainerPortalClientsToListItems(
 
     return {
       ...item,
+      activePackages: source.activePackages,
+      locationId: source.locationId,
       activePackageId: source.activePackageId,
       activeClientPackageId: source.activeClientPackageId,
       hasActivePackage: source.hasActivePackage,

@@ -19,11 +19,11 @@ import { showAppError } from "@/app/components/ui/app-toast";
 import { ApiError, isForbiddenError } from "@/app/lib/backend";
 import {
   getTrainerPortalDashboard,
-  getTrainerPortalSettlement,
+  getTrainerSettlementSummary,
   type TrainerPortalClient,
   type TrainerPortalDashboard,
   type TrainerPortalSession,
-  type TrainerPortalSettlement,
+  type TrainerSettlementSummary,
 } from "@/app/lib/trainer/portal";
 import {
   formatSettlementMoney,
@@ -42,7 +42,7 @@ export default function TrainerDashboardPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentMonth] = useState(getCurrentTrainerMonth);
-  const [settlement, setSettlement] = useState<TrainerPortalSettlement | null>(null);
+  const [settlement, setSettlement] = useState<TrainerSettlementSummary | null>(null);
   const [settlementLoading, setSettlementLoading] = useState(true);
   const [settlementError, setSettlementError] = useState<string | null>(null);
   const [settlementAttempt, setSettlementAttempt] = useState(0);
@@ -86,7 +86,7 @@ export default function TrainerDashboardPage() {
       setSettlementLoading(true);
       setSettlementError(null);
       try {
-        const data = await getTrainerPortalSettlement(year, month);
+        const data = await getTrainerSettlementSummary(year, month);
         if (active) setSettlement(data);
       } catch (err) {
         if (active) {

@@ -49,6 +49,10 @@ export function getNotifications(params: NotificationParams = {}, signal?: Abort
   return backendGet<AppNotification[]>("Notifications", { ...params, limit: params.limit ?? 50 }, signal);
 }
 
+export function getNotificationsPage(params: NotificationParams & { page: number; pageSize: number }, signal?: AbortSignal) {
+  return backendGet<{ items: AppNotification[] | null; totalCount: number; totalPages: number }>("Notifications/page", params, signal);
+}
+
 export function getUnreadNotificationCount(category?: string, signal?: AbortSignal) {
   return backendGet<UnreadCountResponse>("Notifications/unread-count", { category }, signal);
 }
@@ -76,7 +80,7 @@ export async function markAllNotificationsAsRead(category?: string) {
 
 export function notifyNotificationsChanged(unreadCountDelta?: number) {
   if (typeof window !== "undefined") {
-    invalidateBackendGets(["Notifications", "Notifications/unread-count"]);
+    invalidateBackendGets(["Notifications", "Notifications/page", "Notifications/unread-count"]);
     window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, { detail: { unreadCountDelta } }));
   }
 }
@@ -207,19 +211,11 @@ export function getNotificationPreview(id: number) {
   return preview?.item.id === id && preview.expires > Date.now() ? preview.item : null;
 }
 
-// The contract has no GET-by-id endpoint. Increase the supported list limit for
-// an older deep link, stopping if the list is exhausted or the server caps it.
+// Fetch only the notification addressed by the deep link.
 export async function findNotificationInList(id: number, isActive = () => true) {
-  let previousCount = 0;
-  for (let limit = 100; isActive(); limit *= 2) {
-    const items = await getNotifications({ limit });
-    if (!isActive()) return null;
-    const item = items.find(notification => notification.id === id);
-    if (item) return item;
-    if (items.length < limit || items.length <= previousCount) return null;
-    previousCount = items.length;
-  }
-  return null;
+  if (!Number.isSafeInteger(id) || id <= 0 || !isActive()) return null;
+  const item = await backendGet<AppNotification>(`Notifications/${id}`);
+  return isActive() ? item : null;
 }
 
 export function getNotificationKind(item: AppNotification) {

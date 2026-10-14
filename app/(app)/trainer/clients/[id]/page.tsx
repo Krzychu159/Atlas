@@ -19,7 +19,7 @@ import {
   type SubscriptionUsage,
 } from "@/app/lib/owner/clients";
 import { type ClientBillingSummary, type ClientPayment } from "@/app/lib/owner/billing";
-import { getClientSessions, type OwnerSession } from "@/app/lib/owner/sessions";
+import { getTrainerRecentSessions, getTrainerBillingTotals, type ClientBillingTotals, type RecentClientSession } from "@/app/lib/trainer/optimized";
 import { trainerPaymentError } from "@/app/lib/trainer/payment-errors";
 import Link from "next/link";
 import { PaymentsList } from "@/app/components/payments/PaymentsList";
@@ -53,8 +53,13 @@ export default function TrainerClientDetailsPage() {
   const [trainingPlan, setTrainingPlan] = useState<ClientTrainingPlan | null>(
     null,
   );
-  const [sessions, setSessions] = useState<OwnerSession[]>([]);
+  const [sessions, setSessions] = useState<RecentClientSession[]>([]);
+  const [sessionsTotal, setSessionsTotal] = useState(0);
   const [payments, setPayments] = useState<ClientPayment[]>([]);
+  const billingSection = useRef<HTMLDivElement | null>(null);
+  const [billingTotals, setBillingTotals] = useState<ClientBillingTotals | null>(null);
+  const [historyRequested, setHistoryRequested] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [billing, setBilling] = useState<ClientBillingSummary | null>(null);
   const [me, setMe] = useState<TrainerPortalMe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -83,7 +88,7 @@ export default function TrainerClientDetailsPage() {
     }
     setIsLoading(true); setLoadError(null); setClient(null);
     setBillingError(null); setSessionsError(null); setSectionErrors([]);
-    setSubscription(null); setUsage(null); setSessions([]); setBilling(null); setPayments([]);
+    setSubscription(null); setUsage(null); setSessions([]); setBilling(null); setBillingTotals(null); setHistoryRequested(false); setPayments([]);
     setSectionLoading({ subscription: true, usage: true, sessions: true, billing: true });
     async function section<T>(key: keyof typeof sectionLoading, request: Promise<T>, apply: (value: T) => void, fallback: string) {
       try { const value = await request; if (active()) apply(value); }
@@ -107,13 +112,37 @@ export default function TrainerClientDetailsPage() {
       profile,
       section("subscription", getTrainerPortalClientSubscription(clientId, signal), setSubscription, "Nie udało się pobrać odnowień pakietu."),
       section("usage", getTrainerPortalClientSubscriptionUsage(clientId, signal), setUsage, "Nie udało się pobrać wykorzystania pakietu."),
-      section("sessions", getClientSessions(clientId, signal), setSessions, "Nie udało się pobrać treningów klienta."),
-      section("billing", getTrainerPortalClientBilling(clientId, signal), data => {
-        setBilling(data);
-        setPayments([...(data.payments || [])].sort((a, b) => Date.parse(b.paymentDate || b.createdAt) - Date.parse(a.paymentDate || a.createdAt)));
-      }, "Nie udało się pobrać rozliczeń klienta."),
+      section("sessions", getTrainerRecentSessions(clientId, signal), data => { setSessions(data.items || []); setSessionsTotal(data.totalCount); }, "Nie udało się pobrać treningów klienta."),
+      section("billing", getTrainerBillingTotals(clientId, signal), setBillingTotals, "Nie udało się pobrać rozliczeń klienta."),
     ]);
   }
+
+  useEffect(() => {
+    if (!client || historyRequested || !billingSection.current) return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) setHistoryRequested(true);
+    });
+    observer.observe(billingSection.current);
+    return () => observer.disconnect();
+  }, [client, historyRequested]);
+
+  const historyClientId = client?.id;
+  useEffect(() => {
+    if (!historyRequested || !historyClientId) return;
+    const controller = new AbortController();
+    let active = true;
+    void Promise.resolve().then(async () => {
+      if (!active) return;
+      setHistoryLoading(true);
+      try {
+        const data = await getTrainerPortalClientBilling(historyClientId, controller.signal);
+        if (active) { setBilling(data); setPayments(data.payments || []); }
+      } catch (error) {
+        if (active) setBillingError(trainerPaymentError(error, "Nie udało się pobrać historii rozliczeń."));
+      } finally { if (active) setHistoryLoading(false); }
+    });
+    return () => { active = false; controller.abort(); };
+  }, [historyRequested, historyClientId]);
 
   async function handleOpenEdit() {
     if (editingLoading) return;
@@ -216,9 +245,10 @@ export default function TrainerClientDetailsPage() {
             client={client}
             subscription={subscription}
             usage={usage}
-            billing={billing}
+            billing={billingTotals}
           />
-          {sectionLoading.billing ? <p role="status" className="card-shell p-5">Pobieranie rozliczeń klienta…</p> : billingError ? <div role="alert" className="card-shell p-5 text-on-surface-variant">{billingError}<Button variant="secondary" className="mt-3" onClick={() => void loadClientDetails()}>Spróbuj ponownie</Button></div> : <ClientPackagesSection packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} />}
+          <div ref={billingSection}>
+          {sectionLoading.billing || historyLoading || !historyRequested ? <p role="status" className="card-shell p-5">Pobieranie rozliczeń klienta…</p> : billingError ? <div role="alert" className="card-shell p-5 text-on-surface-variant">{billingError}<Button variant="secondary" className="mt-3" onClick={() => void loadClientDetails()}>Spróbuj ponownie</Button></div> : <ClientPackagesSection packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} />}
           {billing && !sectionLoading.billing && !billingError ? <ClientPeriodPackagesSection clientId={client.id} portal="trainer" packages={billing.packages} /> : null}
           {billing ? <section className="card-shell overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 p-5">
@@ -228,8 +258,9 @@ export default function TrainerClientDetailsPage() {
             <PaymentsList dateCorrectionPortal="trainer" payments={payments} isLoading={false} processingId={null} showClient={false} emptyTitle="Brak wpłat klienta" emptyMessage="Wpłaty pojawią się tutaj po ich dodaniu." />
           </section> : null}
 
+          </div>
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_330px]">
-            {sectionLoading.sessions ? <p role="status" className="card-shell p-5">Pobieranie treningów klienta…</p> : sessionsError ? <div role="alert" className="card-shell p-5 text-on-surface-variant">{sessionsError}</div> : <ClientSessionsPanel sessions={sessions} />}
+            {sectionLoading.sessions ? <p role="status" className="card-shell p-5">Pobieranie treningów klienta…</p> : sessionsError ? <div role="alert" className="card-shell p-5 text-on-surface-variant">{sessionsError}</div> : <ClientSessionsPanel totalCount={sessionsTotal} sessions={sessions.map(session => ({ id: session.sessionId, title: session.title, startAt: session.startAt, status: session.status, trainerFullName: session.trainerName }))} />}
             <ClientNotesPanel
               key={client.id}
               client={client}

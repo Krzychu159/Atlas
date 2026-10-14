@@ -70,7 +70,6 @@ import {
   getTrainerPortalClientBilling,
   getTrainerPortalClientSubscription,
   getTrainerPortalClientSubscriptionUsage,
-  getTrainerPortalPendingPayments,
   resumeTrainerPortalClientSubscription,
   setTrainerPortalClientNextPackage,
 } from "@/app/lib/trainer/portal";
@@ -261,10 +260,10 @@ export default function ClientPaymentsPageClient({
     const controller = new AbortController();
     trainerLoad.current?.abort(); trainerLoad.current = controller;
     const signal = controller.signal;
-    const [clientResult, billingResult, subscriptionResult, usageResult, catalogResult, pendingResult] = await Promise.allSettled([
+    const [clientResult, billingResult, subscriptionResult, usageResult, catalogResult] = await Promise.allSettled([
       getTrainerPortalClient(id, signal), getTrainerPortalClientBilling(id, signal),
       getTrainerPortalClientSubscription(id, signal), getTrainerPortalClientSubscriptionUsage(id, signal),
-      getTrainerPackages(signal), getTrainerPortalPendingPayments(signal),
+      getTrainerPackages(signal, { isActive: true }),
     ]);
     if (revision !== loadRevision.current || signal.aborted) return;
     if (clientResult.status === "rejected") throw clientResult.reason;
@@ -275,8 +274,8 @@ export default function ClientPaymentsPageClient({
     setSubscriptionError(subscriptionResult.status === "rejected" ? trainerPaymentError(subscriptionResult.reason, "Nie udało się pobrać odnowień pakietu.") : null);
     setUsageError(usageResult.status === "rejected" ? trainerPaymentError(usageResult.reason, "Nie udało się pobrać wykorzystania pakietu.") : null);
     setCatalogError(catalogResult.status === "rejected" ? trainerPaymentError(catalogResult.reason, "Nie udało się pobrać oferty pakietów.") : null);
-    setConfirmablePaymentIds(new Set(pendingResult.status === "fulfilled" ? pendingResult.value.filter(payment => payment.clientId === id).map(payment => payment.id) : []));
-    setPendingPaymentsError(pendingResult.status === "rejected" ? trainerPaymentError(pendingResult.reason, "Nie udało się sprawdzić wpłat oczekujących.") : null);
+    setConfirmablePaymentIds(new Set((billingResult.value.payments || []).filter(payment => payment.clientId === id && payment.canConfirm === true).map(payment => payment.id)));
+    setPendingPaymentsError(null);
     setClient(mappedClient); setBilling(billingData); setSubscription(subscriptionData);
     setUsage(usageResult.status === "fulfilled" ? usageResult.value : null);
     setClientPayments(billingData.payments || []); setPaymentPage(1);
@@ -294,9 +293,9 @@ export default function ClientPaymentsPageClient({
     setIsLoading(true); setLoadError(null);
     const signal = controller.signal;
     try {
-      const [billingResult, subscriptionResult, usageResult, pendingResult] = await Promise.allSettled([
+      const [billingResult, subscriptionResult, usageResult] = await Promise.allSettled([
         getTrainerPortalClientBilling(id, signal), getTrainerPortalClientSubscription(id, signal),
-        getTrainerPortalClientSubscriptionUsage(id, signal), getTrainerPortalPendingPayments(signal),
+        getTrainerPortalClientSubscriptionUsage(id, signal),
       ]);
       if (revision !== loadRevision.current || signal.aborted) return;
       if (billingResult.status === "rejected") throw billingResult.reason;
@@ -307,8 +306,8 @@ export default function ClientPaymentsPageClient({
       setSubscriptionError(subscriptionResult.status === "rejected" ? trainerPaymentError(subscriptionResult.reason, "Nie udało się pobrać odnowień pakietu.") : null);
       setUsage(usageResult.status === "fulfilled" ? usageResult.value : null);
       setUsageError(usageResult.status === "rejected" ? trainerPaymentError(usageResult.reason, "Nie udało się pobrać wykorzystania pakietu.") : null);
-      setConfirmablePaymentIds(new Set(pendingResult.status === "fulfilled" ? pendingResult.value.filter(payment => payment.clientId === id).map(payment => payment.id) : []));
-      setPendingPaymentsError(pendingResult.status === "rejected" ? trainerPaymentError(pendingResult.reason, "Nie udało się sprawdzić wpłat oczekujących.") : null);
+      setConfirmablePaymentIds(new Set((billingResult.value.payments || []).filter(payment => payment.clientId === id && payment.canConfirm === true).map(payment => payment.id)));
+      setPendingPaymentsError(null);
       setPaymentAmount(typeof billingResult.value.activePackageAmountDue === "number" ? String(Math.max(billingResult.value.activePackageAmountDue, 0)) : "");
     } catch (error) {
       if (revision === loadRevision.current && !signal.aborted) { setBilling(null); setLoadError(trainerPaymentError(error, "Nie udało się odświeżyć rozliczeń klienta.")); }
@@ -591,7 +590,7 @@ export default function ClientPaymentsPageClient({
   async function handleConfirmPayment(payment: ClientPayment) {
     if (!clientId || mutationLock.current || isLoading || !billing || loadError) return;
 
-    if (basePath === "/trainer" && !confirmablePaymentIds.has(payment.id)) return;
+    if (basePath === "/trainer" && (payment.canConfirm !== true || !confirmablePaymentIds.has(payment.id))) return;
 
     if (!isPendingPayment(payment)) {
       showOwnerSuccess("Ta wpłata nie wymaga potwierdzenia.", {
@@ -884,7 +883,7 @@ export default function ClientPaymentsPageClient({
                 isLoading={false}
                 processingId={processingPaymentId}
                 showClient={false}
-                canConfirm={basePath === "/trainer" ? (payment) => confirmablePaymentIds.has(payment.id) : undefined}
+                canConfirm={basePath === "/trainer" ? (payment) => payment.canConfirm === true && confirmablePaymentIds.has(payment.id) : undefined}
                 emptyTitle="Brak wpłat klienta"
                 emptyMessage="Pierwsza wpłata pojawi się tutaj po jej dodaniu."
                 onConfirm={(payment) =>

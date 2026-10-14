@@ -57,7 +57,7 @@ export default function ClientMetricCards({
 }: {
   client: Client;
   subscription: ClientSubscription | null;
-  billing?: ClientBillingSummary | null;
+  billing?: Pick<ClientBillingSummary, "totalAmountDue" | "currentBalance" | "activeClientPackageId" | "activePackageName"> | null;
   usage?: SubscriptionUsage | null;
   preserveMissingData?: boolean;
 }) {

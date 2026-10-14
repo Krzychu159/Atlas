@@ -74,7 +74,7 @@ export default function TrainerPaymentsPage() {
   const currentPage = Math.min(page, Math.max(1, Math.ceil(filteredPayments.length / PAGE_SIZE)));
 
   async function submitAction() {
-    if (!action || submitting.current) return;
+    if (!action || submitting.current || (action.type === "confirm" && action.payment.canConfirm !== true)) return;
     submitting.current = true;
     setProcessingId(action.payment.id);
     try {
@@ -121,7 +121,8 @@ export default function TrainerPaymentsPage() {
             getDetailsHref={(payment) => "/trainer/clients/" + payment.clientId + "/payments"}
             emptyTitle={payments.length ? "Brak pasujących wpłat" : "Brak wpłat oczekujących"}
             emptyMessage={payments.length ? "Zmień wyszukiwanie lub metodę płatności." : "Wszystkie wpłaty wymagające ręcznego potwierdzenia zostały obsłużone."}
-            onConfirm={(payment) => { if (!submitting.current) setAction({ type: "confirm", payment }); }}
+            canConfirm={(payment) => payment.canConfirm === true}
+            onConfirm={(payment) => { if (!submitting.current && payment.canConfirm === true) setAction({ type: "confirm", payment }); }}
             onReject={(payment) => { if (!submitting.current) { setReason(""); setAction({ type: "reject", payment }); } }} />
           {!isLoading && filteredPayments.length > 0 ? <PaymentPagination page={currentPage} pageSize={PAGE_SIZE} totalItems={filteredPayments.length} onPageChange={setPage} /> : null}
         </>}

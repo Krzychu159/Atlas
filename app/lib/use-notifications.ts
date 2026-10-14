@@ -3,11 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { getErrorMessage, isAbortError } from "./backend";
-import { getNotifications, getNotificationCategories, getUnreadNotificationCount, markNotificationAsRead, markAllNotificationsAsRead, NOTIFICATIONS_CHANGED_EVENT, type AppNotification, type NotificationCategory, type UnreadCountResponse } from "./notifications";
+import { getNotificationsPage, getNotifications, getNotificationCategories, getUnreadNotificationCount, markNotificationAsRead, markAllNotificationsAsRead, NOTIFICATIONS_CHANGED_EVENT, type AppNotification, type NotificationCategory, type UnreadCountResponse } from "./notifications";
 
 export function useNotifications(open = true, initialCategory = "", initialRead = "", panel = false) {
   const [category, setCategory] = useState(initialCategory);
   const [readFilter, setReadFilter] = useState(initialRead === "true" || initialRead === "false" ? initialRead : "");
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 25;
+  const requestKey = `${open}:${panel}:${category}:${readFilter}:${page}`;
+  const [loadedKey, setLoadedKey] = useState("");
   const [categories, setCategories] = useState<NotificationCategory[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [counts, setCounts] = useState<UnreadCountResponse>({ unreadCount: 0, unreadByCategory: {} });
@@ -58,20 +63,23 @@ export function useNotifications(open = true, initialCategory = "", initialRead 
       setError(null);
       try {
         const [items, count] = await Promise.all([
-          getNotifications({ category: category || undefined, isRead: readFilter === "" ? undefined : readFilter === "true" }, controller.signal),
+          panel
+            ? getNotifications({ category: category || undefined, isRead: readFilter === "" ? undefined : readFilter === "true" }, controller.signal).then(items => ({ items, totalCount: items.length, totalPages: 1 }))
+            : getNotificationsPage({ page, pageSize, category: category || undefined, isRead: readFilter === "" ? undefined : readFilter === "true" }, controller.signal),
           getUnreadNotificationCount(undefined, controller.signal),
         ]);
         if (!active) return;
-        setNotifications(items);
+        if (!panel && page > Math.max(1, items.totalPages)) { setPage(Math.max(1, items.totalPages)); return; }
+        setNotifications(items.items || []); setTotalCount(items.totalCount); setLoadedKey(requestKey);
         setCounts(count);
       } catch (error) {
-        if (active && !isAbortError(error)) setError(getErrorMessage(error, "Nie udało się pobrać powiadomień."));
+        if (active && !isAbortError(error)) { setError(getErrorMessage(error, "Nie udało się pobrać powiadomień.")); setLoadedKey(requestKey); setNotifications([]); }
       } finally {
         if (active) setLoading(false);
       }
     });
     return () => { active = false; controller.abort(); };
-  }, [open, category, readFilter, revision]);
+  }, [open, category, readFilter, revision, page, panel, requestKey]);
 
   function handleMarkAsRead(id: number): Promise<boolean> {
     const existing = pending.current.get(id);
@@ -112,5 +120,5 @@ export function useNotifications(open = true, initialCategory = "", initialRead 
     }
     finally { allPending.current = false; setMarkingAll(false); }
   }
-  return { category, setCategory, readFilter, setReadFilter, categories, notifications, counts, unreadCount, loading, error: error || categoryError, markingIds, markingAll, handleMarkAsRead, handleMarkAllAsRead, loadNotifications };
+  return { page, pageSize, totalCount, setPage, category, setCategory: (value: string) => { setCategory(value); setPage(1); }, readFilter, setReadFilter: (value: string) => { setReadFilter(value); setPage(1); }, categories, notifications: loadedKey === requestKey ? notifications : [], counts, unreadCount, loading: loading || loadedKey !== requestKey, error: error || categoryError, markingIds, markingAll, handleMarkAsRead, handleMarkAllAsRead, loadNotifications };
 }

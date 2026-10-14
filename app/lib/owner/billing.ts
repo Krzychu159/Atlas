@@ -13,6 +13,7 @@ export const paymentMethodOptions = [
 ];
 
 export type ClientPayment = {
+  canConfirm?: boolean;
   id: number;
   clientId: number;
   clientName: string | null;

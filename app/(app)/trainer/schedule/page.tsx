@@ -73,26 +73,33 @@ export default function TrainerSchedulePage() {
   const locations = useMemo(() => trainerPortalMeToLocations(me), [me]);
   const trainers = useMemo(() => { const trainer = trainerPortalMeToTrainer(me); return trainer ? [trainer] : []; }, [me]);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(anchorDate), index)), [anchorDate]);
-  const visibleSessions = useMemo(() => sortSessions(sessions.filter(session => {
+  const rangeFrom = period.from.toISOString();
+  const rangeTo = period.to.toISOString();
+  const rangeKey = `${rangeFrom}:${rangeTo}`;
+  const [loadedRange, setLoadedRange] = useState<string | null>(null);
+  const [previousRange, setPreviousRange] = useState(rangeKey);
+  if (previousRange !== rangeKey) { setPreviousRange(rangeKey); setIsLoading(true); setLoadError(null); }
+  const visibleSessions = useMemo(() => sortSessions((loadedRange === rangeKey ? sessions : []).filter(session => {
     const start = Date.parse(session.startAt), end = Date.parse(session.endAt);
     return start <= period.to.getTime() && end > period.from.getTime() && matchesStatusFilter(session, statusFilter);
-  })), [sessions, period, statusFilter]);
+  })), [sessions, period, statusFilter, loadedRange, rangeKey]);
 
   const loadSessions = useCallback(async () => {
     if (!mounted.current) return;
     sessionController.current?.abort();
     const controller = new AbortController(); sessionController.current = controller;
     const revision = ++loadRevision.current;
-    return getTrainerPortalSessions(controller.signal).then(data => {
+    return getTrainerPortalSessions(controller.signal, { from: rangeFrom, to: rangeTo }).then(data => {
       if (revision !== loadRevision.current) return;
       setSessions(trainerPortalSessionsToCalendarSessions({ sessions: data }));
+      setLoadedRange(rangeKey);
     }).catch(error => {
       if (revision !== loadRevision.current) return;
       setLoadError(trainerPaymentError(error, "Nie udało się pobrać zajęć. Spróbuj ponownie."));
     }).finally(() => {
       if (revision === loadRevision.current) setIsLoading(false);
     });
-  }, []);
+  }, [rangeFrom, rangeTo, rangeKey]);
   function reloadSessions() { setIsLoading(true); setLoadError(null); return loadSessions(); }
 
   const loadResources = useCallback(async () => {
@@ -115,8 +122,11 @@ export default function TrainerSchedulePage() {
 
   useEffect(() => {
     mounted.current = true;
+    return () => { mounted.current = false; detailRevision.current += 1; detailController.current?.abort(); };
+  }, []);
+  useEffect(() => {
     void loadSessions();
-    return () => { mounted.current = false; loadRevision.current += 1; detailRevision.current += 1; sessionController.current?.abort(); detailController.current?.abort(); };
+    return () => { loadRevision.current += 1; sessionController.current?.abort(); };
   }, [loadSessions, calendarRevision]);
   useEffect(() => { void loadResources(); return () => { resourceRevision.current += 1; resourceController.current?.abort(); }; }, [loadResources]);
   useEffect(() => {

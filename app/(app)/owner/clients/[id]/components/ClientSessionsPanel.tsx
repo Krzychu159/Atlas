@@ -17,8 +17,10 @@ function getStatusStyles(status?: string | null) {
 
 export default function ClientSessionsPanel({
   sessions,
+  totalCount,
 }: {
-  sessions: OwnerSession[];
+  sessions: (Pick<OwnerSession, "id" | "title" | "startAt" | "trainerFullName" | "status"> & { participants?: OwnerSession["participants"] })[];
+  totalCount?: number;
 }) {
   const visibleSessions = [...sessions]
     .sort(
@@ -32,7 +34,7 @@ export default function ClientSessionsPanel({
       <div className="flex items-center justify-between gap-4">
         <p className="text-section-title">Sesje klienta</p>
         <p className="text-label text-on-surface-muted">
-          {sessions.length} przypisanych
+          {totalCount ?? sessions.length} przypisanych
         </p>
       </div>
 
@@ -59,7 +61,7 @@ export default function ClientSessionsPanel({
                       {session.trainerFullName || "Brak trenera"}
                     </p>
                     <p className="mt-1 text-xs font-semibold text-tertiary-light">
-                      {getOwnerSessionPackageName(session)}
+                      {session.participants === undefined ? "Dane pakietu niedostępne" : getOwnerSessionPackageName(session)}
                     </p>
                   </div>
                 </div>

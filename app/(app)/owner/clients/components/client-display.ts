@@ -1,3 +1,4 @@
+import { periodRangeLabel } from "@/app/lib/period-packages";
 import type { ClientListItem } from "@/app/lib/owner/clients";
 
 function firstNumber(...values: Array<number | null | undefined>) {
@@ -62,6 +63,7 @@ export function formatClientBalance(client: ClientListItem, preserveMissingData 
 export function hasActiveClientPackage(client: ClientListItem): boolean;
 export function hasActiveClientPackage(client: ClientListItem, preserveMissingData: boolean): boolean | null;
 export function hasActiveClientPackage(client: ClientListItem, preserveMissingData = false) {
+  if (Array.isArray(client.activePackages)) return client.activePackages.length > 0;
   // Array.filter passes the item index as the second argument.
   if (preserveMissingData === true) {
     if (typeof client.hasActivePackage === "boolean") return client.hasActivePackage;
@@ -100,19 +102,28 @@ export function hasActiveClientPackage(client: ClientListItem, preserveMissingDa
 }
 
 export function getClientPackageUsage(client: ClientListItem, preserveMissingData = false) {
+  const primary = client.activePackages?.find(item => item.clientPackageId === client.activeClientPackageId) || client.activePackages?.[0];
+  if (primary?.billingMode === "PeriodBased") {
+    return { packageName: primary.name || "Pakiet okresowy", used: null, limit: null,
+      percent: 0, sortPercent: null, paymentStatus: primary.paymentStatus || "",
+      label: periodRangeLabel(primary.periodStartsAt, primary.validUntil) };
+  }
   const hasPackage = hasActiveClientPackage(client, preserveMissingData);
   const limit = firstNumber(
+    primary?.totalSessions,
     client.activePackageTotalSessions,
     client.packageSessionsLimit,
     client.sessionsLimit,
   );
   const directUsed = firstNumber(
+    primary?.usedSessions,
     client.activePackageUsedSessions,
     client.packageSessionsUsed,
     client.usedSessions,
     client.sessionsUsed,
   );
   const remaining = firstNumber(
+    primary?.remainingSessions,
     client.activePackageRemainingSessions,
     client.remainingSessions,
   );
@@ -134,6 +145,7 @@ export function getClientPackageUsage(client: ClientListItem, preserveMissingDat
 
   const packageName =
     (preserveMissingData && hasPackage === false ? "Brak aktywnego pakietu" : null) ||
+    primary?.name ||
     client.activeClientPackageName ||
     client.currentPackageName ||
     client.activePackageName ||

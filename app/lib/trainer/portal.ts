@@ -1,6 +1,7 @@
 import type { GroupSessionFields, GroupSessionSettings } from "../group-sessions";
 import { backendGet, backendPatch, backendPost, backendPut } from "../backend";
 import type {
+  ClientListPackage,
   ClientSubscription,
   ClientTrainingPlan,
   SubscriptionUsage,
@@ -138,6 +139,10 @@ export type TrainerSessionPayload = GroupSessionSettings & {
 export type UpdateTrainerSessionPayload = Partial<TrainerSessionPayload> & { correctionReason?: string | null };
 
 export type TrainerPortalClient = {
+  trainerId?: number | null;
+  trainerFullName?: string | null;
+  locationId?: number;
+  activePackages?: ClientListPackage[] | null;
   clientId: number;
   activePackageId?: number | null;
   activeClientPackageId?: number | null;
@@ -306,6 +311,11 @@ export type TrainerPortalSettlement = {
   nonContractedItems: TrainerPortalSettlementItem[];
 };
 
+export type TrainerSettlementSummary = Omit<TrainerPortalSettlement, "items" | "nonContractedItems">;
+export function getTrainerSettlementSummary(year: number, month: number, signal?: AbortSignal) {
+  return backendGet<TrainerSettlementSummary | null>("trainer-portal/settlement/summary", { year, month }, signal);
+}
+
 export function getTrainerPortalSettlement(year: number, month: number) {
   return backendGet<TrainerPortalSettlement | null>("trainer-portal/settlement", {
     year,
@@ -333,8 +343,8 @@ export function updateTrainerPortalClient(
   );
 }
 
-export function getTrainerPortalSessions(signal?: AbortSignal) {
-  return backendGet<TrainerPortalSession[]>("trainer-portal/sessions", undefined, signal);
+export function getTrainerPortalSessions(signal?: AbortSignal, range?: { from: string; to: string }) {
+  return backendGet<TrainerPortalSession[]>("trainer-portal/sessions", range, signal);
 }
 
 export function getTrainerPortalSession(sessionId: number, signal?: AbortSignal) {

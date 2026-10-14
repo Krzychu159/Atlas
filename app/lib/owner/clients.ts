@@ -13,7 +13,15 @@ export type PortalAccessStatus =
   | "Active"
   | "Blocked";
 
+export type ClientListPackage = {
+  clientPackageId: number; packageId: number; name: string | null;
+  billingMode: "SessionBased" | "PeriodBased"; status: string | null; paymentStatus: string | null;
+  totalSessions: number | null; usedSessions: number | null; remainingSessions: number | null;
+  validUntil: string | null; periodStartsAt: string | null; locationId: number | null;
+};
+
 export type Client = {
+  activePackages?: ClientListPackage[] | null;
   id: number;
   userId?: number | null;
   trainerId: number | null;

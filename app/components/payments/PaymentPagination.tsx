@@ -7,6 +7,8 @@ type PaymentPaginationProps = {
   pageSize: number;
   totalItems: number;
   onPageChange: (page: number) => void;
+  itemLabel?: string;
+  ariaLabel?: string;
 };
 
 export function PaymentPagination({
@@ -14,6 +16,8 @@ export function PaymentPagination({
   pageSize,
   totalItems,
   onPageChange,
+  itemLabel = "płatności",
+  ariaLabel = "Paginacja płatności",
 }: PaymentPaginationProps) {
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const firstItem = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -22,12 +26,12 @@ export function PaymentPagination({
 
   return (
     <nav
-      aria-label="Paginacja płatności"
+      aria-label={ariaLabel}
       className="flex flex-col gap-3 bg-surface-container-low px-4 py-4 sm:flex-row sm:items-center sm:justify-between md:px-5"
     >
       <p className="text-xs text-on-surface-muted">
         Pokazano <strong className="font-semibold text-on-surface-variant">{firstItem}–{lastItem}</strong> z{" "}
-        <strong className="font-semibold text-on-surface-variant">{totalItems}</strong> płatności
+        <strong className="font-semibold text-on-surface-variant">{totalItems}</strong> {itemLabel}
       </p>
 
       <div className="flex items-center gap-1.5">
