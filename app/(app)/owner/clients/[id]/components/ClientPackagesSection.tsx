@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { CalendarDays, Dumbbell, MapPin, UsersRound } from "lucide-react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Dumbbell, Info, MapPin, UsersRound } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import { Tooltip } from "@/app/components/ui/tooltip";
 import { getPackageClosureLabel, getPackageOriginLabel, getPackagePaymentStatusLabel, type ClientPackageBilling } from "@/app/lib/owner/billing";
 import { formatMoney as formatKnownMoney } from "@/app/lib/formatters/money";
 import { userTrainingType } from "@/app/lib/user-messages";
@@ -50,12 +51,14 @@ export default function ClientPackagesSection({
   clientId,
   onSaved,
   audience = "staff",
+  embedded = false,
 }: {
   packages: ClientPackageBilling[] | null | undefined;
   activeClientPackageId?: number | null;
   clientId?: number;
   onSaved?: () => Promise<void>;
   audience?: "staff" | "client";
+  embedded?: boolean;
 }) {
   const [managedPackage, setManagedPackage] = useState<ClientPackageBilling | null>(null);
   const [expiryPackage, setExpiryPackage] = useState<ClientPackageBilling | null>(null);
@@ -74,49 +77,62 @@ export default function ClientPackagesSection({
   const groupPackages = sortedPackages.filter(isGroupClientPackage);
   const history = sortedPackages.filter((item) => item !== mainPackage && !isGroupClientPackage(item));
   const visiblePackages = history.slice(0, Math.max(visibleCount, history.findIndex((item) => item.clientPackageId === highlightedId) + 1));
+  const shellClassName = embedded ? "min-w-0" : "card-shell min-w-0 p-5 md:p-6";
+  const canManage = Boolean(clientId && onSaved);
 
   async function handleSaved(clientPackageId?: number) {
     if (clientPackageId !== undefined) setHighlightedId(clientPackageId);
     await onSaved?.();
   }
 
-  if (packages === undefined) return <section className="card-shell p-5 md:p-6"><p className="text-section-title">Pakiety klienta</p><p className="mt-4 text-sm text-on-surface-variant">Dane pakietów są obecnie niedostępne.</p></section>;
+  function renderCard(item: ClientPackageBilling) {
+    return (
+      <ClientPackageCard
+        key={item.clientPackageId}
+        packageData={item}
+        highlighted={item.clientPackageId === highlightedId}
+        onManage={canManage ? () => setManagedPackage(item) : undefined}
+        onExpiry={canManage ? () => setExpiryPackage(item) : undefined}
+      />
+    );
+  }
+
+  if (packages === undefined) {
+    return (
+      <section className={shellClassName}>
+        {embedded ? null : <p className="mb-3 text-section-title">Pakiety klienta</p>}
+        <p className="text-sm text-on-surface-variant">Dane pakietów są obecnie niedostępne.</p>
+      </section>
+    );
+  }
 
   return (
-    <section className="card-shell p-5 md:p-6">
-      <div>
-        <p className="text-label text-on-surface-muted">{audience === "client" ? "Twoje pakiety" : "Pakiety klienta"}</p>
-        <h2 className="mt-2 font-display text-[1.65rem] font-semibold leading-tight">
-          Pakiet indywidualny
-        </h2>
+    <section className={shellClassName}>
+      {embedded ? null : <p className="mb-4 text-label text-on-surface-muted">{audience === "client" ? "Twoje pakiety" : "Pakiety klienta"}</p>}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-on-surface">Pakiet indywidualny</h3>
+        {canManage ? <Button variant="secondary" size="sm" className="h-8 px-3" onClick={() => setIsImportOpen(true)}>Wprowadź trwający pakiet</Button> : null}
       </div>
-      {clientId && onSaved ? <Button variant="secondary" className="mt-4 w-full sm:w-auto" onClick={() => setIsImportOpen(true)}>Wprowadź trwający pakiet</Button> : null}
+      {mainPackage ? <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{renderCard(mainPackage)}</div> : <p className="mt-2 text-xs text-on-surface-variant">{audience === "client" ? "Nie masz bieżącego pakietu indywidualnego. Twoje pakiety grupowe pozostają dostępne niezależnie." : "Klient nie ma bieżącego pakietu indywidualnego. Pakiety grupowe pozostają dostępne niezależnie."}</p>}
 
-      {mainPackage ? <div className="mt-5"><ClientPackageCard packageData={mainPackage} highlighted={mainPackage.clientPackageId === highlightedId} onManage={clientId && onSaved ? () => setManagedPackage(mainPackage) : undefined} onExpiry={clientId && onSaved ? () => setExpiryPackage(mainPackage) : undefined} /></div> : <p className="mt-4 text-sm text-on-surface-variant">{audience === "client" ? "Nie masz bieżącego pakietu indywidualnego. Twoje pakiety grupowe pozostają dostępne niezależnie." : "Klient nie ma bieżącego pakietu indywidualnego. Pakiety grupowe pozostają dostępne niezależnie."}</p>}
-      <h2 className="mt-6 text-section-title">Pakiety grupowe</h2>
-      <p className="mt-2 text-xs text-on-surface-muted">Pakiety grupowe nie odnawiają się automatycznie.</p>
-      {groupPackages.length ? <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{groupPackages.map((item) => <ClientPackageCard key={item.clientPackageId} packageData={item} highlighted={item.clientPackageId === highlightedId} onManage={clientId && onSaved ? () => setManagedPackage(item) : undefined} onExpiry={clientId && onSaved ? () => setExpiryPackage(item) : undefined} />)}</div> : <p className="mt-4 text-sm text-on-surface-variant">Brak pakietów grupowych.</p>}
-      <h2 className="mt-6 text-section-title">Pozostałe pakiety indywidualne</h2>
+      <div className="mt-5 flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-on-surface">Pakiety grupowe</h3>
+        <InfoTooltip label="Pakiety grupowe nie odnawiają się automatycznie." align="start" />
+      </div>
+      {groupPackages.length ? <div className="mt-3 grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{groupPackages.map(renderCard)}</div> : <p className="mt-2 text-xs text-on-surface-variant">Brak pakietów grupowych.</p>}
 
+      <h3 className="mt-5 text-sm font-semibold text-on-surface">Pozostałe pakiety indywidualne</h3>
       {visiblePackages.length ? (
         <>
-          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {visiblePackages.map((packageData) => (
-              <ClientPackageCard
-                key={packageData.clientPackageId}
-                packageData={packageData}
-                highlighted={packageData.clientPackageId === highlightedId}
-                onManage={clientId && onSaved ? () => setManagedPackage(packageData) : undefined}
-                onExpiry={clientId && onSaved ? () => setExpiryPackage(packageData) : undefined}
-              />
-            ))}
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {visiblePackages.map(renderCard)}
           </div>
           {visiblePackages.length < history.length ? (
             <Button
               type="button"
               variant="secondary"
               size="sm"
-              className="mt-4"
+              className="mt-3 h-8 px-3"
               onClick={() => setVisibleCount((current) => current + 6)}
             >
               Pokaż więcej
@@ -124,9 +140,7 @@ export default function ClientPackagesSection({
           ) : null}
         </>
       ) : (
-        <div className="mt-5 rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 text-sm text-on-surface-variant">
-          Brak pozostałych pakietów indywidualnych.
-        </div>
+        <p className="mt-2 text-xs text-on-surface-variant">Brak pozostałych pakietów indywidualnych.</p>
       )}
       {managedPackage && clientId && onSaved ? <PackageManagementModal key={managedPackage.clientPackageId} clientId={clientId} packageData={managedPackage} onClose={() => setManagedPackage(null)} onSaved={handleSaved} /> : null}
       {expiryPackage && clientId && onSaved ? <PackageExpiryDecisionModal key={expiryPackage.clientPackageId} clientId={clientId} packageData={expiryPackage} onClose={() => setExpiryPackage(null)} onSaved={handleSaved} /> : null}
@@ -148,82 +162,117 @@ function ClientPackageCard({
 }) {
   const packageKind = getClientPackageKind(packageData);
   const isGroup = packageKind === "group";
+  const currency = packageData.currency || "PLN";
+  const kindLabel = packageKind === "group" ? "Grupowy" : packageKind === "main" ? "Indywidualny / semi" : "Typ nieokreślony";
+  const originLabel = getPackageOriginLabel(packageData.origin);
+  const closureLabel = getPackageClosureLabel(packageData.closureDisposition);
+  const canDecideExpiry = Boolean(onExpiry) && canDecidePackageExpiry(packageData);
+  const details: [string, string][] = [
+    ["Typ", userTrainingType(String(packageData.expectedBillingType), packageKind === "group" ? "Grupowy" : packageKind === "main" ? "Indywidualny / semi" : "Brak danych")],
+    ["Cena", formatMoney(packageData.totalPrice, currency)],
+    ["Pozostałe wejścia", String(packageData.remainingSessions ?? "Brak danych")],
+    ["Płatność", getPackagePaymentStatusLabel(packageData.paymentStatus)],
+    ["Termin płatności", formatPackageDate(packageData.paymentDueDate)],
+    ["Zakup", formatPackageDate(packageData.purchaseDate)],
+  ];
+  if (packageData.activatedAt) details.push(["Aktywacja", formatPackageDate(packageData.activatedAt)]);
+  if (originLabel) details.push(["Pochodzenie", originLabel]);
 
   return (
-    <article className={`min-w-0 rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 ${highlighted ? "ring-2 ring-primary-light" : ""}`}>
-      {highlighted ? <p role="status" className="mb-3 text-xs font-semibold text-primary-light">Ostatnio zapisany pakiet</p> : null}
-      <div className="flex items-start justify-between gap-3">
+    <article className={`min-w-0 rounded-[var(--radius-lg)] bg-surface-container-lowest p-3 ${highlighted ? "ring-2 ring-primary-light" : ""}`}>
+      {highlighted ? <p role="status" className="mb-2 text-[11px] font-semibold text-primary-light">Ostatnio zapisany pakiet</p> : null}
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-low px-2.5 py-1 text-[10px] font-semibold text-primary-light">
-            {isGroup ? <UsersRound size={12} /> : <Dumbbell size={12} />}
-            {packageKind === "group"
-              ? "Grupowy"
-              : packageKind === "main"
-                ? "Indywidualny / semi"
-                : "Typ nieokreślony"}
-          </span>
-          <h3 className="mt-3 break-words text-base font-semibold">
+          <h4 className="break-words text-sm font-semibold leading-snug">
             {packageData.packageName || "Pakiet bez nazwy"}
-          </h3>
+          </h4>
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-on-surface-muted">
+            <span className="inline-flex items-center gap-1 text-primary-light">
+              {isGroup ? <UsersRound size={11} /> : <Dumbbell size={11} />}
+              {kindLabel}
+            </span>
+            <span className="inline-flex min-w-0 items-center gap-1">
+              <MapPin size={11} className="shrink-0" />
+              {packageData.locationName || "Brak lokalizacji"}
+            </span>
+          </p>
         </div>
-        <span className="shrink-0 rounded-full bg-tertiary-container/45 px-2.5 py-1 text-[10px] font-semibold text-tertiary-light">
-          {getPackageStatusLabel(packageData)}
-        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="rounded-full bg-tertiary-container/45 px-2 py-0.5 text-[10px] font-semibold text-tertiary-light">
+            {getPackageStatusLabel(packageData)}
+          </span>
+          <InfoTooltip
+            align="end"
+            srLabel={`Szczegóły pakietu: ${details.map(([label, value]) => `${label}: ${value}`).join(", ")}`}
+            label={
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                {details.map(([label, value]) => (
+                  <Fragment key={label}>
+                    <dt className="text-on-surface-muted">{label}</dt>
+                    <dd>{value}</dd>
+                  </Fragment>
+                ))}
+              </dl>
+            }
+          />
+        </div>
       </div>
-      {getPackageOriginLabel(packageData.origin) ? <p className="mt-3 text-xs text-primary-light">{getPackageOriginLabel(packageData.origin)}</p> : null}
-      {getPackageClosureLabel(packageData.closureDisposition) ? <p className="mt-3 text-sm font-semibold text-on-surface-variant">{getPackageClosureLabel(packageData.closureDisposition)}</p> : null}
 
-      <p className="mt-4 flex items-center gap-2 text-sm text-on-surface-variant">
-        <MapPin size={14} className="shrink-0 text-primary-light" />
-        {packageData.locationName || "Brak lokalizacji pakietu"}
-      </p>
-
-      <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-        <div><dt className="text-on-surface-muted">Typ</dt><dd>{userTrainingType(String(packageData.expectedBillingType), packageKind === "group" ? "Grupowy" : packageKind === "main" ? "Indywidualny / semi" : "Brak danych")}</dd></div>
-        <div><dt className="text-on-surface-muted">Cena</dt><dd>{formatMoney(packageData.totalPrice, packageData.currency || "PLN")}</dd></div>
-        <div><dt className="text-on-surface-muted">Pozostałe wejścia</dt><dd>{packageData.remainingSessions ?? "Brak danych"}</dd></div>
-        <div><dt className="text-on-surface-muted">Ważność</dt><dd>{formatPackageInstant(packageData.validUntil)}</dd></div>
-        <div><dt className="text-on-surface-muted">Termin płatności</dt><dd>{formatPackageDate(packageData.paymentDueDate)}</dd></div>
-        <div><dt className="text-on-surface-muted">Płatność</dt><dd>{getPackagePaymentStatusLabel(packageData.paymentStatus)}</dd></div>
-        {packageData.closureReason ? <div className="sm:col-span-2"><dt className="text-on-surface-muted">Powód zamknięcia</dt><dd className="break-words">{packageData.closureReason}</dd></div> : null}
-        {packageData.closedAt ? <div><dt className="text-on-surface-muted">Data zamknięcia</dt><dd>{formatPackageDate(packageData.closedAt)}</dd></div> : null}
-        {packageData.refundAmount > 0 ? <div><dt className="text-on-surface-muted">Kwota zwrotu</dt><dd>{formatMoney(packageData.refundAmount, packageData.currency)}</dd></div> : null}
-        {packageData.refundConfirmedAt ? <div><dt className="text-on-surface-muted">Zwrot potwierdzony</dt><dd>{formatPackageDate(packageData.refundConfirmedAt)}</dd></div> : null}
-        {packageData.refundReference ? <div><dt className="text-on-surface-muted">Potwierdzenie zwrotu</dt><dd className="break-words">{packageData.refundReference}</dd></div> : null}
+      <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
+        <CardStat label="Wejścia" value={`${packageData.usedSessions ?? "—"}/${packageData.totalSessions ?? "—"}`} />
+        <CardStat label="Ważność" value={formatPackageInstant(packageData.validUntil)} />
+        <CardStat label="Zapłacono" value={formatMoney(packageData.amountPaid, currency)} />
+        <CardStat label="Do zapłaty" value={formatMoney(packageData.amountDue, currency)} accent />
       </dl>
 
-      <p className="mt-2 flex items-center gap-2 text-sm text-on-surface-variant">
-        <CalendarDays size={14} className="shrink-0 text-primary-light" />
-        Zakup: {formatPackageDate(packageData.purchaseDate)}
-        {packageData.activatedAt
-          ? ` · Aktywacja: ${formatPackageDate(packageData.activatedAt)}`
-          : ""}
-      </p>
+      {closureLabel || packageData.closureReason || packageData.closedAt || packageData.refundAmount > 0 || packageData.refundReference ? (
+        <dl className="mt-3 grid grid-cols-1 gap-1.5 border-t border-white/5 pt-2 text-xs sm:grid-cols-2">
+          {closureLabel ? <div className="font-semibold text-on-surface-variant sm:col-span-2">{closureLabel}</div> : null}
+          {packageData.closureReason ? <InlineDetail label="Powód zamknięcia" value={packageData.closureReason} wide /> : null}
+          {packageData.closedAt ? <InlineDetail label="Zamknięto" value={formatPackageDate(packageData.closedAt)} /> : null}
+          {packageData.refundAmount > 0 ? <InlineDetail label="Kwota zwrotu" value={formatMoney(packageData.refundAmount, packageData.currency)} /> : null}
+          {packageData.refundConfirmedAt ? <InlineDetail label="Zwrot potwierdzony" value={formatPackageDate(packageData.refundConfirmedAt)} /> : null}
+          {packageData.refundReference ? <InlineDetail label="Potwierdzenie zwrotu" value={packageData.refundReference} /> : null}
+        </dl>
+      ) : null}
 
-      <div className="mt-4 grid grid-cols-1 items-end gap-3 border-t border-white/5 pt-4 sm:grid-cols-3">
-        <div>
-          <p className="text-label text-on-surface-muted">Wykorzystanie</p>
-          <p className="mt-1 text-sm font-semibold">
-            {packageData.usedSessions ?? "—"}/{packageData.totalSessions ?? "—"}
-          </p>
+      {isPackageExpired(packageData.validUntil) ? <p className="mt-2 text-[11px] leading-4 text-on-surface-muted">Ważność minęła. Trening odbyty przed końcem ważności nadal może zostać rozliczony.</p> : null}
+      {canDecideExpiry || onManage ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {canDecideExpiry ? <Button size="sm" className="h-8 flex-1 px-3" onClick={onExpiry}>Przedłuż / Zakończ pakiet</Button> : null}
+          {onManage ? <Button size="sm" className="h-8 flex-1 px-3" variant="secondary" onClick={onManage}>Zarządzaj pakietem</Button> : null}
         </div>
-        <div className="text-right">
-          <p className="text-label text-on-surface-muted">Zapłacono</p>
-          <p className="mt-1 text-sm font-semibold">
-            {formatMoney(packageData.amountPaid, packageData.currency || "PLN")}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-label text-on-surface-muted">Do zapłaty</p>
-          <p className="mt-1 text-sm font-semibold text-tertiary-light">
-            {formatMoney(packageData.amountDue, packageData.currency || "PLN")}
-          </p>
-        </div>
-      </div>
-      {isPackageExpired(packageData.validUntil) ? <p className="mt-4 text-sm text-on-surface-variant">Ważność pakietu minęła. Trening odbyty przed końcem ważności nadal może zostać rozliczony.</p> : null}
-      {onExpiry && canDecidePackageExpiry(packageData) ? <Button className="mt-4 w-full" onClick={onExpiry}>Przedłuż / Zakończ pakiet</Button> : null}
-      {onManage ? <Button className="mt-4 w-full" variant="secondary" onClick={onManage}>Zarządzaj pakietem</Button> : null}
+      ) : null}
     </article>
+  );
+}
+
+function CardStat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] uppercase tracking-wide text-on-surface-muted">{label}</dt>
+      <dd className={`mt-0.5 break-words font-semibold ${accent ? "text-tertiary-light" : "text-on-surface"}`}>{value}</dd>
+    </div>
+  );
+}
+
+function InlineDetail({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={wide ? "sm:col-span-2" : undefined}>
+      <dt className="inline text-on-surface-muted">{label}: </dt>
+      <dd className="inline break-words">{value}</dd>
+    </div>
+  );
+}
+
+function InfoTooltip({ label, srLabel, align }: { label: ReactNode; srLabel?: string; align: "start" | "end" }) {
+  return (
+    <Tooltip label={label} align={align}>
+      <span tabIndex={0} className="inline-flex rounded-full text-on-surface-muted transition hover:text-primary-light focus-visible:text-primary-light focus-visible:outline-none">
+        <Info size={14} aria-hidden="true" />
+        <span className="sr-only">{srLabel ?? (typeof label === "string" ? label : "Szczegóły")}</span>
+      </span>
+    </Tooltip>
   );
 }
 

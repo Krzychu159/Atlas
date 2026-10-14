@@ -23,6 +23,7 @@ export default function ClientNotesPanel({
   onClientChange,
   readOnly = false,
   showPayments = true,
+  embedded = false,
 }: {
   client: Client;
   payments: ClientPayment[];
@@ -31,6 +32,7 @@ export default function ClientNotesPanel({
   onClientChange: (client: Client) => void;
   readOnly?: boolean;
   showPayments?: boolean;
+  embedded?: boolean;
 }) {
   const saveLock = useRef(false);
   const revision = useRef(0);
@@ -86,9 +88,9 @@ export default function ClientNotesPanel({
   }
 
   return (
-    <aside className="card-shell p-5 md:p-6">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-section-title">Szybkie notatki</p>
+    <aside className={embedded ? "min-w-0" : "card-shell p-5 md:p-6"}>
+      <div className={`flex items-center gap-3 ${embedded ? "justify-end" : "justify-between"}`}>
+        {embedded ? null : <p className="text-section-title">Szybkie notatki</p>}
         {!readOnly ? (
           <Button
             size="sm"
@@ -109,7 +111,8 @@ export default function ClientNotesPanel({
         }
         rows={4}
         placeholder="Dodaj notatkę o kliencie..."
-        className="mt-5 w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 text-sm leading-7 text-on-surface-variant outline-none placeholder:text-on-surface-muted read-only:cursor-default"
+        aria-label="Notatki o kliencie"
+        className="mt-3 w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-lowest p-3 text-sm leading-6 text-on-surface-variant outline-none placeholder:text-on-surface-muted read-only:cursor-default"
       />
 
       {showPayments ? <PaymentHistory payments={payments} /> : null}

@@ -3,27 +3,29 @@ import type { ClientLegalConsent } from "@/app/lib/owner/clients";
 
 export default function ClientLegalConsentsPanel({
   consents,
+  embedded = false,
 }: {
   consents: ClientLegalConsent[];
+  embedded?: boolean;
 }) {
   return (
-    <section className="card-shell p-5 md:p-6" aria-labelledby="legal-consents-title">
-      <div className="flex items-center gap-3">
+    <section className={embedded ? "min-w-0" : "card-shell p-5 md:p-6"} aria-label="Historia zgód">
+      {embedded ? null : <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
           <FileCheck2 size={19} />
         </span>
         <div>
-          <h2 id="legal-consents-title" className="font-display text-lg font-semibold">
+          <h2 className="font-display text-lg font-semibold">
             Historia zgód
           </h2>
           <p className="mt-1 text-xs text-on-surface-muted">
             Regulaminy zaakceptowane przez klienta.
           </p>
         </div>
-      </div>
+      </div>}
 
       {consents.length ? (
-        <div className="mt-5 overflow-x-auto">
+        <div className={`overflow-x-auto ${embedded ? "" : "mt-5"}`}>
           <table className="w-full min-w-[680px] text-left text-sm">
             <thead className="text-[10px] uppercase tracking-wider text-on-surface-muted">
               <tr>
@@ -56,7 +58,7 @@ export default function ClientLegalConsentsPanel({
           </table>
         </div>
       ) : (
-        <p className="mt-5 rounded-[var(--radius-lg)] bg-surface-container-low p-4 text-sm text-on-surface-muted">
+        <p className={`rounded-[var(--radius-lg)] bg-surface-container-low p-3 text-sm text-on-surface-muted ${embedded ? "" : "mt-5"}`}>
           Brak zapisanych zgód klienta.
         </p>
       )}

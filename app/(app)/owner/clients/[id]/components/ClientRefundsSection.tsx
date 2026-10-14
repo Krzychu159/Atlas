@@ -9,14 +9,16 @@ export default function ClientRefundsSection({
   refunds,
   loading,
   onConfirm,
+  embedded = false,
 }: {
   refunds: ClientRefund[];
   loading: boolean;
   onConfirm: (refund: ClientRefund) => void;
+  embedded?: boolean;
 }) {
   return (
-    <section className="card-shell p-5 md:p-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <section className={embedded ? "min-w-0" : "card-shell p-5 md:p-6"}>
+      {embedded ? null : <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-label text-on-surface-muted">Rozliczenia</p>
           <h2 className="mt-2 font-display text-[1.65rem] font-semibold leading-tight">
@@ -26,9 +28,9 @@ export default function ClientRefundsSection({
         <span className="rounded-full bg-surface-container-lowest px-3 py-1 text-xs font-semibold text-primary-light">
           {refunds.length}
         </span>
-      </div>
+      </div>}
 
-      <div className="mt-5 flex flex-col gap-3">
+      <div className={`flex flex-col gap-2 ${embedded ? "" : "mt-5"}`}>
         {loading ? (
           <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 text-sm text-on-surface-variant">
             Pobieranie zwrotów...

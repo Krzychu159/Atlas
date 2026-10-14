@@ -30,7 +30,10 @@ import {
   getClientBilling,
   getClientPayments,
 } from "@/app/lib/owner/billing";
-import ClientMetricCards from "./components/ClientMetricCards";
+// import ClientMetricCards from "./components/ClientMetricCards";
+import { Banknote, CalendarRange, Dumbbell, FileCheck2, History, NotebookPen, Package } from "lucide-react";
+import type { ClientPackageBilling } from "@/app/lib/owner/billing";
+import ClientProfileCollapsible from "./components/ClientProfileCollapsible";
 import ClientNotesPanel from "./components/ClientNotesPanel";
 import ClientProfileHero from "./components/ClientProfileHero";
 import ClientSessionHistory from "./components/ClientSessionHistory";
@@ -88,7 +91,7 @@ function ClientDetails({ clientId }: { clientId: number }) {
   const refundList = useOwnerRead(String(clientId), loadRefunds, "Nie udało się pobrać zwrotów klienta.", revision);
   const client = profile.data;
   const setClient = profile.setData;
-  const subscription = renewal.data ?? null;
+  // const subscription = renewal.data ?? null;
   const billing = account.data ?? null;
   const trainingPlan = plan.data ?? null;
   const setTrainingPlan = plan.setData;
@@ -386,40 +389,65 @@ function ClientDetails({ clientId }: { clientId: number }) {
           <OwnerReadState loading={account.loading && account.data === undefined} error={account.error} retry={account.retry} label="Ładowanie rozliczeń i pakietów..." />
           <OwnerReadState loading={renewal.loading && renewal.data === undefined} error={renewal.error} retry={renewal.retry} label="Ładowanie danych o przedłużaniu pakietu..." />
           <OwnerReadState loading={plan.loading && plan.data === undefined} error={plan.error} retry={plan.retry} label="Ładowanie folderu klienta..." />
+          {/* Kafelki podsumowania tymczasowo ukryte w nowym układzie karty klienta.
           <ClientMetricCards preserveMissingData
             client={client}
             subscription={subscription}
             billing={billing}
           />
-          {account.data !== undefined ? <ClientPackagesSection key={client.id} packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} clientId={!client.isArchived ? client.id : undefined} onSaved={() => refreshCooperationData(client.id, true)} /> : null}
-          <ClientPeriodPackagesSection key={`period:${client.id}`} clientId={client.id} canManage={!client.isArchived} onSaved={() => refreshCooperationData(client.id, true)} />
-          <ClientAuditSection key={client.id} clientId={client.id} revision={auditRevision} />
+          */}
+          <div className="flex flex-col gap-2">
+            {account.data !== undefined ? (
+              <ClientProfileCollapsible title="Pakiety" icon={<Package size={15} />} meta={getActivePackagesMeta(billing?.packages)}>
+                <ClientPackagesSection key={client.id} embedded packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} clientId={!client.isArchived ? client.id : undefined} onSaved={() => refreshCooperationData(client.id, true)} />
+              </ClientProfileCollapsible>
+            ) : null}
+            <ClientProfileCollapsible title="Usługi okresowe" icon={<CalendarRange size={15} />}>
+              <ClientPeriodPackagesSection key={`period:${client.id}`} embedded clientId={client.id} canManage={!client.isArchived} onSaved={() => refreshCooperationData(client.id, true)} />
+            </ClientProfileCollapsible>
 
-          {!client.isArchived ? (
-            <OwnerReadState loading={refundList.loading} error={refundList.error} retry={refundList.retry} label="Ładowanie zwrotów klienta...">
-              {refundList.data !== undefined ? <ClientRefundsSection refunds={refunds} loading={refundList.loading} onConfirm={setRefundToConfirm} /> : null}
-            </OwnerReadState>
-          ) : null}
-
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_330px]">
             <OwnerReadState loading={history.loading} error={history.error} retry={history.retry} label="Ładowanie historii treningów...">
-              {history.data !== undefined ? <ClientSessionHistory clientId={client.id} sessions={sessions} /> : null}
+              {history.data !== undefined ? (
+                <ClientProfileCollapsible title="Historia treningów" icon={<Dumbbell size={15} />} meta={sessions.length}>
+                  <ClientSessionHistory embedded clientId={client.id} sessions={sessions} />
+                </ClientProfileCollapsible>
+              ) : null}
             </OwnerReadState>
-            <div className="flex min-w-0 flex-col gap-3">
-              <OwnerReadState loading={paymentList.loading && paymentList.data === undefined} error={paymentList.error} retry={paymentList.retry} label="Ładowanie wpłat klienta..." />
-            <ClientNotesPanel
-              client={client}
-              payments={payments}
-              onClientChange={(updated) => { setClient(updated); setAuditRevision((value) => value + 1); }}
-              readOnly={client.isArchived}
-              showPayments={paymentList.data !== undefined}
-            />
-            </div>
-          </div>
 
-          <OwnerReadState loading={consents.loading} error={consents.error} retry={consents.retry} label="Ładowanie zgód klienta...">
-            {consents.data !== undefined ? <ClientLegalConsentsPanel consents={legalConsents} /> : null}
-          </OwnerReadState>
+            <OwnerReadState loading={paymentList.loading && paymentList.data === undefined} error={paymentList.error} retry={paymentList.retry} label="Ładowanie wpłat klienta..." />
+            <ClientProfileCollapsible title="Notatki i ostatnie wpłaty" icon={<NotebookPen size={15} />}>
+              <ClientNotesPanel
+                embedded
+                client={client}
+                payments={payments}
+                onClientChange={(updated) => { setClient(updated); setAuditRevision((value) => value + 1); }}
+                readOnly={client.isArchived}
+                showPayments={paymentList.data !== undefined}
+              />
+            </ClientProfileCollapsible>
+
+            {!client.isArchived ? (
+              <OwnerReadState loading={refundList.loading} error={refundList.error} retry={refundList.retry} label="Ładowanie zwrotów klienta...">
+                {refundList.data !== undefined ? (
+                  <ClientProfileCollapsible title="Zwroty" icon={<Banknote size={15} />} meta={refunds.length}>
+                    <ClientRefundsSection embedded refunds={refunds} loading={refundList.loading} onConfirm={setRefundToConfirm} />
+                  </ClientProfileCollapsible>
+                ) : null}
+              </OwnerReadState>
+            ) : null}
+
+            <OwnerReadState loading={consents.loading} error={consents.error} retry={consents.retry} label="Ładowanie zgód klienta...">
+              {consents.data !== undefined ? (
+                <ClientProfileCollapsible title="Historia zgód" icon={<FileCheck2 size={15} />} meta={legalConsents.length}>
+                  <ClientLegalConsentsPanel embedded consents={legalConsents} />
+                </ClientProfileCollapsible>
+              ) : null}
+            </OwnerReadState>
+
+            <ClientProfileCollapsible title="Historia zmian" icon={<History size={15} />}>
+              <ClientAuditSection key={client.id} embedded clientId={client.id} revision={auditRevision} />
+            </ClientProfileCollapsible>
+          </div>
 
           {!client.isArchived ? (
             <>
@@ -469,6 +497,15 @@ function ClientDetails({ clientId }: { clientId: number }) {
       ) : null}
     </div>
   );
+}
+
+function getActivePackagesMeta(packages: ClientPackageBilling[] | null | undefined) {
+  if (!packages) return undefined;
+  const active = packages.filter((item) => item.isActive === true).length;
+  if (active === 1) return "1 aktywny";
+  const lastDigit = active % 10;
+  const lastTwoDigits = active % 100;
+  return lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 12 || lastTwoDigits > 14) ? `${active} aktywne` : `${active} aktywnych`;
 }
 
 function getTrainingPlanUrl(plan: ClientTrainingPlan | null) {

@@ -1,27 +1,32 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   ArrowLeft,
   Archive,
+  CalendarDays,
   Files,
   Lock,
   Mail,
+  MapPin,
   Pencil,
   Phone,
   ReceiptText,
   RotateCcw,
-  ShieldCheck,
   Unlock,
   UserPlus,
+  UserRound,
   UserRoundX,
 } from "lucide-react";
 import type { Client } from "@/app/lib/owner/clients";
 import { formatTrainingStartDate } from "@/app/lib/formatters/date";
 import ClientRewardProgress from "@/app/components/clients/ClientRewardProgress";
+import { Tooltip } from "@/app/components/ui/tooltip";
 import type { MilestoneAccess } from "@/app/lib/milestones";
 import {
   getClientName,
   getPortalAccessLabel,
 } from "../../components/client-display";
+import { clientStatus } from "../../components/client-list-display";
 
 function getInitials(client: Client) {
   return getClientName(client)
@@ -31,6 +36,14 @@ function getInitials(client: Client) {
     .slice(0, 2)
     .toUpperCase();
 }
+
+const statusToneClasses = {
+  active: "bg-tertiary/15 text-tertiary-light",
+  new: "bg-primary/15 text-primary-light",
+  suspended: "bg-warning-light/15 text-warning-light",
+  inactive: "bg-surface-container-lowest text-on-surface-muted",
+  unknown: "bg-surface-container-lowest text-on-surface-muted",
+} as const;
 
 export default function ClientProfileHero({
   client,
@@ -63,197 +76,253 @@ export default function ClientProfileHero({
 }) {
   const fullName = getClientName(client);
   const resolvedPaymentsHref = paymentsHref || `/owner/clients/${client.id}/payments`;
+  const status = clientStatus(client);
+  const showPortalStatus = Boolean(client.portalAccessStatus) && Boolean(client.isArchived || onPortalAction);
+  const locationLabel = groupLocationNames?.length
+    ? `Lokalizacja główna · zajęcia grupowe: ${groupLocationNames.join(", ")}`
+    : groupLocationNames ? "Lokalizacja główna" : "Lokalizacja";
+
 
   return (
-    <section className="card-shell overflow-hidden p-5 md:p-8">
-      <div className="mb-7 flex items-center justify-between gap-4">
-        <Link
-          href={backHref}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-primary-light"
-        >
-          <ArrowLeft size={18} />
-          Lista klientów
-        </Link>
-        <p className="text-label text-on-surface-muted">Karta klienta</p>
-      </div>
+    <section className="card-shell p-4 md:p-6">
+      <Link
+        href={backHref}
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-on-surface-muted transition hover:text-primary-light"
+      >
+        <ArrowLeft size={14} />
+        Lista klientów
+      </Link>
 
-      <div className="grid gap-7 lg:grid-cols-[190px_1fr_190px] lg:items-start">
-        <div className="flex justify-center lg:justify-start">
-          <div className="relative shrink-0">
-            <div className="flex h-40 w-40 items-center justify-center overflow-hidden rounded-[28px] bg-surface-container-lowest outline outline-4 outline-secondary">
-              {client.isArchived ? (
-                <Archive size={44} className="text-on-surface-muted" />
-              ) : client.avatarUrl ? (
-                <img
-                  src={client.avatarUrl}
-                  alt={fullName}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <span className="text-[2.5rem] font-semibold text-primary-light">
-                  {getInitials(client)}
-                </span>
-              )}
-            </div>
-
-            {!client.isArchived ? (
-              <div className="absolute -right-2 bottom-4 flex h-11 w-11 items-center justify-center rounded-full bg-tertiary-light text-on-tertiary shadow-soft">
-                <ShieldCheck size={18} />
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="min-w-0">
-          <p className="text-label text-primary-light">
-            {client.status || "Profil klienta"}
-          </p>
-          {client.isArchived ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="inline-flex rounded-full bg-error-container/40 px-3 py-1.5 text-xs font-semibold text-error-light">
-                Archiwalny
-              </span>
-              {client.portalAccessStatus ? (
-                <span className="inline-flex rounded-full bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-primary-light">
-                  {getPortalAccessLabel(client.portalAccessStatus)}
-                </span>
-              ) : null}
-            </div>
-          ) : onPortalAction ? (
-            <span className="mt-3 inline-flex rounded-full bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-primary-light">
-              {getPortalAccessLabel(client.portalAccessStatus)}
-            </span>
-          ) : null}
-
-          <h1 className="mt-3 font-display text-[2.7rem] font-semibold leading-[0.92] tracking-tight md:text-[4rem]">
-            {fullName}
-          </h1>
-
-          <div className="mt-5 flex flex-wrap gap-3">
-            <div className="inline-flex items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm text-on-surface">
-              <Mail size={16} className="text-primary-light" />
-              {client.email || "Brak e-maila"}
-            </div>
-
-            <div className="inline-flex items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm text-on-surface">
-              <Phone size={16} className="text-primary-light" />
-              {client.phoneNumber || "Brak telefonu"}
-            </div>
-          </div>
-
-          <div className="mt-7 grid grid-cols-2 gap-4 border-t border-secondary/30 pt-6 md:grid-cols-3">
-            <HeroStat label="Trener" value={client.trainerFullName || "Brak"} />
-            <HeroStat label="Rozpoczęcie treningów" value={formatTrainingStartDate(client.trainingStartDate)} />
-            <HeroStat
-              label={groupLocationNames ? "Lokalizacja główna" : "Lokalizacja"}
-              value={
-                <div>
-                  <span>{client.locationName || "Brak"}</span>
-                  {groupLocationNames?.length ? (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {groupLocationNames.map((locationName) => (
-                        <span
-                          key={locationName}
-                          className="rounded-full bg-surface-container-lowest px-2 py-1 text-[10px] font-semibold text-primary-light"
-                        >
-                          Zajęcia grupowe: {locationName}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              }
-            />
+      <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-lg)] bg-surface-container-lowest ring-1 ring-white/10 md:h-[72px] md:w-[72px]">
             {client.isArchived ? (
-              <HeroStat
-                label="Data archiwizacji"
-                value={formatArchivedAt(client.archivedAt)}
-              />
+              <Archive size={24} className="text-on-surface-muted" />
+            ) : client.avatarUrl ? (
+              <img src={client.avatarUrl} alt={fullName} className="h-full w-full object-cover" />
             ) : (
-              <ClientRewardProgress
-                access={milestoneAccess}
-                clientId={client.id}
-                trainingStartDate={client.trainingStartDate}
-              />
+              <span className="text-xl font-semibold text-primary-light">{getInitials(client)}</span>
             )}
           </div>
+
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {client.isArchived ? (
+                <Chip className="bg-error-container/40 text-error-light">Archiwalny</Chip>
+              ) : (
+                <Chip className={statusToneClasses[status.tone]}>{status.label}</Chip>
+              )}
+              {showPortalStatus ? (
+                <Chip className="bg-surface-container-lowest text-primary-light">
+                  {getPortalAccessLabel(client.portalAccessStatus)}
+                </Chip>
+              ) : null}
+            </div>
+
+            <h1 className="mt-1.5 break-words font-display text-2xl font-semibold leading-tight tracking-tight md:text-[1.9rem]">
+              {fullName}
+            </h1>
+
+            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant">
+              <MetaItem icon={<Mail size={13} />} muted={!client.email}>
+                {client.email || "Brak e-maila"}
+              </MetaItem>
+              <MetaItem icon={<Phone size={13} />} muted={!client.phoneNumber}>
+                {client.phoneNumber || "Brak telefonu"}
+              </MetaItem>
+            </div>
+          </div>
         </div>
 
-        <div className="flex flex-col gap-3">
-          {onPortalAction ? (
-            <button
-              type="button"
-              onClick={onPortalAction}
-              disabled={isPortalActionPending}
-              className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-primary-light transition hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <PortalActionIcon status={client.portalAccessStatus} />
-              {isPortalActionPending ? "Zapisywanie..." : getPortalActionLabel(client.portalAccessStatus)}
-            </button>
-          ) : null}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           {onRestore ? (
             <button
               type="button"
               onClick={onRestore}
               disabled={isRestorePending}
-              className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primary px-5 text-sm font-semibold text-on-primary shadow-soft transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 items-center gap-2 rounded-[var(--radius-md)] bg-primary px-4 text-sm font-semibold text-on-primary shadow-soft transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <RotateCcw size={16} />
+              <RotateCcw size={15} />
               {isRestorePending ? "Przywracanie..." : "Przywróć klienta"}
-            </button>
-          ) : null}
-          {onEdit ? (
-            <button
-              type="button"
-              onClick={onEdit}
-              className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primary px-5 text-sm font-semibold text-on-primary shadow-soft transition hover:bg-primary-container"
-            >
-              <Pencil size={16} />
-              Edytuj dane
-            </button>
-          ) : null}
-          {onFiles ? (
-            <button
-              type="button"
-              onClick={onFiles}
-              className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-primary-light transition hover:bg-surface-container-high"
-            >
-              <Files size={16} />
-              Pliki
             </button>
           ) : null}
           {!client.isArchived ? (
             <Link
               href={resolvedPaymentsHref}
-              className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-primary-light transition hover:bg-surface-container-high"
+              className="inline-flex h-10 items-center gap-2 rounded-[var(--radius-md)] bg-primary px-4 text-sm font-semibold text-on-primary shadow-soft transition hover:bg-primary-container focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_35%,transparent)]"
             >
-              <ReceiptText size={16} />
+              <ReceiptText size={15} />
               Płatności
             </Link>
           ) : null}
-          {onArchive ? (
+          {onEdit ? (
             <button
               type="button"
-              onClick={onArchive}
-              className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-5 text-sm font-semibold text-error-light transition hover:bg-surface-container-high"
+              onClick={onEdit}
+              className="inline-flex h-10 items-center gap-2 rounded-[var(--radius-md)] bg-surface-container-low px-4 text-sm font-semibold text-on-surface transition hover:bg-surface-container-high focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_35%,transparent)]"
             >
-              <Archive size={16} />
-              Archiwizuj klienta
+              <Pencil size={14} className="text-primary-light" />
+              Edytuj
             </button>
           ) : null}
-          {onEndCooperation ? (
-            <button
-              type="button"
-              onClick={onEndCooperation}
-              className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] border border-error-light/35 bg-transparent px-5 text-sm font-semibold text-error-light transition hover:bg-error-container/25"
-            >
-              <UserRoundX size={16} />
-              Zakończ współpracę
-            </button>
+          {onFiles || onPortalAction || onArchive || onEndCooperation ? (
+            <div className="flex items-center gap-1 rounded-[var(--radius-md)] bg-surface-container-lowest p-1">
+              {onFiles ? (
+                <IconAction label="Pliki klienta" onClick={onFiles}>
+                  <Files size={15} />
+                </IconAction>
+              ) : null}
+              {onPortalAction ? (
+                <IconAction
+                  label={isPortalActionPending ? "Zapisywanie..." : getPortalActionLabel(client.portalAccessStatus)}
+                  onClick={onPortalAction}
+                  disabled={isPortalActionPending}
+                >
+                  <PortalActionIcon status={client.portalAccessStatus} />
+                </IconAction>
+              ) : null}
+              {(onFiles || onPortalAction) && (onArchive || onEndCooperation) ? (
+                <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-white/10" />
+              ) : null}
+              {onArchive ? (
+                <IconAction label="Archiwizuj klienta" onClick={onArchive} tone="danger" align="end">
+                  <Archive size={15} />
+                </IconAction>
+              ) : null}
+              {onEndCooperation ? (
+                <IconAction label="Zakończ współpracę" onClick={onEndCooperation} tone="danger" align="end">
+                  <UserRoundX size={15} />
+                </IconAction>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-white/5 pt-4 lg:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,1.4fr)]">
+        <InfoStat icon={<UserRound size={13} />} label="Trener" muted={!client.trainerFullName}>
+          {client.trainerFullName || "Brak trenera"}
+        </InfoStat>
+        <InfoStat icon={<CalendarDays size={13} />} label="Rozpoczęcie treningów">
+          {formatTrainingStartDate(client.trainingStartDate)}
+        </InfoStat>
+        <InfoStat icon={<MapPin size={13} />} label={groupLocationNames ? "Lokalizacja główna" : "Lokalizacja"} muted={!client.locationName}>
+          {groupLocationNames?.length ? (
+            <Tooltip label={locationLabel} align="start">
+              <span tabIndex={0} className="focus-visible:outline-none focus-visible:text-primary-light">
+                {client.locationName || "Brak lokalizacji"}
+                <span className="ml-1 text-xs font-medium text-on-surface-muted">+{groupLocationNames.length} grupowe</span>
+              </span>
+            </Tooltip>
+          ) : client.locationName || "Brak lokalizacji"}
+        </InfoStat>
+        {client.isArchived ? (
+          <InfoStat icon={<Archive size={13} />} label="Data archiwizacji">
+            {formatArchivedAt(client.archivedAt)}
+          </InfoStat>
+        ) : (
+          <div className="col-span-2 min-w-0 lg:col-span-1">
+            <ClientRewardProgress
+              access={milestoneAccess}
+              clientId={client.id}
+              trainingStartDate={client.trainingStartDate}
+            />
+          </div>
+        )}
+      </div>
     </section>
+  );
+}
+
+function InfoStat({
+  icon,
+  label,
+  muted = false,
+  children,
+}: {
+  icon: ReactNode;
+  label: string;
+  muted?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
+        <span className="text-primary-light">{icon}</span>
+        {label}
+      </p>
+      <div className={`mt-1 break-words text-sm font-semibold ${muted ? "text-on-surface-muted" : "text-on-surface"}`}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+
+function Chip({ className, children }: { className: string; children: ReactNode }) {
+  return (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+function MetaItem({
+  icon,
+  label,
+  muted = false,
+  children,
+}: {
+  icon: ReactNode;
+  label?: string;
+  muted?: boolean;
+  children: ReactNode;
+}) {
+  const content = (
+    <span className={`inline-flex min-w-0 items-center gap-1.5 ${muted ? "text-on-surface-muted" : ""}`}>
+      <span className="shrink-0 text-primary-light">{icon}</span>
+      {label ? <span className="sr-only">{label}: </span> : null}
+      <span className="min-w-0 break-words">{children}</span>
+    </span>
+  );
+
+  return label ? <Tooltip label={label} align="start">{content}</Tooltip> : content;
+}
+
+function IconAction({
+  label,
+  href,
+  onClick,
+  disabled = false,
+  tone = "default",
+  align = "center",
+  children,
+}: {
+  label: string;
+  href?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  tone?: "default" | "danger";
+  align?: "center" | "end";
+  children: ReactNode;
+}) {
+  const className = [
+    "inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] transition disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_35%,transparent)]",
+    tone === "danger" ? "text-error-light hover:bg-error-container/25" : "text-primary-light hover:bg-surface-container-high",
+  ].join(" ");
+
+  return (
+    <Tooltip label={label} align={align}>
+      {href ? (
+        <Link href={href} aria-label={label} className={className}>
+          {children}
+        </Link>
+      ) : (
+        <button type="button" aria-label={label} onClick={onClick} disabled={disabled} className={className}>
+          {children}
+        </button>
+      )}
+    </Tooltip>
   );
 }
 
@@ -279,15 +348,4 @@ function PortalActionIcon({ status }: { status: string | undefined }) {
   if (status === "Invited") return <Mail size={16} />;
   if (status === "Blocked") return <Unlock size={16} />;
   return <Lock size={16} />;
-}
-
-function HeroStat({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-label text-on-surface-muted">{label}</p>
-      <p className="mt-2 min-h-8 text-lg font-semibold leading-tight text-on-surface">
-        {value}
-      </p>
-    </div>
-  );
 }

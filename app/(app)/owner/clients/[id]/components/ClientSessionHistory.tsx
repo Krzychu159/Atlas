@@ -27,9 +27,11 @@ const groupLabels: Record<SessionGroup, string> = {
 export default function ClientSessionHistory({
   clientId,
   sessions,
+  embedded = false,
 }: {
   clientId: number;
   sessions: OwnerSession[];
+  embedded?: boolean;
 }) {
   const [visibleCounts, setVisibleCounts] = useState<
     Record<SessionGroup, number>
@@ -44,8 +46,8 @@ export default function ClientSessionHistory({
   );
 
   return (
-    <section className="card-shell p-5 md:p-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <section className={embedded ? "min-w-0" : "card-shell p-5 md:p-6"}>
+      {embedded ? null : <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-label text-on-surface-muted">Sesje klienta</p>
           <h2 className="mt-2 font-display text-[1.65rem] font-semibold leading-tight">
@@ -55,9 +57,9 @@ export default function ClientSessionHistory({
         <p className="text-label text-on-surface-muted">
           {sessions.length} przypisanych
         </p>
-      </div>
+      </div>}
 
-      <div className="mt-6 flex flex-col gap-7">
+      <div className={`flex flex-col gap-5 ${embedded ? "" : "mt-6"}`}>
         {SESSION_GROUPS.map((group) => {
           const items = groupedSessions[group];
           const visibleItems = items.slice(0, visibleCounts[group]);
@@ -65,13 +67,13 @@ export default function ClientSessionHistory({
           return (
             <div key={group}>
               <div className="flex items-center gap-3">
-                <h3 className="text-section-title">{groupLabels[group]}</h3>
-                <span className="rounded-full bg-surface-container-lowest px-2.5 py-1 text-[10px] font-semibold text-primary-light">
+                <h3 className="text-sm font-semibold text-on-surface">{groupLabels[group]}</h3>
+                <span className="rounded-full bg-surface-container-lowest px-2 py-0.5 text-[10px] font-semibold text-primary-light">
                   {items.length}
                 </span>
               </div>
 
-              <div className="mt-3 flex flex-col gap-3">
+              <div className="mt-2 flex flex-col gap-1.5">
                 {visibleItems.length ? (
                   visibleItems.map((session) => (
                     <SessionRow
@@ -81,7 +83,7 @@ export default function ClientSessionHistory({
                     />
                   ))
                 ) : (
-                  <div className="rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-5 text-sm text-on-surface-variant">
+                  <div className="rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-2.5 text-xs text-on-surface-variant">
                     Brak sesji w tej sekcji.
                   </div>
                 )}
@@ -123,17 +125,17 @@ function SessionRow({
   );
 
   return (
-    <article className="rounded-[var(--radius-lg)] bg-surface-container-lowest p-4">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-surface-container text-primary-light">
-            <Dumbbell size={18} />
+    <article className="rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-2.5">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-surface-container text-primary-light">
+            <Dumbbell size={14} />
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-on-surface">
+            <p className="text-sm font-semibold text-on-surface">
               {session.title || "Sesja treningowa"}
             </p>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm text-on-surface-variant">
+            <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-on-surface-variant">
               <span className="inline-flex items-center gap-1.5">
                 <Clock3 size={14} className="text-primary-light" />
                 {formatDateTime(session.startAt)}

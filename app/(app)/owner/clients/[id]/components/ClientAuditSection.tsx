@@ -43,7 +43,7 @@ const fieldLabels: Record<string, string> = {
   debtdisposition: "Pozostała należność", fundsdisposition: "Wpłacone środki", settlementamount: "Kwota rozliczenia",
 };
 
-export default function ClientAuditSection({ clientId, revision = 0 }: { clientId: number; revision?: number }) {
+export default function ClientAuditSection({ clientId, revision = 0, embedded = false }: { clientId: number; revision?: number; embedded?: boolean }) {
   const paymentDateRevision = usePaymentDateCorrectionRevision(clientId);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -66,13 +66,13 @@ export default function ClientAuditSection({ clientId, revision = 0 }: { clientI
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [clientId, page, pageSize, revision, retry, paymentDateRevision]);
 
-  return <section className="card-shell min-w-0 p-5 md:p-6">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <h2 className="text-section-title">Historia zmian</h2>
-      <label className="text-sm text-on-surface-variant">Na stronie <select className="ml-2 rounded-lg bg-surface-container-lowest p-2" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}>{[10, 25, 50].map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
+  return <section className={embedded ? "min-w-0" : "card-shell min-w-0 p-5 md:p-6"}>
+    <div className={`flex flex-wrap items-center gap-3 ${embedded ? "justify-end" : "justify-between"}`}>
+      {embedded ? null : <h2 className="text-section-title">Historia zmian</h2>}
+      <label className="text-xs text-on-surface-variant">Na stronie <select className="ml-2 rounded-md bg-surface-container-lowest px-2 py-1" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}>{[10, 25, 50].map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
     </div>
     {loading ? <p className="mt-4 text-sm" role="status">Pobieranie historii zmian…</p> : error ? <div className="mt-4"><p role="alert" className="text-sm text-error-light">{error}</p><Button variant="secondary" className="mt-3" onClick={() => setRetry((value) => value + 1)}>Spróbuj ponownie</Button></div> : <>
-      <div className="mt-4 space-y-3">{data?.items?.length ? data.items.map((entry) => <AuditEntry key={entry.id} entry={entry} />) : <p className="text-sm text-on-surface-muted">Brak zmian do wyświetlenia.</p>}</div>
+      <div className="mt-3 space-y-2">{data?.items?.length ? data.items.map((entry) => <AuditEntry key={entry.id} entry={entry} />) : <p className="text-sm text-on-surface-muted">Brak zmian do wyświetlenia.</p>}</div>
       {data && data.totalCount > 0 ? <PaymentPagination page={data.page} pageSize={data.pageSize} totalItems={data.totalCount} onPageChange={setPage} /> : null}
     </>}
   </section>;
@@ -83,12 +83,11 @@ function AuditEntry({ entry }: { entry: ClientAuditDto }) {
   const after = parseSnapshot(entry.afterJson);
   const differences = snapshotDifferences(before, after);
   const label = entry.action.startsWith("PackageOpeningBalance:") ? "Wprowadzono stan początkowy pakietu" : Object.hasOwn(actionLabels, entry.action) ? actionLabels[entry.action] : "Zmiana danych klienta";
-  return <article className="min-w-0 rounded-[var(--radius-lg)] bg-surface-container-lowest p-4">
-    <div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">{label}</h3><time className="text-xs text-on-surface-muted" dateTime={entry.createdAt}>{formatDateTime(entry.createdAt)}</time></div>
-    {entry.actorUserId !== null ? <p className="mt-2 text-xs text-on-surface-muted">Osoba wprowadzająca zmianę: #{entry.actorUserId}</p> : null}
-    {entry.reason ? <p className="mt-3 break-words text-sm">Powód: {entry.reason}</p> : null}
-    <div className="mt-3 space-y-1 text-sm">{differences.length ? differences.slice(0, 12).map((item) => <p key={item.path} className="break-words"><span className="text-on-surface-muted">{item.label}: </span>{item.before} → {item.after}</p>) : <p className="text-on-surface-muted">Szczegóły tej zmiany są dostępne poniżej.</p>}</div>
-    <details className="mt-3 text-sm"><summary className="cursor-pointer text-primary-light">Pokaż szczegóły</summary><p className="mt-3 font-semibold">Przed zmianą</p><pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded-lg bg-surface-container p-3 text-xs">{formatSnapshot(before, entry.beforeJson)}</pre><p className="mt-3 font-semibold">Po zmianie</p><pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded-lg bg-surface-container p-3 text-xs">{formatSnapshot(after, entry.afterJson)}</pre></details>
+  return <article className="min-w-0 rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-2.5 text-xs">
+    <div className="flex flex-wrap items-baseline justify-between gap-2"><h3 className="text-sm font-semibold">{label}</h3><time className="text-[11px] text-on-surface-muted" dateTime={entry.createdAt}>{formatDateTime(entry.createdAt)}</time></div>
+    {entry.reason ? <p className="mt-1.5 break-words">Powód: {entry.reason}</p> : null}
+    <div className="mt-1.5 space-y-0.5">{differences.length ? differences.slice(0, 12).map((item) => <p key={item.path} className="break-words"><span className="text-on-surface-muted">{item.label}: </span>{item.before} → {item.after}</p>) : <p className="text-on-surface-muted">Szczegóły tej zmiany są dostępne poniżej.</p>}</div>
+    <details className="mt-1.5"><summary className="cursor-pointer text-[11px] text-primary-light">Pokaż szczegóły</summary><p className="mt-3 font-semibold">Przed zmianą</p><pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded-lg bg-surface-container p-3 text-xs">{formatSnapshot(before, entry.beforeJson)}</pre><p className="mt-3 font-semibold">Po zmianie</p><pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded-lg bg-surface-container p-3 text-xs">{formatSnapshot(after, entry.afterJson)}</pre></details>
   </article>;
 }
 
