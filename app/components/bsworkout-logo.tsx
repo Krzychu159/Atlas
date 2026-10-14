@@ -19,9 +19,9 @@ export function BsworkoutLogo({ className }: { className: string }) {
 
 export function BsworkoutOrganizationPanel() {
   return (
-    <div data-bsworkout-organization-panel className="rounded-xl border border-white/5 bg-surface-container px-4 py-3 shadow-soft">
+    <div data-bsworkout-organization-panel className="rounded-xl border border-white/5 bg-surface-container px-4 py-3 shadow-soft text-center">
       <p className="text-[10px] font-medium uppercase tracking-wider text-on-surface-muted">Twoje studio</p>
-      <BsworkoutLogo className="mt-2 h-8 w-28 max-w-full" />
+      <BsworkoutLogo className="mx-auto mt-2 h-8 w-28 max-w-full" />
     </div>
   );
 }
