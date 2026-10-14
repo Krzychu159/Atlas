@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { expireAuthCookies } from "@/app/lib/server/auth-cookies";
+import { relayBackendSetCookies } from "@/app/lib/server/backend-cookies";
 import { hasSameOrigin } from "@/app/lib/server/request-origin";
 
 const BACKEND_URL = process.env.BACKEND_API_URL;
@@ -104,6 +105,8 @@ async function handler(req: NextRequest, context: RouteContext) {
       expireAuthCookies(nextResponse);
     }
 
+    relayBackendSetCookies(response.headers, nextResponse.headers);
+
     return nextResponse;
   }
 
@@ -131,6 +134,9 @@ async function handler(req: NextRequest, context: RouteContext) {
   if (response.status === 401 || expiredPublicSession) {
     expireAuthCookies(nextResponse);
   }
+
+  // Must run last: ResponseCookies rewrites Set-Cookie headers it did not create.
+  relayBackendSetCookies(response.headers, nextResponse.headers);
 
   return nextResponse;
 }

@@ -206,6 +206,7 @@ test("existing BFF forwards all four routes, query parameters and Bearer session
     "next/headers": { cookies: async () => ({ get: () => ({ value: "test-owner-token" }) }) },
     "@/app/lib/server/auth-cookies": { expireAuthCookies() {} },
     "@/app/lib/server/request-origin": { hasSameOrigin: () => true },
+    "@/app/lib/server/backend-cookies": { relayBackendSetCookies() {} },
   }, { process: { env: { BACKEND_API_URL: "https://studio.test" } }, fetch: async (url, options) => {
     requests.push({ url, options }); return Response.json({ valid: true });
   } });
@@ -226,6 +227,7 @@ test("BFF denies unauthenticated requests and preserves backend Owner-only 403",
       "next/headers": { cookies: async () => ({ get: () => token ? { value: token } : undefined }) },
       "@/app/lib/server/auth-cookies": { expireAuthCookies() {} },
       "@/app/lib/server/request-origin": { hasSameOrigin: () => true },
+      "@/app/lib/server/backend-cookies": { relayBackendSetCookies() {} },
     }, { process: { env: { BACKEND_API_URL: "https://studio.test" } }, fetch: async () => { called = true; return Response.json({ message: "Forbidden" }, { status: 403 }); } });
   }
   const request = { method: "GET", headers: new Headers(), signal: new AbortController().signal, nextUrl: new URL("https://atlas.test/api/backend/owner/dashboard/summary?period=2026-10") };
