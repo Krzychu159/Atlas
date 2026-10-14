@@ -1,0 +1,233 @@
+ATLAS CRM — ETAP 2 FRONTENDU OWNERA, 14.10.2026
+
+STAN I GRANICE PRACY
+Na wejściu: main; wszystkie zmiany etapu 1 nadal lokalne. Nie resetowano,
+nie stashowano, nie przenoszono i nie commitowano tych zmian.
+Raport etapu 1: docs/owner-audit.txt (zachowany jako zapis tamtego etapu).
+Ten plik opisuje tylko etap 2. Bez backendu, zmiany kontraktów, nowych zależności,
+globalnego cache, przebudowy sesji/BFF ani zmiany obliczeń finansowych.
+
+FAKTYCZNIE NAPRAWIONE
+
+1. Grafik — app/(app)/owner/schedule/page.tsx
+   Pobieranie sesji ma AbortSignal i lokalną ochronę publikacji wyników,
+   błędów oraz loadingu. Cleanup anuluje odczyty przy zmianie parametrów
+   i po opuszczeniu widoku; opóźniona odpowiedź ignorująca abort nie wygrywa.
+   Status Outlook i zasoby mają również ochronę późnych odpowiedzi i retry.
+   Outlook nadal musi być połączony przed pobraniem sesji i zasobów.
+   Zasoby pobierane równolegle, osobno od sesji. Dodanie sesji czeka na zasoby.
+   Dwa szybkie kliknięcia sesji: poprzedni odczyt szczegółów jest anulowany,
+   a tylko ostatni może otworzyć modal. Zmiana okresu, opuszczenie widoku,
+   otwarcie tworzenia sesji lub zamknięcie modala również usuwa stary odczyt.
+   Mutacje tworzenia, serii, edycji i korekty nie otrzymały sygnałów anulowania;
+   ich parametry, potwierdzenia i istniejąca obsługa konfliktów pozostają.
+
+   Ograniczone zbędne odczyty:
+   - „wszystkie” / „bez anulowanych” przekazują Status=undefined w obu
+     przypadkach; zmienia się tylko lokalne filtrowanie pobranych danych.
+   - Zmiana lokalizacji usuwająca wybranego trenera od razu używa skutecznego
+     filtra bez tego trenera. Późniejszy reset kontrolki nie wysyła drugiego GET.
+   - Odświeżenie po zakończonej korekcie może nadal pokrywać się ze zdarzeniem
+     korekty; nie zmieniano tej ścieżki zapisu ani jej potwierdzeń w tym etapie.
+
+2. Profil klienta — app/(app)/owner/clients/[id]/page.tsx
+   Osiem niezależnych odczytów nadal rozpoczyna się równolegle, ale każdy
+   publikuje własny wynik bez Promise.allSettled blokującego cały profil.
+   Do pierwszego wyświetlenia wystarcza getClient. Hero, notatki i formularz
+   nie czekają na historię, wpłaty, rozliczenia, zgody, folder i zwroty.
+   Rozliczenia i dane o przedłużaniu mają własne loading/error/retry;
+   ClientMetricCards korzysta z istniejącego preserveMissingData, więc brak
+   danych nie jest przedstawiany jako „brak pakietu” lub wyłączone przedłużanie.
+   Historia, wpłaty, zgody, zwroty i folder mają własne błędy i ponowienie.
+   Błąd jednej sekcji nie usuwa pozostałych. Gdy nie ma jeszcze rozliczeń,
+   sekcja pakietów nie udaje pustej listy; pozostaje komunikat odczytu.
+   404 folderu oznacza brak folderu, zgodnie z już istniejącą obsługą
+   getTrainingPlanForEditModal w EditClientModal — nie jest błędem do retry.
+
+   Zmiana clientId tworzy oddzielny profil poprzez key, z cleanup wszystkich
+   podstawowych odczytów; nie miesza danych, modali ani historii dwóch klientów.
+   Retry jednej sekcji nie odświeża innych ani nie remountuje formularzy.
+   Istniejący EditClientModal inicjalizuje pola po id/open i już chroni szkic
+   przed nowym obiektem tego samego klienta. Nie zmieniono jego zapisu.
+   Przy odświeżeniu zachowane są ostatnie znane dane tego samego klienta;
+   błąd jest pokazany obok nich, a nie maskowany zerami. Nowy klient nigdy
+   nie korzysta z danych poprzedniego.
+
+   Korekty sesji i daty płatności odświeżają sześć zasobów: klient,
+   przedłużanie, billing, historia, wpłaty i zwroty oraz istniejącą historię zmian.
+   Folder oraz zgody nie zależą od tych korekt, więc nie są pobierane ponownie.
+   Nie zawężono zdarzenia sesji do klienta: notifySessionCorrected nie zawiera
+   clientId. Pomijanie korekty „obcego” klienta byłoby zgadywaniem.
+
+   refreshCooperationData zachowuje siedem wcześniejszych odczytów, w tym
+   podgląd zamknięcia współpracy. Po zamknięciu pakietu, przypisaniu lub zwrocie
+   wszystkie te informacje mogą się zmienić. Wyniki publikowane są osobno,
+   a propagateError nadal przekazuje częściowy błąd do formularza wywołującego.
+   Mutacje archiwizacji, zwrotu, dostępu i zamknięcia współpracy nie zmieniają
+   swoich żądań. Ich dodatkowe odczyty kontekstowe nie zostały przebudowane.
+
+3. Profil trenera — app/(app)/owner/trainers/[id]/page.tsx
+   Cztery odczyty mają niezależne stany i retry. Nagłówek pojawia się po
+   odpowiedzi getTrainer, bez oczekiwania na klientów, grafik i stawki.
+   Błędy list nie są już zamieniane na [] i komunikat o braku klientów/sesji.
+   Zmiana trainerId oraz unmount anulują poprzednie odczyty.
+   Brak stawek pokazuje „Niedostępne”; istniejące obliczenie stawki pozostaje
+   takie samo po ich poprawnym pobraniu. Edycja nie otwiera się z nieznanymi
+   stawkami, co wcześniej mogłoby prowadzić do zapisu wartości zastępczych.
+   Przy otwieraniu edycji zapamiętywany jest kontekst trenera i stawek.
+   Odczyt/retry sekcji nie podmienia tych obiektów w otwartym formularzu,
+   więc nie resetuje wpisanych pól. Kolejne otwarcie bierze aktualne dane.
+   Nie zmieniono obliczeń ani procesu zapisu profilu i stawek.
+
+4. Wydatki — app/(app)/owner/expenses/page.tsx
+   summaryQuery zawiera dokładnie dotychczasowe filtry bez page/pageSize.
+   Query listy dodaje paginację. Każda część ma własny odczyt, anulowanie,
+   loading/error/retry i debounce 300 ms. Zmiana strony nie pobiera podsumowania.
+   Zmiana filtrów pobiera obie części; ręczne odświeżenie i dotychczasowe
+   odświeżenie po zapisie/usunięciu/opłaceniu nadal obejmują obie.
+   Błąd podsumowania nie blokuje poprawnej listy. Błąd listy bez wcześniej
+   pobranych danych nie pokazuje pozornego empty state. Retry nie zamyka modala.
+   Zachowane znaczenie i obliczenia kwot, filtry, opcje działalności i działania.
+   Efekt scalania działalności nie wywołuje odczytów; zmiana słowników nadal
+   nie pobiera listy ponownie. Testy etapu 1 nadal przechodzą.
+
+5. Lista klientów — analiza, bez przebudowy
+   Test kontrolowanego wykonania aktualnego ClientsContent dla 500 klientów
+   potwierdza 500 elementów ClientListRow oraz 500 mobilnych reprezentacji
+   z linkiem do profilu. CSS ukrywa widok, ale oba drzewa powstają w React.
+   To 2N reprezentacji wiersza, nie pomiar liczby wszystkich węzłów DOM,
+   bajtów, commitów React ani czasu pracy na realnym urządzeniu.
+   Nie wdrożono paginacji frontendowej, wirtualizacji, breakpointowego
+   remountowania ani nowej memoizacji. Ich koszt/regresje wymagają profilowania.
+   Bezpieczne docelowe ograniczenie to pojedynczy responsywny wiersz,
+   zachowujący sumę informacji i akcji obu wariantów, po akceptacji UX.
+   Nie zmieniono clients/page.tsx w etapie 2; istniejące zmiany to etap 1.
+
+LOKALNY MECHANIZM ODCZYTÓW
+components/use-owner-read.ts obsługuje wyłącznie zamontowane sekcje Ownera:
+kontroler bieżącego odczytu, ochronę nieaktualnych odpowiedzi, ręczne retry,
+tożsamość zasobu i opcjonalne opóźnienie. Nie jest globalnym systemem danych.
+Nie współdzieli gotowych danych ani nie wprowadza cache; istniejący backendGet
+nadal odpowiada za deduplikację trwających żądań i sesję.
+Stary callback reload nie uruchamia odczytu poprzedniego id/filtra po zmianie
+kontekstu. setData po lokalnym zapisie anuluje stare pobieranie, aby opóźniony
+odczyt nie przywracał wersji sprzed zapisu. Cleanup chroni sukces, błąd i loading.
+OwnerReadState zapewnia polskie komunikaty, role=status/alert i dostępny retry;
+nie organizuje na nowo sekcji i zachowuje istniejące komponenty formularzy.
+
+ZMIENIONE PLIKI ETAPU 2
+Widoki:
+- app/(app)/owner/schedule/page.tsx
+- app/(app)/owner/clients/[id]/page.tsx
+- app/(app)/owner/trainers/[id]/page.tsx
+- app/(app)/owner/trainers/components/TrainerProfileHeader.tsx
+- app/(app)/owner/expenses/page.tsx (kontynuacja pliku zmienionego w etapie 1)
+Nowe lokalne komponenty:
+- app/(app)/owner/components/use-owner-read.ts
+- app/(app)/owner/components/OwnerReadState.tsx
+Adaptery — tylko opcjonalny AbortSignal, bez zmiany URL/parametrów/odpowiedzi:
+- app/lib/owner/clients.ts
+- app/lib/owner/billing.ts
+- app/lib/owner/sessions.ts
+- app/lib/owner/trainers.ts
+- app/lib/owner/settlements.ts
+- app/lib/owner/locations.ts
+Testy i raport:
+- tests/owner-stage-two.test.mjs (nowe scenariusze etapu 2)
+- tests/owner-read-harness.mjs (wspólna deterministyczna obsługa hooków/testów)
+- tests/owner-audit.test.mjs (testy etapu 1 korzystają ze wspólnego harnessu
+  i prawdziwego nowego mechanizmu odczytu wydatków; scenariusze zachowane)
+- docs/owner-stage-two.txt
+
+POZOSTAŁE LOKALNE ZMIANY NALEŻĄ DO ETAPU 1
+Statystyki i adapter analytics, pakiety i ich adapter, odporność filtra lokalizacji,
+etykieta/przycisk listy klientów, opcjonalne sygnały adaptera wydatków,
+docs/owner-audit.txt. Nie powtarzano tych prac ani ich nie wycofywano.
+
+PORÓWNANIE LICZBY ODCZYTÓW (KOD + TESTY WYWOŁAŃ ADAPTERÓW)
+Scenariusz                                  Przed etapem 2    Po etapie 2
+Wejście do profilu klienta, zasoby strony     8                 8
+Korekta sesji/dat płatności w profilu         8                 6
+Odświeżenie po zmianie pakietu/zwrocie        7                 7
+Retry jednej sekcji profilu                  brak osobnego     1
+Wejście do profilu trenera                   4                 4
+Paginacja wydatków                          2                 1
+Zmiana filtrów wydatków                     2                 2
+Grafik: wszystkie <-> bez anulowanych       1                 0
+Grafik: lokalizacja usuwająca wybór trenera   do 2              1
+Wejście do grafiku                          bez zmiany: status Outlook, potem
+                                           zasoby i sesje; bramka zachowana.
+Podsumowania nie obejmują dodatkowych odczytów sekcji okresowych, historii zmian
+i modali, które pozostają. Nie są to pomiary Network w uruchomionej aplikacji:
+istniejąca deduplikacja może ograniczać fizyczną liczbę HTTP przed zmianą.
+
+CO PRZYSPIESZYŁO I DLACZEGO
+Profile: pierwszy ekran po odczycie głównych danych, zamiast po najwolniejszym
+z czterech/ośmiu odczytów. Nie usunięto żadnego zasobu ani funkcji.
+Wydatki: paginacja nie czeka na podsumowanie i nie pobiera go ponownie.
+Grafik: brak niepotrzebnych odczytów dwóch opisanych przełączeń; wyniki
+nie przeskakują do starszych filtrów przy wolnej sieci.
+Retry: ponawiana tylko uszkodzona sekcja, bez migania całego profilu/formularza.
+Nie podaję zysków w milisekundach: brak profilowania działającej sesji Ownera.
+
+WERYFIKACJA
+Nowe testy: 14/14. Razem owner-stage-two, owner-audit, owner-dashboard,
+super-admin-auth: 65/65 przechodzi. Testy auth uruchomiono dla regresji wspólnych
+mechanizmów; nie edytowano panelu SuperAdmina.
+Scenariusze: stare sukcesy i błędy ignorujące AbortSignal, nowe filtry/id,
+cleanup, nieaktualny callback, zapis lokalny wygrywający z odczytem,
+wczesny profil przy wolnych sekcjach, niezależny retry, puste i błędne dane,
+404 folderu, siedem odczytów refreshCooperationData i propagateError,
+zachowanie otwartego formularza i brak ponownego pobierania podsumowania
+przy paginacji, bramka Outlook i szczegóły ostatniej klikniętej sesji.
+Testy wykonują funkcje komponentów, hooki i adaptery w VM z kontrolowanymi
+obietnicami/timerami; nie zastępują przeglądarki ani testów backendu.
+TypeScript: npx tsc --noEmit --incremental false — PASS.
+ESLint zmienionych plików — brak błędów; 1 istniejące ostrzeżenie no-img-element
+w TrainerProfileHeader (pozostawione, nie zmieniano sposobu ładowania avatarów).
+git diff --check — PASS; informacje Git o LF/CRLF nie są błędami whitespace.
+Bez pełnego builda, commitów, push i merge.
+
+RYZYKA REGRESJI I GRANICE
+- Rozdzielenie odpowiedzi oznacza chwilową dostępność tylko części danych;
+  stany są jawne. Formularz trenera czeka na znane stawki; pakiety klienta
+  nie udają pustej listy przed pobraniem billing.
+- Prawdziwe konflikty równoczesnych zapisów i niepewne wyniki mutacji pozostają
+  domeną serwera. Kontekst otwartego formularza nie rozwiązuje konfliktu wersji.
+- Zmiana id to inny profil; niezapisane zmiany nie przenoszą się do innej osoby.
+  Ostrzeganie przed nawigacją/remount lokalizacji pozostaje decyzją etapu 3.
+- Globalne zdarzenie korekty nadal odświeża także otwarte profile innych klientów,
+  ponieważ nie ma informacji pozwalającej bezpiecznie je wykluczyć.
+- Odczyty akcyjne po mutacjach (np. podgląd zamknięcia) nie zostały szeroko
+  przebudowane; tożsamość profilu jest izolowana key, a mutacje nie są anulowane.
+- Status Outlook i currentUser nie mają tu zmienionych adapterów; wynik po
+  cleanup jest ignorowany, ale transport tych dwóch odczytów może się zakończyć.
+- Nie wykonano kontroli wizualnej 360/768/1440 ani pomiarów renderów, transferu
+  i p95 w zalogowanej aplikacji. Przejrzano zachowane klasy responsywne oraz
+  komunikaty (flex-col/sm:flex-row, min-w-0 i break-words); to nie jest visual QA.
+- Wcześniejsze 19 błędów starych testów opisanych w owner-audit.txt nie jest
+  naprawiane w tym etapie. Wynik 65/65 dotyczy wymienionego zestawu, nie wszystkich
+  testów repozytorium.
+- Bez zmian plików paneli Trainer/Client/SuperAdmin. Współdzielone adaptery
+  zachowują wywołania bez sygnału dokładnie jak wcześniej.
+
+CO NADAL WYMAGA BACKENDU
+Paginacja klientów i historii, zbiorcze rozliczenia, filtrowanie/paginacja
+płatności, komplet danych zapisów grupowych, kontrola organizacji/IDOR,
+idempotencja i wersjonowanie operacji finansowych. Kontrakty opisano w etapie 1;
+nie dodano frontendowego pobierania wszystkich stron ani zastępczych agregatów.
+
+DECYZJE UX/UI I PROPOZYCJE ETAPU 3
+1. Pojedynczy responsywny wiersz klienta: zachować nazwę, kontakt, rozpoczęcie
+   treningów, dostęp, trenera, pakiet, saldo i link. Desktop/mobile powinny
+   korzystać z jednego zestawu danych i akcji; układ zatwierdzić przed zmianą.
+2. Sesja testowa Ownera: sprawdzić 360/768/1440, klawiaturę/focus, wolną sieć,
+   nagłe rozłączenie, archiwum, konflikty oraz zapisy pakietów i zwrotów.
+3. Pomiar Network/React Profiler dla 100/500/1000 klientów i 5/50 trenerów;
+   dopiero potem decyzja o odroczeniu renderowania lub ciężkich modułach.
+4. Uzgodnić zakres zdarzenia korekty sesji (klienci przed i po zmianie), aby
+   selektywne odświeżanie nie pomijało klienta usuniętego z treningu.
+5. Osobny etap ostrzegania o utracie formularza oraz dostępnych dialogów,
+   bez zmiany potwierdzeń finansowych i bez przeorganizowania ekranów teraz.
+6. Po dostarczeniu backendu: prawdziwa paginacja płatności/klientów i zbiorcze
+   rozliczenia, z testami kontraktów i uprawnień opisanymi w etapie 1.
