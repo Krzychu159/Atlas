@@ -129,14 +129,15 @@ export type TrainerCostSessionsResult = {
   items: TrainerCostSession[] | null;
 };
 
-export function getRevenueStatistics(query: RevenueQuery) {
-  return backendGet<RevenueStatistics>("billing/revenue/statistics", query);
+export function getRevenueStatistics(query: RevenueQuery, signal?: AbortSignal) {
+  return backendGet<RevenueStatistics>("billing/revenue/statistics", query, signal);
 }
 
-export function getTrainerCostStatistics(query: TrainerCostsQuery) {
+export function getTrainerCostStatistics(query: TrainerCostsQuery, signal?: AbortSignal) {
   return backendGet<TrainerCostStatistics>(
     "billing/trainer-costs/statistics",
     query,
+    signal,
   );
 }
 

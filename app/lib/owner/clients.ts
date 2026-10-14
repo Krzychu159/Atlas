@@ -261,8 +261,8 @@ export function getClients(signal?: AbortSignal) {
   return backendGet<Client[]>("Clients", undefined, signal);
 }
 
-export function getClient(id: number) {
-  return backendGet<Client>(`Clients/${id}`);
+export function getClient(id: number, signal?: AbortSignal) {
+  return backendGet<Client>(`Clients/${id}`, undefined, signal);
 }
 
 export type ClientAuditDto = {
@@ -287,12 +287,12 @@ export function getClientAudit(clientId: number, page = 1, pageSize = 25) {
   return backendGet<ClientAuditResponse>(`clients/${clientId}/audit`, { page, pageSize });
 }
 
-export function getClientsByTrainer(trainerId: number) {
-  return backendGet<Client[]>("Clients/filter", { TrainerId: trainerId });
+export function getClientsByTrainer(trainerId: number, signal?: AbortSignal) {
+  return backendGet<Client[]>("Clients/filter", { TrainerId: trainerId }, signal);
 }
 
-export function getClientSubscription(id: number) {
-  return backendGet<ClientSubscription>(`Clients/${id}/subscription`);
+export function getClientSubscription(id: number, signal?: AbortSignal) {
+  return backendGet<ClientSubscription>(`Clients/${id}/subscription`, undefined, signal);
 }
 
 export function setClientNextPackage(id: number, packageId: number) {
@@ -321,12 +321,12 @@ export function getClientCurrentCycle(id: number) {
   );
 }
 
-export function getClientTrainingPlan(id: number) {
-  return backendGet<ClientTrainingPlan>(`clients/${id}/training-plan`);
+export function getClientTrainingPlan(id: number, signal?: AbortSignal) {
+  return backendGet<ClientTrainingPlan>(`clients/${id}/training-plan`, undefined, signal);
 }
 
-export function getClientLegalConsents(id: number) {
-  return backendGet<ClientLegalConsent[]>(`clients/${id}/legal-consents`);
+export function getClientLegalConsents(id: number, signal?: AbortSignal) {
+  return backendGet<ClientLegalConsent[]>(`clients/${id}/legal-consents`, undefined, signal);
 }
 
 export function createClient(payload: CreateClientPayload) {
@@ -373,12 +373,13 @@ export function closeClientCooperation(
 export function getClientRefunds(
   id: number,
   query: { page?: number; pageSize?: number } = {},
+  signal?: AbortSignal,
 ) {
   return backendGet<ClientRefundsPage>("clients/refunds", {
     ClientId: id,
     Page: query.page,
     PageSize: query.pageSize,
-  });
+  }, signal);
 }
 
 export function confirmClientRefund(

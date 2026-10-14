@@ -3,8 +3,10 @@
 import { ApiError } from "@/app/lib/backend";
 import { userMessage } from "@/app/lib/user-messages";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, RefreshCw } from "lucide-react";
+import { useOwnerRead } from "../components/use-owner-read";
+import { OwnerReadState } from "../components/OwnerReadState";
 import { Button } from "@/app/components/ui/button";
 import { getCurrentUser } from "@/app/lib/auth/current-user";
 import { getClients, type Client } from "@/app/lib/owner/clients";
@@ -13,7 +15,7 @@ import {
   useOwnerLocationFilter,
 } from "@/app/lib/owner/location-filter";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
-import { getOutlookStatus, type OutlookStatus } from "@/app/lib/owner/outlook";
+import { getOutlookStatus } from "@/app/lib/owner/outlook";
 import {
   createSession,
   getSession,
@@ -49,29 +51,37 @@ import type {
 } from "./types";
 import { showOwnerError, showOwnerInfo, showOwnerSuccess } from "../components/owner-toast";
 
+const EMPTY_TRAINERS: Trainer[] = [];
+const EMPTY_LOCATIONS: Location[] = [];
+const EMPTY_CLIENTS: Client[] = [];
+const EMPTY_SESSIONS: OwnerSession[] = [];
+
 export default function SchedulePage() {
   const [view, setView] = useState<ScheduleView>("week");
   const { selectedLocationId } = useOwnerLocationFilter();
   const [anchorDate, setAnchorDate] = useState(() => new Date());
-  const [outlookStatus, setOutlookStatus] = useState<OutlookStatus | null>(
-    null,
-  );
-  const [sessions, setSessions] = useState<OwnerSession[]>([]);
-  const [trainers, setTrainers] = useState<Trainer[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
+  const outlook = useOwnerRead("outlook", getOutlookStatus, "Nie udało się sprawdzić połączenia z Outlookiem.");
+  const connected = Boolean(outlook.data?.isConnected);
+  const loadResources = useCallback(async (signal: AbortSignal) => {
+    const [trainers, locations, clients, currentUser] = await Promise.all([
+      getTrainers(signal), getLocations(signal), getClients(signal), getCurrentUser().catch(() => null),
+    ]);
+    const currentTrainer = trainers.find(trainer => String(trainer.userId) === currentUser?.id || trainer.email.toLowerCase() === currentUser?.email.toLowerCase());
+    return { trainers, locations: locations.filter(item => item.isActive), clients, defaultTrainerId: currentTrainer?.id ?? null };
+  }, []);
+  const resources = useOwnerRead("schedule-resources", loadResources, "Nie udało się pobrać trenerów, klientów i lokalizacji.", 0, 0, connected);
+  const trainers = resources.data?.trainers ?? EMPTY_TRAINERS;
+  const locations = resources.data?.locations ?? EMPTY_LOCATIONS;
+  const clients = resources.data?.clients ?? EMPTY_CLIENTS;
+  const defaultTrainerId = resources.data?.defaultTrainerId ?? null;
   const [statusFilter, setStatusFilter] =
     useState<SessionStatusFilter>("without-cancelled");
   const [trainerFilter, setTrainerFilter] = useState("");
-  const [defaultTrainerId, setDefaultTrainerId] = useState<number | null>(null);
   const [selectedSession, setSelectedSession] = useState<OwnerSession | null>(
     null,
   );
   const [createSessionDate, setCreateSessionDate] = useState(() => new Date());
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
-  const [isStatusLoading, setIsStatusLoading] = useState(true);
-  const [isSessionsLoading, setIsSessionsLoading] = useState(false);
-  const [isResourcesLoading, setIsResourcesLoading] = useState(false);
   const [isSavingSession, setIsSavingSession] = useState(false);
   const calendarRevision = useSessionCorrectionRevision();
   const [sessionRevision, setSessionRevision] = useState(0);
@@ -110,6 +120,23 @@ export default function SchedulePage() {
       ...scopedTrainers.filter((trainer) => trainer.id !== currentTrainer.id),
     ];
   }, [defaultTrainerId, scopedTrainers, trainers]);
+  const effectiveTrainerFilter = !trainerFilter || scopedTrainers.some(trainer => String(trainer.id) === trainerFilter) ? trainerFilter : "";
+  const backendStatus = statusFilter === "all" || statusFilter === "without-cancelled" ? undefined : statusFilter;
+  const sessionQuery = useMemo(() => ({ from: period.fromIso, to: period.toIso,
+    trainerId: effectiveTrainerFilter ? Number(effectiveTrainerFilter) : undefined,
+    locationId: selectedLocationId ?? undefined, status: backendStatus,
+  }), [period.fromIso, period.toIso, effectiveTrainerFilter, selectedLocationId, backendStatus]);
+  const readSessions = useCallback((signal: AbortSignal) => getOwnerSessions(sessionQuery, signal), [sessionQuery]);
+  const sessionList = useOwnerRead(JSON.stringify(sessionQuery), readSessions, "Nie udało się pobrać sesji.", calendarRevision, 0, connected);
+  const sessions = sessionList.data ?? EMPTY_SESSIONS;
+  const isSessionsLoading = sessionList.loading;
+  const isResourcesLoading = resources.loading;
+  const detailRead = useRef<AbortController | null>(null);
+  useEffect(() => () => detailRead.current?.abort(), [sessionQuery]);
+  async function loadSessions() {
+    try { await sessionList.reload(); } catch { /* The section displays its read error. */ }
+  }
+
   const visibleSessions = useMemo(
     () =>
       sortSessions(
@@ -126,105 +153,6 @@ export default function SchedulePage() {
 
     return Array.from({ length: 6 }, (_, index) => addDays(weekStart, index));
   }, [anchorDate]);
-
-  async function loadOutlookStatus() {
-    await Promise.resolve();
-
-    try {
-      setIsStatusLoading(true);
-      const data = await getOutlookStatus();
-      setOutlookStatus(data);
-    } catch (err) {
-      showOwnerError(err, "Nie udało się sprawdzić połączenia Outlook.", {
-        id: "owner-schedule-outlook-status",
-      });
-      setOutlookStatus(null);
-    } finally {
-      setIsStatusLoading(false);
-    }
-  }
-
-  async function loadResources() {
-    await Promise.resolve();
-
-    try {
-      setIsResourcesLoading(true);
-      const [trainersData, locationsData, clientsData, currentUser] =
-        await Promise.all([
-          getTrainers(),
-          getLocations(),
-          getClients(),
-          getCurrentUser().catch(() => null),
-        ]);
-      const currentTrainer = trainersData.find(
-        (trainer) =>
-          String(trainer.userId) === currentUser?.id ||
-          trainer.email.toLowerCase() === currentUser?.email.toLowerCase(),
-      );
-
-      setTrainers(trainersData);
-      setLocations(locationsData.filter((item) => item.isActive));
-      setClients(clientsData);
-      setDefaultTrainerId(currentTrainer?.id ?? null);
-    } catch (err) {
-      showOwnerError(err, "Nie udało się pobrać trenerów i lokalizacji.", {
-        id: "owner-schedule-resources",
-      });
-    } finally {
-      setIsResourcesLoading(false);
-    }
-  }
-
-  async function loadSessions() {
-    await Promise.resolve();
-
-    try {
-      setIsSessionsLoading(true);
-      const data = await getOwnerSessions({
-        from: period.fromIso,
-        to: period.toIso,
-        trainerId: trainerFilter ? Number(trainerFilter) : undefined,
-        locationId: selectedLocationId ?? undefined,
-        status:
-          statusFilter !== "all" && statusFilter !== "without-cancelled"
-            ? statusFilter
-            : undefined,
-      });
-      setSessions(data);
-    } catch (err) {
-      showOwnerError(err, "Nie udało się pobrać sesji.", {
-        id: "owner-schedule-sessions",
-      });
-      setSessions([]);
-    } finally {
-      setIsSessionsLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void Promise.resolve().then(() => loadOutlookStatus());
-  }, []);
-
-  useEffect(() => {
-    if (!outlookStatus?.isConnected) return;
-
-    void Promise.resolve().then(() => loadResources());
-  }, [outlookStatus?.isConnected]);
-
-  useEffect(() => {
-    if (!outlookStatus?.isConnected) return;
-
-    void Promise.resolve().then(() => loadSessions());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    outlookStatus?.isConnected,
-    period.fromIso,
-    period.toIso,
-    selectedLocationId,
-    trainerFilter,
-    statusFilter,
-    calendarRevision,
-  ]);
 
   useEffect(() => {
     if (!trainerFilter) return;
@@ -245,18 +173,23 @@ export default function SchedulePage() {
   }
 
   function openCreateModal(date = anchorDate) {
+    detailRead.current?.abort();
     setSelectedSession(null);
     setCreateSessionDate(date);
     setIsSessionModalOpen(true);
   }
 
   async function openEditModal(session: OwnerSession) {
+    detailRead.current?.abort();
+    const controller = new AbortController();
+    detailRead.current = controller;
     try {
-      const detailed = await getSession(session.id);
+      const detailed = await getSession(session.id, controller.signal);
+      if (controller.signal.aborted) return;
       setSelectedSession(detailed);
       setIsSessionModalOpen(true);
     } catch (err) {
-      showOwnerError(err, "Nie udało się pobrać szczegółów sesji.");
+      if (!controller.signal.aborted) showOwnerError(err, "Nie udało się pobrać szczegółów sesji.");
     }
   }
 
@@ -326,7 +259,6 @@ export default function SchedulePage() {
     }
   }
 
-  const connected = Boolean(outlookStatus?.isConnected);
 
   return (
     <>
@@ -369,7 +301,7 @@ export default function SchedulePage() {
                 <Button
                   icon={<Plus size={16} />}
                   onClick={() => openCreateModal()}
-                  disabled={isResourcesLoading}
+                  disabled={isResourcesLoading || resources.data === undefined}
                 >
                   Dodaj sesję
                 </Button>
@@ -389,12 +321,17 @@ export default function SchedulePage() {
           />
         ) : null}
 
-        {isStatusLoading ? (
+        <OwnerReadState loading={false} error={outlook.error} retry={outlook.retry} label="Sprawdzanie połączenia..." />
+        {connected ? <>
+          <OwnerReadState loading={false} error={resources.error} retry={resources.retry} label="Ładowanie danych grafiku..." />
+          <OwnerReadState loading={false} error={sessionList.error} retry={sessionList.retry} label="Ładowanie sesji..." />
+        </> : null}
+        {outlook.loading ? (
           <div className="card-shell p-6 text-on-surface-variant">
             Sprawdzanie połączenia z Microsoft Outlook...
           </div>
         ) : !connected ? (
-          <OutlookRequiredState />
+          outlook.error ? null : <OutlookRequiredState />
         ) : view === "week" ? (
           <WeekSchedule
             days={weekDays}
@@ -435,6 +372,7 @@ export default function SchedulePage() {
         isSaving={isSavingSession}
         onClose={() => {
           if (isSavingSession) return;
+          detailRead.current?.abort();
           setIsSessionModalOpen(false);
           setSelectedSession(null);
         }}

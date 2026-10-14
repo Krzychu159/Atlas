@@ -149,8 +149,8 @@ export type ExpenseDictionaryItem = {
   displayName?: string;
 };
 
-export function getExpenses(query: ExpenseQuery) {
-  return backendGet<ExpensePagedResult>("expenses", query);
+export function getExpenses(query: ExpenseQuery, signal?: AbortSignal) {
+  return backendGet<ExpensePagedResult>("expenses", query, signal);
 }
 
 export function getExpense(id: number) {
@@ -192,11 +192,11 @@ export function getExpenseRecurrenceEditScopes() {
   return backendGet<ExpenseDictionaryItem[]>("expenses/recurrence-edit-scopes");
 }
 
-export function getExpenseStatistics(query: ExpenseQuery) {
+export function getExpenseStatistics(query: ExpenseQuery, signal?: AbortSignal) {
   const filters = { ...query };
   delete filters.page;
   delete filters.pageSize;
-  return backendGet<ExpenseStatistics>("expenses/statistics", filters);
+  return backendGet<ExpenseStatistics>("expenses/statistics", filters, signal);
 }
 
 export async function uploadExpenseAttachment(id: number, file: File) {

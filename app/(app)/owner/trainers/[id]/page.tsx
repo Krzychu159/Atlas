@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useParams } from "next/navigation";
-import { getClientsByTrainer, type Client } from "@/app/lib/owner/clients";
+import { getClientsByTrainer } from "@/app/lib/owner/clients";
 import { getTrainerRates, type TrainerRate } from "@/app/lib/owner/settlements";
 import {
   getTrainerSessions,
-  type OwnerSession,
 } from "@/app/lib/owner/sessions";
 import { getTrainer, type Trainer } from "@/app/lib/owner/trainers";
 import EditTrainerModal from "../components/EditTrainerModal";
@@ -14,69 +13,36 @@ import TrainerContractsModal from "../components/TrainerContractsModal";
 import TrainerProfileClients from "../components/TrainerProfileClients";
 import TrainerProfileHeader from "../components/TrainerProfileHeader";
 import TrainerSchedulePanel from "../components/TrainerSchedulePanel";
-import { showOwnerError } from "../../components/owner-toast";
+import { useOwnerRead } from "../../components/use-owner-read";
+import { OwnerReadState } from "../../components/OwnerReadState";
 
 export default function TrainerPage() {
   const params = useParams<{ id: string }>();
-  const [trainer, setTrainer] = useState<Trainer | null>(null);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [rates, setRates] = useState<TrainerRate[]>([]);
-  const [sessions, setSessions] = useState<OwnerSession[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const trainerId = Number(params.id);
+  if (!Number.isSafeInteger(trainerId) || trainerId <= 0) return <p role="alert">Nie można otworzyć tego trenera. Wróć do listy trenerów i wybierz go ponownie.</p>;
+  return <TrainerProfile key={trainerId} trainerId={trainerId} />;
+}
+
+function TrainerProfile({ trainerId }: { trainerId: number }) {
+  const loadTrainer = useCallback((signal: AbortSignal) => getTrainer(trainerId, signal), [trainerId]);
+  const loadClients = useCallback((signal: AbortSignal) => getClientsByTrainer(trainerId, signal), [trainerId]);
+  const loadRates = useCallback((signal: AbortSignal) => getTrainerRates(trainerId, signal), [trainerId]);
+  const loadSessions = useCallback((signal: AbortSignal) => getTrainerSessions(trainerId, signal), [trainerId]);
+  const profile = useOwnerRead(String(trainerId), loadTrainer, "Nie udało się pobrać profilu trenera.");
+  const clientList = useOwnerRead(String(trainerId), loadClients, "Nie udało się pobrać klientów trenera.");
+  const rateList = useOwnerRead(String(trainerId), loadRates, "Nie udało się pobrać stawek trenera.");
+  const sessionList = useOwnerRead(String(trainerId), loadSessions, "Nie udało się pobrać grafiku trenera.");
+  const trainer = profile.data;
+  const rates = rateList.data ?? [];
+  const setTrainer = profile.setData;
+  const setRates = rateList.setData;
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editContext, setEditContext] = useState<{ trainer: Trainer; rates: TrainerRate[] } | null>(null);
   const [isContractsOpen, setIsContractsOpen] = useState(false);
-
-  useEffect(() => {
-    async function loadTrainer() {
-      try {
-        const trainerId = Number(params.id);
-
-        if (!trainerId) {
-          showOwnerError(new Error("Nie można otworzyć tego trenera. Wróć do listy trenerów i wybierz go ponownie."), "", {
-            id: "owner-trainer-invalid-id",
-          });
-          return;
-        }
-
-        const [trainerResult, clientsResult, ratesResult, sessionsResult] =
-          await Promise.allSettled([
-            getTrainer(trainerId),
-            getClientsByTrainer(trainerId),
-            getTrainerRates(trainerId),
-            getTrainerSessions(trainerId),
-          ]);
-
-        if (trainerResult.status !== "fulfilled") {
-          throw trainerResult.reason;
-        }
-
-        setTrainer(trainerResult.value);
-        setClients(
-          clientsResult.status === "fulfilled" ? clientsResult.value : [],
-        );
-        setRates(ratesResult.status === "fulfilled" ? ratesResult.value : []);
-        setSessions(
-          sessionsResult.status === "fulfilled" ? sessionsResult.value : [],
-        );
-      } catch (err) {
-        showOwnerError(err, "Nie udało się pobrać trenera.", {
-          id: "owner-trainer-load-error",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadTrainer();
-  }, [params.id]);
 
   return (
     <div className="mx-auto w-full max-w-[1400px] pb-10">
-      {isLoading ? (
-        <div className="card-shell p-6 text-on-surface-variant">
-          Ładowanie profilu trenera...
-        </div>
-      ) : null}
+      <OwnerReadState loading={profile.loading && !trainer} error={profile.error} retry={profile.retry} label="Ładowanie profilu trenera..." />
 
       {trainer ? (
         <>
@@ -84,20 +50,26 @@ export default function TrainerPage() {
             <TrainerProfileHeader
               trainer={trainer}
               rates={rates}
-              onEdit={() => setIsEditOpen(true)}
+              ratesAvailable={rateList.data !== undefined}
+              onEdit={() => {
+                if (rateList.data === undefined) return;
+                setEditContext({ trainer, rates });
+                setIsEditOpen(true);
+              }}
               onContracts={() => setIsContractsOpen(true)}
             />
 
+            <OwnerReadState loading={rateList.loading && rateList.data === undefined} error={rateList.error} retry={rateList.retry} label="Ładowanie stawek trenera..." />
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-              <TrainerProfileClients clients={clients} />
-              <TrainerSchedulePanel sessions={sessions} />
+              <OwnerReadState loading={clientList.loading} error={clientList.error} retry={clientList.retry} label="Ładowanie klientów trenera...">{clientList.data !== undefined ? <TrainerProfileClients clients={clientList.data} /> : null}</OwnerReadState>
+              <OwnerReadState loading={sessionList.loading} error={sessionList.error} retry={sessionList.retry} label="Ładowanie grafiku trenera...">{sessionList.data !== undefined ? <TrainerSchedulePanel sessions={sessionList.data} /> : null}</OwnerReadState>
             </div>
           </div>
 
           <EditTrainerModal
             open={isEditOpen}
-            trainer={trainer}
-            rates={rates}
+            trainer={editContext?.trainer ?? trainer}
+            rates={editContext?.rates ?? rates}
             onClose={() => setIsEditOpen(false)}
             onAvatarChanged={(avatarUrl) =>
               setTrainer((current) =>

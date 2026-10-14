@@ -13,9 +13,11 @@ function formatPrice(value: number, currency: string) {
 export default function PackageDetailsHero({
   item,
   clients,
+  clientsAvailable = true,
 }: {
   item: Package;
   clients: PackageClient[];
+  clientsAvailable?: boolean;
 }) {
   const periodBased = isPeriodPackage(item);
   const usedSessions = clients.every(client => client.activePackageId === item.id && typeof client.activePackageUsedSessions === "number" && Number.isFinite(client.activePackageUsedSessions))
@@ -82,20 +84,20 @@ export default function PackageDetailsHero({
           <div className="bg-surface-container-low rounded-[var(--radius-lg)] p-4">
             <Users size={18} className="text-primary-light" />
             <p className="mt-4 text-label text-on-surface-muted">Klienci</p>
-            <p className="mt-1 text-2xl font-semibold">{clients.length}</p>
+            <p className="mt-1 text-2xl font-semibold">{clientsAvailable ? clients.length : "—"}</p>
           </div>
 
           <div className="bg-surface-container-low rounded-[var(--radius-lg)] p-4">
             <TrendingUp size={18} className="text-tertiary-light" />
             <p className="mt-4 text-label text-on-surface-muted">Szacowana wartość</p>
             <p className="mt-1 text-2xl font-semibold">
-              {new Intl.NumberFormat("pl-PL", {
+              {clientsAvailable ? new Intl.NumberFormat("pl-PL", {
                 notation: "compact",
                 maximumFractionDigits: 1,
-              }).format(estimatedRevenue)} {item.currency || "PLN"}
+              }).format(estimatedRevenue) : "—"} {clientsAvailable ? item.currency || "PLN" : ""}
             </p>
             {!periodBased ? <p className="mt-1 text-xs text-on-surface-muted">
-              {usedSessions === null ? "Brak danych o wykorzystaniu" : `${usedSessions} wykorzystanych sesji`}
+              {!clientsAvailable || usedSessions === null ? "Brak danych o wykorzystaniu" : `${usedSessions} wykorzystanych sesji`}
             </p> : null}
           </div>
         </div>

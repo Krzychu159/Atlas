@@ -54,12 +54,12 @@ export type UpdateTrainerPayload = {
   locationIds?: number[] | null;
 };
 
-export function getTrainers() {
-  return backendGet<Trainer[]>("Trainers");
+export function getTrainers(signal?: AbortSignal) {
+  return backendGet<Trainer[]>("Trainers", undefined, signal);
 }
 
-export function getTrainer(id: number) {
-  return backendGet<Trainer>(`Trainers/${id}`);
+export function getTrainer(id: number, signal?: AbortSignal) {
+  return backendGet<Trainer>(`Trainers/${id}`, undefined, signal);
 }
 
 export function createTrainer(payload: CreateTrainerPayload) {

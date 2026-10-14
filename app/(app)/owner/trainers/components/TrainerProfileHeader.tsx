@@ -11,7 +11,6 @@ import {
   Pencil,
   ReceiptText,
   ShieldCheck,
-  Star,
 } from "lucide-react";
 import { Button, ButtonLink } from "@/app/components/ui/button";
 import { getActiveTrainerHourlyRate, type TrainerRate } from "@/app/lib/owner/settlements";
@@ -40,11 +39,13 @@ export default function TrainerProfileHeader({
   rates,
   onEdit,
   onContracts,
+  ratesAvailable = true,
 }: {
   trainer: Trainer;
   rates: TrainerRate[];
   onEdit: () => void;
   onContracts: () => void;
+  ratesAvailable?: boolean;
 }) {
   const { selectedLocationId } = useOwnerLocationFilter();
   const fullName =
@@ -112,7 +113,7 @@ export default function TrainerProfileHeader({
 
           <div className="mt-7 grid grid-cols-2 gap-4 border-t border-secondary/30 pt-6 md:grid-cols-4">
             <HeroStat label="Sesje" value={trainer.sessionsCount ?? 0} />
-            <HeroStat label="Stawka" value={getRateLabel(trainer, rates)} />
+            <HeroStat label="Stawka" value={ratesAvailable ? getRateLabel(trainer, rates) : "Niedostępne"} />
             <HeroStat label="BIO" value={trainer.bio || "Brak specjalizacji"} />
           </div>
         </div>
@@ -121,6 +122,7 @@ export default function TrainerProfileHeader({
           <Button
             type="button"
             onClick={onEdit}
+            disabled={!ratesAvailable}
             size="lg"
             icon={<Pencil size={16} />}
             className="flex-1 p-4"

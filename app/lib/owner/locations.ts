@@ -11,6 +11,6 @@ export type Location = {
   legalEntityName?: string | null;
 };
 
-export function getLocations() {
-  return backendGet<Location[]>("Locations");
+export function getLocations(signal?: AbortSignal) {
+  return backendGet<Location[]>("Locations", undefined, signal);
 }

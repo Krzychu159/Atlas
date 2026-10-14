@@ -67,8 +67,8 @@ function emptySettlement(
   };
 }
 
-export function getTrainerRates(trainerId: number) {
-  return backendGet<TrainerRate[]>(`Trainers/${trainerId}/rates`);
+export function getTrainerRates(trainerId: number, signal?: AbortSignal) {
+  return backendGet<TrainerRate[]>(`Trainers/${trainerId}/rates`, undefined, signal);
 }
 
 export function updateTrainerRates(

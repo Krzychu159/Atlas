@@ -4,7 +4,7 @@ import { safeExternalUrl } from "@/app/lib/safe-url";
 
 import { useSessionCorrectionRevision, usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   archiveClient,
@@ -19,21 +19,16 @@ import {
   getClientTrainingPlan,
   restoreClient,
   setClientPortalAccess,
-  type Client,
   type ClientArchiveCheck,
   type ClientClosurePreview,
-  type ClientLegalConsent,
   type ClientRefund,
-  type ClientSubscription,
   type ClientTrainingPlan,
   type CloseCooperationPayload,
 } from "@/app/lib/owner/clients";
-import { getClientSessions, type OwnerSession } from "@/app/lib/owner/sessions";
+import { getClientSessions } from "@/app/lib/owner/sessions";
 import {
   getClientBilling,
   getClientPayments,
-  type ClientBillingSummary,
-  type ClientPayment,
 } from "@/app/lib/owner/billing";
 import ClientMetricCards from "./components/ClientMetricCards";
 import ClientNotesPanel from "./components/ClientNotesPanel";
@@ -51,7 +46,9 @@ import ClientRefundsSection from "./components/ClientRefundsSection";
 import ClientPeriodPackagesSection from "./components/ClientPeriodPackagesSection";
 import RefundConfirmationModal from "./components/RefundConfirmationModal";
 import ClientAuditSection from "./components/ClientAuditSection";
-import { ApiError } from "@/app/lib/backend";
+import { ApiError, isNotFoundError } from "@/app/lib/backend";
+import { useOwnerRead } from "../../components/use-owner-read";
+import { OwnerReadState } from "../../components/OwnerReadState";
 import {
   showOwnerError,
   showOwnerInfo,
@@ -59,28 +56,48 @@ import {
 } from "../../components/owner-toast";
 
 export default function OwnerClientDetailsPage() {
-  const correctionRevision = useSessionCorrectionRevision();
   const params = useParams<{ id: string }>();
-  const paymentDateRevision = usePaymentDateCorrectionRevision(Number(params.id));
+  const clientId = Number(params.id);
+  if (!Number.isSafeInteger(clientId) || clientId <= 0) return <p role="alert">Nie można otworzyć tego klienta. Wróć do listy klientów i wybierz go ponownie.</p>;
+  return <ClientDetails key={clientId} clientId={clientId} />;
+}
+
+function ClientDetails({ clientId }: { clientId: number }) {
+  const correctionRevision = useSessionCorrectionRevision();
+  const paymentDateRevision = usePaymentDateCorrectionRevision(clientId);
   const router = useRouter();
-  const [client, setClient] = useState<Client | null>(null);
-  const [subscription, setSubscription] = useState<ClientSubscription | null>(
-    null,
-  );
-  const [billing, setBilling] = useState<ClientBillingSummary | null>(null);
-  const [trainingPlan, setTrainingPlan] = useState<ClientTrainingPlan | null>(
-    null,
-  );
-  const [sessions, setSessions] = useState<OwnerSession[]>([]);
-  const [payments, setPayments] = useState<ClientPayment[]>([]);
-  const [legalConsents, setLegalConsents] = useState<ClientLegalConsent[]>([]);
-  const [refunds, setRefunds] = useState<ClientRefund[]>([]);
+  const revision = correctionRevision + ":" + paymentDateRevision;
+  const loadClient = useCallback((signal: AbortSignal) => getClient(clientId, signal), [clientId]);
+  const loadSubscription = useCallback((signal: AbortSignal) => getClientSubscription(clientId, signal), [clientId]);
+  const loadBilling = useCallback((signal: AbortSignal) => getClientBilling(clientId, signal), [clientId]);
+  const loadSessions = useCallback((signal: AbortSignal) => getClientSessions(clientId, signal), [clientId]);
+  const loadPlan = useCallback(async (signal: AbortSignal) => {
+    try { return await getClientTrainingPlan(clientId, signal); }
+    catch (error) { if (isNotFoundError(error)) return null; throw error; }
+  }, [clientId]);
+  const loadPayments = useCallback((signal: AbortSignal) => getClientPayments(clientId, { page: 1, pageSize: 3 }, signal), [clientId]);
+  const loadConsents = useCallback((signal: AbortSignal) => getClientLegalConsents(clientId, signal), [clientId]);
+  const loadRefunds = useCallback((signal: AbortSignal) => getClientRefunds(clientId, { page: 1, pageSize: 25 }, signal), [clientId]);
+  const profile = useOwnerRead(String(clientId), loadClient, "Nie udało się pobrać profilu klienta.", revision);
+  const renewal = useOwnerRead(String(clientId), loadSubscription, "Nie udało się pobrać danych o przedłużaniu pakietu.", revision);
+  const account = useOwnerRead(String(clientId), loadBilling, "Nie udało się pobrać rozliczeń i pakietów klienta.", revision);
+  const history = useOwnerRead(String(clientId), loadSessions, "Nie udało się pobrać historii treningów.", revision);
+  const plan = useOwnerRead<ClientTrainingPlan | null>(String(clientId), loadPlan, "Nie udało się pobrać folderu klienta.");
+  const paymentList = useOwnerRead(String(clientId), loadPayments, "Nie udało się pobrać wpłat klienta.", revision);
+  const consents = useOwnerRead(String(clientId), loadConsents, "Nie udało się pobrać zgód klienta.");
+  const refundList = useOwnerRead(String(clientId), loadRefunds, "Nie udało się pobrać zwrotów klienta.", revision);
+  const client = profile.data;
+  const setClient = profile.setData;
+  const subscription = renewal.data ?? null;
+  const billing = account.data ?? null;
+  const trainingPlan = plan.data ?? null;
+  const setTrainingPlan = plan.setData;
+  const sessions = history.data ?? [];
+  const payments = paymentList.data?.items ?? [];
+  const legalConsents = consents.data ?? [];
+  const refunds = refundList.data?.items ?? [];
   const [closurePreview, setClosurePreview] =
     useState<ClientClosurePreview | null>(null);
-  const [sessionsAvailable, setSessionsAvailable] = useState(false);
-  const [paymentsAvailable, setPaymentsAvailable] = useState(false);
-  const [legalConsentsAvailable, setLegalConsentsAvailable] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [archiveCheck, setArchiveCheck] = useState<ClientArchiveCheck | null>(null);
@@ -90,7 +107,6 @@ export default function OwnerClientDetailsPage() {
   const [isEndCooperationOpen, setIsEndCooperationOpen] = useState(false);
   const [isEndCooperationLoading, setIsEndCooperationLoading] = useState(false);
   const [isEndingCooperation, setIsEndingCooperation] = useState(false);
-  const [isRefundsLoading, setIsRefundsLoading] = useState(true);
   const [refundToConfirm, setRefundToConfirm] = useState<ClientRefund | null>(
     null,
   );
@@ -106,7 +122,7 @@ export default function OwnerClientDetailsPage() {
     setAuditRevision((value) => value + 1);
 
     try {
-      setClient(await getClient(client.id));
+      await profile.reload();
     } catch (err) {
       showOwnerError(err, "Nie udało się odświeżyć danych klienta.", {
         id: "owner-client-refresh-error",
@@ -275,157 +291,33 @@ export default function OwnerClientDetailsPage() {
     }
   }
 
-  async function refreshCooperationData(clientId: number, propagateError = false) {
-    setAuditRevision((value) => value + 1);
+  async function refreshCooperationData(id: number, propagateError = false) {
+    if (id !== clientId) return;
+    setAuditRevision(value => value + 1);
+    // These reads may change after package closure, assignment or a refund.
+    // Keep the same scope; each section publishes independently.
     const results = await Promise.allSettled([
-      getClient(clientId),
-      getClientSubscription(clientId),
-      getClientBilling(clientId),
-      getClientSessions(clientId),
-      getClientPayments(clientId, { page: 1, pageSize: 3 }),
-      getClientRefunds(clientId, { page: 1, pageSize: 25 }),
-      getClientClosurePreview(clientId),
+      profile.reload(), renewal.reload(), account.reload(), history.reload(),
+      paymentList.reload(), refundList.reload(), getClientClosurePreview(id),
     ]);
-
-    const [
-      clientResult,
-      subscriptionResult,
-      billingResult,
-      sessionsResult,
-      paymentsResult,
-      refundsResult,
-      previewResult,
-    ] = results;
-
-    if (clientResult.status === "fulfilled") setClient(clientResult.value);
-    if (subscriptionResult.status === "fulfilled") {
-      setSubscription(subscriptionResult.value);
-    }
-    if (billingResult.status === "fulfilled") setBilling(billingResult.value);
-    if (sessionsResult.status === "fulfilled") {
-      setSessions(sessionsResult.value);
-      setSessionsAvailable(true);
-    }
-    if (paymentsResult.status === "fulfilled") {
-      setPayments(paymentsResult.value.items || []);
-      setPaymentsAvailable(true);
-    }
-    if (refundsResult.status === "fulfilled") {
-      setRefunds(refundsResult.value.items || []);
-    }
-    if (previewResult.status === "fulfilled") {
-      setClosurePreview(previewResult.value);
-    }
-
-    const failedResult = results.find((result) => result.status === "rejected");
-    if (failedResult?.status === "rejected") {
-      showOwnerError(
-        failedResult.reason,
-        "Część danych klienta nie została odświeżona.",
-        { id: "owner-client-cooperation-refresh-error" },
-      );
-      if (propagateError) throw failedResult.reason;
+    const preview = results[6];
+    if (preview.status === "fulfilled") setClosurePreview(preview.value ?? null);
+    const failed = results.find(result => result.status === "rejected");
+    if (failed?.status === "rejected") {
+      showOwnerError(failed.reason, "Część danych klienta nie została odświeżona.", { id: "owner-client-cooperation-refresh-error" });
+      if (propagateError) throw failed.reason;
     }
   }
 
-  async function refreshRefundData(clientId: number) {
-    await refreshCooperationData(clientId);
+  async function refreshRefundData(id: number) {
+    await refreshCooperationData(id);
   }
 
   useEffect(() => {
-    async function loadClientDetails() {
-      setAuditRevision((value) => value + 1);
-      const clientId = Number(params.id);
-
-      if (!clientId) {
-        showOwnerError(new Error("Nie można otworzyć tego klienta. Wróć do listy klientów i wybierz go ponownie."), "", {
-          id: "owner-client-invalid-id",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setSessionsAvailable(false);
-        setPaymentsAvailable(false);
-        setLegalConsentsAvailable(false);
-        setIsRefundsLoading(true);
-
-        const [
-          clientResult,
-          subscriptionResult,
-          billingResult,
-          sessionsResult,
-          trainingPlanResult,
-          paymentsResult,
-          legalConsentsResult,
-          refundsResult,
-        ] = await Promise.allSettled([
-          getClient(clientId),
-          getClientSubscription(clientId),
-          getClientBilling(clientId),
-          getClientSessions(clientId),
-          getClientTrainingPlan(clientId),
-          getClientPayments(clientId, { page: 1, pageSize: 3 }),
-          getClientLegalConsents(clientId),
-          getClientRefunds(clientId, { page: 1, pageSize: 25 }),
-        ]);
-
-        if (clientResult.status !== "fulfilled") {
-          throw clientResult.reason;
-        }
-
-        setClient(clientResult.value);
-
-        if (subscriptionResult.status === "fulfilled") {
-          setSubscription(subscriptionResult.value);
-        }
-
-        if (billingResult.status === "fulfilled") {
-          setBilling(billingResult.value);
-        }
-
-        if (sessionsResult.status === "fulfilled") {
-          setSessions(sessionsResult.value);
-          setSessionsAvailable(true);
-        }
-
-        if (trainingPlanResult.status === "fulfilled") {
-          setTrainingPlan(trainingPlanResult.value);
-        }
-
-        if (paymentsResult.status === "fulfilled") {
-          setPayments(paymentsResult.value.items || []);
-          setPaymentsAvailable(true);
-        }
-
-        if (legalConsentsResult.status === "fulfilled") {
-          setLegalConsents(legalConsentsResult.value || []);
-          setLegalConsentsAvailable(true);
-        }
-
-        if (refundsResult.status === "fulfilled") {
-          setRefunds(refundsResult.value.items || []);
-        } else {
-          showOwnerError(
-            refundsResult.reason,
-            "Nie udało się pobrać zwrotów klienta.",
-            { id: "owner-client-refunds-load-error" },
-          );
-        }
-      } catch (err) {
-        showOwnerError(err, "Nie udało się pobrać klienta.", {
-          id: "owner-client-load-error",
-        });
-      } finally {
-        setIsLoading(false);
-        setIsRefundsLoading(false);
-      }
-    }
-
-    loadClientDetails();
-  }, [params.id, correctionRevision, paymentDateRevision]);
+    let active = true;
+    void Promise.resolve().then(() => { if (active) setAuditRevision(value => value + 1); });
+    return () => { active = false; };
+  }, [correctionRevision, paymentDateRevision]);
 
   async function handleOpenTrainingPlan() {
     if (!client) return;
@@ -446,9 +338,8 @@ export default function OwnerClientDetailsPage() {
     let url = "";
 
     try {
-      const plan = await getClientTrainingPlan(client.id);
-      setTrainingPlan(plan);
-      url = getTrainingPlanUrl(plan);
+      const refreshedPlan = await plan.reload();
+      url = getTrainingPlanUrl(refreshedPlan ?? null);
     } catch {
       url = "";
     }
@@ -471,11 +362,7 @@ export default function OwnerClientDetailsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
-      {isLoading ? (
-        <div className="card-shell p-6 text-on-surface-variant">
-          Ładowanie klienta...
-        </div>
-      ) : null}
+      <OwnerReadState loading={profile.loading && !client} error={profile.error} retry={profile.retry} label="Ładowanie klienta..." />
 
       {client ? (
         <>
@@ -496,53 +383,43 @@ export default function OwnerClientDetailsPage() {
             isPortalActionPending={isPortalActionPending}
             isRestorePending={isRestoring}
           />
-          <ClientMetricCards
+          <OwnerReadState loading={account.loading && account.data === undefined} error={account.error} retry={account.retry} label="Ładowanie rozliczeń i pakietów..." />
+          <OwnerReadState loading={renewal.loading && renewal.data === undefined} error={renewal.error} retry={renewal.retry} label="Ładowanie danych o przedłużaniu pakietu..." />
+          <OwnerReadState loading={plan.loading && plan.data === undefined} error={plan.error} retry={plan.retry} label="Ładowanie folderu klienta..." />
+          <ClientMetricCards preserveMissingData
             client={client}
             subscription={subscription}
             billing={billing}
           />
-          <ClientPackagesSection key={client.id} packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} clientId={!client.isArchived ? client.id : undefined} onSaved={() => refreshCooperationData(client.id, true)} />
+          {account.data !== undefined ? <ClientPackagesSection key={client.id} packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} clientId={!client.isArchived ? client.id : undefined} onSaved={() => refreshCooperationData(client.id, true)} /> : null}
           <ClientPeriodPackagesSection key={`period:${client.id}`} clientId={client.id} canManage={!client.isArchived} onSaved={() => refreshCooperationData(client.id, true)} />
           <ClientAuditSection key={client.id} clientId={client.id} revision={auditRevision} />
 
           {!client.isArchived ? (
-            <ClientRefundsSection
-              refunds={refunds}
-              loading={isRefundsLoading}
-              onConfirm={setRefundToConfirm}
-            />
-          ) : null}
-
-          {client.isArchived &&
-          (!sessionsAvailable ||
-            !paymentsAvailable ||
-            !legalConsentsAvailable) ? (
-            <div className="card-shell p-5 text-sm text-on-surface-variant">
-              Nie udało się wyświetlić części historii archiwalnego klienta.
-              Spróbuj odświeżyć profil.
-            </div>
+            <OwnerReadState loading={refundList.loading} error={refundList.error} retry={refundList.retry} label="Ładowanie zwrotów klienta...">
+              {refundList.data !== undefined ? <ClientRefundsSection refunds={refunds} loading={refundList.loading} onConfirm={setRefundToConfirm} /> : null}
+            </OwnerReadState>
           ) : null}
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_330px]">
-            {sessionsAvailable ? (
-              <ClientSessionHistory clientId={client.id} sessions={sessions} />
-            ) : (
-              <div className="card-shell p-5 text-sm text-on-surface-variant">
-                Historia treningów jest obecnie niedostępna. Spróbuj odświeżyć profil.
-              </div>
-            )}
+            <OwnerReadState loading={history.loading} error={history.error} retry={history.retry} label="Ładowanie historii treningów...">
+              {history.data !== undefined ? <ClientSessionHistory clientId={client.id} sessions={sessions} /> : null}
+            </OwnerReadState>
+            <div className="flex min-w-0 flex-col gap-3">
+              <OwnerReadState loading={paymentList.loading && paymentList.data === undefined} error={paymentList.error} retry={paymentList.retry} label="Ładowanie wpłat klienta..." />
             <ClientNotesPanel
               client={client}
               payments={payments}
               onClientChange={(updated) => { setClient(updated); setAuditRevision((value) => value + 1); }}
               readOnly={client.isArchived}
-              showPayments={!client.isArchived || paymentsAvailable}
+              showPayments={paymentList.data !== undefined}
             />
+            </div>
           </div>
 
-          {!client.isArchived || legalConsentsAvailable ? (
-            <ClientLegalConsentsPanel consents={legalConsents} />
-          ) : null}
+          <OwnerReadState loading={consents.loading} error={consents.error} retry={consents.retry} label="Ładowanie zgód klienta...">
+            {consents.data !== undefined ? <ClientLegalConsentsPanel consents={legalConsents} /> : null}
+          </OwnerReadState>
 
           {!client.isArchived ? (
             <>

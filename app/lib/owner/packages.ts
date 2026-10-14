@@ -98,6 +98,6 @@ export function getDeletedPackages() {
   return backendGet<Package[]>("Packages/deleted");
 }
 
-export function getPackageClients(id: number) {
-  return backendGet<PackageClient[]>(`Packages/${id}/clients`);
+export function getPackageClients(id: number, signal?: AbortSignal) {
+  return backendGet<PackageClient[]>(`Packages/${id}/clients`, undefined, signal);
 }
