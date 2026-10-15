@@ -12,7 +12,7 @@ import { correctTrainerSessionBilling } from "@/app/lib/trainer/portal";
 import { notifySessionCorrected } from "@/app/lib/session-corrections";
 import { trainerPaymentError } from "@/app/lib/trainer/payment-errors";
 import { getOutlookStatus, type OutlookStatus } from "@/app/lib/calendar/outlook";
-import { updateTrainerPortalSession, createTrainerPortalSession, getTrainerPortalClients, getTrainerPortalMe, getTrainerPortalSession, getTrainerPortalSessions, type TrainerPortalMe, type TrainerSessionDetails, type TrainerSessionPayload } from "@/app/lib/trainer/portal";
+import { updateTrainerPortalSession, createTrainerPortalSession, getTrainerPortalMe, getTrainerPortalSession, getTrainerPortalSessions, type TrainerPortalMe, type TrainerSessionDetails, type TrainerSessionPayload } from "@/app/lib/trainer/portal";
 import { trainerPortalClientsToClients, trainerPortalMeToLocations, trainerPortalMeToTrainer, trainerPortalSessionsToCalendarSessions } from "@/app/lib/trainer/portal-mappers";
 import { DateNavigator, ViewSwitch } from "@/app/(app)/owner/schedule/components/ScheduleControls";
 import { DaySchedule, WeekSchedule } from "@/app/(app)/owner/schedule/components/ScheduleViews";
@@ -22,6 +22,7 @@ import { addDays, getPeriod, startOfWeek, toDateInputValue } from "@/app/(app)/o
 import { matchesStatusFilter, sortSessions, toSessionPayload } from "@/app/(app)/owner/schedule/session-utils";
 import type { CalendarSession, ScheduleView, SessionFormValues, SessionStatusFilter } from "@/app/(app)/owner/schedule/types";
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
+import { getTrainerClientsPage } from "@/app/lib/trainer/optimized";
 import type { Client } from "@/app/lib/owner/clients";
 import TrainerSessionDetailsModal from "./components/TrainerSessionDetailsModal";
 
@@ -106,10 +107,9 @@ export default function TrainerSchedulePage() {
     resourceController.current?.abort();
     const controller = new AbortController(); resourceController.current = controller;
     const revision = ++resourceRevision.current;
-    return Promise.all([getTrainerPortalMe(controller.signal), getTrainerPortalClients(controller.signal)]).then(([meData, clientData]) => {
+    return getTrainerPortalMe(controller.signal).then(meData => {
       if (revision !== resourceRevision.current) return;
       setMe(meData);
-      setClients(trainerPortalClientsToClients(clientData, meData));
       if (!dashboardCreateHandled.current && new URLSearchParams(window.location.search).get("action") === "new" && meData.trainerId && trainerPortalMeToLocations(meData).length > 0) {
         dashboardCreateHandled.current = true; setCreateDate(new Date()); setIsCreateOpen(true);
       }
@@ -118,6 +118,12 @@ export default function TrainerSchedulePage() {
       setResourcesError(trainerPaymentError(error, "Nie udało się pobrać danych potrzebnych do dodania zajęć."));
     }).finally(() => { if (revision === resourceRevision.current) setIsResourcesLoading(false); });
   }, []);
+  const loadClientOptions = useCallback(async (search: string, page: number, signal: AbortSignal) => {
+    const result = await getTrainerClientsPage({ Page: page, PageSize: 25, Search: search || undefined }, signal);
+    const items = trainerPortalClientsToClients(result.items || [], me);
+    if (!signal.aborted && mounted.current) setClients(previous => [...new Map([...previous, ...items].map(client => [client.id, client])).values()]);
+    return { items, totalCount: result.totalCount, totalPages: result.totalPages };
+  }, [me]);
   function reloadResources() { setIsResourcesLoading(true); setResourcesError(null); return loadResources(); }
 
   useEffect(() => {
@@ -271,8 +277,8 @@ export default function TrainerSchedulePage() {
         </>}
       </div>
       {selectedSession && !isEditOpen ? <TrainerSessionDetailsModal session={selectedSession} onEdit={!isResourcesLoading && !resourcesError && selectedSession.trainerId === me?.trainerId ? () => { if (selectedSession.canEdit === true) setIsEditOpen(true); } : undefined} onClose={() => { detailRevision.current += 1; detailController.current?.abort(); setSelectedSession(null); }} /> : null}
-      {isEditOpen && selectedSession ? <SessionEditorModal key={"edit-" + selectedSession.id + "-" + editorRevision} open session={selectedSession} anchorDate={new Date(selectedSession.startAt)} trainers={trainers} locations={locations} clients={clients} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsEditOpen(false); }} onSubmit={handleEdit} /> : null}
-      <SessionEditorModal key={isCreateOpen ? "new-" + toDateInputValue(createDate) : "closed"} open={isCreateOpen} session={null} anchorDate={createDate} trainers={trainers} locations={locations} clients={clients} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsCreateOpen(false); }} onSubmit={handleCreate} />
+      {isEditOpen && selectedSession ? <SessionEditorModal key={"edit-" + selectedSession.id + "-" + editorRevision} open session={selectedSession} anchorDate={new Date(selectedSession.startAt)} trainers={trainers} locations={locations} clients={clients} loadClientOptions={loadClientOptions} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsEditOpen(false); }} onSubmit={handleEdit} /> : null}
+      <SessionEditorModal key={isCreateOpen ? "new-" + toDateInputValue(createDate) : "closed"} open={isCreateOpen} session={null} anchorDate={createDate} trainers={trainers} locations={locations} clients={clients} loadClientOptions={loadClientOptions} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsCreateOpen(false); }} onSubmit={handleCreate} />
     </>
   );
 }

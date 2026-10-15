@@ -91,6 +91,8 @@ export function trainerPortalClientToClient(
 
   return {
     id: client.id,
+    userId: client.userId,
+    portalAccessStatus: client.portalAccessStatus ?? undefined,
     trainerId: client.trainerId,
     activePackageId: client.activePackageId ?? null,
     activeClientPackageId: client.activeClientPackageId ?? null,

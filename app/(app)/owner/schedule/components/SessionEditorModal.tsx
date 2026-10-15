@@ -9,13 +9,15 @@ import GroupSessionDetails from "@/app/components/schedule/GroupSessionDetails";
 import BookingThresholdField from "@/app/components/schedule/BookingThresholdField";
 import { NativeDateInput } from "@/app/components/ui/native-date-input";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Plus,
   Save,
   Search,
   X,
 } from "lucide-react";
+import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
+import { getErrorMessage } from "@/app/lib/backend";
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import type { Client } from "@/app/lib/owner/clients";
@@ -48,6 +50,7 @@ export default function SessionEditorModal({
   trainers,
   locations,
   clients,
+  loadClientOptions,
   defaultTrainerId,
   trainerAccess = false,
   allowPublicSessions = false,
@@ -64,6 +67,7 @@ export default function SessionEditorModal({
   trainers: Trainer[];
   locations: Location[];
   clients: Client[];
+  loadClientOptions?: (search: string, page: number, signal: AbortSignal) => Promise<{ items: Client[]; totalCount: number; totalPages: number }>;
   defaultTrainerId?: number | null;
   trainerAccess?: boolean;
   allowPublicSessions?: boolean;
@@ -101,11 +105,34 @@ export default function SessionEditorModal({
     Boolean(session?.title),
   );
 
+  const [clientPage, setClientPage] = useState(1);
+  const [remoteClients, setRemoteClients] = useState<Client[]>([]);
+  const [remoteTotal, setRemoteTotal] = useState(0);
+  const [remoteKey, setRemoteKey] = useState("");
+  const [clientLoadError, setClientLoadError] = useState<string | null>(null);
+  const [clientAttempt, setClientAttempt] = useState(0);
+  const isGroupForm = isGroupTraining({ ...session, isPubliclyBookable: values.isPubliclyBookable, plannedSessionType: values.plannedSessionType });
+  const clientLoadKey = JSON.stringify([open, values.locationId, isGroupForm, clientSearch.trim(), clientPage, clientAttempt]);
+  const clientsLoading = Boolean(loadClientOptions) && remoteKey !== clientLoadKey;
+  useEffect(() => {
+    if (!open || !loadClientOptions || isGroupForm) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      loadClientOptions(clientSearch.trim(), clientPage, controller.signal).then(data => {
+        if (controller.signal.aborted) return;
+        if (clientPage > Math.max(1, data.totalPages)) { setClientPage(Math.max(1, data.totalPages)); return; }
+        setRemoteClients(data.items); setRemoteTotal(data.totalCount); setClientLoadError(null); setRemoteKey(clientLoadKey);
+      }).catch(error => {
+        if (!controller.signal.aborted) { setRemoteClients([]); setClientLoadError(getErrorMessage(error, "Nie udało się pobrać klientów.")); setRemoteKey(clientLoadKey); }
+      });
+    }, clientSearch.trim() ? 300 : 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [open, loadClientOptions, isGroupForm, clientSearch, clientPage, clientLoadKey]);
+
   if (!open) return null;
 
   const readOnly = session?.canEdit === false || (trainerAccess && session != null && session.canEdit !== true);
   const ownerGroupSession = !trainerAccess && session != null && (session.isGroupSession === true || isGroupTraining(session));
-  const isGroupForm = isGroupTraining({ ...session, isPubliclyBookable: values.isPubliclyBookable, plannedSessionType: values.plannedSessionType });
   const billingType = values.actualSessionType ?? getSessionTrainingTypeValue(session || {});
   const billingTypeOptions = sessionBillingTypeOptions.some(option => option.value === billingType)
     ? sessionBillingTypeOptions
@@ -127,7 +154,8 @@ export default function SessionEditorModal({
   const outlookCategoryPlaceholder =
     selectedTrainer?.outlookCategoryName?.trim() || "Np. Trening personalny, Opłacone";
   const clientQuery = normalizeSearch(clientSearch);
-  const activeClients = clients.filter(
+  const clientChoices = loadClientOptions ? (clientsLoading ? [] : [...remoteClients, ...clients.filter(client => selectedClientIds.has(String(client.id)) && !remoteClients.some(item => item.id === client.id))]) : clients;
+  const activeClients = clientChoices.filter(
     (client) =>
       trainerAccess || selectedClientIds.has(String(client.id)) ||
       isActiveClientForSession(client),
@@ -150,7 +178,7 @@ export default function SessionEditorModal({
       "pl",
     );
   });
-  const visibleClients = orderedClients.filter(client => matchesClientSearch(client, clientQuery));
+  const visibleClients = loadClientOptions ? orderedClients : orderedClients.filter(client => matchesClientSearch(client, clientQuery));
 
   function updateValue(
     key: Exclude<
@@ -383,7 +411,8 @@ export default function SessionEditorModal({
                     <Search size={16} className="shrink-0 text-primary-light" />
                     <input
                       value={clientSearch}
-                      onChange={(event) => setClientSearch(event.target.value)}
+                      maxLength={loadClientOptions ? 100 : undefined}
+                      onChange={(event) => { setClientSearch(event.target.value); setClientPage(1); }}
                       aria-label="Szukaj uczestnika"
                       placeholder="Szukaj klienta..."
                       className="min-w-0 flex-1 rounded-[var(--radius-md)] px-3 py-2 text-sm outline-none placeholder:text-on-surface-muted"
@@ -394,7 +423,7 @@ export default function SessionEditorModal({
                   </span>
                 </div>
 
-                {activeClients.length ? (
+                {clientsLoading && loadClientOptions ? <p role="status" className="p-3 text-sm text-on-surface-muted">Pobieranie klientów…</p> : clientLoadError && loadClientOptions ? <div role="alert" className="p-3 text-sm text-on-surface-muted">{clientLoadError}<Button type="button" variant="secondary" onClick={() => setClientAttempt(value => value + 1)}>Spróbuj ponownie</Button></div> : activeClients.length ? (
                   visibleClients.length ? (
                     <div className="mt-2 grid max-h-[260px] gap-2 overflow-y-auto overscroll-contain md:grid-cols-2">
                       {visibleClients.map((client) => {
@@ -448,6 +477,7 @@ export default function SessionEditorModal({
                     Brak aktywnych klientów do przypisania.
                   </div>
                 )}
+                {loadClientOptions && !clientsLoading && !clientLoadError && remoteTotal > 25 ? <PaymentPagination page={clientPage} pageSize={25} totalItems={remoteTotal} onPageChange={setClientPage} itemLabel="klientów" ariaLabel="Strony wyboru klientów" /> : null}
               </div>
             </div>
             {trainerAccess ? <>

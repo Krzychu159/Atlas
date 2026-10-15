@@ -18,7 +18,7 @@ export function CurrentUserProvider({ initialUser, children }: { initialUser: Cu
     clearBackendRequests();
     clearNotificationMemory();
     return () => { revision.current += 1; pending.current?.abort(); clearBackendRequests(); clearNotificationMemory(); };
-  }, [initialUser.id]);
+  }, [initialUser.id, initialUser.role, initialUser.organizationId]);
   const refresh = useCallback(async () => {
     const current = ++revision.current;
     pending.current?.abort();
@@ -29,18 +29,18 @@ export function CurrentUserProvider({ initialUser, children }: { initialUser: Cu
     try {
       const next = await getCurrentUser(controller.signal);
       if (current !== revision.current) return;
-      if (next.id !== initialUser.id || next.role !== initialUser.role) {
+      if (next.id !== initialUser.id || next.role !== initialUser.role || next.organizationId !== initialUser.organizationId) {
         clearBackendRequests(); setUser(null); window.location.reload(); return;
       }
       setUser(next);
     } catch (cause) {
       if (current === revision.current && !controller.signal.aborted) setError(getErrorMessage(cause, "Nie udało się pobrać profilu."));
     } finally { if (current === revision.current) setLoading(false); }
-  }, [initialUser.id, initialUser.role]);
+  }, [initialUser.id, initialUser.role, initialUser.organizationId]);
   useEffect(() => {
     const changed = (event: Event) => {
       const updated = (event as CustomEvent<CurrentUser>).detail;
-      if (updated && updated.id === initialUser.id && updated.role === initialUser.role) {
+      if (updated && updated.id === initialUser.id && updated.role === initialUser.role && updated.organizationId === initialUser.organizationId) {
         revision.current += 1; pending.current?.abort(); setUser(updated); setError(null); setLoading(false);
       } else void refresh();
     };
@@ -56,7 +56,7 @@ export function CurrentUserProvider({ initialUser, children }: { initialUser: Cu
       window.removeEventListener(SESSION_CLEARED_EVENT, clear);
       window.removeEventListener("storage", storage);
     };
-  }, [refresh, initialUser.id, initialUser.role]);
+  }, [refresh, initialUser.id, initialUser.role, initialUser.organizationId]);
   return <CurrentUserContext.Provider value={{ user, loading, error, refresh }}>{user ? children : <p role="status" className="p-8">Odświeżamy dostęp…</p>}</CurrentUserContext.Provider>;
 }
 

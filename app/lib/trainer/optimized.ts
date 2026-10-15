@@ -1,4 +1,5 @@
 import { backendGet } from "../backend";
+import type { TrainerPortalClient } from "./portal";
 import type { ClientBillingSummary, ClientPayment } from "../owner/billing";
 
 export type PagedResult<T> = {
@@ -22,6 +23,15 @@ export function getTrainerRecentSessions(id: number, signal?: AbortSignal) {
 export function getTrainerBillingTotals(id: number, signal?: AbortSignal) {
   return backendGet<ClientBillingTotals>(`trainer-portal/clients/${id}/billing/summary`, undefined, signal);
 }
-export function getTrainerPendingPage(params: { Page: number; PageSize: number; Search?: string; ClientId?: number; LocationId?: number }, signal?: AbortSignal) {
+export function getTrainerPendingPage(params: { Page: number; PageSize: number; Search?: string; ClientId?: number; LocationId?: number; Method?: number; Sort?: "paymentDateDesc" | "paymentDate" | "amountDesc" | "amount" }, signal?: AbortSignal) {
   return backendGet<PagedResult<ClientPayment>>("trainer-portal/payments/pending/page", params, signal);
+}
+
+export type TrainerClientsQuery = {
+  Page: number; PageSize: number; Search?: string; LocationId?: number;
+  HasActivePackage?: boolean;
+  Sort?: "name" | "nameDesc" | "created" | "createdDesc" | "balance" | "balanceDesc" | "packageUsage" | "packageUsageDesc";
+};
+export function getTrainerClientsPage(query: TrainerClientsQuery, signal?: AbortSignal) {
+  return backendGet<PagedResult<TrainerPortalClient>>("trainer-portal/clients/page", query, signal);
 }

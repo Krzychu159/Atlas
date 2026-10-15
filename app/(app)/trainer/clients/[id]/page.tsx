@@ -16,7 +16,6 @@ import {
   type Client,
   type ClientSubscription,
   type ClientTrainingPlan,
-  type SubscriptionUsage,
 } from "@/app/lib/owner/clients";
 import { type ClientBillingSummary, type ClientPayment } from "@/app/lib/owner/billing";
 import { getTrainerRecentSessions, getTrainerBillingTotals, type ClientBillingTotals, type RecentClientSession } from "@/app/lib/trainer/optimized";
@@ -28,7 +27,6 @@ import {
   getTrainerPortalClient,
   getTrainerPortalClientBilling,
   getTrainerPortalClientSubscription,
-  getTrainerPortalClientSubscriptionUsage,
   getTrainerPortalClientTrainingPlan,
   getTrainerPortalMe,
   type TrainerPortalMe,
@@ -39,7 +37,7 @@ import { trainerPortalClientToClient } from "@/app/lib/trainer/portal-mappers";
 export default function TrainerClientDetailsPage() {
   const loadRevision = useRef(0);
   const loadController = useRef<AbortController | null>(null);
-  const [sectionLoading, setSectionLoading] = useState({ subscription: true, usage: true, sessions: true, billing: true });
+  const [sectionLoading, setSectionLoading] = useState({ subscription: true, sessions: true, billing: true });
   const [editingLoading, setEditingLoading] = useState(false);
   const [sectionErrors, setSectionErrors] = useState<string[]>([]);
   const correctionRevision = useSessionCorrectionRevision();
@@ -49,7 +47,6 @@ export default function TrainerClientDetailsPage() {
   const [subscription, setSubscription] = useState<ClientSubscription | null>(
     null,
   );
-  const [usage, setUsage] = useState<SubscriptionUsage | null>(null);
   const [trainingPlan, setTrainingPlan] = useState<ClientTrainingPlan | null>(
     null,
   );
@@ -88,8 +85,8 @@ export default function TrainerClientDetailsPage() {
     }
     setIsLoading(true); setLoadError(null); setClient(null);
     setBillingError(null); setSessionsError(null); setSectionErrors([]);
-    setSubscription(null); setUsage(null); setSessions([]); setBilling(null); setBillingTotals(null); setHistoryRequested(false); setPayments([]);
-    setSectionLoading({ subscription: true, usage: true, sessions: true, billing: true });
+    setSubscription(null); setSessions([]); setBilling(null); setBillingTotals(null); setHistoryRequested(false); setPayments([]);
+    setSectionLoading({ subscription: true, sessions: true, billing: true });
     async function section<T>(key: keyof typeof sectionLoading, request: Promise<T>, apply: (value: T) => void, fallback: string) {
       try { const value = await request; if (active()) apply(value); }
       catch (error) {
@@ -111,7 +108,6 @@ export default function TrainerClientDetailsPage() {
     await Promise.all([
       profile,
       section("subscription", getTrainerPortalClientSubscription(clientId, signal), setSubscription, "Nie udało się pobrać odnowień pakietu."),
-      section("usage", getTrainerPortalClientSubscriptionUsage(clientId, signal), setUsage, "Nie udało się pobrać wykorzystania pakietu."),
       section("sessions", getTrainerRecentSessions(clientId, signal), data => { setSessions(data.items || []); setSessionsTotal(data.totalCount); }, "Nie udało się pobrać treningów klienta."),
       section("billing", getTrainerBillingTotals(clientId, signal), setBillingTotals, "Nie udało się pobrać rozliczeń klienta."),
     ]);
@@ -239,12 +235,11 @@ export default function TrainerClientDetailsPage() {
             onFiles={handleOpenTrainingPlan}
           />
           {sectionErrors.length ? <div role="alert" className="card-shell p-5 text-sm text-on-surface-variant">{sectionErrors.map((message, index) => <p key={index}>{message}</p>)}<Button variant="secondary" className="mt-3" onClick={() => void loadClientDetails()}>Spróbuj ponownie</Button></div> : null}
-          {sectionLoading.subscription || sectionLoading.usage ? <p role="status" className="text-sm text-on-surface-variant">Pobieranie wykorzystania pakietu…</p> : null}
+          {sectionLoading.subscription ? <p role="status" className="text-sm text-on-surface-variant">Pobieranie wykorzystania pakietu…</p> : null}
           <ClientMetricCards
             preserveMissingData
             client={client}
             subscription={subscription}
-            usage={usage}
             billing={billingTotals}
           />
           <div ref={billingSection}>

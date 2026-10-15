@@ -1,6 +1,7 @@
 import type { GroupSessionFields, GroupSessionSettings } from "../group-sessions";
 import { backendGet, backendPatch, backendPost, backendPut } from "../backend";
 import type {
+  Client,
   ClientListPackage,
   ClientSubscription,
   ClientTrainingPlan,
@@ -139,6 +140,8 @@ export type TrainerSessionPayload = GroupSessionSettings & {
 export type UpdateTrainerSessionPayload = Partial<TrainerSessionPayload> & { correctionReason?: string | null };
 
 export type TrainerPortalClient = {
+  userId?: number | null;
+  portalAccessStatus?: Client["portalAccessStatus"] | null;
   trainerId?: number | null;
   trainerFullName?: string | null;
   locationId?: number;
@@ -184,6 +187,8 @@ export type TrainerPortalClient = {
 };
 
 export type TrainerPortalClientDetails = {
+  userId?: number | null;
+  portalAccessStatus?: Client["portalAccessStatus"] | null;
   id: number;
   trainerId: number | null;
   activePackageId: number | null;

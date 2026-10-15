@@ -1,7 +1,7 @@
 "use client";
 import { formatTrainingStartDate } from "@/app/lib/formatters/date";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import ClientFilters, {
@@ -11,35 +11,20 @@ import ClientFilters, {
 import ClientListRow from "@/app/(app)/owner/clients/components/ClientListRow";
 import {
   formatClientBalance,
-  getClientBalance,
   getClientName,
   getClientPackageUsage,
-  hasActiveClientPackage,
 } from "@/app/(app)/owner/clients/components/client-display";
-import { showOwnerError } from "@/app/(app)/owner/components/owner-toast";
 import type { ClientListItem } from "@/app/lib/owner/clients";
 import { isForbiddenError } from "@/app/lib/backend";
-import { getTrainerPortalClients } from "@/app/lib/trainer/portal";
+import { getTrainerClientsPage, type TrainerClientsQuery } from "@/app/lib/trainer/optimized";
+import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { trainerPortalClientsToListItems } from "@/app/lib/trainer/portal-mappers";
 
-function normalize(value: string) {
-  return value.toLowerCase().trim();
-}
-
-function matchesPackageFilter(client: ClientListItem, filter: ClientPackageFilter) {
-  if (filter === "active-package") return hasActiveClientPackage(client, true) === true;
-  if (filter === "inactive-package") return hasActiveClientPackage(client, true) === false;
-
-  return true;
-}
-
-function getTime(value?: string | null) {
-  if (!value) return 0;
-
-  const date = new Date(value);
-
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
-}
+const PAGE_SIZE = 25;
+const serverSort: Record<ClientSort, TrainerClientsQuery["Sort"]> = {
+  newest: "createdDesc", name: "name", trainer: "name",
+  "balance-desc": "balanceDesc", "balance-asc": "balance", "package-usage": "packageUsageDesc",
+};
 
 export default function TrainerClientsPage() {
   const [clients, setClients] = useState<ClientListItem[]>([]);
@@ -47,98 +32,48 @@ export default function TrainerClientsPage() {
   const [packageFilter, setPackageFilter] =
     useState<ClientPackageFilter>("all");
   const [sort, setSort] = useState<ClientSort>("package-usage");
-  const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [activeClientsCount, setActiveClientsCount] = useState<number | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [loadedKey, setLoadedKey] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const queryKey = JSON.stringify([search.trim(), packageFilter, sort, page, attempt]);
+  const isLoading = loadedKey !== queryKey;
+  const filteredClients = isLoading ? [] : clients;
 
-  const loadClients = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setLoadError(null);
-      const clientsData = await getTrainerPortalClients();
-      setClients(trainerPortalClientsToListItems(clientsData));
-    } catch (err) {
-      const message = isForbiddenError(err)
-        ? "Nie masz uprawnień do przeglądania tej listy klientów."
-        : "Nie udało się pobrać klientów. Spróbuj ponownie.";
-      setLoadError(message);
-      showOwnerError(new Error(message), message, {
-        id: "trainer-clients-load-error",
-      });
-      setClients([]);
-    } finally {
-      setIsLoading(false);
-    }
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getTrainerClientsPage({ Page: 1, PageSize: 1, HasActivePackage: true }, controller.signal)
+      .then(data => { if (!controller.signal.aborted) setActiveClientsCount(data.totalCount); })
+      .catch(() => { /* Do not replace an unavailable count with zero. */ });
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadClients();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, [loadClients]);
-
-  const filteredClients = useMemo(() => {
-    const query = normalize(search);
-
-    const result = clients.filter((client) => {
-      const fullName = normalize(getClientName(client));
-      const email = normalize(client.email || "");
-      const phoneNumber = normalize(client.phoneNumber || "");
-
-      const matchesSearch =
-        !query ||
-        fullName.includes(query) ||
-        email.includes(query) ||
-        phoneNumber.includes(query);
-      return matchesSearch && matchesPackageFilter(client, packageFilter);
+    if (search.trim() !== debouncedSearch) return;
+    const controller = new AbortController();
+    getTrainerClientsPage({ Page: page, PageSize: PAGE_SIZE, Search: debouncedSearch || undefined,
+      HasActivePackage: packageFilter === "all" ? undefined : packageFilter === "active-package",
+      Sort: serverSort[sort],
+    }, controller.signal).then(data => {
+      if (controller.signal.aborted) return;
+      if (page > Math.max(1, data.totalPages)) { setPage(Math.max(1, data.totalPages)); return; }
+      setClients(trainerPortalClientsToListItems(data.items || []));
+      setTotalCount(data.totalCount); setLoadError(null); setLoadedKey(queryKey);
+    }).catch(error => {
+      if (controller.signal.aborted) return;
+      setClients([]); setLoadedKey(queryKey);
+      setLoadError(isForbiddenError(error) ? "Nie masz uprawnień do przeglądania tej listy klientów." : "Nie udało się pobrać klientów. Spróbuj ponownie.");
     });
-
-    return [...result].sort((first, second) => {
-      if (sort === "name") {
-        return getClientName(first).localeCompare(getClientName(second), "pl");
-      }
-
-      if (sort === "trainer") {
-        return (first.trainerFullName || "").localeCompare(
-          second.trainerFullName || "",
-          "pl",
-        );
-      }
-
-      if (sort === "balance-desc") {
-        return compareOptionalNumbers(
-          getClientBalance(first, true),
-          getClientBalance(second, true),
-          true,
-        );
-      }
-
-      if (sort === "balance-asc") {
-        return compareOptionalNumbers(
-          getClientBalance(first, true),
-          getClientBalance(second, true),
-        );
-      }
-
-      if (sort === "package-usage") {
-        return compareOptionalNumbers(
-          getClientPackageUsage(first, true).sortPercent,
-          getClientPackageUsage(second, true).sortPercent,
-          true,
-        );
-      }
-
-      return getTime(second.createdAt) - getTime(first.createdAt);
-    });
-  }, [clients, search, packageFilter, sort]);
-
-  const activeClientsCount = clients.filter(
-    (client) => hasActiveClientPackage(client, true) === true,
-  ).length;
-  const hasMissingPackageData = clients.some(
-    (client) => hasActiveClientPackage(client, true) === null,
-  );
+    return () => controller.abort();
+  }, [search, debouncedSearch, packageFilter, sort, page, queryKey]);
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
@@ -149,7 +84,7 @@ export default function TrainerClientsPage() {
               Klienci
             </h1>
             <span className="rounded-full bg-surface-container px-3 py-1 text-sm text-on-surface-variant">
-              {isLoading ? "Ładowanie..." : loadError ? "Niedostępne" : `${clients.length} łącznie`}
+              {isLoading ? "Ładowanie..." : loadError ? "Niedostępne" : `${totalCount} znalezionych`}
             </span>
           </div>
 
@@ -161,19 +96,21 @@ export default function TrainerClientsPage() {
         <div className="rounded-[var(--radius-lg)] bg-surface-container px-4 py-3">
           <p className="text-label text-on-surface-muted">Aktywny pakiet</p>
           <p className="mt-2 text-2xl font-semibold leading-none text-on-surface">
-            {isLoading || loadError ? "—" : hasMissingPackageData ? "Brak danych" : activeClientsCount}
+            {isLoading || loadError ? "—" : activeClientsCount === null ? "Brak danych" : activeClientsCount}
           </p>
         </div>
       </section>
 
       <ClientFilters
         showTrainerFilter={false}
+        searchPlaceholder="Szukaj po nazwisku lub e-mailu..."
+        searchMaxLength={100}
         search={search}
         packageFilter={packageFilter}
         sort={sort}
-        onSearchChange={setSearch}
-        onPackageFilterChange={setPackageFilter}
-        onSortChange={setSort}
+        onSearchChange={value => { setSearch(value); setPage(1); }}
+        onPackageFilterChange={value => { setPackageFilter(value); setPage(1); }}
+        onSortChange={value => { setSort(value); setPage(1); }}
       />
 
       <section className="hidden flex-col gap-3 md:flex">
@@ -184,6 +121,7 @@ export default function TrainerClientsPage() {
         ) : loadError ? (
           <div role="alert" className="card-shell p-5 text-on-surface-variant">
             {loadError}
+            <button type="button" className="ml-3 font-semibold text-primary-light" onClick={() => setAttempt(value => value + 1)}>Spróbuj ponownie</button>
           </div>
         ) : filteredClients.length > 0 ? (
           filteredClients.map((client) => (
@@ -209,6 +147,7 @@ export default function TrainerClientsPage() {
         ) : loadError ? (
           <div role="alert" className="card-shell p-5 text-on-surface-variant">
             {loadError}
+            <button type="button" className="ml-3 font-semibold text-primary-light" onClick={() => setAttempt(value => value + 1)}>Spróbuj ponownie</button>
           </div>
         ) : filteredClients.length > 0 ? (
           filteredClients.map((client) => {
@@ -280,16 +219,7 @@ export default function TrainerClientsPage() {
           </div>
         )}
       </section>
+      {!isLoading && !loadError && totalCount > 0 ? <PaymentPagination page={page} pageSize={PAGE_SIZE} totalItems={totalCount} onPageChange={setPage} itemLabel="klientów" ariaLabel="Paginacja klientów" /> : null}
     </div>
   );
-}
-
-function compareOptionalNumbers(
-  first: number | null,
-  second: number | null,
-  descending = false,
-) {
-  if (first === null) return second === null ? 0 : 1;
-  if (second === null) return -1;
-  return descending ? second - first : first - second;
 }

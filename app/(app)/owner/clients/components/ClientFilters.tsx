@@ -15,6 +15,8 @@ export type ClientSort =
 
 type ClientFiltersProps = {
   search: string;
+  searchPlaceholder?: string;
+  searchMaxLength?: number;
   packageFilter: ClientPackageFilter;
   showTrainerFilter?: boolean;
   trainerFilter?: string;
@@ -43,6 +45,8 @@ const sortOptions: { label: string; value: ClientSort }[] = [
 
 export default function ClientFilters({
   search,
+  searchPlaceholder = "Szukaj po nazwisku, mailu lub telefonie...",
+  searchMaxLength,
   packageFilter,
   showTrainerFilter = true,
   trainerFilter = "all",
@@ -64,7 +68,8 @@ export default function ClientFilters({
         <Input
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Szukaj po nazwisku, mailu lub telefonie..."
+          placeholder={searchPlaceholder}
+          maxLength={searchMaxLength}
           icon={<Search size={18} />}
           wrapperClassName="min-w-0 flex-1"
           className="h-12 bg-surface-container-low"

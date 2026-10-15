@@ -189,6 +189,7 @@ export default function ClientPaymentsPageClient({
       }
       setAuditRevision((value) => value + 1);
 
+      const billingRequest = getClientBilling(id);
       const [
         clientData,
         billingData,
@@ -199,11 +200,13 @@ export default function ClientPaymentsPageClient({
         refundsData,
       ] = await Promise.all([
         getClient(id),
-        getClientBilling(id),
+        billingRequest,
         getClientSubscription(id),
         getPackages(),
         getClientSubscriptionUsage(id).catch(() => null),
-        getClientPayments(id, { page: 1, pageSize: 1000 }),
+        billingRequest.then(async data => Array.isArray(data.payments)
+          ? data.payments
+          : (await getClientPayments(id, { page: 1, pageSize: 1000 })).items),
         getClientRefunds(id, { page: 1, pageSize: 25 }),
       ]);
 
@@ -213,7 +216,7 @@ export default function ClientPaymentsPageClient({
       setBilling(billingData);
       setSubscription(subscriptionData);
       setUsage(usageData);
-      setClientPayments(billingData.payments || paymentsData.items || []);
+      setClientPayments(billingData.payments || paymentsData || []);
       setPaymentPage(1);
       setPackages(
         packagesData.filter(
