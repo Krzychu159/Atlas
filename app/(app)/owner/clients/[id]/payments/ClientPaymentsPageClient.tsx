@@ -8,21 +8,26 @@ import { packageTrainingKind } from "@/app/lib/package-validity";
 
 import { useSessionCorrectionRevision, usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft,
+  Banknote,
+  CalendarRange,
+  Dumbbell,
+  History,
+  Info,
+  Package as PackageIcon,
   PackagePlus,
   ReceiptText,
-  RefreshCw,
-  WalletCards,
 } from "lucide-react";
+import { Tooltip } from "@/app/components/ui/tooltip";
+import {
+  profilePrimaryActionClassName,
+} from "@/app/components/ui/profile-hero";
 import { PaymentActionConfirmModal } from "@/app/components/payments/PaymentActionConfirmModal";
 import { PaymentEntryModal } from "@/app/components/payments/PaymentEntryModal";
 import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { PaymentsList } from "@/app/components/payments/PaymentsList";
 import { PaymentReasonModal } from "@/app/components/payments/PaymentReasonModal";
-import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import {
   cancelClientSubscription,
@@ -82,6 +87,8 @@ import { isSessionPackage } from "@/app/lib/period-packages";
 import ClientAuditSection from "../components/ClientAuditSection";
 import ClientRefundsSection from "../components/ClientRefundsSection";
 import RefundConfirmationModal from "../components/RefundConfirmationModal";
+import ClientProfileCollapsible from "../components/ClientProfileCollapsible";
+import ClientProfileHero from "../components/ClientProfileHero";
 
 type ClientPaymentsPageClientProps = {
   clientIdParam: string;
@@ -236,6 +243,10 @@ export default function ClientPaymentsPageClient({
         } else {
           showOwnerError(new Error("Nie znaleziono pakietu przypisanego do zgłoszenia. Sprawdź aktualne dane klienta."), "");
         }
+      } else if (query.get("addPayment") === "1" && !query.get("clientPackageId") && paymentLinkHandled.current !== `${id}:new`) {
+        paymentLinkHandled.current = `${id}:new`;
+        setPaymentDate(localToday());
+        setIsPaymentModalOpen(true);
       }
       setSelectedPackageId("");
       setSelectedNextPackageId(
@@ -764,187 +775,126 @@ export default function ClientPaymentsPageClient({
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <Link
-            href={clientId ? `${basePath}/clients/${clientId}` : `${basePath}/clients`}
-            className="inline-flex items-center gap-2 text-sm font-semibold text-primary-light"
-          >
-            <ArrowLeft size={18} />
-            Karta klienta
-          </Link>
-          <h1 className="mt-4 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
-            Płatności klienta
-          </h1>
-          <p className="mt-3 text-on-surface-variant">
-            {client?.fullName || billing?.clientName || "Ładowanie klienta..."}
-          </p>
-        </div>
-
-        <Button
-          variant="secondary"
-          icon={
-            <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-          }
-          onClick={() => loadClientPayments()}
-          disabled={isLoading || isSaving || processingPaymentId !== null || !clientId}
-        >
-          Odśwież
-        </Button>
-      </div>
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 pb-10">
+      {client ? (
+        <ClientProfileHero
+          client={client}
+          activeTab="payments"
+          milestoneAccess={basePath === "/trainer" ? "trainer" : "owner"}
+          backHref={client.isArchived && basePath === "/owner" ? "/owner/clients/archived" : `${basePath}/clients`}
+          paymentsHref={`${basePath}/clients/${client.id}/payments`}
+          onAddPayment={() => {
+            setPaymentDate(localToday());
+            setIsPaymentModalOpen(true);
+          }}
+          addPaymentDisabled={!billing || isSaving || processingPaymentId !== null || isLoading || packagesBilling.length === 0}
+          onRefresh={() => loadClientPayments()}
+          isRefreshing={isLoading}
+          refreshDisabled={isLoading || isSaving || processingPaymentId !== null || !clientId}
+          billingSummary={billing ? { amountDue: billing.totalAmountDue, balance: billing.currentBalance, currency: activeCurrency } : null}
+        />
+      ) : null}
 
       {isLoading ? (
-        <div className="card-shell p-6 text-on-surface-variant">
+        <div role="status" className="card-shell p-4 text-sm text-on-surface-variant">
           Ładowanie płatności klienta...
         </div>
       ) : null}
 
-      {!isLoading && loadError ? <div role="alert" className="card-shell p-5 text-on-surface-variant">{loadError}</div> : null}
+      {!isLoading && loadError ? <div role="alert" className="card-shell p-4 text-sm text-on-surface-variant">{loadError}</div> : null}
 
       {billing && !isLoading && !(basePath === "/trainer" && loadError) ? (
         <>
-          <section className="grid gap-3 md:grid-cols-4">
-            <BillingStat
-              label="Łącznie do zapłaty"
-              value={typeof billing.totalAmountDue === "number" ? formatMoney(billing.totalAmountDue, activeCurrency) : "Niedostępne"}
-              icon={<WalletCards size={18} />}
-            />
-            <BillingStat
-              label="Bieżący pakiet indywidualny"
-              value={billing.activeClientPackageId ? billing.activePackageName || "Brak nazwy" : "Brak"}
-              icon={<PackagePlus size={18} />}
-            />
-            <BillingStat
-              label="Saldo do wykorzystania"
-              value={formatMoney(billing.currentBalance, activeCurrency)}
-              icon={<WalletCards size={18} />}
-            />
-            <BillingStat
-              label="Automatyczne przedłużanie"
-              value={subscription ? subscription.autoRenewEnabled && !subscription.cancelRenewalRequested ? "Włączone" : "Wyłączone" : "Niedostępne"}
-              icon={<RefreshCw size={18} />}
-            />
-          </section>
+          {catalogError ? <div role="alert" className="card-shell p-4 text-sm text-on-surface-variant">{catalogError}</div> : null}
+          {subscriptionError ? <div role="alert" className="card-shell p-4 text-sm text-on-surface-variant">{subscriptionError}</div> : <SubscriptionPanel
+            subscription={mainSubscription}
+            activePackage={mainPackage}
+            isGroup={false}
+            selectedPackageId={selectedPackageId}
+            selectedNextPackageId={selectedNextPackageId}
+            packageOptions={packageOptions}
+            nextPackageOptions={nextPackageOptions}
+            clientLocationName={client?.locationName || "lokalizacji klienta"}
+            canAssignPackage={basePath === "/owner"}
+            canSetNextPackage={basePath === "/owner" || !catalogError}
+            isSaving={isSaving || processingPaymentId !== null}
+            onPackageChange={setSelectedPackageId}
+            onNextPackageChange={setSelectedNextPackageId}
+            onAssignPackage={handleAssignPackage}
+            onSetNextPackage={handleSetNextPackage}
+            onCancelAfterCycle={handleRequestCancelAfterCycle}
+            onResumeAutoRenew={handleResumeAutoRenew}
+          />}
 
-          <ClientPackagesSection key={`${basePath}:${clientId}`} packages={billing.packages} activeClientPackageId={billing.activeClientPackageId} clientId={basePath === "/owner" ? clientId || undefined : undefined} onSaved={() => loadClientPayments(clientId, true)} />
-          {clientId ? <ClientPeriodPackagesSection key={`period:${basePath}:${clientId}`} clientId={clientId} portal={basePath === "/trainer" ? "trainer" : "owner"} packages={billing.packages} canManage={basePath === "/owner" && !client?.isArchived} onSaved={() => loadClientPayments(clientId, true)} onPayment={item => {
-            if (mutationLock.current || isSaving || processingPaymentId !== null) return;
-            setPaymentPackageId(String(item.clientPackageId)); setPaymentAmount(String(Math.max(item.amountDue, 0))); setPaymentDate(localToday()); setPaymentNote(""); setIsPaymentModalOpen(true);
-          }} /> : null}
-          {basePath === "/owner" && clientId ? <><ClientRefundsSection refunds={refunds} loading={isLoading} onConfirm={setRefundToConfirm} /><ClientAuditSection key={clientId} clientId={clientId} revision={auditRevision} /></> : null}
-
-          <section className="grid gap-5">
-            <div className="card-shell flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between md:p-5">
-              <div>
-                <p className="text-section-title">Wpłaty klienta</p>
-                <p className="mt-2 max-w-[720px] text-sm leading-6 text-on-surface-variant">
-                  Dodaj wpłatę do konkretnego pakietu. Jeśli kwota jest większa
-                  niż należność za pakiet, po potwierdzeniu wpłaty nadpłata zasili saldo klienta.
-                </p>
-                {!packagesBilling.length ? (
-                  <p className="mt-3 text-sm font-semibold text-warning-light">
-                    Najpierw przypisz klientowi pakiet, żeby dodać wpłatę.
-                  </p>
-                ) : null}
-              </div>
-              <Button
-                size="lg"
-                icon={<ReceiptText size={17} />}
-                onClick={() => {
-                  setPaymentDate(localToday());
-                  setIsPaymentModalOpen(true);
-                }}
-                disabled={isSaving || processingPaymentId !== null || isLoading || packagesBilling.length === 0}
-                className="w-full md:w-auto"
-              >
-                Dodaj wpłatę
-              </Button>
-            </div>
-
-            <div className="overflow-hidden rounded-[var(--radius-xl)] bg-surface-container-low shadow-soft">
-              <div className="flex flex-col gap-2 px-4 py-5 sm:flex-row sm:items-end sm:justify-between md:px-5">
-                <div>
-                  <p className="text-section-title">Historia wpłat</p>
-                  <p className="mt-2 text-sm text-on-surface-variant">
-                    Kwota, sposób rozliczenia i najważniejsze akcje w jednym
-                    wierszu.
-                  </p>
-                </div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-muted">
-                  {payments.length} {payments.length === 1 ? "płatność" : "płatności"}
-                </p>
-              </div>
-
-              {pendingPaymentsError ? <p role="alert" className="px-5 pb-4 text-sm text-on-surface-variant">{pendingPaymentsError}</p> : null}
-              <PaymentsList
-                dateCorrectionPortal={basePath === "/trainer" ? "trainer" : "owner"}
-                payments={visiblePayments}
-                isLoading={false}
-                processingId={processingPaymentId}
-                showClient={false}
-                canConfirm={basePath === "/trainer" ? (payment) => payment.canConfirm === true && confirmablePaymentIds.has(payment.id) : undefined}
-                emptyTitle="Brak wpłat klienta"
-                emptyMessage="Pierwsza wpłata pojawi się tutaj po jej dodaniu."
-                onConfirm={(payment) =>
-                  setPaymentAction({ type: "confirm", payment })
-                }
-                onIssueReceipt={basePath === "/owner" ? (payment) =>
-                  setPaymentAction({ type: "issueReceipt", payment })
-                : undefined}
-                onCancelReceipt={basePath === "/owner" ? (payment) =>
-                  setPaymentAction({ type: "cancelReceipt", payment })
-                : undefined}
-                onReverse={basePath === "/owner" ? (payment) => {
-                  setPaymentToReverse(payment);
-                  setReversalReason("");
-                } : undefined}
+          <ClientProfileCollapsible title="Historia wpłat" icon={<ReceiptText size={15} />} meta={payments.length} defaultOpen flush>
+            {pendingPaymentsError ? <p role="alert" className="px-4 pt-3 text-sm text-on-surface-variant">{pendingPaymentsError}</p> : null}
+            <PaymentsList
+              dateCorrectionPortal={basePath === "/trainer" ? "trainer" : "owner"}
+              payments={visiblePayments}
+              isLoading={false}
+              processingId={processingPaymentId}
+              showClient={false}
+              canConfirm={basePath === "/trainer" ? (payment) => payment.canConfirm === true && confirmablePaymentIds.has(payment.id) : undefined}
+              emptyTitle="Brak wpłat klienta"
+              emptyMessage="Pierwsza wpłata pojawi się tutaj po jej dodaniu."
+              onConfirm={(payment) =>
+                setPaymentAction({ type: "confirm", payment })
+              }
+              onIssueReceipt={basePath === "/owner" ? (payment) =>
+                setPaymentAction({ type: "issueReceipt", payment })
+              : undefined}
+              onCancelReceipt={basePath === "/owner" ? (payment) =>
+                setPaymentAction({ type: "cancelReceipt", payment })
+              : undefined}
+              onReverse={basePath === "/owner" ? (payment) => {
+                setPaymentToReverse(payment);
+                setReversalReason("");
+              } : undefined}
+            />
+            {payments.length > 0 ? (
+              <PaymentPagination
+                page={currentPaymentPage}
+                pageSize={CLIENT_PAYMENTS_PER_PAGE}
+                totalItems={payments.length}
+                onPageChange={setPaymentPage}
               />
+            ) : null}
+          </ClientProfileCollapsible>
 
-              {payments.length > 0 ? (
-                <PaymentPagination
-                  page={currentPaymentPage}
-                  pageSize={CLIENT_PAYMENTS_PER_PAGE}
-                  totalItems={payments.length}
-                  onPageChange={setPaymentPage}
-                />
-              ) : null}
-            </div>
-          </section>
+          {usageError ? <div role="alert" className="card-shell p-4 text-sm text-on-surface-variant">{usageError}</div> : null}
+          {mainUsage ? (
+            <ClientProfileCollapsible
+              title="Wykorzystanie pakietu"
+              icon={<Dumbbell size={15} />}
+              meta={typeof mainUsage.usedSessions === "number" && typeof mainUsage.totalSessions === "number" ? `${mainUsage.usedSessions}/${mainUsage.totalSessions}` : undefined}
+            >
+              <UsageCard usage={mainUsage} />
+            </ClientProfileCollapsible>
+          ) : null}
 
-          <section
-            className={
-              mainUsage
-                ? "grid gap-5 xl:grid-cols-[0.9fr_1.1fr]"
-                : "grid gap-5"
-            }
-          >
-            {mainUsage ? <UsageCard usage={mainUsage} /> : null}
+          <ClientProfileCollapsible title="Pakiety" icon={<PackageIcon size={15} />}>
+            <ClientPackagesSection key={`${basePath}:${clientId}`} embedded packages={billing.packages} activeClientPackageId={billing.activeClientPackageId} clientId={basePath === "/owner" ? clientId || undefined : undefined} onSaved={() => loadClientPayments(clientId, true)} />
+          </ClientProfileCollapsible>
 
-            <div className="grid min-w-0 gap-5">
-                {catalogError ? <div role="alert" className="card-shell p-4 text-on-surface-variant">{catalogError}</div> : null}
-                {usageError ? <div role="alert" className="card-shell p-4 text-on-surface-variant">{usageError}</div> : null}
-                {subscriptionError ? <div role="alert" className="card-shell p-4 text-on-surface-variant">{subscriptionError}</div> : <SubscriptionPanel
-                  subscription={mainSubscription}
-                  activePackage={mainPackage}
-                  isGroup={false}
-                  selectedPackageId={selectedPackageId}
-                  selectedNextPackageId={selectedNextPackageId}
-                  packageOptions={packageOptions}
-                  nextPackageOptions={nextPackageOptions}
-                  clientLocationName={client?.locationName || "lokalizacji klienta"}
-                  canAssignPackage={basePath === "/owner"}
-                  canSetNextPackage={basePath === "/owner" || !catalogError}
-                  isSaving={isSaving || processingPaymentId !== null}
-                  onPackageChange={setSelectedPackageId}
-                  onNextPackageChange={setSelectedNextPackageId}
-                  onAssignPackage={handleAssignPackage}
-                  onSetNextPackage={handleSetNextPackage}
-                  onCancelAfterCycle={handleRequestCancelAfterCycle}
-                  onResumeAutoRenew={handleResumeAutoRenew}
-                />}
-            </div>
-          </section>
+          {clientId ? (
+            <ClientProfileCollapsible title="Usługi okresowe" icon={<CalendarRange size={15} />}>
+              <ClientPeriodPackagesSection key={`period:${basePath}:${clientId}`} embedded clientId={clientId} portal={basePath === "/trainer" ? "trainer" : "owner"} packages={billing.packages} canManage={basePath === "/owner" && !client?.isArchived} onSaved={() => loadClientPayments(clientId, true)} onPayment={item => {
+                if (mutationLock.current || isSaving || processingPaymentId !== null) return;
+                setPaymentPackageId(String(item.clientPackageId)); setPaymentAmount(String(Math.max(item.amountDue, 0))); setPaymentDate(localToday()); setPaymentNote(""); setIsPaymentModalOpen(true);
+              }} />
+            </ClientProfileCollapsible>
+          ) : null}
+
+          {basePath === "/owner" && clientId ? (
+            <>
+              <ClientProfileCollapsible title="Zwroty" icon={<Banknote size={15} />} meta={refunds.length}>
+                <ClientRefundsSection embedded refunds={refunds} loading={isLoading} onConfirm={setRefundToConfirm} />
+              </ClientProfileCollapsible>
+              <ClientProfileCollapsible title="Historia zmian" icon={<History size={15} />}>
+                <ClientAuditSection key={clientId} embedded clientId={clientId} revision={auditRevision} />
+              </ClientProfileCollapsible>
+            </>
+          ) : null}
         </>
       ) : null}
 
@@ -1107,45 +1057,37 @@ function SubscriptionPanel({
   const nextPackageUnchanged =
     Boolean(selectedNextPackageId) &&
     selectedNextPackageId === savedNextPackageId;
+  const noPackagesInLocation = packageOptions.length <= 1;
 
   if (!hasActivePackage) {
     return (
-      <section className="card-shell flex min-h-[360px] flex-col items-center justify-center p-6 text-center md:p-10">
-        <div className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-xl)] bg-primary/15 text-primary-light">
-          <PackagePlus size={28} />
-        </div>
-        <p className="mt-5 text-section-title">{canAssignPackage ? "Ustaw pakiet klienta" : "Brak aktywnego pakietu"}</p>
-        <p className="mt-3 max-w-[560px] text-sm leading-6 text-on-surface-variant">
-          {canAssignPackage ? "Wybierz pakiet dostępny w lokalizacji " + clientLocationName + "." : "Klient nie ma obecnie aktywnego pakietu indywidualnego."}
-        </p>
+      <section className="card-shell p-4 md:p-5">
+        <PanelTitle icon={<PackagePlus size={15} />} title={canAssignPackage ? "Ustaw pakiet klienta" : "Brak aktywnego pakietu"}>
+          {canAssignPackage ? `Pakiety dostępne w lokalizacji ${clientLocationName}.` : "Klient nie ma obecnie aktywnego pakietu indywidualnego. Pakiet może ustawić właściciel studia."}
+        </PanelTitle>
 
         {canAssignPackage ? (
-          <div className="mt-7 grid w-full max-w-[680px] gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+          <div className="mt-3 grid max-w-2xl gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
             <CustomSelect
               label="Pakiet"
               value={selectedPackageId}
               onChange={onPackageChange}
               options={packageOptions}
             />
-            <Button
-              icon={<PackagePlus size={16} />}
+            <button
+              type="button"
               onClick={onAssignPackage}
-              disabled={
-                isSaving || !selectedPackageId || packageOptions.length <= 1
-              }
-              className="w-full sm:w-auto"
+              disabled={isSaving || !selectedPackageId || noPackagesInLocation}
+              className={profilePrimaryActionClassName}
             >
+              <PackagePlus size={15} />
               {isSaving ? "Ustawianie..." : "Ustaw pakiet"}
-            </Button>
+            </button>
           </div>
-        ) : (
-          <p className="mt-6 text-sm font-semibold text-on-surface-muted">
-            Pakiet może ustawić właściciel studia.
-          </p>
-        )}
+        ) : null}
 
-        {canAssignPackage && packageOptions.length <= 1 ? (
-          <p className="mt-4 text-sm font-semibold text-warning-light">
+        {canAssignPackage && noPackagesInLocation ? (
+          <p className="mt-2 text-xs font-semibold text-warning-light">
             Brak aktywnych pakietów dla tej lokalizacji.
           </p>
         ) : null}
@@ -1155,37 +1097,28 @@ function SubscriptionPanel({
 
   return (
     <section className="card-shell p-4 md:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-section-title">{isGroup ? "Pakiet grupowy" : "Pakiet indywidualny"}</p>
-          <p className="mt-2 text-sm text-on-surface-variant">
-            Aktualny pakiet, wykorzystanie wejść i status płatności.
-          </p>
-        </div>
-        <StatusPill label={typeof activePackage?.isActive === "boolean" ? activePackage.isActive ? "Aktywny" : "Nieaktywny" : "Niedostępne"} muted />
-      </div>
-
-      <div className={`mt-4 grid gap-3 ${!isGroup && subscription ? "lg:grid-cols-2" : ""}`}>
-        <div className="rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-low p-4">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+        <div className="min-w-0">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-label text-on-surface-muted">Aktualny pakiet</p>
-              <h3 className="mt-2 text-xl font-semibold text-on-surface">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
+                {isGroup ? "Pakiet grupowy" : "Aktualny pakiet"}
+              </p>
+              <h2 className="mt-0.5 break-words text-base font-semibold text-on-surface">
                 {activePackageName}
-              </h3>
+              </h2>
             </div>
-            <StatusPill
-              label={getPackagePaymentStatusLabel(activePackage?.paymentStatus)}
-              muted
-            />
+            <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+              <StatusPill label={getPackagePaymentStatusLabel(activePackage?.paymentStatus)} muted />
+              <StatusPill label={typeof activePackage?.isActive === "boolean" ? activePackage.isActive ? "Aktywny" : "Nieaktywny" : "Niedostępne"} muted={activePackage?.isActive !== true} />
+            </div>
           </div>
-          {progress !== null ? <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-container-high">
-            <div
-              className="h-full rounded-full bg-tertiary-light"
-              style={{ width: `${progress}%` }}
-            />
-          </div> : null}
-          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          {progress !== null ? (
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-container-high">
+              <div className="h-full rounded-full bg-tertiary-light" style={{ width: `${progress}%` }} />
+            </div>
+          ) : null}
+          <div className="mt-3 grid grid-cols-3 gap-2">
             <SmallMetric label="Wejścia" value={usedSessions !== undefined && totalSessions !== undefined ? `${usedSessions}/${totalSessions}` : "Niedostępne"} />
             <SmallMetric label="Zapłacono" value={formatMoney(amountPaid, currency)} />
             <SmallMetric label="Do zapłaty" value={formatMoney(amountDue, currency)} />
@@ -1193,115 +1126,95 @@ function SubscriptionPanel({
         </div>
 
         {!isGroup && subscription ? (
-          <div className="rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-low p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-label text-on-surface-muted">
-                  Automatyczne przedłużanie
+          <div className="flex min-w-0 flex-col gap-3 border-t border-white/5 pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <p className="text-sm text-on-surface-variant">
+                  Przedłużanie:{" "}
+                  <span className={`font-semibold ${willRenew ? "text-tertiary-light" : "text-on-surface"}`}>
+                    {willRenew ? "włączone" : "wyłączone"}
+                  </span>
                 </p>
-                <h3 className="mt-2 text-xl font-semibold text-on-surface">
-                  {willRenew ? "Włączone" : "Wyłączone"}
-                </h3>
+                <HintIcon
+                  label={willRenew
+                    ? "Po wykorzystaniu aktualnego pakietu subskrypcja przedłuży się automatycznie."
+                    : "Po wykorzystaniu aktualnego pakietu subskrypcja klienta zostanie zakończona."}
+                />
               </div>
-              <StatusPill
-                label={willRenew ? "Odnowienie" : "Zakończenie"}
-                muted={!willRenew}
-              />
-            </div>
-            <p className="mt-3 text-sm leading-5 text-on-surface-variant">
-              {willRenew
-                ? "Po wykorzystaniu aktualnego pakietu system przedłuży subskrypcję automatycznie."
-                : "Po wykorzystaniu aktualnego pakietu subskrypcja klienta zostanie zakończona."}
-            </p>
-            <div className="mt-4">
               {willRenew ? (
-                <Button
-                  variant="outline"
-                  onClick={onCancelAfterCycle}
-                  disabled={isSaving || !subscription}
-                >
+                <button type="button" onClick={onCancelAfterCycle} disabled={isSaving || !subscription} className={compactSecondaryClassName}>
                   Zakończ po pakiecie
-                </Button>
+                </button>
               ) : (
-                <Button
-                  variant="secondary"
-                  onClick={onResumeAutoRenew}
-                  disabled={isSaving || !subscription}
-                >
-                  Włącz automatyczne przedłużanie
-                </Button>
+                <button type="button" onClick={onResumeAutoRenew} disabled={isSaving || !subscription} className={compactSecondaryClassName}>
+                  Włącz przedłużanie
+                </button>
               )}
             </div>
+
+            {canSetNextPackage ? (
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">Kolejny pakiet</p>
+                  <HintIcon
+                    label={willRenew
+                      ? "Zostanie użyty po wykorzystaniu aktualnego pakietu."
+                      : "Wybór zacznie obowiązywać po ponownym włączeniu przedłużania."}
+                  />
+                </div>
+                <div className="mt-1.5 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <CustomSelect
+                    value={selectedNextPackageId}
+                    onChange={onNextPackageChange}
+                    options={nextPackageOptions}
+                  />
+                  <button
+                    type="button"
+                    onClick={onSetNextPackage}
+                    disabled={isSaving || !selectedNextPackageId || nextPackageUnchanged || noPackagesInLocation}
+                    className={compactSecondaryClassName}
+                  >
+                    {nextPackageUnchanged ? "Zapisano" : "Zapisz"}
+                  </button>
+                </div>
+                {noPackagesInLocation ? (
+                  <p className="mt-1.5 text-xs text-warning-light">
+                    Brak aktywnych pakietów dla lokalizacji {clientLocationName}.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
-
-      {canSetNextPackage && !isGroup && subscription ? (
-        <div className="mt-3 rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest/50 p-3">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-on-surface-variant">
-                Kolejny pakiet
-              </p>
-              <p className="mt-1 text-xs leading-5 text-on-surface-muted">
-                {willRenew
-                  ? "Zostanie użyty po wykorzystaniu aktualnego pakietu."
-                  : "Wybór zacznie obowiązywać po ponownym włączeniu automatycznego przedłużania."}
-              </p>
-            </div>
-            <div className="grid w-full shrink-0 gap-2 sm:grid-cols-[minmax(0,280px)_auto] md:w-auto">
-              <CustomSelect
-                value={selectedNextPackageId}
-                onChange={onNextPackageChange}
-                options={nextPackageOptions}
-              />
-              <Button
-                variant="outline"
-                onClick={onSetNextPackage}
-                disabled={
-                  isSaving ||
-                  !selectedNextPackageId ||
-                  nextPackageUnchanged ||
-                  packageOptions.length <= 1
-                }
-              >
-                {nextPackageUnchanged ? "Zapisano" : "Zapisz"}
-              </Button>
-            </div>
-          </div>
-          {packageOptions.length <= 1 ? (
-            <p className="mt-2 text-xs text-warning-light">
-              Brak aktywnych pakietów dla lokalizacji {clientLocationName}.
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-
     </section>
   );
 }
 
-function BillingStat({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon: React.ReactNode;
-}) {
+const compactSecondaryClassName = "inline-flex h-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-low px-3 text-xs font-semibold text-primary-light transition hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_35%,transparent)]";
+
+function PanelTitle({ icon, title, children }: { icon: React.ReactNode; title: string; children?: React.ReactNode }) {
   return (
-    <div className="card-shell flex items-center justify-between gap-4 p-5">
-      <div className="min-w-0">
-        <p className="text-label text-on-surface-muted">{label}</p>
-        <p className="mt-3 truncate text-xl font-semibold text-on-surface">
-          {value}
-        </p>
-      </div>
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
+    <div className="flex items-center gap-3">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-lowest text-primary-light">
         {icon}
+      </span>
+      <div className="min-w-0">
+        <h2 className="text-sm font-semibold text-on-surface">{title}</h2>
+        {children ? <p className="text-xs text-on-surface-muted">{children}</p> : null}
       </div>
     </div>
+  );
+}
+
+function HintIcon({ label }: { label: string }) {
+  return (
+    <Tooltip label={label} align="start">
+      <span tabIndex={0} className="inline-flex text-on-surface-muted transition hover:text-primary-light focus-visible:text-primary-light focus-visible:outline-none">
+        <Info size={13} aria-hidden="true" />
+        <span className="sr-only">{label}</span>
+      </span>
+    </Tooltip>
   );
 }
 
@@ -1335,95 +1248,72 @@ function UsageCard({ usage }: { usage: SubscriptionUsage | null }) {
   const sessions = showAllSessions ? allSessions : allSessions.slice(0, 3);
   const hiddenSessionsCount = Math.max(allSessions.length - sessions.length, 0);
 
+  if (!usage?.clientPackageId) {
+    return <EmptyState label="Brak aktywnego pakietu do policzenia wykorzystania." />;
+  }
+
   return (
-    <section className="card-shell p-4 md:p-5">
-      <p className="text-section-title">Wykorzystanie pakietu</p>
-      {usage?.clientPackageId ? (
-        <>
-          <div className="mt-4 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <p className="text-label text-on-surface-muted">
-                  Użyte wejścia
-                </p>
-                <p className="mt-2 text-2xl font-semibold text-on-surface">
-                  {usedSessions ?? "—"}/{totalSessions ?? "—"}
-                </p>
-              </div>
-              <p className="text-sm font-semibold text-tertiary-light">
-                zostało {usage.remainingSessions ?? "—"}
-              </p>
-            </div>
-            {progress !== null ? <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-container-high">
-              <div
-                className="h-full rounded-full bg-tertiary-light"
-                style={{ width: `${progress}%` }}
-              />
-            </div> : null}
-          </div>
+    <div className="min-w-0">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm text-on-surface-variant">
+          Użyte wejścia: <span className="font-semibold text-on-surface">{usedSessions ?? "—"}/{totalSessions ?? "—"}</span>
+        </p>
+        <p className="text-xs font-semibold text-tertiary-light">
+          zostało {usage.remainingSessions ?? "—"}
+        </p>
+      </div>
+      {progress !== null ? (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-container-high">
+          <div className="h-full rounded-full bg-tertiary-light" style={{ width: `${progress}%` }} />
+        </div>
+      ) : null}
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <SmallMetric
-              label="Planowany typ"
-              value={userTrainingType(usage.expectedBillingType, "Brak danych")}
-            />
-            <SmallMetric
-              label="Inny typ"
-              value={String(usage.differentThanExpectedCount)}
-            />
-            <SmallMetric
-              label="Suma korekt"
-              value={formatMoney(usage.adjustmentsTotal, "PLN")}
-            />
-          </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <SmallMetric label="Planowany typ" value={userTrainingType(usage.expectedBillingType, "Brak danych")} />
+        <SmallMetric label="Inny typ" value={String(usage.differentThanExpectedCount)} />
+        <SmallMetric label="Suma korekt" value={formatMoney(usage.adjustmentsTotal, "PLN")} />
+      </div>
 
-          {sessions.length > 0 ? (
-            <div className="mt-4 flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-label text-on-surface-muted">
-                  Treningi rozliczone z pakietu
-                </p>
-                <p className="text-xs font-semibold text-on-surface-muted">
-                  {sessions.length} z {allSessions.length}
-                </p>
-              </div>
-              {sessions.map((session) => (
-                <div
-                  key={session.sessionId}
-                  className="rounded-[var(--radius-md)] bg-surface-container-low px-3 py-2 text-sm"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-semibold text-on-surface">
-                      {formatDate(session.date)}
-                    </p>
-                    <p className="text-xs text-on-surface-muted">
-                      {formatMoney(session.balanceDifference, "PLN")}
-                    </p>
-                  </div>
-                  <p className="mt-1 text-xs text-on-surface-variant">
-                    Plan: {userTrainingType(session.plannedBillingType, "brak danych")} · Faktycznie:{" "}
-                    {userTrainingType(session.actualBillingType, "brak danych")}
-                  </p>
-                </div>
-              ))}
-              {allSessions.length > 3 ? (
-                <button
-                  type="button"
-                  onClick={() => setShowAllSessions((current) => !current)}
-                  className="mt-1 h-10 rounded-[var(--radius-md)] border border-secondary px-3 text-xs font-semibold text-primary-light transition hover:border-primary-light hover:bg-surface-container-high"
-                >
-                  {showAllSessions
-                    ? "Pokaż mniej"
-                    : `Pokaż wszystkie (${hiddenSessionsCount} więcej)`}
-                </button>
-              ) : null}
-            </div>
+      {sessions.length > 0 ? (
+        <div className="mt-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
+              Treningi rozliczone z pakietu
+            </p>
+            <p className="text-[11px] text-on-surface-muted">
+              {sessions.length} z {allSessions.length}
+            </p>
+          </div>
+          <ul className="mt-1.5 flex flex-col gap-1">
+            {sessions.map((session) => (
+              <li
+                key={session.sessionId}
+                className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] bg-surface-container-low px-3 py-1.5 text-xs"
+              >
+                <span className="min-w-0">
+                  <span className="font-semibold text-on-surface">{formatDate(session.date)}</span>
+                  <span className="ml-2 text-on-surface-muted">
+                    {userTrainingType(session.plannedBillingType, "brak danych")} → {userTrainingType(session.actualBillingType, "brak danych")}
+                  </span>
+                </span>
+                <span className="shrink-0 text-on-surface-muted">{formatMoney(session.balanceDifference, "PLN")}</span>
+              </li>
+            ))}
+          </ul>
+          {allSessions.length > 3 ? (
+            <button
+              type="button"
+              onClick={() => setShowAllSessions((current) => !current)}
+              className="mt-2 text-xs font-semibold text-primary-light hover:underline"
+            >
+              {showAllSessions
+                ? "Pokaż mniej"
+                : `Pokaż wszystkie (${hiddenSessionsCount} więcej)`}
+            </button>
           ) : null}
-        </>
-      ) : (
-        <EmptyState label="Brak aktywnego pakietu do policzenia wykorzystania." />
-      )}
-    </section>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -1455,7 +1345,7 @@ function StatusPill({ label, muted }: { label: string; muted?: boolean }) {
   return (
     <span
       className={[
-        "rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider",
+        "rounded-full px-2 py-0.5 text-[10px] font-semibold",
         muted
           ? "bg-surface-container text-on-surface-muted"
           : "bg-tertiary-light/15 text-tertiary-light",
@@ -1468,18 +1358,18 @@ function StatusPill({ label, muted }: { label: string; muted?: boolean }) {
 
 function SmallMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-2">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
+    <div className="min-w-0 rounded-[var(--radius-md)] bg-surface-container-lowest px-2.5 py-1.5">
+      <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
         {label}
       </p>
-      <p className="mt-1 truncate font-semibold text-on-surface">{value}</p>
+      <p className="mt-0.5 truncate text-sm font-semibold text-on-surface">{value}</p>
     </div>
   );
 }
 
 function EmptyState({ label }: { label: string }) {
   return (
-    <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-6 text-center text-on-surface-variant">
+    <div className="rounded-[var(--radius-md)] bg-surface-container-low px-3 py-4 text-sm text-on-surface-variant">
       {label}
     </div>
   );

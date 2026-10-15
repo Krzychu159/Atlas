@@ -372,6 +372,11 @@ function ClientDetails({ clientId }: { clientId: number }) {
           <ClientProfileHero
             client={client}
             groupLocationNames={groupLocationNames}
+            billingSummary={billing ? {
+              amountDue: billing.totalAmountDue,
+              balance: billing.currentBalance,
+              currency: billing.packages?.find((item) => item.clientPackageId === billing.activeClientPackageId)?.currency,
+            } : null}
             backHref={client.isArchived ? "/owner/clients/archived" : "/owner/clients"}
             onEdit={client.isArchived ? undefined : () => setIsEditOpen(true)}
             onFiles={client.isArchived ? undefined : handleOpenTrainingPlan}

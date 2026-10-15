@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   ArrowLeft,
   Archive,
@@ -10,14 +11,17 @@ import {
   Pencil,
   Phone,
   ReceiptText,
+  RefreshCw,
   RotateCcw,
   Unlock,
   UserPlus,
   UserRound,
   UserRoundX,
+  WalletCards,
 } from "lucide-react";
 import type { Client } from "@/app/lib/owner/clients";
 import { formatTrainingStartDate } from "@/app/lib/formatters/date";
+import { formatMoney } from "@/app/lib/formatters/money";
 import ClientRewardProgress from "@/app/components/clients/ClientRewardProgress";
 import { Tooltip } from "@/app/components/ui/tooltip";
 import {
@@ -53,22 +57,38 @@ const statusToneClasses = {
   unknown: "bg-surface-container-lowest text-on-surface-muted",
 } as const;
 
+export type ClientProfileTab = "profile" | "payments";
+
+export type ClientProfileBillingSummary = {
+  amountDue: number | null | undefined;
+  balance: number | null | undefined;
+  currency?: string | null;
+};
+
 export default function ClientProfileHero({
   client,
+  activeTab = "profile",
   onEdit,
   onFiles,
-  backHref = "/owner/clients",
+  backHref,
   paymentsHref,
   milestoneAccess = "owner",
   onPortalAction,
   onArchive,
   onEndCooperation,
   onRestore,
+  onAddPayment,
+  addPaymentDisabled = false,
+  onRefresh,
+  isRefreshing = false,
+  refreshDisabled = false,
+  billingSummary,
   isPortalActionPending = false,
   isRestorePending = false,
   groupLocationNames,
 }: {
   client: Client;
+  activeTab?: ClientProfileTab;
   onEdit?: () => void;
   onFiles?: () => void;
   backHref?: string;
@@ -78,23 +98,33 @@ export default function ClientProfileHero({
   onArchive?: () => void;
   onEndCooperation?: () => void;
   onRestore?: () => void;
+  onAddPayment?: () => void;
+  addPaymentDisabled?: boolean;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+  refreshDisabled?: boolean;
+  billingSummary?: ClientProfileBillingSummary | null;
   isPortalActionPending?: boolean;
   isRestorePending?: boolean;
   groupLocationNames?: string[];
 }) {
   const fullName = getClientName(client);
-  const resolvedPaymentsHref = paymentsHref || `/owner/clients/${client.id}/payments`;
+  const portalBase = milestoneAccess === "trainer" ? "/trainer" : "/owner";
+  const profileHref = `${portalBase}/clients/${client.id}`;
+  const resolvedPaymentsHref = paymentsHref || `${profileHref}/payments`;
+  const resolvedBackHref = backHref || `${portalBase}/clients`;
   const status = clientStatus(client);
   const showPortalStatus = Boolean(client.portalAccessStatus) && Boolean(client.isArchived || onPortalAction);
+  const showTabs = !client.isArchived;
   const locationLabel = groupLocationNames?.length
     ? `Lokalizacja główna · zajęcia grupowe: ${groupLocationNames.join(", ")}`
     : groupLocationNames ? "Lokalizacja główna" : "Lokalizacja";
-
+  const hasIconActions = Boolean(onFiles || onPortalAction || onArchive || onEndCooperation || onRefresh);
 
   return (
     <section className="card-shell p-4 md:p-6">
       <Link
-        href={backHref}
+        href={resolvedBackHref}
         className="inline-flex items-center gap-1.5 text-xs font-semibold text-on-surface-muted transition hover:text-primary-light"
       >
         <ArrowLeft size={14} />
@@ -155,13 +185,22 @@ export default function ClientProfileHero({
             </button>
           ) : null}
           {!client.isArchived ? (
-            <Link
-              href={resolvedPaymentsHref}
-              className={profilePrimaryActionClassName}
-            >
-              <ReceiptText size={15} />
-              Płatności
-            </Link>
+            onAddPayment ? (
+              <button
+                type="button"
+                onClick={onAddPayment}
+                disabled={addPaymentDisabled}
+                className={profilePrimaryActionClassName}
+              >
+                <ReceiptText size={15} />
+                Dodaj wpłatę
+              </button>
+            ) : (
+              <Link href={`${resolvedPaymentsHref}?addPayment=1`} className={profilePrimaryActionClassName}>
+                <ReceiptText size={15} />
+                Dodaj wpłatę
+              </Link>
+            )
           ) : null}
           {onEdit ? (
             <button
@@ -173,8 +212,17 @@ export default function ClientProfileHero({
               Edytuj
             </button>
           ) : null}
-          {onFiles || onPortalAction || onArchive || onEndCooperation ? (
+          {hasIconActions ? (
             <ProfileIconActions>
+              {onRefresh ? (
+                <IconAction
+                  label={isRefreshing ? "Odświeżanie..." : "Odśwież dane"}
+                  onClick={onRefresh}
+                  disabled={refreshDisabled}
+                >
+                  <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} />
+                </IconAction>
+              ) : null}
               {onFiles ? (
                 <IconAction label="Pliki klienta" onClick={onFiles}>
                   <Files size={15} />
@@ -189,7 +237,7 @@ export default function ClientProfileHero({
                   <PortalActionIcon status={client.portalAccessStatus} />
                 </IconAction>
               ) : null}
-              {(onFiles || onPortalAction) && (onArchive || onEndCooperation) ? (
+              {(onFiles || onPortalAction || onRefresh) && (onArchive || onEndCooperation) ? (
                 <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-white/10" />
               ) : null}
               {onArchive ? (
@@ -207,7 +255,7 @@ export default function ClientProfileHero({
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-white/5 pt-4 lg:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,1.4fr)]">
+      <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-white/5 pt-4 sm:grid-cols-3 lg:flex lg:flex-wrap lg:items-start lg:gap-x-10">
         <InfoStat icon={<UserRound size={13} />} label="Trener" muted={!client.trainerFullName}>
           {client.trainerFullName || "Brak trenera"}
         </InfoStat>
@@ -224,22 +272,69 @@ export default function ClientProfileHero({
             </Tooltip>
           ) : client.locationName || "Brak lokalizacji"}
         </InfoStat>
+        {billingSummary ? (
+          <>
+            <InfoStat icon={<WalletCards size={13} />} label="Do zapłaty" muted={!isKnownAmount(billingSummary.amountDue)}>
+              {formatSummaryMoney(billingSummary.amountDue, billingSummary.currency)}
+            </InfoStat>
+            <InfoStat icon={<WalletCards size={13} />} label="Saldo" muted={!isKnownAmount(billingSummary.balance)}>
+              {formatSummaryMoney(billingSummary.balance, billingSummary.currency)}
+            </InfoStat>
+          </>
+        ) : null}
         {client.isArchived ? (
           <InfoStat icon={<Archive size={13} />} label="Data archiwizacji">
             {formatArchivedAt(client.archivedAt)}
           </InfoStat>
-        ) : (
-          <div className="col-span-2 min-w-0 lg:col-span-1">
+        ) : activeTab === "profile" ? (
+          <div className="col-span-2 min-w-0 sm:col-span-3 lg:ml-auto lg:w-80">
             <ClientRewardProgress
               access={milestoneAccess}
               clientId={client.id}
               trainingStartDate={client.trainingStartDate}
             />
           </div>
-        )}
+        ) : null}
       </div>
+
+      {showTabs ? (
+        <nav aria-label="Sekcje klienta" className="mt-4 flex gap-1 border-t border-white/5 pt-3">
+          <TabLink href={profileHref} active={activeTab === "profile"} icon={<UserRound size={14} />}>
+            Profil
+          </TabLink>
+          <TabLink href={resolvedPaymentsHref} active={activeTab === "payments"} icon={<ReceiptText size={14} />}>
+            Płatności
+          </TabLink>
+        </nav>
+      ) : null}
     </section>
   );
+}
+
+function TabLink({ href, active, icon, children }: { href: string; active: boolean; icon: ReactNode; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={[
+        "inline-flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_35%,transparent)]",
+        active
+          ? "bg-primary/15 text-primary-light"
+          : "text-on-surface-muted hover:bg-surface-container-low hover:text-on-surface",
+      ].join(" ")}
+    >
+      {icon}
+      {children}
+    </Link>
+  );
+}
+
+function isKnownAmount(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function formatSummaryMoney(value: number | null | undefined, currency?: string | null) {
+  return isKnownAmount(value) ? formatMoney(value, currency) : "Niedostępne";
 }
 
 function formatArchivedAt(value?: string | null) {

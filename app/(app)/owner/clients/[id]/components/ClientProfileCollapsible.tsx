@@ -7,14 +7,18 @@ export default function ClientProfileCollapsible({
   title,
   icon,
   meta,
+  defaultOpen = false,
+  flush = false,
   children,
 }: {
   title: string;
   icon: ReactNode;
   meta?: ReactNode;
+  defaultOpen?: boolean;
+  flush?: boolean;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const contentId = useId();
 
   return (
@@ -39,7 +43,7 @@ export default function ClientProfileCollapsible({
         />
       </button>
       {open ? (
-        <div id={contentId} className="min-w-0 border-t border-white/5 p-4 md:p-5">
+        <div id={contentId} className={`min-w-0 border-t border-white/5 ${flush ? "" : "p-4 md:p-5"}`}>
           {children}
         </div>
       ) : null}
