@@ -1,8 +1,6 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { getErrorMessage } from "@/app/lib/backend";
 import {
@@ -12,7 +10,7 @@ import {
   type PackageClient,
 } from "@/app/lib/owner/packages";
 import PackageDetailsHero from "./components/PackageDetailsHero";
-import PackageEditCard from "./components/PackageEditCard";
+import PackageEditModal from "./components/PackageEditModal";
 import PackageClientsList from "./components/PackageClientsList";
 import { isPeriodPackage } from "@/app/lib/period-packages";
 import { showOwnerError } from "../../components/owner-toast";
@@ -31,6 +29,7 @@ export default function PackageDetailsPage({
   const [error, setError] = useState<string | null>(null);
   const [clientsError, setClientsError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [isRetryingClients, setIsRetryingClients] = useState(false);
   const clientsRetryLoad = useRef<AbortController | null>(null);
 
@@ -99,46 +98,29 @@ export default function PackageDetailsPage({
   }, [packageId, attempt]);
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-[1400px] pb-10">
-      <div className="flex items-center justify-between gap-4">
-        <Link
-          href="/owner/packages"
-          className="inline-flex items-center gap-3 text-on-surface hover:text-primary-light"
-        >
-          <ArrowLeft size={20} className="text-primary-light" />
-          <span className="text-lg font-semibold">Szczegóły pakietu</span>
-        </Link>
-
-      </div>
-
+    <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col gap-3 pb-10">
       {isLoading ? (
-        <div className="mt-6 card-shell p-6 text-on-surface-variant">
+        <div role="status" className="card-shell p-4 text-sm text-on-surface-variant">
           Ładowanie pakietu...
         </div>
       ) : null}
 
-      {error ? <div role="alert" className="mt-6 card-shell flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+      {error ? <div role="alert" className="card-shell flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-on-surface-variant">{error}</p>
         <Button variant="secondary" onClick={() => setAttempt(value => value + 1)}>Spróbuj ponownie</Button>
       </div> : null}
 
       {!isLoading && item?.id === packageId ? (
-        <div className="mt-6 flex flex-col gap-5">
-          <PackageDetailsHero item={item} clients={clients} clientsAvailable={!clientsError} />
+        <>
+          <PackageDetailsHero item={item} clients={clients} clientsAvailable={!clientsError} onEdit={() => setIsEditOpen(true)} />
 
-          <div className="grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(340px,0.85fr)_minmax(0,1.65fr)]">
-            <div className="min-w-0">
-              <PackageEditCard item={item} onUpdated={setItem} />
-            </div>
+          {clientsError ? <div role="alert" className="card-shell flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-on-surface-variant">{clientsError}</p>
+            <Button variant="secondary" disabled={isRetryingClients} onClick={() => void retryClients()}>{isRetryingClients ? "Pobieranie klientów..." : "Spróbuj ponownie"}</Button>
+          </div> : <PackageClientsList clients={clients} packageId={item.id} periodBased={isPeriodPackage(item)} />}
 
-            <div className="min-w-0">
-              {clientsError ? <div role="alert" className="card-shell flex flex-col gap-3 p-5">
-                <p className="text-sm text-on-surface-variant">{clientsError}</p>
-                <Button variant="secondary" disabled={isRetryingClients} onClick={() => void retryClients()}>{isRetryingClients ? "Pobieranie klientów..." : "Spróbuj ponownie"}</Button>
-              </div> : <PackageClientsList clients={clients} packageId={item.id} periodBased={isPeriodPackage(item)} />}
-            </div>
-          </div>
-        </div>
+          {isEditOpen ? <PackageEditModal item={item} onUpdated={setItem} onClose={() => setIsEditOpen(false)} /> : null}
+        </>
       ) : null}
     </div>
   );

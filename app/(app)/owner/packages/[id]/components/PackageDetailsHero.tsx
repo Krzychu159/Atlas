@@ -1,107 +1,131 @@
-import { CalendarDays, Dumbbell, TrendingUp, Users } from "lucide-react";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  CalendarDays,
+  CalendarRange,
+  Dumbbell,
+  Globe,
+  MapPin,
+  Pencil,
+  Repeat,
+  TrendingUp,
+  Users,
+  UsersRound,
+} from "lucide-react";
 import type { Package, PackageClient } from "@/app/lib/owner/packages";
 import { isPeriodPackage } from "@/app/lib/period-packages";
-
-function formatPrice(value: number, currency: string) {
-  return new Intl.NumberFormat("pl-PL", {
-    style: "currency",
-    currency: currency || "PLN",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { formatMoney } from "@/app/lib/formatters/money";
+import { Tooltip } from "@/app/components/ui/tooltip";
+import {
+  ProfileChip,
+  ProfileInfoStat,
+  profilePrimaryActionClassName,
+} from "@/app/components/ui/profile-hero";
 
 export default function PackageDetailsHero({
   item,
   clients,
   clientsAvailable = true,
+  onEdit,
 }: {
   item: Package;
   clients: PackageClient[];
   clientsAvailable?: boolean;
+  onEdit: () => void;
 }) {
   const periodBased = isPeriodPackage(item);
   const usedSessions = clients.every(client => client.activePackageId === item.id && typeof client.activePackageUsedSessions === "number" && Number.isFinite(client.activePackageUsedSessions))
     ? clients.reduce((sum, client) => sum + client.activePackageUsedSessions!, 0)
     : null;
-
   const estimatedRevenue = clients.length * item.price;
+  const currency = item.currency || "PLN";
 
   return (
-    <div className="card-shell p-6 md:p-7 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,color-mix(in_srgb,var(--color-primary)_13%,transparent),transparent_55%)]" />
+    <section className="card-shell p-4 md:p-6">
+      <Link
+        href="/owner/packages"
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-on-surface-muted transition hover:text-primary-light"
+      >
+        <ArrowLeft size={14} />
+        Lista pakietów
+      </Link>
 
-      <div className="relative z-10">
-        <div className="flex flex-wrap items-center gap-3">
-          <span
-            className={`px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.05em] ${
-              item.isActive
-                ? "bg-tertiary-container text-tertiary-light"
-                : "bg-surface-container-high text-on-surface-variant"
-            }`}
-          >
-            {item.isActive ? "Aktywny" : "Archiwalny"}
-          </span>
-
-          <span className="text-label text-on-surface-variant">
-            {periodBased ? "Usługa okresowa" : "Pakiet treningowy"}
-          </span>
-        </div>
-
-        <div className="mt-5 grid gap-5 md:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light md:h-16 md:w-16">
+            {periodBased ? <CalendarRange size={24} /> : <Dumbbell size={24} />}
+          </div>
           <div className="min-w-0">
-            <h1 className="break-words font-display text-3xl font-semibold leading-tight tracking-tight sm:text-4xl xl:text-5xl">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <ProfileChip className={item.isActive ? "bg-tertiary/15 text-tertiary-light" : "bg-surface-container-lowest text-on-surface-muted"}>
+                {item.isActive ? "Aktywny" : "Archiwalny"}
+              </ProfileChip>
+              <ProfileChip className="bg-surface-container-lowest text-primary-light">
+                {periodBased ? "Usługa okresowa" : "Pakiet treningowy"}
+              </ProfileChip>
+            </div>
+            <h1 className="mt-1.5 break-words font-display text-2xl font-semibold leading-tight tracking-tight md:text-[1.9rem]">
               {item.name}
             </h1>
-
-            <p className="mt-3 max-w-[640px] break-words text-sm leading-6 text-on-surface-variant sm:text-base">
+            <p className="mt-1 max-w-[680px] break-words text-sm leading-5 text-on-surface-variant">
               {item.description || (periodBased ? "Usługa bez opisu." : "Pakiet bez opisu.")}
             </p>
           </div>
-
-          <div className="md:text-right">
-            <p className="text-label text-on-surface-variant">{periodBased ? "Cena usługi" : "Cena pakietu"}</p>
-            <p className="mt-2 text-[2.2rem] leading-none font-semibold text-primary-light">
-              {formatPrice(item.price, item.currency)}
-            </p>
-          </div>
         </div>
 
-        <div className={`mt-7 grid grid-cols-2 gap-3 ${periodBased ? "md:grid-cols-3" : "md:grid-cols-4"}`}>
-          {!periodBased ? <div className="bg-surface-container-low rounded-[var(--radius-lg)] p-4">
-            <Dumbbell size={18} className="text-primary-light" />
-            <p className="mt-4 text-label text-on-surface-muted">Limit sesji</p>
-            <p className="mt-1 text-2xl font-semibold">{item.sessionsLimit}</p>
-          </div> : null}
-
-          <div className="bg-surface-container-low rounded-[var(--radius-lg)] p-4">
-            <CalendarDays size={18} className="text-primary-light" />
-            <p className="mt-4 text-label text-on-surface-muted">Ważność</p>
-            <p className="mt-1 text-2xl font-semibold">
-              {item.durationDays} dni
-            </p>
+        <div className="flex shrink-0 items-center gap-4 md:flex-col md:items-end md:gap-3">
+          <div className="md:text-right">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">{periodBased ? "Cena usługi" : "Cena pakietu"}</p>
+            <p className="text-2xl font-semibold leading-tight text-primary-light">{formatMoney(item.price, currency)}</p>
           </div>
-
-          <div className="bg-surface-container-low rounded-[var(--radius-lg)] p-4">
-            <Users size={18} className="text-primary-light" />
-            <p className="mt-4 text-label text-on-surface-muted">Klienci</p>
-            <p className="mt-1 text-2xl font-semibold">{clientsAvailable ? clients.length : "—"}</p>
-          </div>
-
-          <div className="bg-surface-container-low rounded-[var(--radius-lg)] p-4">
-            <TrendingUp size={18} className="text-tertiary-light" />
-            <p className="mt-4 text-label text-on-surface-muted">Szacowana wartość</p>
-            <p className="mt-1 text-2xl font-semibold">
-              {clientsAvailable ? new Intl.NumberFormat("pl-PL", {
-                notation: "compact",
-                maximumFractionDigits: 1,
-              }).format(estimatedRevenue) : "—"} {clientsAvailable ? item.currency || "PLN" : ""}
-            </p>
-            {!periodBased ? <p className="mt-1 text-xs text-on-surface-muted">
-              {!clientsAvailable || usedSessions === null ? "Brak danych o wykorzystaniu" : `${usedSessions} wykorzystanych sesji`}
-            </p> : null}
-          </div>
+          <button type="button" onClick={onEdit} className={`${profilePrimaryActionClassName} ml-auto md:ml-0`}>
+            <Pencil size={14} />
+            Edytuj
+          </button>
         </div>
       </div>
-    </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-white/5 pt-4 sm:grid-cols-3 lg:flex lg:flex-wrap lg:gap-x-10">
+        {!periodBased ? (
+          <ProfileInfoStat icon={<Dumbbell size={13} />} label="Limit sesji">{item.sessionsLimit}</ProfileInfoStat>
+        ) : null}
+        <ProfileInfoStat icon={<CalendarDays size={13} />} label={periodBased ? "Czas trwania" : "Ważność"}>{item.durationDays} dni</ProfileInfoStat>
+        {!periodBased && typeof item.sessionsPerWeek === "number" ? (
+          <ProfileInfoStat icon={<Repeat size={13} />} label="Sesje / tydzień">{item.sessionsPerWeek}</ProfileInfoStat>
+        ) : null}
+        {!periodBased ? (
+          <ProfileInfoStat icon={<UsersRound size={13} />} label="Uczestnicy">{item.participantsCount}</ProfileInfoStat>
+        ) : null}
+        <ProfileInfoStat icon={<MapPin size={13} />} label="Lokalizacja" muted={!item.locationName}>
+          {item.locationName || "Bez przypisania"}
+        </ProfileInfoStat>
+        {!periodBased && typeof item.isPubliclyAvailable === "boolean" ? (
+          <ProfileInfoStat icon={<Globe size={13} />} label="Zapisy online" muted={!item.isPubliclyAvailable}>
+            {item.isPubliclyAvailable ? "Włączone" : "Wyłączone"}
+          </ProfileInfoStat>
+        ) : null}
+        <ProfileInfoStat icon={<Users size={13} />} label="Klienci" muted={!clientsAvailable}>
+          {clientsAvailable ? clients.length : "—"}
+        </ProfileInfoStat>
+        <ProfileInfoStat icon={<TrendingUp size={13} />} label="Szacowana wartość" muted={!clientsAvailable}>
+          {clientsAvailable ? (
+            <Tooltip
+              align="start"
+              label={periodBased
+                ? "Liczba klientów × cena usługi."
+                : `Liczba klientów × cena pakietu. ${usedSessions === null ? "Brak danych o wykorzystaniu." : `Wykorzystane sesje: ${usedSessions}.`}`}
+            >
+              <span tabIndex={0} className="focus-visible:text-primary-light focus-visible:outline-none">
+                {formatMoney(estimatedRevenue, currency)}
+              </span>
+            </Tooltip>
+          ) : (
+            <Tooltip align="start" label="Brak danych o wykorzystaniu i liczbie klientów.">
+              <span tabIndex={0} className="focus-visible:text-primary-light focus-visible:outline-none">—</span>
+            </Tooltip>
+          )}
+        </ProfileInfoStat>
+      </div>
+    </section>
   );
 }

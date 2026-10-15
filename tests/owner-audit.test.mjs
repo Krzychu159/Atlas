@@ -161,7 +161,15 @@ test("disabled storage keeps the location filter and same-tab synchronization us
 });
 
 test("unavailable package clients display unknown counts and usage instead of zero", () => {
-  const Hero = load("app/(app)/owner/packages/[id]/components/PackageDetailsHero.tsx", { "@/app/lib/period-packages": { isPeriodPackage: () => false } }).default;
+  const Hero = load("app/(app)/owner/packages/[id]/components/PackageDetailsHero.tsx", {
+    "@/app/lib/period-packages": { isPeriodPackage: () => false },
+    "@/app/components/ui/profile-hero": {
+      ProfileChip: ({ children }) => React.createElement("span", null, children),
+      ProfileInfoStat: ({ label, children }) => React.createElement("div", null, label, children),
+      profilePrimaryActionClassName: "",
+    },
+    "@/app/components/ui/tooltip": { Tooltip: ({ label, children }) => React.createElement("span", null, children, label) },
+  }).default;
   const markup = renderToStaticMarkup(React.createElement(Hero, { item: { id: 3, name: "Pakiet", price: 200, currency: "PLN", durationDays: 30, sessionsLimit: 10 }, clients: [], clientsAvailable: false }));
   assert.ok(markup.includes("Brak danych o wykorzystaniu"));
   assert.ok(!markup.includes("0 wykorzystanych sesji"));
