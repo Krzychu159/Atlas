@@ -4,12 +4,13 @@ type ListSectionProps = {
   title: string;
   description?: string;
   meta?: ReactNode;
+  busy?: boolean;
   children: ReactNode;
 };
 
-export function ListSection({ title, description, meta, children }: ListSectionProps) {
+export function ListSection({ title, description, meta, busy, children }: ListSectionProps) {
   return (
-    <section className="overflow-hidden rounded-[var(--radius-xl)] bg-surface-container-low shadow-soft">
+    <section className="overflow-hidden rounded-[var(--radius-xl)] bg-surface-container-low shadow-soft" aria-busy={busy || undefined}>
       <div className="flex items-end justify-between gap-2 px-4 py-3 md:py-5 md:px-5">
         <div>
           <p className="text-section-title">{title}</p>

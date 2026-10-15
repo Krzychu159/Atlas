@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
-import { LoaderCircle, RefreshCw } from "lucide-react";
+import { CircleAlert, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import { ListSection } from "@/app/components/ui/list/ListSection";
+import { ListState } from "@/app/components/ui/list/ListState";
 import { activityErrorMessage, defaultActivityFilters, getActivityLog, getActivityLogMetadata, validateActivityFilters, type ActivityFilters as Filters, type ActivityLogEntry, type ActivityLogMetadata, type ActivityLogResponse } from "@/app/lib/owner/activity-log";
 import { showOwnerError } from "../../components/owner-toast";
 import { ActivityFilters } from "./ActivityFilters";
@@ -80,12 +82,19 @@ export function ActivityLogPageClient() {
     </div>
     <ActivityFilters value={filters} metadata={metadata} onChange={changeFilters} onClear={() => changeFilters(defaultActivityFilters)} />
     {metadataError ? <div role="alert" className="card-shell flex flex-col gap-3 p-4 text-sm text-on-surface-variant sm:flex-row sm:items-center sm:justify-between"><p>Nie udało się pobrać dostępnych rodzajów danych, operacji i źródeł. {metadataError}</p><Button variant="secondary" size="sm" onClick={() => setMetadataRevision((current) => current + 1)}>Ponów pobieranie filtrów</Button></div> : null}
-    <section className="overflow-hidden rounded-[var(--radius-xl)] bg-surface-container-low shadow-soft" aria-busy={loading && !validation}>
-      <div className="flex flex-col gap-2 px-4 py-5 md:flex-row md:items-end md:justify-between md:px-5"><h2 className="text-section-title">Zmiany w studiu</h2>{data && !loading && !message ? <p className="text-xs text-on-surface-muted">Znaleziono: {data.totalCount} wpisów</p> : null}</div>
-      {message ? <div role="alert" className="flex min-h-56 flex-col items-center justify-center gap-4 bg-surface-container-lowest px-5 text-center text-sm text-on-surface-variant"><p>{message}</p>{!validation ? <Button variant="secondary" onClick={refresh}>Spróbuj ponownie</Button> : null}</div>
-        : loading ? <div role="status" className="flex min-h-56 items-center justify-center gap-2 bg-surface-container-lowest text-sm text-on-surface-muted"><LoaderCircle size={18} className="animate-spin" />Ładowanie historii zmian...</div>
+    <ListSection title="Zmiany w studiu" meta={data && !loading && !message ? pluralizeEntries(data.totalCount) : null} busy={loading && !validation}>
+      {validation ? <ListState variant="error" icon={<SlidersHorizontal size={28} />} title="Popraw filtry" message={validation} />
+        : error ? <ListState variant="error" icon={<CircleAlert size={28} />} title="Nie udało się wczytać historii zmian" message={error} action={<Button variant="secondary" size="sm" onClick={refresh}>Spróbuj ponownie</Button>} />
+        : loading ? <ListState variant="loading" label="Ładowanie historii zmian..." />
         : data ? <><ActivityList items={data.items ?? []} onSelect={setSelected} /><ActivityPagination data={data} onPageChange={(next) => { if (next === page) return; setPage(next); setData(null); setLoading(true); }} onPageSizeChange={(next) => { if (next === pageSize) return; setPageSize(next); setPage(1); setData(null); setLoading(true); }} /></> : null}
-    </section>
+    </ListSection>
     {selected ? <ActivityDetails entry={selected} onClose={closeDetails} onRelated={(changeSetId) => { changeFilters({ ...defaultActivityFilters, changeSetId }); setSelected(null); }} /> : null}
   </div>;
+}
+
+function pluralizeEntries(count: number) {
+  if (count === 1) return "1 wpis";
+  const last = count % 10;
+  const lastTwo = count % 100;
+  return `${count} ${last >= 2 && last <= 4 && !(lastTwo >= 12 && lastTwo <= 14) ? "wpisy" : "wpisów"}`;
 }

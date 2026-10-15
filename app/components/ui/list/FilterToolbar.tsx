@@ -113,11 +113,13 @@ export function FilterSearchField({
   onChange,
   placeholder,
   label = "Szukaj",
+  maxLength,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   label?: string;
+  maxLength?: number;
 }) {
   return (
     <label className="min-w-0">
@@ -127,6 +129,7 @@ export function FilterSearchField({
         <input
           type="search"
           value={value}
+          maxLength={maxLength}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           className="h-full min-w-0 flex-1 bg-transparent text-base font-semibold text-on-surface outline-none placeholder:font-normal placeholder:text-on-surface-muted md:text-sm"

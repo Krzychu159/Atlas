@@ -1,8 +1,13 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { ArrowRight, Clock3, ReceiptText } from "lucide-react";
 import type { TrainerMonthlySettlement } from "@/app/lib/owner/settlements";
 
-export const settlementGridClass = "xl:grid-cols-[minmax(180px,1.8fr)_minmax(70px,0.7fr)_minmax(110px,1fr)_minmax(100px,1fr)_120px_44px]";
+// Columns live in a CSS variable, so the Tailwind class never changes and mobile rows keep their own grid.
+export const settlementGridClass = "xl:grid-cols-[var(--settlement-columns)]";
+export const settlementGridStyle = {
+  "--settlement-columns": "minmax(180px,1.8fr) minmax(70px,0.7fr) minmax(110px,1fr) minmax(100px,1fr) 120px 44px",
+} as CSSProperties;
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("pl-PL", {
@@ -39,7 +44,7 @@ export default function SettlementTrainerRow({ settlement, locationId }: {
       : "bg-surface-container-high text-on-surface-muted";
 
   return (
-    <li className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-4 rounded-[var(--radius-lg)] bg-surface-container-low p-4 transition hover:bg-surface-container-high/50 xl:gap-3 xl:rounded-none xl:bg-surface-container-lowest xl:px-5 xl:py-3 xl:odd:bg-surface-container-low/55 ${settlementGridClass}`}>
+    <li style={settlementGridStyle} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-4 rounded-[var(--radius-lg)] bg-surface-container-low p-4 transition hover:bg-surface-container-high/50 xl:gap-3 xl:rounded-none xl:bg-surface-container-lowest xl:px-5 xl:py-3 xl:odd:bg-surface-container-low/55 ${settlementGridClass}`}>
       <div className="flex min-w-0 items-center gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-high text-xs font-semibold text-on-surface" aria-hidden="true">
           {initials}
