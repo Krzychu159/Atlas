@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Clock3, ReceiptText, Wallet, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock3, ReceiptText, Wallet, CheckCircle2, FileCheck2, FileX2 } from "lucide-react";
 import DashboardStatCard from "@/app/(app)/owner/components/DashboardStatCard";
 import { NativeDateInput } from "@/app/components/ui/native-date-input";
 import { getTrainerPortalSettlement, type TrainerPortalSettlement } from "@/app/lib/trainer/portal";
@@ -10,7 +10,8 @@ import {
   getCurrentTrainerMonth, getSettlementErrorMessage, getSettlementPaymentLabel,
   moveTrainerMonth, parseTrainerMonth,
 } from "@/app/lib/trainer/settlement-display";
-import SettlementItems from "./components/SettlementItems";
+import SettlementItems from "@/app/components/settlements/SettlementItems";
+import CollapsibleSection from "@/app/components/ui/collapsible-section";
 
 export default function TrainerSettlementsPage() {
   const [monthValue, setMonthValue] = useState(getCurrentTrainerMonth);
@@ -19,7 +20,7 @@ export default function TrainerSettlementsPage() {
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-label text-primary-light">Panel trenera</p>
-          <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">Moje rozliczenia</h1>
+          <h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">Moje rozliczenia</h1>
           <p className="mt-3 text-sm leading-6 text-on-surface-variant">Sesje, godziny rozliczeniowe i wypłata za wybrany miesiąc.</p>
         </div>
         <div className="flex w-full items-end gap-2 sm:w-auto">
@@ -101,8 +102,12 @@ function SettlementContent({ monthValue }: { monthValue: string }) {
         </div>
       </section>
       <p className="text-sm leading-6 text-on-surface-muted">Godziny rozliczeniowe wynikają z zasad rozliczenia i mogą różnić się od czasu trwania zajęć.</p>
-      <SettlementItems title="Szczegóły sesji objętych umową" description="Godziny, stawki i kwoty dla sesji ujętych w rozliczeniu." items={items} />
-      <SettlementItems title="Szczegóły sesji poza umową" description="Sesje wykazane poza umową, bez doliczania ich do kwoty rozliczenia." items={nonContractedItems} />
+      <CollapsibleSection title="Sesje objęte umową" icon={<FileCheck2 size={15} />} meta={items.length} defaultOpen flush>
+        <SettlementItems title="Sesje objęte umową" items={items} />
+      </CollapsibleSection>
+      <CollapsibleSection title="Sesje poza umową" icon={<FileX2 size={15} />} meta={nonContractedItems.length} defaultOpen={nonContractedItems.length > 0} flush>
+        <SettlementItems title="Sesje poza umową" items={nonContractedItems} muteAmounts />
+      </CollapsibleSection>
     </>
   );
 }

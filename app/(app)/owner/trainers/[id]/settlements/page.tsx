@@ -8,23 +8,41 @@ import { useTrainerRatesRevision } from "@/app/lib/owner/trainer-rates-changes";
 import { NativeDateInput } from "@/app/components/ui/native-date-input";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   normalizeOwnerLocationFilterValue,
   useOwnerLocationFilter,
 } from "@/app/lib/owner/location-filter";
 import {
-  ArrowLeft,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
-  Dumbbell,
+  FileCheck2,
   FileDown,
+  FileX2,
+  Info,
   ReceiptText,
+  RotateCcw,
   Wallet,
 } from "lucide-react";
-import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
+import CollapsibleSection from "@/app/components/ui/collapsible-section";
+import { Tooltip } from "@/app/components/ui/tooltip";
+import {
+  ProfileInfoStat,
+  profilePrimaryActionClassName,
+  profileSecondaryActionClassName,
+} from "@/app/components/ui/profile-hero";
+import SettlementItems from "@/app/components/settlements/SettlementItems";
+import {
+  formatSettlementDate,
+  formatSettlementMoney,
+  formatSettlementNumber,
+  moveTrainerMonth,
+  parseTrainerMonth,
+} from "@/app/lib/trainer/settlement-display";
+import TrainerProfileHeader from "../../components/TrainerProfileHeader";
 import {
   downloadTrainerWorkHoursDocument,
   getTrainerRates,
@@ -33,7 +51,6 @@ import {
   reopenTrainerSettlement,
   type TrainerMonthlySettlement,
   type TrainerRate,
-  type TrainerSettlementItem,
 } from "@/app/lib/owner/settlements";
 import { getTrainer, type Trainer } from "@/app/lib/owner/trainers";
 import {
@@ -79,28 +96,8 @@ function updateUrlMonth(value: string) {
   window.history.replaceState(window.history.state, "", url.toString());
 }
 
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("pl-PL", {
-    style: "currency",
-    currency: "PLN",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString("pl-PL", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
-function formatSessionType(value: string | null) {
-  if (!value) return "Sesja";
-
-  return userTrainingType(value);
-}
 
 export default function TrainerSettlementPage() {
   const { selectedLocationId, selectedLocationValue, setSelectedLocationValue } = useOwnerLocationFilter();
@@ -195,9 +192,12 @@ export default function TrainerSettlementPage() {
     [rates],
   );
   const items = settlement?.items ?? [];
-  const trainerName =
-    trainer?.fullName ||
-    `${trainer?.firstName ?? ""} ${trainer?.lastName ?? ""}`.trim();
+
+  function changeMonth(value: string) {
+    if (!parseTrainerMonth(value)) return;
+    setMonthValue(value);
+    updateUrlMonth(value);
+  }
 
   async function handleMarkAsPaid() {
     if (!settlement) return;
@@ -292,206 +292,197 @@ export default function TrainerSettlementPage() {
     }
   }
 
+  const nonContractedItems = settlement?.nonContractedItems ?? [];
+  const visibleRates = activeRates.length ? activeRates : rates;
+  const isBusy = isMarkingPaid || isUndoingPaid || isGeneratingDocument;
+
+  const headerActions = settlement ? (
+    <>
+      {settlement.isPaid ? (
+        <button
+          type="button"
+          onClick={handleUndoMarkAsPaid}
+          disabled={isBusy}
+          className={profileSecondaryActionClassName}
+        >
+          <RotateCcw size={14} className="text-primary-light" />
+          {isUndoingPaid ? "Cofanie..." : "Cofnij wypłatę"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={handleMarkAsPaid}
+          disabled={isBusy}
+          className={profilePrimaryActionClassName}
+        >
+          <CheckCircle2 size={15} />
+          {isMarkingPaid ? "Zapisywanie..." : "Oznacz jako wypłacone"}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={handleGenerateDocument}
+        disabled={isBusy}
+        className={profileSecondaryActionClassName}
+      >
+        <FileDown size={14} className="text-primary-light" />
+        {isGeneratingDocument ? "Generowanie..." : "Ewidencja godzin"}
+      </button>
+    </>
+  ) : <></>;
+
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <Link
-            href={`/owner/trainers/${trainerId || ""}`}
-            className="inline-flex items-center gap-2 text-sm font-semibold text-primary-light"
-          >
-            <ArrowLeft size={17} />
-            Profil trenera
-          </Link>
-          <p className="mt-6 text-label text-primary-light">Rozliczenia</p>
-          <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
-            {trainerName || "Trener"}
-          </h1>
-          <p className="mt-3 text-on-surface-variant">
-            Stawki, sesje i kwota do wypłaty za wybrany miesiąc.
-          </p>
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 pb-10">
+      {trainer ? (
+        <TrainerProfileHeader
+          trainer={trainer}
+          rates={rates}
+          activeTab="settlements"
+          actions={headerActions}
+        />
+      ) : null}
+
+      <section className="card-shell p-4 md:p-5">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div className="flex items-end gap-2">
+            <button
+              type="button"
+              aria-label="Poprzedni miesiąc"
+              onClick={() => changeMonth(moveTrainerMonth(monthValue, -1))}
+              disabled={!monthValue || isLoading}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-low text-primary-light transition hover:bg-surface-container-high disabled:opacity-50"
+            >
+              <ChevronLeft size={17} />
+            </button>
+            <label className="min-w-0 flex-1 sm:w-52 sm:flex-none">
+              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-on-surface-muted">Miesiąc</span>
+              <NativeDateInput
+                type="month"
+                value={monthValue}
+                onChange={(event) => {
+                  if (parseTrainerMonth(event.target.value)) changeMonth(event.target.value);
+                }}
+                className="h-10 w-full rounded-[var(--radius-md)] bg-surface-container-low px-3 text-sm font-semibold"
+              />
+            </label>
+            <button
+              type="button"
+              aria-label="Następny miesiąc"
+              onClick={() => changeMonth(moveTrainerMonth(monthValue, 1))}
+              disabled={!monthValue || isLoading}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-low text-primary-light transition hover:bg-surface-container-high disabled:opacity-50"
+            >
+              <ChevronRight size={17} />
+            </button>
+          </div>
+
+          <div className="xl:hidden md:w-64">
+            <CustomSelect
+              label="Lokalizacja"
+              value={selectedLocationValue}
+              onChange={setSelectedLocationValue}
+              options={[
+                { value: "all", label: "Wszystkie lokalizacje" },
+                ...(trainer?.locationIds ?? []).map((id, index) => ({
+                  value: String(id),
+                  label: trainer?.locationNames?.[index] || `Lokalizacja ${id}`,
+                })),
+                ...(selectedLocationId != null && !trainer?.locationIds?.includes(selectedLocationId)
+                  ? [{ value: String(selectedLocationId), label: `Lokalizacja ${selectedLocationId}` }]
+                  : []),
+              ]}
+            />
+          </div>
+
+          {settlement && !isLoading ? (
+            <div className="flex items-center gap-2 md:ml-auto">
+              <span
+                className={[
+                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold",
+                  settlement.isPaid ? "bg-tertiary/15 text-tertiary-light" : "bg-warning-light/15 text-warning-light",
+                ].join(" ")}
+              >
+                <CheckCircle2 size={13} />
+                {settlement.isPaid
+                  ? settlement.paidAt ? `Wypłacone ${formatSettlementDate(settlement.paidAt)}` : "Wypłacone"
+                  : "Niewypłacone"}
+              </span>
+              <HintIcon label="Status wypłaty dotyczy całego miesiąca, we wszystkich lokalizacjach." />
+            </div>
+          ) : null}
         </div>
 
-        <label className="flex w-full max-w-[220px] items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3">
-          <NativeDateInput
-            type="month"
-            value={monthValue}
-            onChange={(event) => {
-              setMonthValue(event.target.value);
-              updateUrlMonth(event.target.value);
-            }}
-            className="w-full bg-transparent text-sm font-semibold text-on-surface outline-none"
-          />
-        </label>
-      </div>
+        {settlement && !isLoading ? (
+          <>
+            <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-white/5 pt-4 lg:grid-cols-4">
+              <ProfileInfoStat icon={<Wallet size={13} />} label="Do wypłaty">
+                <span className="text-lg text-tertiary-light">{formatSettlementMoney(settlement.totalAmount)}</span>
+              </ProfileInfoStat>
+              <ProfileInfoStat icon={<ReceiptText size={13} />} label="Sesje w rozliczeniu">
+                <span className="text-lg">{formatSettlementNumber(settlement.totalSessions)}</span>
+              </ProfileInfoStat>
+              <ProfileInfoStat icon={<Clock3 size={13} />} label="Godziny rozliczeniowe">
+                <span className="inline-flex items-center gap-1.5 text-lg">
+                  {formatSettlementNumber(settlement.totalHours)} h
+                  <HintIcon label="Godziny rozliczeniowe wynikają z zasad rozliczenia i mogą różnić się od czasu trwania zajęć." />
+                </span>
+              </ProfileInfoStat>
+              <ProfileInfoStat icon={<FileX2 size={13} />} label="Poza umową" muted={!settlement.nonContractedTotalSessions}>
+                <span className="inline-flex items-center gap-1.5 text-lg">
+                  {formatSettlementNumber(settlement.nonContractedTotalSessions)} sesji · {formatSettlementNumber(settlement.nonContractedTotalHours)} h
+                  <HintIcon label="Sesje bez umowy są pokazane osobno i nie są doliczane do kwoty rozliczenia." />
+                </span>
+              </ProfileInfoStat>
+            </div>
 
-      <div className="xl:hidden">
-        <CustomSelect
-          label="Lokalizacja"
-          value={selectedLocationValue}
-          onChange={setSelectedLocationValue}
-          options={[
-            { value: "all", label: "Wszystkie lokalizacje" },
-            ...(trainer?.locationIds ?? []).map((id, index) => ({
-              value: String(id),
-              label: trainer?.locationNames?.[index] || `Lokalizacja ${id}`,
-            })),
-            ...(selectedLocationId != null && !trainer?.locationIds?.includes(selectedLocationId)
-              ? [{ value: String(selectedLocationId), label: `Lokalizacja ${selectedLocationId}` }]
-              : []),
-          ]}
-        />
-      </div>
+            <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-white/5 pt-3">
+              <span className="mr-1 text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">Stawki</span>
+              {visibleRates.length ? (
+                visibleRates.map((rate) => (
+                  <span key={rate.id} className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-low px-2.5 py-1 text-xs">
+                    <span className="text-on-surface-variant">{userTrainingType(rate.sessionType, "Stawka domyślna")}</span>
+                    <span className="font-semibold text-on-surface">
+                      {formatSettlementMoney(rate.rate)}{rate.sessionType === "Group" ? "/zajęcia" : "/h"}
+                    </span>
+                  </span>
+                ))
+              ) : (
+                <span className="text-xs text-on-surface-muted">Nie ustawiono stawek dla tego trenera.</span>
+              )}
+            </div>
+          </>
+        ) : null}
+      </section>
 
       {isLoading ? (
-        <div className="card-shell p-6 text-on-surface-variant">
+        <div role="status" className="card-shell p-4 text-sm text-on-surface-variant">
           Ładowanie rozliczenia...
         </div>
       ) : null}
 
       {settlement && !isLoading ? (
         <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <SummaryCard
-              label="Sesje"
-              value={settlement.totalSessions}
-              icon={<ReceiptText size={20} />}
-            />
-            <SummaryCard
-              label="Roboczogodziny"
-              value={`${settlement.totalHours.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h`}
-              icon={<Clock3 size={20} />}
-            />
-            <SummaryCard
-              label="Do wypłaty"
-              value={formatMoney(settlement.totalAmount)}
-              icon={<Wallet size={20} />}
-              highlight
-            />
-            <SummaryCard
-              label="Status"
-              value={settlement.isPaid ? "Wypłacone" : "Niewypłacone"}
-              icon={<CheckCircle2 size={20} />}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[0.85fr_1.15fr]">
-            <section className="card-shell p-6">
-              <p className="text-section-title">Stawki rozliczenia</p>
-              <p className="mt-2 text-sm text-on-surface-variant">
-                Aktualne stawki trenera.
-              </p>
-
-              <div className="mt-5 flex flex-col gap-3">
-                {(activeRates.length ? activeRates : rates).length > 0 ? (
-                  (activeRates.length ? activeRates : rates).map((rate) => (
-                    <div
-                      key={rate.id}
-                      className="rounded-[var(--radius-lg)] bg-surface-container-low p-4"
-                    >
-                      <p className="text-sm font-semibold text-on-surface">
-                        {userTrainingType(rate.sessionType, "Stawka domyślna")}
-                      </p>
-                      <p className="mt-2 text-2xl font-semibold text-tertiary-light">
-                        {formatMoney(rate.rate)}{rate.sessionType === "Group" ? "/zajęcia" : "/h"}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-5 text-on-surface-variant">
-                    Nie ustawiono stawek dla tego trenera.
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-5 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
-                <p className="text-label text-on-surface-muted">
-                  Status płatności
-                </p>
-                <p className="mt-2 text-sm text-on-surface-variant">
-                  Status wypłaty dotyczy całego miesiąca, we wszystkich lokalizacjach.
-                </p>
-                <span
-                  className={[
-                    "mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold",
-                    settlement.isPaid
-                      ? "bg-tertiary-container text-tertiary-light"
-                      : "bg-warning-container text-warning-light",
-                  ].join(" ")}
-                >
-                  <CheckCircle2 size={14} />
-                  {settlement.isPaid ? "Wypłacone" : "Niewypłacone"}
-                </span>
-
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="mt-4 h-12 w-full justify-center rounded-[var(--radius-lg)]"
-                  icon={<FileDown size={17} />}
-                  onClick={handleGenerateDocument}
-                  disabled={
-                    isGeneratingDocument || isMarkingPaid || isUndoingPaid
-                  }
-                >
-                  {isGeneratingDocument
-                    ? "Generowanie..."
-                    : "Generuj ewidencję godzin"}
-                </Button>
-
-                {settlement.isPaid ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="mt-2 h-12 w-full justify-center rounded-[var(--radius-lg)]"
-                    onClick={handleUndoMarkAsPaid}
-                    disabled={isUndoingPaid || isGeneratingDocument}
-                  >
-                    {isUndoingPaid
-                      ? "Cofanie..."
-                      : "Cofnij oznaczenie jako wypłacone"}
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    className="mt-2 h-12 w-full justify-center rounded-[var(--radius-lg)]"
-                    onClick={handleMarkAsPaid}
-                    disabled={isMarkingPaid || isGeneratingDocument}
-                  >
-                    {isMarkingPaid
-                      ? "Zapisywanie..."
-                      : "Oznacz jako wypłacone"}
-                  </Button>
-                )}
-              </div>
-            </section>
-
-            <section className="card-shell p-6">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-section-title">Lista sesji</p>
-                  <p className="mt-2 text-sm text-on-surface-variant">
-                    Typ sesji, przeliczone godziny i kwota.
-                  </p>
-                </div>
-                <Dumbbell className="text-primary-light" size={22} />
-              </div>
-
-              <div className="mt-5 flex flex-col gap-3">
-                {items.length > 0 ? (
-                  items.map((item) => (
-                    <SettlementItemRow key={item.sessionId} item={item} />
-                  ))
-                ) : (
-                  <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-8 text-center text-on-surface-variant">
-                    Brak sesji w wybranym miesiącu.
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
+          <CollapsibleSection
+            title="Sesje objęte umową"
+            icon={<FileCheck2 size={15} />}
+            meta={`${formatSettlementNumber(settlement.contractedTotalSessions)} · ${formatSettlementMoney(settlement.contractedTotalAmount)}`}
+            defaultOpen
+            flush
+          >
+            <SettlementItems title="Sesje objęte umową" items={items} />
+          </CollapsibleSection>
+          <CollapsibleSection
+            title="Sesje poza umową"
+            icon={<FileX2 size={15} />}
+            meta={formatSettlementNumber(settlement.nonContractedTotalSessions)}
+            defaultOpen={nonContractedItems.length > 0}
+            flush
+          >
+            <SettlementItems title="Sesje poza umową" items={nonContractedItems} muteAmounts />
+          </CollapsibleSection>
         </>
       ) : !isLoading ? (
-        <div className="card-shell p-8 text-center text-on-surface-variant">
+        <div className="card-shell p-6 text-center text-sm text-on-surface-variant">
           Brak danych rozliczenia dla tego miesiąca.
         </div>
       ) : null}
@@ -499,66 +490,13 @@ export default function TrainerSettlementPage() {
   );
 }
 
-function SummaryCard({
-  label,
-  value,
-  icon,
-  highlight,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  highlight?: boolean;
-}) {
+function HintIcon({ label }: { label: string }) {
   return (
-    <div className="card-shell p-5">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-label text-on-surface-variant">{label}</p>
-        <span className="text-primary-light">{icon}</span>
-      </div>
-      <p
-        className={[
-          "mt-5 text-xl font-semibold leading-tight md:text-2xl",
-          highlight ? "text-tertiary-light" : "text-on-surface",
-        ].join(" ")}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function SettlementItemRow({ item }: { item: TrainerSettlementItem }) {
-  return (
-    <div className="grid gap-3 rounded-[var(--radius-lg)] bg-surface-container-low p-4 md:grid-cols-[1fr_0.65fr_0.65fr_0.7fr] md:items-center">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-on-surface">
-          {item.title || formatSessionType(item.sessionType)}
-        </p>
-        <p className="mt-1 text-xs text-on-surface-muted">
-          {formatDateTime(item.startAt)} · {formatSessionType(item.sessionType)}
-        </p>
-      </div>
-      <Metric label="Godziny" value={`${item.hours.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h`} />
-      <Metric
-        label="Stawka"
-        value={`${new Intl.NumberFormat("pl-PL").format(item.rate)} zł/${item.rateType === "PerSession" ? "zajęcia" : "h"}`}
-      />
-      <div>
-        <p className="text-label text-on-surface-muted">Kwota</p>
-        <p className="mt-1 text-base font-semibold text-tertiary-light">
-          {formatMoney(item.amount)}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-label text-on-surface-muted">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-on-surface">{value}</p>
-    </div>
+    <Tooltip label={label} align="end">
+      <span tabIndex={0} className="inline-flex text-on-surface-muted transition hover:text-primary-light focus-visible:text-primary-light focus-visible:outline-none">
+        <Info size={13} aria-hidden="true" />
+        <span className="sr-only">{label}</span>
+      </span>
+    </Tooltip>
   );
 }

@@ -27,24 +27,36 @@ export type TrainerSettlementItem = {
   endAt: string;
   title: string | null;
   sessionType: string | null;
+  locationId: number;
+  locationName: string | null;
+  isCoveredByContract: boolean;
+  contractId: number | null;
+  contractNumber: string | null;
   hours: number;
   rate: number;
-  rateType: "Hourly" | "PerSession";
+  rateType: string | null;
   amount: number;
   participantsCount: number;
 };
 
 export type TrainerMonthlySettlement = {
   trainerId: number;
+  locationId: number | null;
   trainerFullName: string | null;
   year: number;
   month: number;
   totalHours: number;
   totalSessions: number;
   totalAmount: number;
+  contractedTotalHours: number;
+  contractedTotalSessions: number;
+  contractedTotalAmount: number;
+  nonContractedTotalHours: number;
+  nonContractedTotalSessions: number;
   isPaid: boolean;
   paidAt: string | null;
   items: TrainerSettlementItem[] | null;
+  nonContractedItems: TrainerSettlementItem[] | null;
 };
 
 function emptySettlement(
@@ -54,6 +66,7 @@ function emptySettlement(
 ): TrainerMonthlySettlement {
   return {
     trainerId: trainer.id,
+    locationId: null,
     trainerFullName:
       trainer.fullName || `${trainer.firstName} ${trainer.lastName}`,
     year,
@@ -61,9 +74,15 @@ function emptySettlement(
     totalHours: 0,
     totalSessions: 0,
     totalAmount: 0,
+    contractedTotalHours: 0,
+    contractedTotalSessions: 0,
+    contractedTotalAmount: 0,
+    nonContractedTotalHours: 0,
+    nonContractedTotalSessions: 0,
     isPaid: false,
     paidAt: null,
     items: [],
+    nonContractedItems: [],
   };
 }
 

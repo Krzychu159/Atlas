@@ -14,14 +14,15 @@ import {
   Phone,
   ReceiptText,
   Sparkles,
+  UserRound,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { Tooltip } from "@/app/components/ui/tooltip";
 import {
   ProfileChip,
-  ProfileIconAction,
-  ProfileIconActions,
   ProfileInfoStat,
   ProfileMetaItem,
+  ProfileTabs,
   profilePrimaryActionClassName,
   profileSecondaryActionClassName,
 } from "@/app/components/ui/profile-hero";
@@ -60,12 +61,16 @@ export default function TrainerProfileHeader({
   onEdit,
   onContracts,
   ratesAvailable = true,
+  activeTab = "profile",
+  actions,
 }: {
   trainer: Trainer;
   rates: TrainerRate[];
-  onEdit: () => void;
-  onContracts: () => void;
+  onEdit?: () => void;
+  onContracts?: () => void;
   ratesAvailable?: boolean;
+  activeTab?: "profile" | "settlements";
+  actions?: ReactNode;
 }) {
   const { selectedLocationId } = useOwnerLocationFilter();
   const fullName =
@@ -124,24 +129,27 @@ export default function TrainerProfileHeader({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <Link href={settlementsHref} className={profilePrimaryActionClassName}>
-            <ReceiptText size={15} />
-            Rozliczenia
-          </Link>
-          <button
-            type="button"
-            onClick={onEdit}
-            disabled={!ratesAvailable}
-            className={profileSecondaryActionClassName}
-          >
-            <Pencil size={14} className="text-primary-light" />
-            Edytuj
-          </button>
-          <ProfileIconActions>
-            <ProfileIconAction label="Umowa" onClick={onContracts} align="end">
-              <FileSignature size={15} />
-            </ProfileIconAction>
-          </ProfileIconActions>
+          {actions ?? (
+            <>
+              {onEdit ? (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  disabled={!ratesAvailable}
+                  className={profilePrimaryActionClassName}
+                >
+                  <Pencil size={14} />
+                  Edytuj
+                </button>
+              ) : null}
+              {onContracts ? (
+                <button type="button" onClick={onContracts} className={profileSecondaryActionClassName}>
+                  <FileSignature size={14} className="text-primary-light" />
+                  Umowa
+                </button>
+              ) : null}
+            </>
+          )}
         </div>
       </div>
 
@@ -174,6 +182,14 @@ export default function TrainerProfileHeader({
           </ProfileInfoStat>
         </div>
       </div>
+
+      <ProfileTabs
+        label="Sekcje trenera"
+        tabs={[
+          { href: `/owner/trainers/${trainer.id}`, label: "Profil", icon: <UserRound size={14} />, active: activeTab === "profile" },
+          { href: settlementsHref, label: "Rozliczenia", icon: <ReceiptText size={14} />, active: activeTab === "settlements" },
+        ]}
+      />
     </section>
   );
 }

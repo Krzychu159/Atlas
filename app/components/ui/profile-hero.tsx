@@ -107,3 +107,33 @@ export function ProfileIconAction({
     </Tooltip>
   );
 }
+
+export type ProfileTab = {
+  href: string;
+  label: string;
+  icon: ReactNode;
+  active: boolean;
+};
+
+export function ProfileTabs({ label, tabs }: { label: string; tabs: ProfileTab[] }) {
+  return (
+    <nav aria-label={label} className="mt-4 flex gap-1 border-t border-white/5 pt-3">
+      {tabs.map((tab) => (
+        <Link
+          key={tab.href}
+          href={tab.href}
+          aria-current={tab.active ? "page" : undefined}
+          className={[
+            `inline-flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-3 text-sm font-semibold transition ${focusRing}`,
+            tab.active
+              ? "bg-primary/15 text-primary-light"
+              : "text-on-surface-muted hover:bg-surface-container-low hover:text-on-surface",
+          ].join(" ")}
+        >
+          {tab.icon}
+          {tab.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}

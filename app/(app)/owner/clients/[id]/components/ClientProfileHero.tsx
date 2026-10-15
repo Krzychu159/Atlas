@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 import {
   ArrowLeft,
   Archive,
@@ -30,6 +29,7 @@ import {
   ProfileIconActions,
   ProfileInfoStat as InfoStat,
   ProfileMetaItem as MetaItem,
+  ProfileTabs,
   profilePrimaryActionClassName,
   profileSecondaryActionClassName,
 } from "@/app/components/ui/profile-hero";
@@ -298,34 +298,15 @@ export default function ClientProfileHero({
       </div>
 
       {showTabs ? (
-        <nav aria-label="Sekcje klienta" className="mt-4 flex gap-1 border-t border-white/5 pt-3">
-          <TabLink href={profileHref} active={activeTab === "profile"} icon={<UserRound size={14} />}>
-            Profil
-          </TabLink>
-          <TabLink href={resolvedPaymentsHref} active={activeTab === "payments"} icon={<ReceiptText size={14} />}>
-            Płatności
-          </TabLink>
-        </nav>
+        <ProfileTabs
+          label="Sekcje klienta"
+          tabs={[
+            { href: profileHref, label: "Profil", icon: <UserRound size={14} />, active: activeTab === "profile" },
+            { href: resolvedPaymentsHref, label: "Płatności", icon: <ReceiptText size={14} />, active: activeTab === "payments" },
+          ]}
+        />
       ) : null}
     </section>
-  );
-}
-
-function TabLink({ href, active, icon, children }: { href: string; active: boolean; icon: ReactNode; children: ReactNode }) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "page" : undefined}
-      className={[
-        "inline-flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_35%,transparent)]",
-        active
-          ? "bg-primary/15 text-primary-light"
-          : "text-on-surface-muted hover:bg-surface-container-low hover:text-on-surface",
-      ].join(" ")}
-    >
-      {icon}
-      {children}
-    </Link>
   );
 }
 
