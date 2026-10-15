@@ -291,7 +291,7 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-label text-primary-light">Finanse firmy</p>
-          <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight md:text-[2.75rem]">
+          <h1 className="mt-2 font-display text-[1.75rem] font-semibold leading-[0.95] tracking-tight md:text-[2.75rem]">
             Ewidencja wydatków
           </h1>
           <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">

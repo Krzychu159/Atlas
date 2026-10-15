@@ -445,7 +445,7 @@ function LocationMultiSelect({
         type="button"
         onClick={() => setIsOpen((current) => !current)}
         className={[
-          "mt-2 flex h-12 w-full items-center gap-3 rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest px-3 text-left transition",
+          "mt-1.5 flex h-11 w-full items-center gap-3 md:h-10 rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest px-3 text-left transition",
           "hover:border-white/10 hover:bg-surface-container-low focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_24%,transparent)]",
           isOpen ? "border-primary-light/40 bg-surface-container-low" : "",
         ].join(" ")}

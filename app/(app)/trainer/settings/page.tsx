@@ -7,7 +7,7 @@ export default function TrainerSettingsPage() {
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 pb-10">
       <section>
         <p className="text-label text-primary-light">Ustawienia</p>
-        <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
+        <h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
           Profil trenera
         </h1>
         <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">

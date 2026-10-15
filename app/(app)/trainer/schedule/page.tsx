@@ -257,7 +257,7 @@ export default function TrainerSchedulePage() {
     <>
       <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div><p className="text-label text-primary-light">Plan</p><h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-tight tracking-tight">Moje zajęcia</h1><p className="mt-3 text-sm leading-6 text-on-surface-variant">Własne treningi i zajęcia grupowe. Wybierz zajęcia, aby zobaczyć uczestników i szczegóły.</p></div>
+          <div><p className="text-label text-primary-light">Plan</p><h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-tight tracking-tight">Moje zajęcia</h1><p className="mt-3 text-sm leading-6 text-on-surface-variant">Własne treningi i zajęcia grupowe. Wybierz zajęcia, aby zobaczyć uczestników i szczegóły.</p></div>
           <div className="flex flex-wrap items-center gap-3"><ViewSwitch value={view} onChange={setView} /><DateNavigator view={view} anchorDate={anchorDate} periodLabel={period.label} onDateChange={setAnchorDate} onMove={direction => setAnchorDate(date => addDays(date, (view === "week" ? 7 : 1) * direction))} />
             <Button variant="secondary" icon={<RefreshCw size={16} />} disabled={isLoading || isSaving} onClick={() => void reloadSessions()}>Odśwież</Button><Button icon={<Plus size={16} />} disabled={!canCreate || isSaving} onClick={() => openCreate()}>Dodaj sesję</Button></div>
         </div>

@@ -54,6 +54,13 @@ export default function PackageListFilters({ value, onChange }: PackageListFilte
 
   return (
     <FilterToolbar
+      search={
+        <FilterSearchField
+          value={value.search}
+          onChange={(nextValue) => update("search", nextValue)}
+          placeholder="Nazwa, opis lub lokalizacja"
+        />
+      }
       gridClassName="md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_240px_200px_auto_auto]"
       advancedId="package-advanced-filters"
       advancedOpen={advancedOpen}
@@ -93,11 +100,6 @@ export default function PackageListFilters({ value, onChange }: PackageListFilte
         </>
       }
     >
-      <FilterSearchField
-        value={value.search}
-        onChange={(nextValue) => update("search", nextValue)}
-        placeholder="Nazwa, opis lub lokalizacja"
-      />
       <CustomSelect
         label="Rodzaj oferty"
         value={value.billingModeFilter}

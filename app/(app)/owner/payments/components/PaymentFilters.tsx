@@ -1,9 +1,8 @@
 "use client";
 
-import { Search } from "lucide-react";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { DateRangeFilter } from "@/app/components/ui/date-range-filter";
-import { FilterToolbar } from "@/app/components/ui/list/FilterToolbar";
+import { FilterSearchField, FilterToolbar } from "@/app/components/ui/list/FilterToolbar";
 
 export type PaymentFiltersValue = {
   client: string;
@@ -29,6 +28,8 @@ export const defaultPaymentFilters: PaymentFiltersValue = {
   sortBy: "newest",
 };
 
+const advancedKeys: (keyof PaymentFiltersValue)[] = ["status", "source", "overpayment", "amountMin", "amountMax"];
+
 type PaymentFiltersProps = {
   value: PaymentFiltersValue;
   advancedOpen: boolean;
@@ -51,11 +52,20 @@ export function PaymentFilters({
 
   return (
     <FilterToolbar
-      gridClassName="xl:grid-cols-[minmax(280px,1fr)_260px_220px_auto_auto]"
+      search={
+        <FilterSearchField
+          value={value.client}
+          onChange={(nextValue) => update("client", nextValue)}
+          placeholder="Imię, nazwisko lub ID klienta"
+        />
+      }
+      gridClassName="md:grid-cols-2 xl:grid-cols-[minmax(280px,1fr)_260px_220px_auto_auto]"
       advancedId="payment-advanced-filters"
       advancedGridClassName="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_minmax(180px,1fr)_minmax(150px,0.75fr)_minmax(150px,0.75fr)]"
       advancedOpen={advancedOpen}
       onAdvancedOpenChange={onAdvancedOpenChange}
+      advancedActiveCount={advancedKeys.filter((key) => value[key] !== defaultPaymentFilters[key]).length}
+      canClear={(Object.keys(defaultPaymentFilters) as (keyof PaymentFiltersValue)[]).some((key) => value[key] !== defaultPaymentFilters[key])}
       onClear={onClear}
       advanced={
         <>
@@ -90,10 +100,6 @@ export function PaymentFilters({
         </>
       }
     >
-      <PaymentSearchField
-        value={value.client}
-        onChange={(nextValue) => update("client", nextValue)}
-      />
       <DateRangeFilter
         value={{ from: value.dateFrom, to: value.dateTo }}
         onChange={(range) =>
@@ -107,29 +113,6 @@ export function PaymentFilters({
         options={paymentSortOptions}
       />
     </FilterToolbar>
-  );
-}
-
-function PaymentSearchField({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label>
-      <span className="text-label text-on-surface-muted">Szukaj</span>
-      <div className="mt-2 flex h-12 items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 transition focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-primary)_30%,transparent)]">
-        <Search size={17} className="shrink-0 text-on-surface-muted" />
-        <input
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="Imię, nazwisko lub ID klienta"
-          className="h-full min-w-0 flex-1 bg-transparent text-sm font-semibold text-on-surface outline-none placeholder:font-normal placeholder:text-on-surface-muted"
-        />
-      </div>
-    </label>
   );
 }
 

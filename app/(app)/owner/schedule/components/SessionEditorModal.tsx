@@ -1,5 +1,6 @@
 "use client";
 
+import { FieldDensityProvider, compactFieldLabelClassName } from "@/app/components/ui/field-density";
 import SessionToggle from "@/app/components/schedule/SessionToggle";
 import SessionAccordion from "@/app/components/schedule/SessionAccordion";
 import { groupSeatsLabel, isGroupTraining } from "@/app/lib/group-sessions";
@@ -223,7 +224,8 @@ export default function SessionEditorModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6">
+    <FieldDensityProvider value="compact">
+    <div data-atlas-modal="" className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6">
       <button
         type="button"
         aria-label="Zamknij"
@@ -252,7 +254,7 @@ export default function SessionEditorModal({
               <p className="text-label text-primary-light">
                 {session ? "Szczegóły sesji" : "Nowa sesja"}
               </p>
-              <h2 className="mt-2 font-display text-2xl font-semibold">
+              <h2 className="mt-1 font-display text-xl font-semibold">
                 {session ? getSessionTitle(session) : "Dodaj sesję do grafiku"}
               </h2>
               {session ? (
@@ -292,7 +294,7 @@ export default function SessionEditorModal({
                       ? getSuggestedSessionTitle(values.participantIds, clients)
                       : "Np. Anna N + Dominik S"
                 }
-                className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
+                className="h-11 w-full rounded-[var(--radius-lg)] md:h-10 bg-surface-container-low px-4 text-sm outline-none"
               />
             </Field>
 
@@ -302,7 +304,7 @@ export default function SessionEditorModal({
                 required
                 value={values.startAt}
                 onChange={(event) => updateStartAt(event.target.value)}
-                className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
+                className="h-11 w-full rounded-[var(--radius-lg)] md:h-10 bg-surface-container-low px-4 text-sm outline-none"
               />
             </Field>
 
@@ -311,7 +313,7 @@ export default function SessionEditorModal({
                 type="datetime-local"
                 value={values.endAt}
                 onChange={(event) => updateValue("endAt", event.target.value)}
-                className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
+                className="h-11 w-full rounded-[var(--radius-lg)] md:h-10 bg-surface-container-low px-4 text-sm outline-none"
               />
             </Field>
 
@@ -453,7 +455,7 @@ export default function SessionEditorModal({
           {(!session || values.participantIds.some(id => !session.participants?.some(participant => participant.clientId === Number(id)))) && values.participantIds.length > 0 ? <fieldset className="min-w-0 md:col-span-2"><legend className="mb-2 text-label text-on-surface-muted">Rozliczenie wybranych uczestników</legend>
             <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">
               <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={countsAgainstPackage} onChange={event => setCountsAgainstPackage(event.target.checked)} className="h-5 w-5 accent-primary" />Wejścia z pakietu</label>
-              <label className="mt-3 block text-sm text-on-surface-variant">Liczba wejść na uczestnika<input type="number" min="0" step="1" required value={sessionsCharged} onChange={event => setSessionsCharged(event.target.value)} className="mt-2 h-12 w-full rounded-[var(--radius-lg)] bg-surface-container px-4 text-on-surface" /></label>
+              <label className="mt-3 block text-sm text-on-surface-variant">Liczba wejść na uczestnika<input type="number" min="0" step="1" required value={sessionsCharged} onChange={event => setSessionsCharged(event.target.value)} className="mt-2 h-11 w-full rounded-[var(--radius-lg)] md:h-10 bg-surface-container px-4 text-on-surface" /></label>
             </div>
           </fieldset> : null}
           </> : null}
@@ -504,7 +506,7 @@ export default function SessionEditorModal({
               <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly} className="grid min-w-0 gap-4 md:grid-cols-2">
             {isGroupForm ? <>
               {!readOnly || values.publicCapacity ? <Field label={values.isPubliclyBookable ? "Limit uczestników" : "Limit uczestników (bez limitu: pozostaw puste)"}>
-                <input type="number" min="1" step="1" required={values.isPubliclyBookable} value={values.publicCapacity} onChange={event => updateValue("publicCapacity", event.target.value)} className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+                <input type="number" min="1" step="1" required={values.isPubliclyBookable} value={values.publicCapacity} onChange={event => updateValue("publicCapacity", event.target.value)} className="h-11 w-full rounded-[var(--radius-lg)] md:h-10 bg-surface-container-lowest px-4 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
               </Field> : null}
               {!readOnly || values.eventRules.trim() ? <Field label="Zasady uczestnictwa" className="md:col-span-2">
                 <textarea rows={4} value={values.eventRules} onChange={event => updateValue("eventRules", event.target.value)} className="w-full rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
@@ -541,7 +543,7 @@ export default function SessionEditorModal({
                   updateValue("outlookCategories", event.target.value)
                 }
                 placeholder={outlookCategoryPlaceholder}
-                className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
+                className="h-11 w-full rounded-[var(--radius-lg)] md:h-10 bg-surface-container-low px-4 text-sm outline-none"
               />
             </Field> : null}
 
@@ -574,7 +576,7 @@ export default function SessionEditorModal({
                       updateValue("publicSlug", event.target.value);
                     }}
                     placeholder="full-body-2026-09-10-18-00"
-                    className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container-low px-4 text-sm outline-none"
+                    className="h-11 w-full rounded-[var(--radius-lg)] md:h-10 bg-surface-container-low px-4 text-sm outline-none"
                   />
                 </Field>
               </>
@@ -596,7 +598,7 @@ export default function SessionEditorModal({
                   <Field label={frequency === "Weekly" ? "Co ile tygodni" : "Co ile dni"}>
                     <input type="number" min="1" max="12" step="1" required value={interval}
                       onChange={(event) => setInterval(event.target.value)}
-                      className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container px-4 text-sm outline-none" />
+                      className="h-11 w-full rounded-[var(--radius-lg)] md:h-10 bg-surface-container px-4 text-sm outline-none" />
                   </Field>
                   {frequency === "Weekly" && (
                     <fieldset className="min-w-0 md:col-span-2">
@@ -622,13 +624,13 @@ export default function SessionEditorModal({
                     <Field label="Liczba wystąpień">
                       <input type="number" min="2" max="104" step="1" required value={occurrencesCount}
                         onChange={(event) => setOccurrencesCount(event.target.value)}
-                        className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container px-4 text-sm outline-none" />
+                        className="h-11 w-full rounded-[var(--radius-lg)] md:h-10 bg-surface-container px-4 text-sm outline-none" />
                     </Field>
                   ) : (
                     <Field label="Data końcowa (włącznie)">
                       <NativeDateInput type="date" required min={values.startAt.slice(0, 10)} value={endDate}
                         onChange={(event) => setEndDate(event.target.value)}
-                        className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container px-4 text-sm outline-none" />
+                        className="h-11 w-full rounded-[var(--radius-lg)] md:h-10 bg-surface-container px-4 text-sm outline-none" />
                     </Field>
                   )}
                 </div>
@@ -662,6 +664,7 @@ export default function SessionEditorModal({
         </div>
       </form>
     </div>
+    </FieldDensityProvider>
   );
 }
 
@@ -676,7 +679,7 @@ function Field({
 }) {
   return (
     <label className={className}>
-      <span className="mb-2 block text-label text-on-surface-muted">
+      <span className={`mb-1.5 block ${compactFieldLabelClassName}`}>
         {label}
       </span>
       {children}

@@ -199,7 +199,7 @@ export default function PackagesPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="max-w-[560px]">
             <p className="text-label text-primary-light">Zarządzanie pakietami</p>
-            <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
+            <h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
               Pakiety <span className="text-primary-light">i usługi</span>
             </h1>
             <p className="mt-3 text-sm leading-6 text-on-surface-variant">

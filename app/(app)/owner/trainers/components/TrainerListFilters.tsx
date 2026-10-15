@@ -22,6 +22,13 @@ export default function TrainerListFilters({ value, onChange }: TrainerListFilte
 
   return (
     <FilterToolbar
+      search={
+        <FilterSearchField
+          value={value.search}
+          onChange={(nextValue) => update("search", nextValue)}
+          placeholder="Imię, nazwisko, e-mail lub specjalizacja"
+        />
+      }
       gridClassName="md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_220px_220px_auto]"
       canClear={
         value.search !== defaultTrainerListFilters.search ||
@@ -30,11 +37,6 @@ export default function TrainerListFilters({ value, onChange }: TrainerListFilte
       }
       onClear={() => onChange(defaultTrainerListFilters)}
     >
-      <FilterSearchField
-        value={value.search}
-        onChange={(nextValue) => update("search", nextValue)}
-        placeholder="Imię, nazwisko, e-mail lub specjalizacja"
-      />
       <CustomSelect
         label="Status"
         value={value.status}

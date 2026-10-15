@@ -12,7 +12,7 @@ import { formatMoney } from "@/app/lib/formatters/money";
 import { importClientPackage, type ImportClientPackagePayload } from "@/app/lib/owner/billing";
 import { getPackages, type Package } from "@/app/lib/owner/packages";
 
-const inputClass = "mt-1 w-full min-w-0 rounded-lg bg-surface-container-lowest p-3";
+const inputClass = "mt-1.5 w-full min-w-0 rounded-[var(--radius-lg)] bg-surface-container-lowest px-3 py-2.5 text-sm";
 
 // Keep this component mounted when closed: an uncertain result must retain its requestId.
 export default function ImportClientPackageModal({ open, clientId, onClose, onSaved }: {

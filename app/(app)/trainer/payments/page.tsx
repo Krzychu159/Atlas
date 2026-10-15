@@ -105,7 +105,7 @@ export default function TrainerPaymentsPage() {
       <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-label text-primary-light">Płatności</p>
-          <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-tight tracking-tight">Wpłaty oczekujące</h1>
+          <h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-tight tracking-tight">Wpłaty oczekujące</h1>
           <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">Wpłaty wymagające ręcznego potwierdzenia. Historię wpłat i rozliczenia znajdziesz w profilu klienta.</p>
         </div>
         <Button variant="secondary" icon={<RefreshCw size={16} />} disabled={isLoading || processingId !== null} onClick={() => void reloadPayments()}>Odśwież</Button>

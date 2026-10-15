@@ -307,7 +307,7 @@ export default function InviteUserModal({
               !form.locationId
             }
             icon={<ArrowRight size={18} />}
-            className="h-14 w-full uppercase tracking-[0.08em]"
+            className="h-11 w-full"
           >
             {isSubmitting ? "Wysyłanie..." : submitLabel}
           </Button>

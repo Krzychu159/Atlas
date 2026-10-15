@@ -33,7 +33,7 @@ import {
 // import ClientMetricCards from "./components/ClientMetricCards";
 import { Banknote, CalendarRange, Dumbbell, FileCheck2, History, NotebookPen, Package } from "lucide-react";
 import type { ClientPackageBilling } from "@/app/lib/owner/billing";
-import ClientProfileCollapsible from "./components/ClientProfileCollapsible";
+import CollapsibleSection from "@/app/components/ui/collapsible-section";
 import ClientNotesPanel from "./components/ClientNotesPanel";
 import ClientProfileHero from "./components/ClientProfileHero";
 import ClientSessionHistory from "./components/ClientSessionHistory";
@@ -403,24 +403,24 @@ function ClientDetails({ clientId }: { clientId: number }) {
           */}
           <div className="flex flex-col gap-2">
             {account.data !== undefined ? (
-              <ClientProfileCollapsible title="Pakiety" icon={<Package size={15} />} meta={getActivePackagesMeta(billing?.packages)}>
+              <CollapsibleSection title="Pakiety" icon={<Package size={15} />} meta={getActivePackagesMeta(billing?.packages)}>
                 <ClientPackagesSection key={client.id} embedded packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} clientId={!client.isArchived ? client.id : undefined} onSaved={() => refreshCooperationData(client.id, true)} />
-              </ClientProfileCollapsible>
+              </CollapsibleSection>
             ) : null}
-            <ClientProfileCollapsible title="Usługi okresowe" icon={<CalendarRange size={15} />}>
+            <CollapsibleSection title="Usługi okresowe" icon={<CalendarRange size={15} />}>
               <ClientPeriodPackagesSection key={`period:${client.id}`} embedded clientId={client.id} canManage={!client.isArchived} onSaved={() => refreshCooperationData(client.id, true)} />
-            </ClientProfileCollapsible>
+            </CollapsibleSection>
 
             <OwnerReadState loading={history.loading} error={history.error} retry={history.retry} label="Ładowanie historii treningów...">
               {history.data !== undefined ? (
-                <ClientProfileCollapsible title="Historia treningów" icon={<Dumbbell size={15} />} meta={sessions.length}>
+                <CollapsibleSection title="Historia treningów" icon={<Dumbbell size={15} />} meta={sessions.length}>
                   <ClientSessionHistory embedded clientId={client.id} sessions={sessions} />
-                </ClientProfileCollapsible>
+                </CollapsibleSection>
               ) : null}
             </OwnerReadState>
 
             <OwnerReadState loading={paymentList.loading && paymentList.data === undefined} error={paymentList.error} retry={paymentList.retry} label="Ładowanie wpłat klienta..." />
-            <ClientProfileCollapsible title="Notatki i ostatnie wpłaty" icon={<NotebookPen size={15} />}>
+            <CollapsibleSection title="Notatki i ostatnie wpłaty" icon={<NotebookPen size={15} />}>
               <ClientNotesPanel
                 embedded
                 client={client}
@@ -429,29 +429,29 @@ function ClientDetails({ clientId }: { clientId: number }) {
                 readOnly={client.isArchived}
                 showPayments={paymentList.data !== undefined}
               />
-            </ClientProfileCollapsible>
+            </CollapsibleSection>
 
             {!client.isArchived ? (
               <OwnerReadState loading={refundList.loading} error={refundList.error} retry={refundList.retry} label="Ładowanie zwrotów klienta...">
                 {refundList.data !== undefined ? (
-                  <ClientProfileCollapsible title="Zwroty" icon={<Banknote size={15} />} meta={refunds.length}>
+                  <CollapsibleSection title="Zwroty" icon={<Banknote size={15} />} meta={refunds.length}>
                     <ClientRefundsSection embedded refunds={refunds} loading={refundList.loading} onConfirm={setRefundToConfirm} />
-                  </ClientProfileCollapsible>
+                  </CollapsibleSection>
                 ) : null}
               </OwnerReadState>
             ) : null}
 
             <OwnerReadState loading={consents.loading} error={consents.error} retry={consents.retry} label="Ładowanie zgód klienta...">
               {consents.data !== undefined ? (
-                <ClientProfileCollapsible title="Historia zgód" icon={<FileCheck2 size={15} />} meta={legalConsents.length}>
+                <CollapsibleSection title="Historia zgód" icon={<FileCheck2 size={15} />} meta={legalConsents.length}>
                   <ClientLegalConsentsPanel embedded consents={legalConsents} />
-                </ClientProfileCollapsible>
+                </CollapsibleSection>
               ) : null}
             </OwnerReadState>
 
-            <ClientProfileCollapsible title="Historia zmian" icon={<History size={15} />}>
+            <CollapsibleSection title="Historia zmian" icon={<History size={15} />}>
               <ClientAuditSection key={client.id} embedded clientId={client.id} revision={auditRevision} />
-            </ClientProfileCollapsible>
+            </CollapsibleSection>
           </div>
 
           {!client.isArchived ? (

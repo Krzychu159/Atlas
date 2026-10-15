@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { X } from "lucide-react";
+import { FieldDensityProvider } from "./field-density";
 
 type ModalOverlayProps = {
   children: React.ReactNode;
@@ -24,8 +25,9 @@ export function ModalOverlay({
 
   return (
     <div
+      data-atlas-modal=""
       className={[
-        "fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 md:p-4",
+        "fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overflow-x-hidden overscroll-contain bg-black/70 p-3 md:p-4 [&>*]:my-auto",
         className,
       ]
         .filter(Boolean)
@@ -39,7 +41,7 @@ export function ModalOverlay({
           className="absolute inset-0 cursor-default"
         />
       ) : null}
-      {children}
+      <FieldDensityProvider value="compact">{children}</FieldDensityProvider>
     </div>
   );
 }
@@ -73,7 +75,7 @@ export function ModalHeader({
         {icon ? (
           <div
             className={[
-              "mb-4 flex h-11 w-11 items-center justify-center rounded-[var(--radius-lg)]",
+              "mb-3 flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] md:mb-4 md:h-11 md:w-11",
               iconTone === "danger"
                 ? "bg-error-container text-on-error-container"
                 : "bg-primary/15 text-primary-light",
@@ -85,9 +87,9 @@ export function ModalHeader({
         {eyebrow ? (
           <p className="text-label text-primary-light">{eyebrow}</p>
         ) : null}
-        <h2 className="mt-2 text-2xl font-semibold text-on-surface">{title}</h2>
+        <h2 className="mt-1 break-words text-lg font-semibold text-on-surface md:text-xl">{title}</h2>
         {description ? (
-          <p className="mt-2 max-w-[560px] text-sm leading-6 text-on-surface-variant">
+          <p className="mt-1 max-w-[560px] text-sm leading-5 text-on-surface-variant">
             {description}
           </p>
         ) : null}
@@ -102,7 +104,7 @@ export function ModalCloseButton({ onClose }: { onClose: () => void }) {
     <button
       type="button"
       onClick={onClose}
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container-low text-on-surface-muted transition hover:text-on-surface"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-container-low text-on-surface-muted transition hover:text-on-surface"
       aria-label="Zamknij"
     >
       <X size={18} />
@@ -120,7 +122,7 @@ export function ModalFooter({
   return (
     <div
       className={[
-        "sticky bottom-0 flex flex-col-reverse gap-2 border-t border-white/5 bg-surface-container px-5 py-4 sm:flex-row sm:justify-end md:px-6",
+        "sticky bottom-0 flex flex-col-reverse gap-2 border-t border-white/5 bg-surface-container px-4 py-3 sm:flex-row sm:justify-end md:px-6 md:py-4",
         className,
       ]
         .filter(Boolean)

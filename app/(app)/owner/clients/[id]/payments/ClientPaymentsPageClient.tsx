@@ -87,7 +87,7 @@ import { isSessionPackage } from "@/app/lib/period-packages";
 import ClientAuditSection from "../components/ClientAuditSection";
 import ClientRefundsSection from "../components/ClientRefundsSection";
 import RefundConfirmationModal from "../components/RefundConfirmationModal";
-import ClientProfileCollapsible from "../components/ClientProfileCollapsible";
+import CollapsibleSection from "@/app/components/ui/collapsible-section";
 import ClientProfileHero from "../components/ClientProfileHero";
 
 type ClientPaymentsPageClientProps = {
@@ -826,7 +826,7 @@ export default function ClientPaymentsPageClient({
             onResumeAutoRenew={handleResumeAutoRenew}
           />}
 
-          <ClientProfileCollapsible title="Historia wpłat" icon={<ReceiptText size={15} />} meta={payments.length} defaultOpen flush>
+          <CollapsibleSection title="Historia wpłat" icon={<ReceiptText size={15} />} meta={payments.length} defaultOpen flush>
             {pendingPaymentsError ? <p role="alert" className="px-4 pt-3 text-sm text-on-surface-variant">{pendingPaymentsError}</p> : null}
             <PaymentsList
               dateCorrectionPortal={basePath === "/trainer" ? "trainer" : "owner"}
@@ -859,40 +859,40 @@ export default function ClientPaymentsPageClient({
                 onPageChange={setPaymentPage}
               />
             ) : null}
-          </ClientProfileCollapsible>
+          </CollapsibleSection>
 
           {usageError ? <div role="alert" className="card-shell p-4 text-sm text-on-surface-variant">{usageError}</div> : null}
           {mainUsage ? (
-            <ClientProfileCollapsible
+            <CollapsibleSection
               title="Wykorzystanie pakietu"
               icon={<Dumbbell size={15} />}
               meta={typeof mainUsage.usedSessions === "number" && typeof mainUsage.totalSessions === "number" ? `${mainUsage.usedSessions}/${mainUsage.totalSessions}` : undefined}
             >
               <UsageCard usage={mainUsage} />
-            </ClientProfileCollapsible>
+            </CollapsibleSection>
           ) : null}
 
-          <ClientProfileCollapsible title="Pakiety" icon={<PackageIcon size={15} />}>
+          <CollapsibleSection title="Pakiety" icon={<PackageIcon size={15} />}>
             <ClientPackagesSection key={`${basePath}:${clientId}`} embedded packages={billing.packages} activeClientPackageId={billing.activeClientPackageId} clientId={basePath === "/owner" ? clientId || undefined : undefined} onSaved={() => loadClientPayments(clientId, true)} />
-          </ClientProfileCollapsible>
+          </CollapsibleSection>
 
           {clientId ? (
-            <ClientProfileCollapsible title="Usługi okresowe" icon={<CalendarRange size={15} />}>
+            <CollapsibleSection title="Usługi okresowe" icon={<CalendarRange size={15} />}>
               <ClientPeriodPackagesSection key={`period:${basePath}:${clientId}`} embedded clientId={clientId} portal={basePath === "/trainer" ? "trainer" : "owner"} packages={billing.packages} canManage={basePath === "/owner" && !client?.isArchived} onSaved={() => loadClientPayments(clientId, true)} onPayment={item => {
                 if (mutationLock.current || isSaving || processingPaymentId !== null) return;
                 setPaymentPackageId(String(item.clientPackageId)); setPaymentAmount(String(Math.max(item.amountDue, 0))); setPaymentDate(localToday()); setPaymentNote(""); setIsPaymentModalOpen(true);
               }} />
-            </ClientProfileCollapsible>
+            </CollapsibleSection>
           ) : null}
 
           {basePath === "/owner" && clientId ? (
             <>
-              <ClientProfileCollapsible title="Zwroty" icon={<Banknote size={15} />} meta={refunds.length}>
+              <CollapsibleSection title="Zwroty" icon={<Banknote size={15} />} meta={refunds.length}>
                 <ClientRefundsSection embedded refunds={refunds} loading={isLoading} onConfirm={setRefundToConfirm} />
-              </ClientProfileCollapsible>
-              <ClientProfileCollapsible title="Historia zmian" icon={<History size={15} />}>
+              </CollapsibleSection>
+              <CollapsibleSection title="Historia zmian" icon={<History size={15} />}>
                 <ClientAuditSection key={clientId} embedded clientId={clientId} revision={auditRevision} />
-              </ClientProfileCollapsible>
+              </CollapsibleSection>
             </>
           ) : null}
         </>

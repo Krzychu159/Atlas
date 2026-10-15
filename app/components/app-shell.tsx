@@ -233,7 +233,7 @@ export function AppShell({ children, role, theme = "atlas" }: AppShellProps) {
             <Header role={role} unreadNotificationCount={unreadCount} onUnreadCountChange={setUnreadCount} />
           </div>
 
-          <main className="min-w-0 bg-surface px-4 pb-6 pt-4 md:px-8 md:pb-8 md:pt-0">
+          <main className="min-w-0 bg-surface px-3 pb-6 pt-3 md:px-8 md:pb-8 md:pt-0">
             {children}
           </main>
         </div>

@@ -3,7 +3,7 @@
 import { useId, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
-export default function ClientProfileCollapsible({
+export default function CollapsibleSection({
   title,
   icon,
   meta,

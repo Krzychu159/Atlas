@@ -261,7 +261,7 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-label text-primary-light">Raport danych</p>
-          <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight md:text-[2.75rem]">
+          <h1 className="mt-2 font-display text-[1.75rem] font-semibold leading-[0.95] tracking-tight md:text-[2.75rem]">
             Przegląd wyników
           </h1>
         </div>

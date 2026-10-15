@@ -266,7 +266,7 @@ export default function SchedulePage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-label text-primary-light">Grafik</p>
-            <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
+            <h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
               Sesje treningowe
             </h1>
             <p className="mt-3 max-w-[680px] text-sm leading-6 text-on-surface-variant">

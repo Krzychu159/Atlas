@@ -1,4 +1,7 @@
+"use client";
+
 import * as React from "react";
+import { compactControlHeightClassName, compactFieldLabelClassName, useFieldDensity } from "./field-density";
 import { NativeDateInput } from "./native-date-input";
 
 type FormFieldProps = {
@@ -10,7 +13,7 @@ type FormFieldProps = {
 export function FormField({ label, children, className }: FormFieldProps) {
   return (
     <label className={className}>
-      <span className="text-label text-on-surface-muted">{label}</span>
+      <span className={useFieldDensity() === "compact" ? `block ${compactFieldLabelClassName}` : "text-label text-on-surface-muted"}>{label}</span>
       {children}
     </label>
   );
@@ -71,6 +74,7 @@ export function TextField({
   type = "text",
   ...props
 }: TextFieldProps) {
+  const compact = useFieldDensity() === "compact";
   return (
     <FormField label={label} className={className}>
       <Input
@@ -79,8 +83,8 @@ export function TextField({
         value={value}
         icon={icon}
         onChange={(event) => onChange(event.target.value)}
-        wrapperClassName="mt-2"
-        className="h-12"
+        wrapperClassName={compact ? "mt-1.5" : "mt-2"}
+        className={compact ? `${compactControlHeightClassName} py-0` : "h-12"}
       />
     </FormField>
   );
@@ -101,6 +105,7 @@ export function TextArea({
   rows = 4,
   ...props
 }: TextAreaProps) {
+  const compact = useFieldDensity() === "compact";
   return (
     <FormField label={label} className={className}>
       <textarea
@@ -109,7 +114,8 @@ export function TextArea({
         rows={rows}
         onChange={(event) => onChange(event.target.value)}
         className={[
-          "mt-2 w-full rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none placeholder:text-on-surface-muted transition-all",
+          compact ? "mt-1.5 px-3 py-2.5" : "mt-2 px-4 py-3",
+          "w-full rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest text-sm text-on-surface outline-none placeholder:text-on-surface-muted transition-all",
           "hover:border-white/10 hover:bg-surface-container-low focus:border-primary-light/40 focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_22%,transparent)]",
         ].join(" ")}
       />

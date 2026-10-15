@@ -34,6 +34,13 @@ export default function OwnerClientFilters({ value, trainerOptions, onChange }: 
 
   return (
     <FilterToolbar
+      search={
+        <FilterSearchField
+          value={value.search}
+          onChange={(nextValue) => update("search", nextValue)}
+          placeholder="Imię, nazwisko, e-mail lub telefon"
+        />
+      }
       gridClassName="md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_240px_240px_auto_auto]"
       advancedId="client-advanced-filters"
       advancedOpen={advancedOpen}
@@ -55,11 +62,6 @@ export default function OwnerClientFilters({ value, trainerOptions, onChange }: 
       }
       onClear={() => onChange(defaultOwnerClientFilters)}
     >
-      <FilterSearchField
-        value={value.search}
-        onChange={(nextValue) => update("search", nextValue)}
-        placeholder="Imię, nazwisko, e-mail lub telefon"
-      />
       <CustomSelect
         label="Trener"
         value={value.trainerFilter}

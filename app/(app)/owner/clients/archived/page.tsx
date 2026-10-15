@@ -49,7 +49,7 @@ export default function ArchivedClientsPage() {
             Aktywni klienci
           </Link>
           <div className="mt-5 flex items-center gap-3">
-            <h1 className="font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
+            <h1 className="font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
               Archiwum klientów
             </h1>
             <span className="rounded-full bg-surface-container px-3 py-1 text-sm text-on-surface-variant">

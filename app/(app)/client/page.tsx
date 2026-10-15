@@ -186,7 +186,7 @@ export default function ClientDashboardPage() {
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-label text-primary-light">Panel klienta</p>
-          <h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
+          <h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
             Cześć, {firstName}
           </h1>
           <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
@@ -453,7 +453,7 @@ function MobileDashboard({
     <div className="flex flex-col gap-4 md:hidden">
       <section>
         <p className="text-label text-primary-light">Panel klienta</p>
-        <h1 className="mt-2 font-display text-[2.15rem] font-semibold leading-[0.95] tracking-tight">
+        <h1 className="mt-2 font-display text-[1.6rem] md:text-[2.15rem] font-semibold leading-[0.95] tracking-tight">
           Cześć, {firstName}
         </h1>
         <p className="mt-3 text-sm leading-6 text-on-surface-variant">

@@ -238,7 +238,7 @@ input[type="time"] {
   color-scheme: dark;
   border: 1px solid color-mix(in srgb, var(--color-secondary) 58%, transparent);
   background-color: var(--color-surface-container-lowest);
-  min-height: 2.75rem;
+  min-height: 2.5rem;
   border-radius: var(--radius-lg);
   padding: 0 2.5rem 0 0.875rem;
   color: var(--color-on-surface);
@@ -282,6 +282,42 @@ select {
 select option {
   background: var(--color-surface-container);
   color: var(--color-on-surface);
+}
+
+/* iOS/Android give date controls an intrinsic min width that ignores the
+   container and pushes modals sideways; let them shrink like text inputs. */
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+input[type="date"]::-webkit-date-and-time-value,
+input[type="datetime-local"]::-webkit-date-and-time-value,
+input[type="month"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  min-height: 1.5em;
+  text-align: left;
+}
+
+/* Field labels inside modals share one compact style. */
+[data-atlas-modal] .text-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Prevent iOS from zooming the page when a form field gets focus. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator,

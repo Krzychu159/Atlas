@@ -349,7 +349,7 @@ function ClosurePackageDecision({
                   })
                 }
                 placeholder="0,00"
-                className="mt-2 h-12 w-full rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-low px-4 text-sm text-on-surface outline-none transition focus:border-primary-light/40"
+                className="mt-1.5 h-11 w-full rounded-[var(--radius-lg)] md:h-10 border border-white/5 bg-surface-container-low px-4 text-sm text-on-surface outline-none transition focus:border-primary-light/40"
               />
               <span className="mt-2 block text-xs text-on-surface-muted">
                 Maksymalnie{" "}

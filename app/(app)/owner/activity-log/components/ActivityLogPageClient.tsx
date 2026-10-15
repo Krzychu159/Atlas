@@ -75,7 +75,7 @@ export function ActivityLogPageClient() {
 
   return <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
     <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div><p className="text-label text-primary-light">Panel właściciela</p><h1 className="mt-2 font-display text-[2.25rem] font-semibold leading-[0.95] tracking-tight">Historia zmian</h1><p className="mt-3 text-sm leading-6 text-on-surface-variant">Sprawdź, kto i jakie zmiany wprowadził w studiu.</p></div>
+      <div><p className="text-label text-primary-light">Panel właściciela</p><h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">Historia zmian</h1><p className="mt-3 text-sm leading-6 text-on-surface-variant">Sprawdź, kto i jakie zmiany wprowadził w studiu.</p></div>
       <Button variant="secondary" icon={<RefreshCw size={16} className={loading && !validation ? "animate-spin" : ""} />} onClick={refresh} disabled={Boolean(validation) || loading}>Odśwież</Button>
     </div>
     <ActivityFilters value={filters} metadata={metadata} onChange={changeFilters} onClear={() => changeFilters(defaultActivityFilters)} />

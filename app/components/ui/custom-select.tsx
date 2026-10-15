@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
+import { compactControlHeightClassName, compactFieldLabelClassName, useFieldDensity } from "./field-density";
 
 export type SelectOption = {
   value: string;
@@ -27,6 +28,9 @@ export function CustomSelect({
   className,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const compact = useFieldDensity() === "compact";
+  // In forms the label sits above the control so it lines up with text fields in the same grid.
+  const outsideLabel = compact && Boolean(label);
   const rootRef = useRef<HTMLDivElement>(null);
   const selectedOption =
     options.find((option) => option.value === value) ?? options[0];
@@ -45,18 +49,22 @@ export function CustomSelect({
 
   return (
     <div ref={rootRef} className={["relative", className].filter(Boolean).join(" ")}>
+      {outsideLabel ? <span aria-hidden="true" className={`mb-1.5 block ${compactFieldLabelClassName}`}>{label}</span> : null}
+      <div className="relative">
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
+        aria-label={outsideLabel ? `${label}: ${selectedOption?.label ?? ""}` : undefined}
         className={[
-          "flex h-12 w-full items-center gap-3 rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest px-3 text-left transition",
+          compact ? compactControlHeightClassName : "h-12",
+          "flex w-full items-center gap-3 rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest px-3 text-left transition",
           "hover:border-white/10 hover:bg-surface-container-low focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_24%,transparent)]",
           isOpen ? "border-primary-light/40 bg-surface-container-low" : "",
         ].join(" ")}
       >
         {icon ? <span className="shrink-0 text-on-surface-muted">{icon}</span> : null}
         <span className="min-w-0 flex-1">
-          {label ? (
+          {label && !outsideLabel ? (
             <span className="block text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
               {label}
             </span>
@@ -110,6 +118,7 @@ export function CustomSelect({
           })}
         </div>
       ) : null}
+      </div>
     </div>
   );
 }

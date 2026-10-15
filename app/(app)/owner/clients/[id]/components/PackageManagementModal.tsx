@@ -17,7 +17,7 @@ import {
 } from "@/app/lib/owner/billing";
 
 type Mode = "overview" | "correct" | "delete" | "close";
-const inputClass = "mt-1 w-full min-w-0 rounded-lg bg-surface-container-lowest p-3";
+const inputClass = "mt-1.5 w-full min-w-0 rounded-[var(--radius-lg)] bg-surface-container-lowest px-3 py-2.5 text-sm";
 
 export default function PackageManagementModal({ clientId, packageData, onClose, onSaved }: {
   clientId: number; packageData: ClientPackageBilling; onClose: () => void;
