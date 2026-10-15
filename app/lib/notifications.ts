@@ -45,6 +45,15 @@ export type NotificationRole = "owner" | "trainer" | "client";
 
 export const NOTIFICATIONS_CHANGED_EVENT = "atlas:notifications-changed";
 
+// readIds / readAll describe a local change that views apply without refetching;
+// "poll" means the server count changed, so open views reload their list.
+export type NotificationsChange = {
+  unreadCountDelta?: number;
+  readIds?: number[];
+  readAll?: { category?: string };
+  source?: "local" | "poll";
+};
+
 export function getNotifications(params: NotificationParams = {}, signal?: AbortSignal) {
   return backendGet<AppNotification[]>("Notifications", { ...params, limit: params.limit ?? 50 }, signal);
 }
@@ -64,7 +73,7 @@ export function markNotificationAsRead(id: number) {
   if (pending) return pending;
   const request = backendPost<void>(`Notifications/${id}/read`)
     .then(result => {
-      notifyNotificationsChanged(-1);
+      notifyNotificationsChanged({ unreadCountDelta: -1, readIds: [id] });
       return result;
     })
     .finally(() => { if (pendingReads.get(id) === request) pendingReads.delete(id); });
@@ -74,14 +83,14 @@ export function markNotificationAsRead(id: number) {
 
 export async function markAllNotificationsAsRead(category?: string) {
   const result = await backendPost<ReadAllResponse | null>("Notifications/read-all", undefined, { category });
-  notifyNotificationsChanged(result ? -result.markedAsRead : undefined);
+  notifyNotificationsChanged({ unreadCountDelta: result ? -result.markedAsRead : undefined, readAll: { category } });
   return result;
 }
 
-export function notifyNotificationsChanged(unreadCountDelta?: number) {
+export function notifyNotificationsChanged(change: NotificationsChange = {}) {
   if (typeof window !== "undefined") {
     invalidateBackendGets(["Notifications", "Notifications/page", "Notifications/unread-count"]);
-    window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, { detail: { unreadCountDelta } }));
+    window.dispatchEvent(new CustomEvent<NotificationsChange>(NOTIFICATIONS_CHANGED_EVENT, { detail: { source: "local", ...change } }));
   }
 }
 
@@ -125,11 +134,18 @@ function matchNotificationUrl(notification: AppNotification, role: NotificationR
   const url = new URL(safe, "https://atlas.invalid");
   const path = url.pathname.replace(/\/$/, "");
   if (path === "/accept-invitation" && url.searchParams.get("token")) return safe;
+  const domainPath = path.replace(/^\/(owner|trainer|client)(?=\/|$)/, "");
+  const suffix = safe.slice(url.pathname.length);
+  // A payment for a known client opens that client's payments tab, not the general list.
+  const paymentClientId = url.searchParams.get("clientId");
+  if (role && role !== "client" && /^\/(payments|billing)(?:\/[1-9]\d*)?$/.test(domainPath) && paymentClientId && /^[1-9]\d*$/.test(paymentClientId)) {
+    url.searchParams.delete("clientId");
+    const query = url.searchParams.toString();
+    return `/${role}/clients/${paymentClientId}/payments${query ? `?${query}` : ""}${url.hash}`;
+  }
   if (role ? notificationRoutes[role].test(path) : isNotificationRoute(path)) return safe;
   if (!role) return null;
 
-  const domainPath = path.replace(/^\/(owner|trainer|client)(?=\/|$)/, "");
-  const suffix = safe.slice(url.pathname.length);
   const candidate = `/${role}${domainPath}`;
   if (notificationRoutes[role].test(candidate)) return `${candidate}${suffix}`;
 
@@ -139,11 +155,7 @@ function matchNotificationUrl(notification: AppNotification, role: NotificationR
     return `/${role}/clients/${client[1]}${client[2] ? "/payments" : ""}${suffix}`;
   }
   if (/^\/(sessions|schedule|group-classes)(?:\/[1-9]\d*)?$/.test(domainPath)) return `/${role}/schedule${suffix}`;
-  if (/^\/(payments|billing)(?:\/[1-9]\d*)?$/.test(domainPath)) {
-    const clientId = url.searchParams.get("clientId");
-    if (role !== "client" && clientId && /^[1-9]\d*$/.test(clientId)) return `/${role}/clients/${clientId}/payments${suffix}`;
-    return `/${role}/payments${suffix}`;
-  }
+  if (/^\/(payments|billing)(?:\/[1-9]\d*)?$/.test(domainPath)) return `/${role}/payments${suffix}`;
   if (/^\/(client-packages|subscriptions)(?:\/[1-9]\d*)?$/.test(domainPath)) return `/${role}/payments${suffix}`;
   if (/^\/packages(?:\/[1-9]\d*)?$/.test(domainPath)) {
     return `/${role}/${role === "client" ? "payments" : "packages"}${suffix}`;

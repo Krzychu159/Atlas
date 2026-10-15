@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Bell,
@@ -74,6 +74,8 @@ function getRoleLabel(role: string) {
 export function Header({ role, unreadNotificationCount, onUnreadCountChange }: HeaderProps) {
   const theme = useOrganizationTheme();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const notificationsAnchorRef = useRef<HTMLDivElement>(null);
+  const closeNotifications = useCallback(() => setIsNotificationsOpen(false), []);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const {
     selectedLocationValue,
@@ -297,24 +299,37 @@ export function Header({ role, unreadNotificationCount, onUnreadCountChange }: H
                 ) : null}
               </Link>
 
-              <button
-                onClick={() => setIsNotificationsOpen(true)}
-                className="relative hidden h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant transition hover:bg-surface-container hover:text-on-surface md:flex"
-                aria-label={
-                  unreadNotificationCount > 0
-                    ? `Otwórz powiadomienia, nieprzeczytane: ${unreadNotificationCount}`
-                    : "Otwórz powiadomienia"
-                }
-              >
-                <Bell width={18} height={18} />
-                {unreadNotificationCount > 0 ? (
-                  <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-tertiary-light px-1 text-[0.58rem] font-bold text-on-tertiary">
-                    {unreadNotificationCount > 99
-                      ? "99+"
-                      : unreadNotificationCount}
-                  </span>
-                ) : null}
-              </button>
+              <div ref={notificationsAnchorRef} className="relative hidden md:block">
+                <button
+                  type="button"
+                  onClick={() => setIsNotificationsOpen((open) => !open)}
+                  aria-haspopup="dialog"
+                  aria-expanded={isNotificationsOpen}
+                  className={`relative flex h-12 w-12 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container hover:text-on-surface focus-visible:outline-2 focus-visible:outline-primary-light ${isNotificationsOpen ? "bg-surface-container text-on-surface" : "bg-surface-container-lowest"}`}
+                  aria-label={
+                    unreadNotificationCount > 0
+                      ? `Powiadomienia, nieprzeczytane: ${unreadNotificationCount}`
+                      : "Powiadomienia"
+                  }
+                >
+                  <Bell width={18} height={18} />
+                  {unreadNotificationCount > 0 ? (
+                    <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-tertiary-light px-1 text-[0.58rem] font-bold text-on-tertiary">
+                      {unreadNotificationCount > 99
+                        ? "99+"
+                        : unreadNotificationCount}
+                    </span>
+                  ) : null}
+                </button>
+                <NotificationsPanel
+                  open={isNotificationsOpen}
+                  onClose={closeNotifications}
+                  notificationsHref={notificationsHref}
+                  onUnreadCountChange={onUnreadCountChange}
+                  role={role}
+                  anchorRef={notificationsAnchorRef}
+                />
+              </div>
             </>
           ) : null}
 
@@ -386,16 +401,6 @@ export function Header({ role, unreadNotificationCount, onUnreadCountChange }: H
         </div>
       </header>
 
-      {role !== "client" ? (
-        <NotificationsPanel
-          open={isNotificationsOpen}
-          onClose={() => setIsNotificationsOpen(false)}
-          notificationsHref={notificationsHref}
-          totalUnreadCount={unreadNotificationCount}
-          onUnreadCountChange={onUnreadCountChange}
-          role={role}
-        />
-      ) : null}
     </>
   );
 }

@@ -8,7 +8,7 @@ function load(path, dependencies = {}, globals = {}) {
   const exports = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
-  }).outputText, { exports, require: name => dependencies[name] ?? {}, URLSearchParams, URL, Headers, Event, setTimeout, clearTimeout, window: { addEventListener() {}, removeEventListener() {}, dispatchEvent() {} }, ...globals });
+  }).outputText, { exports, require: name => dependencies[name] ?? {}, URLSearchParams, URL, Headers, Request, Response, Event, CustomEvent, AbortController, AbortSignal, DOMException, setTimeout, clearTimeout, window: { addEventListener() {}, removeEventListener() {}, dispatchEvent() {}, setInterval() { return 0; }, clearInterval() {} }, ...globals });
   return exports;
 }
 
@@ -49,16 +49,17 @@ function descendants(tree) {
   const children = [tree.props?.children].flat(Infinity);
   return [tree, ...children.flatMap(descendants)];
 }
-function renderCard({ isRead = false, actionUrl = '/owner/payments?clientId=5', mark = async () => {}, timers = {}, variant = "panel", expanded = false, onToggle = () => {} } = {}) {
+function renderCard({ isRead = false, actionUrl = '/owner/payments?clientId=5', type = 'PaymentPendingConfirmation', category = 'payments', mark = async () => {}, timers = {}, variant = "panel", expanded = false, onToggle = () => {} } = {}) {
   const navigations = [];
   const api = load('app/lib/notifications.ts');
   const component = load('app/(app)/owner/components/Notification.tsx', {
     react: { useRef: () => ({ current: null }), useEffect: () => {} },
     'react/jsx-runtime': { jsx, jsxs: jsx },
-    'next/navigation': { useRouter: () => ({ push: href => navigations.push(href) }) },
+    'next/navigation': { useRouter: () => ({ push: href => navigations.push(href) }), usePathname: () => '/owner/notifications' },
+    './notification-display': load('app/(app)/owner/components/notification-display.ts'),
     '@/app/lib/notifications': api,
   }, timers);
-  return { navigations, tree: component.default({ item: { id: 1, type: 'PaymentPendingConfirmation', category: 'payments', createdAt: new Date().toISOString(), title: 'Płatność', isRead, actionUrl }, role: 'owner', variant, expanded, onToggle, onMarkAsRead: mark }) };
+  return { navigations, tree: component.default({ item: { id: 1, type, category, createdAt: new Date().toISOString(), title: 'Płatność', isRead, actionUrl }, role: 'owner', variant, expanded, onToggle, onMarkAsRead: mark }) };
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
@@ -69,16 +70,16 @@ test('unread panel card marks once before navigating to the selected notificatio
   tree.props.children[0].props.onClick(); tree.props.children[0].props.onClick();
   assert.equal(posts, 1); assert.equal(navigations.length, 0);
   resolveRead(); await tick();
-  assert.deepEqual(navigations, ['/owner/notifications?notificationId=1']);
+  assert.deepEqual(navigations, ['/owner/clients/5/payments']);
 });
 test('read panel card skips POST; missing actionUrl still opens the full notification', async () => {
   let posts = 0;
   const read = renderCard({ isRead: true, mark: async () => { posts++; } });
   read.tree.props.children[0].props.onClick(); await tick();
   assert.equal(posts, 0); assert.equal(read.navigations.length, 1);
-  const noUrl = renderCard({ actionUrl: null, mark: async () => { posts++; } });
+  const noUrl = renderCard({ actionUrl: null, type: 'SystemAnnouncement', category: 'system', mark: async () => { posts++; } });
   noUrl.tree.props.children[0].props.onClick(); await tick();
-  assert.equal(posts, 1); assert.equal(noUrl.navigations.length, 1);
+  assert.equal(posts, 1); assert.deepEqual(noUrl.navigations, ['/owner/notifications?notificationId=1']);
 });
 test('details CTA navigates exactly once using actionUrl', async () => {
   let posts = 0;
@@ -88,7 +89,7 @@ test('details CTA navigates exactly once using actionUrl', async () => {
   // CTA is a sibling of the summary button, so it has no parent click handler.
   assert.equal(tree.props.onClick, undefined);
   await tick();
-  assert.equal(posts, 1); assert.deepEqual(navigations, ['/owner/payments?clientId=5']);
+  assert.equal(posts, 1); assert.deepEqual(navigations, ['/owner/clients/5/payments']);
 });
 test('failed or slow mark-read never blocks navigation', async () => {
   const failed = renderCard({ mark: async () => { throw Error('offline'); } });
@@ -111,7 +112,7 @@ test('category pills show only positive authoritative counts; read filters stay 
   assert.equal(component.markAllLabel('payments', []), 'Oznacz wszystkie w Płatnościach jako przeczytane');
 });
 
-function hookHarness(api, options = []) {
+function hookHarness(api, options = [], windowStub) {
   const slots = []; let cursor = 0; let effects = []; let dirty = false;
   const same = (a, b) => a?.length === b?.length && a.every((value, index) => Object.is(value, b[index]));
   const react = {
@@ -120,18 +121,18 @@ function hookHarness(api, options = []) {
     useCallback(fn, deps) { const i = cursor++; if (!same(slots[i]?.deps, deps)) slots[i] = { deps, fn }; return slots[i].fn; },
     useEffect(fn, deps) { const i = cursor++; if (!same(slots[i]?.deps, deps)) { slots[i]?.cleanup?.(); slots[i] = { deps }; effects.push(() => { slots[i].cleanup = fn(); }); } },
   };
-  const hook = load('app/lib/use-notifications.ts', { react, sonner: { toast: { error() {} } }, './backend': { getErrorMessage: error => error.message }, './notifications': api });
+  const hook = load('app/lib/use-notifications.ts', { react, sonner: { toast: { error() {} } }, './backend': { getErrorMessage: error => error.message, isAbortError: error => error?.name === 'AbortError' }, './notifications': api }, windowStub ? { window: windowStub } : {});
   let state;
   function render() { cursor = 0; dirty = false; state = hook.useNotifications(...options); const pending = effects; effects = []; pending.forEach(fn => fn()); return state; }
   return { render, async flush() { await tick(); if (dirty) render(); await tick(); if (dirty) render(); return state; } };
 }
 
-test('shared hook refetches after mutations, scopes mark-all and ignores stale filter results', async () => {
+test('shared hook updates locally after marking, scopes mark-all and ignores stale filter results', async () => {
   const requests = []; const marks = []; let counts = 0; let resolveOld;
   const harness = hookHarness({
     getNotificationCategories: async () => [{ key: 'payments', label: 'Płatności' }],
     getUnreadNotificationCount: async () => { counts++; return { unreadCount: 3, unreadByCategory: { payments: 2 } }; },
-    getNotifications: params => { requests.push(params); if (params.category === 'schedule') return new Promise(resolve => { resolveOld = resolve; }); return Promise.resolve([{ id: 1, category: params.category ?? 'system', isRead: false }]); },
+    getNotificationsPage: params => { requests.push(params); if (params.category === 'schedule') return new Promise(resolve => { resolveOld = items => resolve({ items, totalCount: items.length, totalPages: 1 }); }); return Promise.resolve({ items: [{ id: 1, category: params.category ?? 'system', isRead: false }], totalCount: 1, totalPages: 1 }); },
     markNotificationAsRead: async id => marks.push(id),
     markAllNotificationsAsRead: async category => marks.push(category),
   });
@@ -146,7 +147,8 @@ test('shared hook refetches after mutations, scopes mark-all and ignores stale f
   assert.equal(requests.at(-1).isRead, false);
   const before = requests.length;
   await state.handleMarkAsRead(1); state = await harness.flush();
-  assert.ok(requests.length > before);
+  assert.equal(requests.length, before, 'marking as read updates the list locally');
+  assert.equal(state.notifications[0].isRead, true); assert.equal(state.unreadCount, 1);
   await state.handleMarkAllAsRead(); state = await harness.flush();
   assert.equal(marks.at(-1), 'payments');
   state.setCategory(''); harness.render(); state = await harness.flush();
@@ -160,11 +162,13 @@ test('page summary expands and marks without navigation; panel remains compact',
   page.tree.props.children[0].props.onClick(); await tick();
   assert.equal(expanded, 1); assert.equal(marked, 1); assert.equal(page.navigations.length, 0);
   const panel = renderCard();
-  assert.equal(descendants(panel.tree).filter(node => node.type === 'button').length, 1);
+  const panelButtons = descendants(panel.tree).filter(node => node.type === 'button');
+  assert.deepEqual(panelButtons.map(node => node.props['aria-label'] ?? null), [null, 'Oznacz jako przeczytane']);
   assert.equal(descendants(panel.tree).some(node => node.props?.id === 'notification-details-1'), false);
+  assert.equal(descendants(renderCard({ isRead: true }).tree).filter(node => node.type === 'button').length, 1);
   const full = renderCard({ variant: 'page', expanded: true });
   assert.equal(full.tree.props.children[0].props['aria-expanded'], true);
-  assert.equal(full.tree.props.children[1].props.hidden, false);
+  assert.equal(descendants(full.tree).find(node => node.props?.id === 'notification-details-1').props.hidden, false);
 });
 
 test('destinations preserve full app paths and normalize only known legacy routes', () => {
@@ -178,11 +182,27 @@ test('destinations preserve full app paths and normalize only known legacy route
   assert.equal(api.getNotificationDestination({ actionUrl: '/schedule' }, 'trainer'), '/trainer/schedule');
 });
 
+test('payment notifications for a known client open that client payments tab', () => {
+  const api = load('app/lib/notifications.ts');
+  for (const [raw, role, expected] of [
+    ['/owner/payments?clientId=5', 'owner', '/owner/clients/5/payments'],
+    ['/payments?clientId=5', 'owner', '/owner/clients/5/payments'],
+    ['/billing/9?clientId=5&paymentId=9', 'owner', '/owner/clients/5/payments?paymentId=9'],
+    ['/trainer/payments?clientId=7', 'trainer', '/trainer/clients/7/payments'],
+    ['/owner/payments?clientId=abc', 'owner', '/owner/payments?clientId=abc'],
+    ['/owner/payments', 'owner', '/owner/payments'],
+    ['/payments?clientId=5', 'client', '/client/payments?clientId=5'],
+  ]) assert.equal(api.getNotificationDestination({ actionUrl: raw }, role), expected, raw);
+});
+
 test('proxy forwards capitalized Notifications paths without changing case', async () => {
   const requests = [];
   const proxy = load('app/api/backend/[...path]/route.ts', {
     'next/headers': { cookies: async () => ({ get: () => ({ value: 'fixture-token' }) }) },
     'next/server': { NextResponse: Response },
+    '@/app/lib/server/auth-cookies': { expireAuthCookies() {} },
+    '@/app/lib/server/backend-cookies': { relayBackendSetCookies() {} },
+    '@/app/lib/server/request-origin': { hasSameOrigin: () => true },
   }, { process: { env: { BACKEND_API_URL: 'https://backend.test' } }, fetch: async (url, options) => { requests.push({ url, options }); return new Response(null, { status: 204 }); } });
   for (const path of ['Notifications', 'Notifications/categories', 'Notifications/unread-count', 'Notifications/1/read', 'Notifications/read-all']) {
     const method = path.endsWith('/read') || path.endsWith('/read-all') ? 'POST' : 'GET';
@@ -194,18 +214,14 @@ test('proxy forwards capitalized Notifications paths without changing case', asy
   }
 });
 
-test('older deep links increase the supported limit and stop at exhausted or capped history', async () => {
-  const limits = [];
-  const api = load('app/lib/notifications.ts', { '@/app/lib/backend': { backendGet: async (_path, params) => {
-    limits.push(params.limit);
-    return Array.from({length: Math.min(params.limit, 180)}, (_, index) => ({id:index+1}));
-  } } });
+test('deep links fetch only the addressed notification and ignore invalid or inactive lookups', async () => {
+  const paths = [];
+  const api = load('app/lib/notifications.ts', { '@/app/lib/backend': { backendGet: async path => { paths.push(path); return { id: Number(path.split('/')[1]) }; } } });
   assert.equal((await api.findNotificationInList(150)).id, 150);
-  assert.deepEqual(limits, [100,200]);
-  assert.equal(await api.findNotificationInList(999), null);
-  const before = limits.length;
+  assert.deepEqual(paths, ['Notifications/150']);
+  assert.equal(await api.findNotificationInList(0), null);
   assert.equal(await api.findNotificationInList(1, () => false), null);
-  assert.equal(limits.length, before);
+  assert.deepEqual(paths, ['Notifications/150']);
 });
 
 test('panel never fetches categories; a failed read rolls back optimistic state and permits retry', async () => {
@@ -229,17 +245,19 @@ test('panel never fetches categories; a failed read rolls back optimistic state 
 });
 
 test('notificationId auto-expands the selected entry; filters clear selection; popup has no filters', () => {
+  const display = load('app/(app)/owner/components/notification-display.ts');
   const filter = function Filters() {};
   const card = function Card() {};
   const panelOptions = [];
-  const state = { notifications:[{id:7,isRead:true,message:'Pełny opis'}], loading:false, error:null, markingIds:[], counts:{unreadCount:0,unreadByCategory:{}}, categories:[], category:'', readFilter:'', unreadCount:0, setCategory(){}, setReadFilter(){} };
+  const state = { notifications:[{id:7,isRead:true,message:'Pełny opis',createdAt:new Date().toISOString()}], loading:false, error:null, markingIds:[], counts:{unreadCount:0,unreadByCategory:{}}, categories:[], category:'', readFilter:'', unreadCount:0, page:1, pageSize:25, totalCount:1, setCategory(){}, setReadFilter(){}, setPage(){}, loadNotifications(){} };
   const stateValues = [];
-  const react = { Suspense:'suspense', useState: initial => { const value = typeof initial === 'function' ? initial() : initial; return [value, next => stateValues.push(next)]; }, useEffect(){} };
+  const react = { Suspense:'suspense', useState: initial => { const value = typeof initial === 'function' ? initial() : initial; return [value, next => stateValues.push(next)]; }, useEffect(){}, useRef: value => ({ current: value }) };
   const dependencies = {
     react, 'react/jsx-runtime':{jsx,jsxs:jsx},
     'next/navigation':{usePathname:()=>'/owner/notifications',useSearchParams:()=>new URLSearchParams('notificationId=7')},
     '@/app/lib/notifications':{getNotificationPreview:()=>null},
-    '@/app/lib/use-notifications':{useNotifications:(...options)=>{panelOptions.push(options); return state;}},
+    '@/app/lib/use-notifications':{useNotifications:(...options)=>{panelOptions.push(options); return state;}, useNow:()=>Date.now()},
+    '../components/notification-display': display, './notification-display': display,
     '../components/Notification':{default:card}, './Notification':{default:card},
     '../components/NotificationFilters':{default:filter,markAllLabel:()=>''},
   };
@@ -259,9 +277,49 @@ test('notificationId auto-expands the selected entry; filters clear selection; p
 
 test('mark-read requests are deduplicated across panel and page during navigation', async () => {
   let resolveRead; let calls = 0;
-  const api = load('app/lib/notifications.ts', { '@/app/lib/backend': { backendPost: () => { calls++; return new Promise(resolve => { resolveRead = resolve; }); } } });
+  const api = load('app/lib/notifications.ts', { '@/app/lib/backend': { invalidateBackendGets() {}, backendPost: () => { calls++; return new Promise(resolve => { resolveRead = resolve; }); } } });
   const panel = api.markNotificationAsRead(9);
   const page = api.markNotificationAsRead(9);
   assert.equal(panel, page); assert.equal(calls, 1);
   resolveRead(); await page;
+});
+
+test('a read event from another view updates the list and counters without refetching', async () => {
+  const listeners = [];
+  const requests = [];
+  const harness = hookHarness({
+    getNotificationCategories: async () => [],
+    getUnreadNotificationCount: async () => { requests.push('count'); return { unreadCount: 3, unreadByCategory: { payments: 2, schedule: 1 } }; },
+    getNotifications: async () => { requests.push('list'); return [{ id: 1, category: 'payments', isRead: false }, { id: 2, category: 'schedule', isRead: false }]; },
+    NOTIFICATIONS_CHANGED_EVENT: 'changed',
+  }, [true, '', '', true], { addEventListener: (_name, handler) => listeners.push(handler), removeEventListener() {} });
+  harness.render(); let state = await harness.flush();
+  const before = requests.length;
+  listeners.at(-1)({ detail: { source: 'local', readIds: [1, 99], unreadCountDelta: -2 } });
+  state = await harness.flush();
+  assert.equal(requests.length, before);
+  assert.deepEqual(state.notifications.map(item => item.isRead), [true, false]);
+  assert.equal(state.counts.unreadCount, 1); assert.equal(state.counts.unreadByCategory.payments, 1);
+  listeners.at(-1)({ detail: { source: 'local', readAll: { category: 'schedule' } } });
+  state = await harness.flush();
+  assert.equal(state.counts.unreadByCategory.schedule, 0); assert.equal(state.counts.unreadCount, 0);
+  listeners.at(-1)({ detail: { source: 'poll' } });
+  await harness.flush();
+  assert.ok(requests.length > before, 'a server-side change reloads the list');
+});
+
+test('notifications are grouped by day and show compact Polish times', () => {
+  const display = load('app/(app)/owner/components/notification-display.ts', {}, { Intl, Date });
+  const now = new Date(2026, 9, 15, 12, 0).getTime();
+  const at = (days, hours, minutes = 0) => new Date(2026, 9, 15 - days, hours, minutes).toISOString();
+  const groups = display.groupNotificationsByDay([{ createdAt: at(0, 11, 30) }, { createdAt: at(0, 8) }, { createdAt: at(1, 18) }, { createdAt: at(10, 9) }], now);
+  assert.equal(JSON.stringify(groups.map(group => [group.label, group.items.length])), JSON.stringify([['Dziś', 2], ['Wczoraj', 1], ['5 października', 1]]));
+  assert.equal(display.formatNotificationTime(new Date(now - 20_000).toISOString(), now), 'Teraz');
+  assert.equal(display.formatNotificationTime(at(0, 11, 30), now), '30 min temu');
+  assert.equal(display.formatNotificationTime(at(0, 8), now), '08:00');
+  assert.equal(display.formatNotificationTime(at(1, 18), now), 'wczoraj, 18:00');
+  assert.equal(display.notificationCategoryLabel('payments'), 'Płatności');
+  assert.equal(display.notificationCategoryLabel('unknown'), null);
+  assert.equal(display.pluralizeNotifications(3), '3 powiadomienia');
+  assert.equal(display.pluralizeNotifications(12), '12 powiadomień');
 });

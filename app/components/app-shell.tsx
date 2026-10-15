@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Menu, X, Dumbbell, CircleUserRound, Bell, LogOut, Settings } from "lucide-react";
-import { getUnreadNotificationCount, NOTIFICATIONS_CHANGED_EVENT } from "@/app/lib/notifications";
+import { getUnreadNotificationCount, notifyNotificationsChanged, NOTIFICATIONS_CHANGED_EVENT, type NotificationsChange } from "@/app/lib/notifications";
 import { SidebarNav } from "@/app/components/sidebar-nav";
 import { Header } from "@/app/components/header";
 import { navigationByRole, type AppRole } from "@/app/components/navigation";
@@ -47,22 +47,40 @@ export function AppShell({ children, role, theme = "atlas" }: AppShellProps) {
     let active = true;
     let revision = 0;
     let controller: AbortController | null = null;
-    const refreshUnreadCount = (event?: Event) => {
+    let lastKnown: number | null = null;
+    const fetchUnreadCount = (fromPoll: boolean) => {
       const requestRevision = ++revision;
       controller?.abort();
       controller = new AbortController();
-      const delta = (event as CustomEvent<{ unreadCountDelta?: number }> | undefined)?.detail?.unreadCountDelta;
-      if (typeof delta === "number") setUnreadCount(count => Math.max(0, count + delta));
       getUnreadNotificationCount(undefined, controller.signal)
-        .then(data => { if (active && requestRevision === revision) setUnreadCount(data.unreadCount); })
+        .then(data => {
+          if (!active || requestRevision !== revision) return;
+          const changedOnServer = fromPoll && lastKnown !== null && data.unreadCount !== lastKnown;
+          lastKnown = data.unreadCount;
+          setUnreadCount(data.unreadCount);
+          // Something arrived or was read elsewhere: let open lists reload.
+          if (changedOnServer) notifyNotificationsChanged({ source: "poll" });
+        })
         .catch(() => {});
     };
-    refreshUnreadCount();
-    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshUnreadCount);
+    const handleChange = (event: Event) => {
+      const change = (event as CustomEvent<NotificationsChange | undefined>).detail;
+      if (change?.source === "poll") return;
+      const delta = change?.unreadCountDelta;
+      if (typeof delta === "number") setUnreadCount(count => Math.max(0, count + delta));
+      fetchUnreadCount(false);
+    };
+    const poll = () => { if (document.visibilityState === "visible") fetchUnreadCount(true); };
+    fetchUnreadCount(false);
+    const timer = window.setInterval(poll, 60_000);
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, handleChange);
+    document.addEventListener("visibilitychange", poll);
     return () => {
       active = false;
       controller?.abort();
-      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshUnreadCount);
+      window.clearInterval(timer);
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, handleChange);
+      document.removeEventListener("visibilitychange", poll);
     };
   }, [role]);
 
