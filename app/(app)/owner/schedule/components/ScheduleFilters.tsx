@@ -1,5 +1,6 @@
 "use client";
 
+import { CircleDot, UserRound } from "lucide-react";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import type { Trainer } from "@/app/lib/owner/trainers";
 import { scheduleStatusFilterOptions } from "../options";
@@ -29,23 +30,24 @@ export default function ScheduleFilters({
   ];
 
   return (
-    <div className="card-shell grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,280px)_minmax(220px,280px)_1fr] xl:items-center">
+    <div className="card-shell grid gap-2 p-2 sm:grid-cols-2 lg:grid-cols-[minmax(220px,280px)_minmax(220px,280px)_1fr] lg:items-center">
       <CustomSelect
         label="Status sesji"
+        icon={<CircleDot size={16} />}
         value={statusFilter}
         options={scheduleStatusFilterOptions}
         onChange={(value) => onStatusFilterChange(value as SessionStatusFilter)}
       />
       <CustomSelect
         label="Trener"
+        icon={<UserRound size={16} />}
         value={trainerFilter}
         options={trainerFilterOptions}
         onChange={onTrainerFilterChange}
       />
-      <div className="flex items-center justify-between rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm text-on-surface-variant">
-        <span>Widoczne sesje</span>
-        <span className="font-semibold text-primary-light">{visibleCount}</span>
-      </div>
+      <p className="px-2 text-sm text-on-surface-variant sm:col-span-2 lg:col-span-1 lg:text-right">
+        Widoczne sesje: <span className="font-semibold text-on-surface">{visibleCount}</span>
+      </p>
     </div>
   );
 }

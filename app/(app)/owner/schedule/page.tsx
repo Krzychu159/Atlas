@@ -81,7 +81,9 @@ export default function SchedulePage() {
     null,
   );
   const [createSessionDate, setCreateSessionDate] = useState(() => new Date());
+  const [createSessionStartAt, setCreateSessionStartAt] = useState<Date | null>(null);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
+  const [pendingSessionId, setPendingSessionId] = useState<number | null>(null);
   const [isSavingSession, setIsSavingSession] = useState(false);
   const calendarRevision = useSessionCorrectionRevision();
   const [sessionRevision, setSessionRevision] = useState(0);
@@ -172,10 +174,12 @@ export default function SchedulePage() {
     );
   }
 
-  function openCreateModal(date = anchorDate) {
+  function openCreateModal(date = anchorDate, startAt?: Date) {
     detailRead.current?.abort();
+    setPendingSessionId(null);
     setSelectedSession(null);
     setCreateSessionDate(date);
+    setCreateSessionStartAt(startAt ?? null);
     setIsSessionModalOpen(true);
   }
 
@@ -183,6 +187,7 @@ export default function SchedulePage() {
     detailRead.current?.abort();
     const controller = new AbortController();
     detailRead.current = controller;
+    setPendingSessionId(session.id);
     try {
       const detailed = await getSession(session.id, controller.signal);
       if (controller.signal.aborted) return;
@@ -190,6 +195,8 @@ export default function SchedulePage() {
       setIsSessionModalOpen(true);
     } catch (err) {
       if (!controller.signal.aborted) showOwnerError(err, "Nie udało się pobrać szczegółów sesji.");
+    } finally {
+      if (detailRead.current === controller) setPendingSessionId(null);
     }
   }
 
@@ -262,19 +269,19 @@ export default function SchedulePage() {
 
   return (
     <>
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      <div className="flex w-full flex-col gap-4 pb-10">
+        <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
           <div>
             <p className="text-label text-primary-light">Grafik</p>
             <h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
               Sesje treningowe
             </h1>
             <p className="mt-3 max-w-[680px] text-sm leading-6 text-on-surface-variant">
-              Widok sesji połączony z integracją Microsoft Outlook.
+              Planuj sesje i zarządzaj nimi. Grafik jest połączony z kalendarzem Microsoft Outlook.
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <ViewSwitch value={view} onChange={setView} />
             <DateNavigator
               view={view}
@@ -284,9 +291,11 @@ export default function SchedulePage() {
               onMove={movePeriod}
             />
             {connected ? (
-              <div className="flex gap-2">
+              <div className="flex gap-2 sm:ml-auto 2xl:ml-0">
                 <Button
                   variant="secondary"
+                  size="icon"
+                  className="h-12 w-12"
                   icon={
                     <RefreshCw
                       size={16}
@@ -295,11 +304,12 @@ export default function SchedulePage() {
                   }
                   onClick={loadSessions}
                   disabled={isSessionsLoading}
-                >
-                  Odśwież
-                </Button>
+                  aria-label="Odśwież grafik"
+                  title="Odśwież grafik"
+                />
                 <Button
                   icon={<Plus size={16} />}
+                  className="flex-1 sm:flex-none"
                   onClick={() => openCreateModal()}
                   disabled={isResourcesLoading || resources.data === undefined}
                 >
@@ -337,6 +347,8 @@ export default function SchedulePage() {
             days={weekDays}
             sessions={visibleSessions}
             isLoading={isSessionsLoading}
+            selectedSessionId={isSessionModalOpen ? selectedSession?.id : null}
+            pendingSessionId={pendingSessionId}
             onSelectSession={openEditModal}
             onCreateSession={openCreateModal}
           />
@@ -345,6 +357,8 @@ export default function SchedulePage() {
             date={anchorDate}
             sessions={visibleSessions}
             isLoading={isSessionsLoading}
+            selectedSessionId={isSessionModalOpen ? selectedSession?.id : null}
+            pendingSessionId={pendingSessionId}
             onSelectSession={openEditModal}
             onCreateSession={openCreateModal}
           />
@@ -365,6 +379,7 @@ export default function SchedulePage() {
         open={isSessionModalOpen}
         session={selectedSession}
         anchorDate={selectedSession ? anchorDate : createSessionDate}
+        defaultStartAt={selectedSession ? null : createSessionStartAt}
         trainers={modalTrainers}
         locations={scopedLocations}
         clients={scopedClients}

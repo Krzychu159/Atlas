@@ -121,12 +121,15 @@ export function getDefaultFormValues({
   trainers,
   locations,
   defaultTrainerId,
+  startAt,
 }: {
   session: SessionEditorSession | null;
   date: Date;
   trainers: Trainer[];
   locations: Location[];
   defaultTrainerId?: number | null;
+  /** A time slot picked in the calendar; the session then lasts the default 60 minutes. */
+  startAt?: Date | null;
 }): SessionFormValues {
   if (session) {
     return {
@@ -153,8 +156,8 @@ export function getDefaultFormValues({
     };
   }
 
-  const start = new Date(date);
-  start.setHours(10, 0, 0, 0);
+  const start = new Date(startAt ?? date);
+  if (!startAt) start.setHours(10, 0, 0, 0);
   const end = new Date(start);
   end.setHours(start.getHours() + 1);
   const defaultTrainer = trainers.find(

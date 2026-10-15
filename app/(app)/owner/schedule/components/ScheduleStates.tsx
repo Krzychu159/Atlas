@@ -37,11 +37,3 @@ export function EmptyDay() {
     </div>
   );
 }
-
-export function LoadingState() {
-  return (
-    <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-6 text-on-surface-variant xl:col-span-2">
-      Ładowanie sesji...
-    </div>
-  );
-}

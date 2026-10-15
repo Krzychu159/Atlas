@@ -45,6 +45,7 @@ export default function TrainerSchedulePage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editorRevision, setEditorRevision] = useState(0);
   const [createDate, setCreateDate] = useState(() => new Date());
+  const [createStartAt, setCreateStartAt] = useState<Date | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const loadRevision = useRef(0);
   const sessionController = useRef<AbortController | null>(null);
@@ -111,7 +112,7 @@ export default function TrainerSchedulePage() {
       if (revision !== resourceRevision.current) return;
       setMe(meData);
       if (!dashboardCreateHandled.current && new URLSearchParams(window.location.search).get("action") === "new" && meData.trainerId && trainerPortalMeToLocations(meData).length > 0) {
-        dashboardCreateHandled.current = true; setCreateDate(new Date()); setIsCreateOpen(true);
+        dashboardCreateHandled.current = true; setCreateDate(new Date()); setCreateStartAt(null); setIsCreateOpen(true);
       }
     }).catch(error => {
       if (revision !== resourceRevision.current) return;
@@ -144,9 +145,10 @@ export default function TrainerSchedulePage() {
     return () => { active = false; controller.abort(); };
   }, []);
 
-  function openCreate(date = anchorDate) {
+  function openCreate(date = anchorDate, startAt?: Date) {
     if (isResourcesLoading || resourcesError || !me?.trainerId || !locations.length || saving.current) return;
     setCreateDate(date);
+    setCreateStartAt(startAt ?? null);
     setIsCreateOpen(true);
   }
   const fetchDetails = useCallback(async (session: Pick<CalendarSession, "id">) => {
@@ -278,7 +280,7 @@ export default function TrainerSchedulePage() {
       </div>
       {selectedSession && !isEditOpen ? <TrainerSessionDetailsModal session={selectedSession} onEdit={!isResourcesLoading && !resourcesError && selectedSession.trainerId === me?.trainerId ? () => { if (selectedSession.canEdit === true) setIsEditOpen(true); } : undefined} onClose={() => { detailRevision.current += 1; detailController.current?.abort(); setSelectedSession(null); }} /> : null}
       {isEditOpen && selectedSession ? <SessionEditorModal key={"edit-" + selectedSession.id + "-" + editorRevision} open session={selectedSession} anchorDate={new Date(selectedSession.startAt)} trainers={trainers} locations={locations} clients={clients} loadClientOptions={loadClientOptions} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsEditOpen(false); }} onSubmit={handleEdit} /> : null}
-      <SessionEditorModal key={isCreateOpen ? "new-" + toDateInputValue(createDate) : "closed"} open={isCreateOpen} session={null} anchorDate={createDate} trainers={trainers} locations={locations} clients={clients} loadClientOptions={loadClientOptions} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsCreateOpen(false); }} onSubmit={handleCreate} />
+      <SessionEditorModal key={isCreateOpen ? "new-" + toDateInputValue(createDate) : "closed"} open={isCreateOpen} session={null} anchorDate={createDate} defaultStartAt={createStartAt} trainers={trainers} locations={locations} clients={clients} loadClientOptions={loadClientOptions} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsCreateOpen(false); }} onSubmit={handleCreate} />
     </>
   );
 }

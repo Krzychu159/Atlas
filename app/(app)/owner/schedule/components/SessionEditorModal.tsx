@@ -47,6 +47,7 @@ export default function SessionEditorModal({
   open,
   session,
   anchorDate,
+  defaultStartAt,
   trainers,
   locations,
   clients,
@@ -64,6 +65,7 @@ export default function SessionEditorModal({
   open: boolean;
   session: SessionEditorSession | null;
   anchorDate: Date;
+  defaultStartAt?: Date | null;
   trainers: Trainer[];
   locations: Location[];
   clients: Client[];
@@ -82,6 +84,7 @@ export default function SessionEditorModal({
     getDefaultFormValues({
       session,
       date: anchorDate,
+      startAt: defaultStartAt,
       trainers,
       locations,
       defaultTrainerId,
