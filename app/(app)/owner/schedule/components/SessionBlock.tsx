@@ -2,8 +2,8 @@
 
 import type { CSSProperties } from "react";
 import { LoaderCircle, MapPin, UserRound, UsersRound } from "lucide-react";
-import { getSessionOutlookColor } from "@/app/lib/calendar/outlook-colors";
-import { groupSeatsLabel, isGroupTraining } from "@/app/lib/group-sessions";
+import { getSessionCategoryColor, getSessionOutlookColor } from "@/app/lib/calendar/outlook-colors";
+import { groupSeatsLabel, isConsultationSession, isGroupTraining } from "@/app/lib/group-sessions";
 import { formatTime } from "../date-utils";
 import {
   getSessionStatusLabel,
@@ -28,12 +28,7 @@ export function statusDotClassName(status?: string | null) {
 }
 
 function hasCategoryColor(session: CalendarSession) {
-  return Boolean(
-    session.primaryOutlookCategoryColor ||
-      session.outlookCategoryColors?.some(
-        (category) => category.name === session.primaryOutlookCategory && category.color,
-      ),
-  );
+  return Boolean(getSessionCategoryColor(session));
 }
 
 // Uncategorized sessions follow the studio accent instead of a fixed Outlook blue.
@@ -47,8 +42,11 @@ function shortPersonName(fullName?: string | null) {
   return `${parts[0]} ${parts[parts.length - 1][0]}.`;
 }
 
+const CONSULTATION_LABEL = "Konsultacja";
+
 export function getSessionHeadline(session: CalendarSession) {
   const title = getSessionTitle(session);
+  if (isConsultationSession(session)) return { primary: title, secondary: title === CONSULTATION_LABEL ? null : CONSULTATION_LABEL };
   if (isGroupTraining(session)) return { primary: title, secondary: groupSeatsLabel(session) };
   const clients = session.clientsDisplayName?.trim();
   const knownType = Boolean(session.title?.trim() || session.plannedSessionType || session.actualSessionType);
@@ -87,9 +85,10 @@ export default function SessionBlock<TSession extends CalendarSession>({
 }) {
   const cancelled = isCancelledSession(session);
   const group = isGroupTraining(session);
+  const consultation = isConsultationSession(session);
   const { primary, secondary } = getSessionHeadline(session);
   const trainer = shortPersonName(session.trainerFullName);
-  const extraParticipants = !group && (session.participantsCount ?? 0) > 1 ? session.participantsCount : null;
+  const extraParticipants = !group && !consultation && (session.participantsCount ?? 0) > 1 ? session.participantsCount : null;
   // Height tiers: ~30 min → one line, ~60 min → time / name / trainer + location, 90+ min → more detail.
   const tier = heightPx < 44 ? "line" : heightPx < 100 ? "standard" : "tall";
   const roomy = heightPx >= 132;
@@ -133,6 +132,11 @@ export default function SessionBlock<TSession extends CalendarSession>({
                 <span className="hidden items-center gap-1 rounded-full bg-black/25 px-1.5 text-[10px] font-semibold text-on-surface @[120px]:inline-flex">
                   <UsersRound size={11} aria-hidden="true" />
                   {session.isFullyBooked === true ? "Brak miejsc" : compactSeats(session)}
+                </span>
+              ) : null}
+              {consultation ? (
+                <span className="hidden items-center rounded-full bg-black/25 px-1.5 text-[10px] font-semibold text-on-surface @[120px]:inline-flex">
+                  Konsultacja
                 </span>
               ) : null}
               {extraParticipants ? (

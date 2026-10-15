@@ -1,12 +1,14 @@
 "use client";
 
 import { sessionTrainingType } from "@/app/lib/user-messages";
+import { isConsultationSession } from "@/app/lib/group-sessions";
 
 import { userStatus } from "@/app/lib/user-messages";
 
 import { useMemo, useState } from "react";
 import { Clock3, Dumbbell, MapPin, UserRound } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { formatDateTime } from "@/app/lib/formatters/date";
 import type {
   OwnerSession,
@@ -28,10 +30,12 @@ export default function ClientSessionHistory({
   clientId,
   sessions,
   embedded = false,
+  pagination,
 }: {
   clientId: number;
   sessions: OwnerSession[];
   embedded?: boolean;
+  pagination?: { page: number; pageSize: number; totalCount: number; totalPages: number; onPageChange: (page: number) => void };
 }) {
   const [visibleCounts, setVisibleCounts] = useState<
     Record<SessionGroup, number>
@@ -55,21 +59,21 @@ export default function ClientSessionHistory({
           </h2>
         </div>
         <p className="text-label text-on-surface-muted">
-          {sessions.length} przypisanych
+          {pagination?.totalCount ?? sessions.length} przypisanych
         </p>
       </div>}
 
       <div className={`flex flex-col gap-5 ${embedded ? "" : "mt-6"}`}>
         {SESSION_GROUPS.map((group) => {
           const items = groupedSessions[group];
-          const visibleItems = items.slice(0, visibleCounts[group]);
+          const visibleItems = pagination ? items : items.slice(0, visibleCounts[group]);
 
           return (
             <div key={group}>
               <div className="flex items-center gap-3">
                 <h3 className="text-sm font-semibold text-on-surface">{groupLabels[group]}</h3>
                 <span className="rounded-full bg-surface-container-lowest px-2 py-0.5 text-[10px] font-semibold text-primary-light">
-                  {items.length}
+                  {items.length}{pagination ? " na tej stronie" : ""}
                 </span>
               </div>
 
@@ -89,7 +93,7 @@ export default function ClientSessionHistory({
                 )}
               </div>
 
-              {visibleItems.length < items.length ? (
+              {!pagination && visibleItems.length < items.length ? (
                 <Button
                   type="button"
                   variant="secondary"
@@ -109,6 +113,7 @@ export default function ClientSessionHistory({
           );
         })}
       </div>
+      {pagination && pagination.totalPages > 1 ? <PaymentPagination page={pagination.page} pageSize={pagination.pageSize} totalItems={pagination.totalCount} totalPages={pagination.totalPages} onPageChange={pagination.onPageChange} itemLabel="treningów" ariaLabel="Strony historii treningów" /> : null}
     </section>
   );
 }
@@ -210,6 +215,8 @@ function groupClientSessions(sessions: OwnerSession[]) {
   };
 
   sessions.forEach((session) => {
+    // Consultations have no clients and never belong to a client's training history.
+    if (isConsultationSession(session)) return;
     const status = (session.status || "").toLowerCase();
     const isCancelled =
       status.includes("cancel") ||

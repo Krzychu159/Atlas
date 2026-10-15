@@ -1,6 +1,8 @@
 import { CalendarDays } from "lucide-react";
 import { PanelEmpty, PanelHeader } from "./TrainerProfilePanel";
+import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import type { OwnerSession } from "@/app/lib/owner/sessions";
+import { isConsultationSession } from "@/app/lib/group-sessions";
 import { getOwnerSessionPackageName } from "../../components/session-display";
 
 function formatDay(value: string) {
@@ -37,8 +39,10 @@ function getStatus(status?: string | null) {
 
 export default function TrainerSchedulePanel({
   sessions,
+  pagination,
 }: {
   sessions: OwnerSession[];
+  pagination?: { page: number; pageSize: number; totalCount: number; totalPages: number; onPageChange: (page: number) => void };
 }) {
   const visibleSessions = [...sessions]
     .sort(
@@ -52,7 +56,7 @@ export default function TrainerSchedulePanel({
       <PanelHeader
         icon={<CalendarDays size={15} />}
         title="Najbliższe sesje"
-        meta={`${sessions.length} w grafiku`}
+        meta={`${pagination?.totalCount ?? sessions.length} w grafiku`}
         href="/owner/schedule"
         linkLabel="Grafik"
       />
@@ -75,9 +79,9 @@ export default function TrainerSchedulePanel({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-on-surface">{session.title || "Trening"}</span>
                   <span className="block truncate text-xs text-on-surface-muted">
-                    {session.clientsDisplayName || "Brak klienta"} · {session.locationName || "Brak lokalizacji"}
+                    {isConsultationSession(session) ? "Konsultacja" : session.clientsDisplayName || "Brak klienta"} · {session.locationName || "Brak lokalizacji"}
                   </span>
-                  <span className="block truncate text-[11px] font-medium text-tertiary-light">{getOwnerSessionPackageName(session)}</span>
+                  {!isConsultationSession(session) ? <span className="block truncate text-[11px] font-medium text-tertiary-light">{getOwnerSessionPackageName(session)}</span> : null}
                 </span>
 
                 <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.className}`}>
@@ -90,6 +94,7 @@ export default function TrainerSchedulePanel({
       ) : (
         <PanelEmpty icon={<CalendarDays size={16} />}>Brak najbliższych sesji.</PanelEmpty>
       )}
+      {pagination && pagination.totalPages > 1 ? <PaymentPagination page={pagination.page} pageSize={pagination.pageSize} totalItems={pagination.totalCount} totalPages={pagination.totalPages} onPageChange={pagination.onPageChange} itemLabel="treningów" ariaLabel="Strony treningów trenera" /> : null}
     </section>
   );
 }

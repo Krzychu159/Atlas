@@ -30,7 +30,7 @@ import { DateNavigator, ViewSwitch } from "./components/ScheduleControls";
 import ScheduleFilters from "./components/ScheduleFilters";
 import { OutlookRequiredState } from "./components/ScheduleStates";
 import { DaySchedule, WeekSchedule } from "./components/ScheduleViews";
-import { correctCompletedSession } from "@/app/(app)/owner/schedule/session-utils";
+import { completeConsultation, correctCompletedSession, isConsultationForm } from "@/app/(app)/owner/schedule/session-utils";
 import { notifySessionCorrected, useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 import SessionEditorModal from "./components/SessionEditorModal";
 import {
@@ -222,9 +222,16 @@ export default function SchedulePage() {
         await loadSessions();
         return;
       }
-      const payload = toSessionPayload(values, selectedSession);
+      const completingConsultation = Boolean(selectedSession) && isConsultationForm(values) && values.status === "Completed";
+      // Save other edits with the current status, then complete through the dedicated endpoint.
+      const payload = toSessionPayload(completingConsultation ? { ...values, status: selectedSession?.status || "" } : values, selectedSession);
 
-      if (selectedSession) {
+      if (selectedSession && completingConsultation) {
+        await updateSession(selectedSession.id, payload);
+        await completeConsultation(selectedSession.id);
+        notifySessionCorrected();
+        showOwnerSuccess("Konsultacja została zakończona.", { id: "owner-session-updated" });
+      } else if (selectedSession) {
         await updateSession(selectedSession.id, payload);
         showOwnerSuccess("Sesja została zaktualizowana.", {
           id: "owner-session-updated",
@@ -242,7 +249,7 @@ export default function SchedulePage() {
         }
       } else {
         await createSession(payload);
-        showOwnerSuccess("Sesja została dodana.", {
+        showOwnerSuccess(isConsultationForm(values) ? "Konsultacja została dodana." : "Sesja została dodana.", {
           id: "owner-session-created",
         });
       }

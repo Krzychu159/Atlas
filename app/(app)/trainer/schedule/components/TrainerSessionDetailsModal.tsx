@@ -2,7 +2,7 @@
 
 import SessionAccordion from "@/app/components/schedule/SessionAccordion";
 import GroupSessionDetails from "@/app/components/schedule/GroupSessionDetails";
-import { groupSeatsLabel, isGroupTraining } from "@/app/lib/group-sessions";
+import { groupSeatsLabel, isConsultationSession, isGroupTraining } from "@/app/lib/group-sessions";
 import { Button } from "@/app/components/ui/button";
 import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
 import { getSessionStatusLabel } from "@/app/(app)/owner/schedule/session-utils";
@@ -11,22 +11,23 @@ import type { TrainerSessionDetails } from "@/app/lib/trainer/portal";
 
 export default function TrainerSessionDetailsModal({ session, onClose, onEdit }: { session: TrainerSessionDetails; onClose: () => void; onEdit?: () => void }) {
   const participants = session.participants;
+  const consultation = isConsultationSession(session);
   return (
     <ModalOverlay onClose={onClose}>
       <div role="dialog" aria-modal="true" aria-label="Szczegóły zajęć" className="relative z-10 flex max-h-[92vh] w-full max-w-[1000px] flex-col overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient">
         <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
-          <ModalHeader title={session.title || "Sesja treningowa"} description={dateLabel(session.startAt) + " – " + dateLabel(session.endAt)} onClose={onClose} />
+          <ModalHeader title={session.title || (consultation ? "Konsultacja" : "Sesja treningowa")} description={dateLabel(session.startAt) + " – " + dateLabel(session.endAt)} onClose={onClose} />
           <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Detail label="Trener" value={session.trainerFullName || "Brak danych"} />
             <Detail label="Lokalizacja" value={session.locationName || "Brak danych"} />
             <Detail label="Status" value={getSessionStatusLabel(session.status)} />
             <Detail label="Rodzaj zajęć" value={sessionTrainingType(session)} />
-            <Detail label="Uczestnicy" value={isGroupTraining(session) ? groupSeatsLabel(session) : numberLabel(session.participantsCount)} />
+            <Detail label="Uczestnicy" value={consultation ? "Bez klienta" : isGroupTraining(session) ? groupSeatsLabel(session) : numberLabel(session.participantsCount)} />
           </dl>
           {session.isLocationLimitExceeded === true ? <p className="mt-4 rounded-[var(--radius-lg)] bg-warning-container p-4 text-sm text-warning-light">Liczba uczestników przekracza limit lokalizacji.</p> : null}
           <GroupSessionDetails key={session.id + ":" + session.updatedAt} session={session} trainerAccess showSummary={false} />
           {!isGroupTraining(session) && session.note?.trim() ? <div className="mt-4"><SessionAccordion title="Opis zajęć"><p className="whitespace-pre-wrap break-words text-sm leading-6 text-on-surface-variant">{session.note}</p></SessionAccordion></div> : null}
-          {!isGroupTraining(session) ? <div className="mt-4"><SessionAccordion title="Uczestnicy" summary={Array.isArray(participants) ? participants.length + " osób" : undefined}>
+          {!isGroupTraining(session) && !consultation ? <div className="mt-4"><SessionAccordion title="Uczestnicy" summary={Array.isArray(participants) ? participants.length + " osób" : undefined}>
           {Array.isArray(participants) ? participants.length ? <div className="grid max-h-[320px] gap-3 overflow-y-auto overscroll-contain md:grid-cols-2">
             {participants.map((participant) => <article key={participant.id} className="min-w-0 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
               <h3 className="break-words font-semibold">{participant.clientFullName || "Uczestnik bez nazwy"}</h3>

@@ -3,7 +3,7 @@
 import { FieldDensityProvider, compactFieldLabelClassName } from "@/app/components/ui/field-density";
 import SessionToggle from "@/app/components/schedule/SessionToggle";
 import SessionAccordion from "@/app/components/schedule/SessionAccordion";
-import { groupSeatsLabel, isGroupTraining } from "@/app/lib/group-sessions";
+import { groupSeatsLabel, isConsultationSession, isGroupTraining } from "@/app/lib/group-sessions";
 import { userTrainingType, getSessionTrainingTypeValue } from "@/app/lib/user-messages";
 import GroupSessionDetails from "@/app/components/schedule/GroupSessionDetails";
 import BookingThresholdField from "@/app/components/schedule/BookingThresholdField";
@@ -38,6 +38,7 @@ import {
   generatePublicSessionSlug,
   getSessionStatusLabel,
   getSessionTitle,
+  isConsultationForm,
 } from "../session-utils";
 import type { SessionEditorSession, SessionFormValues } from "../types";
 import SessionCorrectionHistory from "./SessionCorrectionHistory";
@@ -114,11 +115,12 @@ export default function SessionEditorModal({
   const [remoteKey, setRemoteKey] = useState("");
   const [clientLoadError, setClientLoadError] = useState<string | null>(null);
   const [clientAttempt, setClientAttempt] = useState(0);
-  const isGroupForm = isGroupTraining({ ...session, isPubliclyBookable: values.isPubliclyBookable, plannedSessionType: values.plannedSessionType });
+  const consultationForm = isConsultationForm(values);
+  const isGroupForm = !consultationForm && isGroupTraining({ ...session, isPubliclyBookable: values.isPubliclyBookable, plannedSessionType: values.plannedSessionType });
   const clientLoadKey = JSON.stringify([open, values.locationId, isGroupForm, clientSearch.trim(), clientPage, clientAttempt]);
   const clientsLoading = Boolean(loadClientOptions) && remoteKey !== clientLoadKey;
   useEffect(() => {
-    if (!open || !loadClientOptions || isGroupForm) return;
+    if (!open || !loadClientOptions || isGroupForm || consultationForm) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       loadClientOptions(clientSearch.trim(), clientPage, controller.signal).then(data => {
@@ -130,12 +132,13 @@ export default function SessionEditorModal({
       });
     }, clientSearch.trim() ? 300 : 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [open, loadClientOptions, isGroupForm, clientSearch, clientPage, clientLoadKey]);
+  }, [open, loadClientOptions, isGroupForm, consultationForm, clientSearch, clientPage, clientLoadKey]);
 
   if (!open) return null;
 
   const readOnly = session?.canEdit === false || (trainerAccess && session != null && session.canEdit !== true);
-  const ownerGroupSession = !trainerAccess && session != null && (session.isGroupSession === true || isGroupTraining(session));
+  const ownerGroupSession = !trainerAccess && !consultationForm && session != null && (session.isGroupSession === true || isGroupTraining(session));
+  const droppedParticipants = consultationForm && session != null && !isConsultationSession(session) ? session.participants?.length ?? 0 : 0;
   const billingType = values.actualSessionType ?? getSessionTrainingTypeValue(session || {});
   const billingTypeOptions = sessionBillingTypeOptions.some(option => option.value === billingType)
     ? sessionBillingTypeOptions
@@ -218,7 +221,10 @@ export default function SessionEditorModal({
   }
 
   function updateSessionType(value: string) {
-    setValues(current => ({ ...current, plannedSessionType: value, isPubliclyBookable: value === "Group" && current.isPubliclyBookable }));
+    setValues(current => isConsultationForm({ plannedSessionType: value })
+      // A consultation has no clients: clear the selection so nothing is booked by accident.
+      ? { ...current, plannedSessionType: value, isPubliclyBookable: false, participantIds: [], participantsEdited: Boolean(session?.participants?.length) || current.participantsEdited }
+      : { ...current, plannedSessionType: value, isPubliclyBookable: value === "Group" && current.isPubliclyBookable });
   }
 
   function togglePublicSession(checked: boolean) {
@@ -235,7 +241,7 @@ export default function SessionEditorModal({
   }
 
   function toggleParticipant(clientId: string) {
-    if (isGroupForm) return;
+    if (isGroupForm || consultationForm) return;
     setValues((current) => {
       const participantIds = current.participantIds.includes(clientId)
         ? current.participantIds.filter((id) => id !== clientId)
@@ -268,7 +274,7 @@ export default function SessionEditorModal({
         onSubmit={(event) => {
           event.preventDefault();
           if (isSaving || groupEnrollmentBusy || readOnly) return;
-          onSubmit(trainerAccess ? { ...values, newParticipantCountsAgainstPackage: countsAgainstPackage, newParticipantSessionsCharged: sessionsCharged } : values, allowRecurringSessions && !session && repeat ? {
+          onSubmit(trainerAccess ? { ...values, newParticipantCountsAgainstPackage: countsAgainstPackage, newParticipantSessionsCharged: sessionsCharged } : values, allowRecurringSessions && !session && repeat && !consultationForm ? {
             frequency,
             interval: Number(interval),
             daysOfWeek: frequency === "Weekly" ? daysOfWeek : [],
@@ -307,6 +313,11 @@ export default function SessionEditorModal({
           </div>
 
           {readOnly ? <p className="mt-4 text-sm text-on-surface-variant">Te zajęcia są dostępne tylko do podglądu.</p> : null}
+          {consultationForm ? <div className="mt-4 rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3 text-sm">
+            <span className="mr-2 rounded-full bg-primary/15 px-3 py-1 font-semibold text-primary-light">Konsultacja</span>
+            <span className="text-on-surface-variant">Czas pracy trenera bez przypisanego klienta. Wlicza się do rozliczenia trenera, nie zużywa wejść z pakietów i nie zmienia sald klientów.</span>
+            {droppedParticipants > 0 ? <p role="alert" className="mt-2 text-warning-light">Po zapisaniu z zajęć zostaną usunięci uczestnicy ({droppedParticipants}).</p> : null}
+          </div> : null}
           {isGroupForm ? <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
             <span className="rounded-full bg-primary/15 px-3 py-1 font-semibold text-primary-light">Grupowe</span>
             <span className="text-on-surface-variant">{session && isGroupTraining(session) ? groupSeatsLabel(session) : "Uczestników potwierdzisz po zapisaniu zajęć" + (values.publicCapacity ? " · limit " + values.publicCapacity : "")}</span>
@@ -316,10 +327,12 @@ export default function SessionEditorModal({
             <Field label="Tytuł" className="md:col-span-2">
               <input
                 value={values.title}
-                required={trainerAccess || values.isPubliclyBookable}
+                required={!consultationForm && (trainerAccess || values.isPubliclyBookable)}
                 onChange={(event) => updateTitle(event.target.value)}
                 placeholder={
-                  values.isPubliclyBookable
+                  consultationForm
+                    ? "Konsultacja"
+                    : values.isPubliclyBookable
                     ? "Np. Full Body"
                     : values.participantIds.length
                       ? getSuggestedSessionTitle(values.participantIds, clients)
@@ -385,7 +398,7 @@ export default function SessionEditorModal({
             </Field>
           </fieldset>
           <div className="mt-4 space-y-3">
-            {ownerGroupSession && session ? <GroupEnrollmentsSection key={session.id + ":" + session.locationId} session={session} canConfirm={!readOnly && !isSaving} onChanged={onGroupEnrollmentChanged} onBusyChange={setGroupEnrollmentBusy} /> : <SessionAccordion title="Uczestnicy" summary={values.participantIds.length + (readOnly ? " osób" : " wybranych")}>
+            {consultationForm ? null : ownerGroupSession && session ? <GroupEnrollmentsSection key={session.id + ":" + session.locationId} session={session} canConfirm={!readOnly && !isSaving} onChanged={onGroupEnrollmentChanged} onBusyChange={setGroupEnrollmentBusy} /> : <SessionAccordion title="Uczestnicy" summary={values.participantIds.length + (readOnly ? " osób" : " wybranych")}>
               {isGroupForm && !session ? <p className="mb-3 text-sm text-on-surface-variant">Dodaj zajęcia, aby zapisać uczestników.</p> : null}
               {!readOnly && !isGroupForm ? <fieldset disabled={isSaving || groupEnrollmentBusy} className="min-w-0 space-y-4">
             <div className="space-y-3">
@@ -561,7 +574,7 @@ export default function SessionEditorModal({
                     className="w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3 text-sm outline-none" />
                   <span className="mt-2 block text-xs text-on-surface-variant">Korekta dotyczy tylko tego wystąpienia sesji. Rozliczenie zostanie przeliczone przez system.</span>
                 </Field> : null}
-                {values.status === "Completed" && (!readOnly || values.actualSessionType || session.actualSessionType || session.plannedSessionType) && (
+                {values.status === "Completed" && !consultationForm && (!readOnly || values.actualSessionType || session.actualSessionType || session.plannedSessionType) && (
                   <Field label="Typ rozliczenia" className="md:col-span-2">
                     <CustomSelect value={billingType} options={billingTypeOptions} onChange={value => updateValue("actualSessionType", value)} />
                   </Field>
@@ -615,7 +628,7 @@ export default function SessionEditorModal({
               </>
             )}
 
-          {allowRecurringSessions && !session && (
+          {allowRecurringSessions && !session && !consultationForm && (
             <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4 md:col-span-2">
               <label className="flex cursor-pointer items-center justify-between gap-4 font-semibold">
                 Powtarzaj
@@ -690,9 +703,9 @@ export default function SessionEditorModal({
               ? "Zapisywanie..."
               : session
                 ? "Zapisz zmiany"
-                : repeat && allowRecurringSessions
+                : repeat && allowRecurringSessions && !consultationForm
                   ? "Dodaj serię"
-                  : "Dodaj sesję"}
+                  : consultationForm ? "Dodaj konsultację" : "Dodaj sesję"}
           </Button>
         </div>
       </form>

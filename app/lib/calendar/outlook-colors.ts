@@ -44,10 +44,21 @@ export type OutlookSessionColors = {
   outlookCategoryColors?: { name: string; color: string | null }[] | null;
 };
 
+// Consultations carry the trainer category and the shared "Konsultacje" category; keep the trainer colour.
+const CONSULTATION_CATEGORY = "konsultacje";
+
+export function getSessionCategoryColor(session: OutlookSessionColors) {
+  if (session.primaryOutlookCategory?.trim().toLowerCase() === CONSULTATION_CATEGORY) {
+    const trainerColor = session.outlookCategoryColors?.find(
+      (category) => category.name.trim().toLowerCase() !== CONSULTATION_CATEGORY && category.color,
+    )?.color;
+    if (trainerColor) return trainerColor;
+  }
+  return session.primaryOutlookCategoryColor ??
+    session.outlookCategoryColors?.find((category) => category.name === session.primaryOutlookCategory)?.color ??
+    null;
+}
+
 export function getSessionOutlookColor(session: OutlookSessionColors) {
-  return getOutlookColor(
-    session.primaryOutlookCategoryColor ??
-      session.outlookCategoryColors?.find((category) => category.name === session.primaryOutlookCategory)?.color ??
-      "preset7",
-  );
+  return getOutlookColor(getSessionCategoryColor(session) ?? "preset7");
 }

@@ -103,10 +103,10 @@ function SettlementContent({ monthValue }: { monthValue: string }) {
       </section>
       <p className="text-sm leading-6 text-on-surface-muted">Godziny rozliczeniowe wynikają z zasad rozliczenia i mogą różnić się od czasu trwania zajęć.</p>
       <CollapsibleSection title="Sesje objęte umową" icon={<FileCheck2 size={15} />} meta={items.length} defaultOpen flush>
-        <SettlementItems title="Sesje objęte umową" items={items} />
+        <SettlementItems key={`${settlement.year}-${settlement.month}`} title="Sesje objęte umową" items={items} totals={{ sessions: settlement.contractedTotalSessions, hours: settlement.contractedTotalHours, amount: settlement.contractedTotalAmount }} />
       </CollapsibleSection>
       <CollapsibleSection title="Sesje poza umową" icon={<FileX2 size={15} />} meta={nonContractedItems.length} defaultOpen={nonContractedItems.length > 0} flush>
-        <SettlementItems title="Sesje poza umową" items={nonContractedItems} muteAmounts />
+        <SettlementItems key={`${settlement.year}-${settlement.month}`} title="Sesje poza umową" items={nonContractedItems} totals={{ sessions: settlement.nonContractedTotalSessions, hours: settlement.nonContractedTotalHours }} muteAmounts />
       </CollapsibleSection>
     </>
   );

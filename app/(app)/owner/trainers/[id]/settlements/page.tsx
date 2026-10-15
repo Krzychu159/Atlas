@@ -469,7 +469,7 @@ export default function TrainerSettlementPage() {
             defaultOpen
             flush
           >
-            <SettlementItems title="Sesje objęte umową" items={items} />
+            <SettlementItems key={`${settlement.year}-${settlement.month}`} title="Sesje objęte umową" items={items} totals={{ sessions: settlement.contractedTotalSessions, hours: settlement.contractedTotalHours, amount: settlement.contractedTotalAmount }} />
           </CollapsibleSection>
           <CollapsibleSection
             title="Sesje poza umową"
@@ -478,7 +478,7 @@ export default function TrainerSettlementPage() {
             defaultOpen={nonContractedItems.length > 0}
             flush
           >
-            <SettlementItems title="Sesje poza umową" items={nonContractedItems} muteAmounts />
+            <SettlementItems key={`${settlement.year}-${settlement.month}`} title="Sesje poza umową" items={nonContractedItems} totals={{ sessions: settlement.nonContractedTotalSessions, hours: settlement.nonContractedTotalHours }} muteAmounts />
           </CollapsibleSection>
         </>
       ) : !isLoading ? (

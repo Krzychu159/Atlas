@@ -1,4 +1,4 @@
-import { groupSeatsLabel, isGroupTraining } from "@/app/lib/group-sessions";
+import { CONSULTATION_SESSION_TYPE, groupSeatsLabel, isConsultationSession, isGroupTraining } from "@/app/lib/group-sessions";
 import { sessionTrainingType } from "@/app/lib/user-messages";
 import type { Location } from "@/app/lib/owner/locations";
 import type {
@@ -46,6 +46,7 @@ export function getSessionStatusLabel(status?: string | null) {
 }
 
 export function getParticipantsLabel(session: CalendarSession) {
+  if (isConsultationSession(session)) return "Bez klienta";
   if (isGroupTraining(session)) return groupSeatsLabel(session);
   const count = session.actualParticipantsCount ?? session.participantsCount ?? session.participants?.length;
   if (count === undefined) return "Brak danych";
@@ -202,12 +203,16 @@ export function toSessionPayload(
     throw new Error("Uzupełnij czas sesji.");
   }
 
+  const consultation = isConsultationForm(values);
+  if (consultation && session?.status === "Completed" && session.participants?.length && !isConsultationSession(session)) {
+    throw new Error("Zrealizowanych zajęć z klientami nie można zmienić na konsultację.");
+  }
   const preserveParticipants = Boolean(session && !values.participantsEdited);
-  const isGroupForm = isGroupTraining({ ...session, isPubliclyBookable: values.isPubliclyBookable, plannedSessionType: values.plannedSessionType });
+  const isGroupForm = !consultation && isGroupTraining({ ...session, isPubliclyBookable: values.isPubliclyBookable, plannedSessionType: values.plannedSessionType });
   if (isGroupForm && (!session ? values.participantIds.length > 0 : values.participantsEdited)) {
     throw new Error("Zapis na zajęcia grupowe potwierdź w zgłoszeniach po opłaceniu odpowiedniego pakietu.");
   }
-  if (session?.status !== "Completed" && !isGroupForm && !preserveParticipants && !values.participantIds.length) {
+  if (session?.status !== "Completed" && !consultation && !isGroupForm && !preserveParticipants && !values.participantIds.length) {
     throw new Error("Wybierz przynajmniej jednego klienta.");
   }
 
@@ -288,7 +293,28 @@ export function toSessionPayload(
     );
   }
 
+  // The backend rejects consultations with participants or public booking (400).
+  if (consultation) {
+    payload.plannedSessionType = CONSULTATION_SESSION_TYPE;
+    payload.isPubliclyBookable = false;
+    delete payload.publicSlug;
+    delete payload.publicCapacity;
+    payload.participants = [];
+  }
+
   return payload;
+}
+
+export function isConsultationForm(values: Pick<SessionFormValues, "plannedSessionType">) {
+  return values.plannedSessionType === CONSULTATION_SESSION_TYPE;
+}
+
+// Manual completion of a planned consultation: no participants and no package usage.
+export function completeConsultation(
+  sessionId: number,
+  complete: (id: number, payload: Parameters<typeof completeSession>[1]) => Promise<unknown> = completeSession,
+) {
+  return complete(sessionId, { actualSessionType: CONSULTATION_SESSION_TYPE, correctionReason: "", participants: [] });
 }
 
 export async function correctCompletedSession(session: SessionEditorSession, values: SessionFormValues, complete: (id: number, payload: Parameters<typeof completeSession>[1]) => Promise<unknown> = completeSession) {
@@ -297,6 +323,7 @@ export async function correctCompletedSession(session: SessionEditorSession, val
   if (!["Completed", "Planned", "Cancelled"].includes(values.status)) {
     throw new Error("Wybierz status: Zrealizowana, Zaplanowana lub Anulowana.");
   }
+  if (!session.participants && isConsultationSession(session)) session = { ...session, participants: [] };
   if (!session.participants) throw new Error("Odśwież szczegóły sesji przed korektą uczestników.");
   const payload = toSessionPayload(values, session);
   const participantsChanged = values.participantIds.length !== session.participants.length ||

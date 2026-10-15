@@ -19,7 +19,7 @@ import { DaySchedule, WeekSchedule } from "@/app/(app)/owner/schedule/components
 import SessionEditorModal from "@/app/(app)/owner/schedule/components/SessionEditorModal";
 import { scheduleStatusFilterOptions } from "@/app/(app)/owner/schedule/options";
 import { addDays, getPeriod, startOfWeek, toDateInputValue } from "@/app/(app)/owner/schedule/date-utils";
-import { matchesStatusFilter, sortSessions, toSessionPayload } from "@/app/(app)/owner/schedule/session-utils";
+import { isConsultationForm, matchesStatusFilter, sortSessions, toSessionPayload } from "@/app/(app)/owner/schedule/session-utils";
 import type { CalendarSession, ScheduleView, SessionFormValues, SessionStatusFilter } from "@/app/(app)/owner/schedule/types";
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 import { getTrainerClientsPage } from "@/app/lib/trainer/optimized";
@@ -168,25 +168,26 @@ export default function TrainerSchedulePage() {
     try {
       if (Number(values.trainerId) !== me.trainerId) throw new Error("Możesz dodawać tylko własne zajęcia.");
       if (!locations.some(location => location.id === Number(values.locationId))) throw new Error("Wybierz dostępną lokalizację.");
-      if (!values.title.trim()) throw new Error("Podaj tytuł zajęć.");
+      const consultation = isConsultationForm(values);
+      if (!consultation && !values.title.trim()) throw new Error("Podaj tytuł zajęć.");
       if (!["Planned", "Active"].includes(values.status)) throw new Error("Wybierz status zajęć.");
       if (values.participantIds.some(id => !clients.some(client => client.id === Number(id)))) throw new Error("Wybierz uczestników z listy swoich klientów.");
       const sessionsCharged = Number(values.newParticipantSessionsCharged);
-      if (values.participantIds.length && (!values.newParticipantSessionsCharged?.trim() || !Number.isSafeInteger(sessionsCharged) || sessionsCharged < 0)) throw new Error("Podaj poprawną liczbę wejść na uczestnika.");
+      if (!consultation && values.participantIds.length && (!values.newParticipantSessionsCharged?.trim() || !Number.isSafeInteger(sessionsCharged) || sessionsCharged < 0)) throw new Error("Podaj poprawną liczbę wejść na uczestnika.");
       const formPayload = toSessionPayload(values, null);
       const payload: TrainerSessionPayload = {
-        title: values.title.trim(), note: values.note.trim() || null,
+        title: values.title.trim() || (consultation ? "Konsultacja" : ""), note: values.note.trim() || null,
         startAt: formPayload.startAt, endAt: formPayload.endAt,
         trainerId: me.trainerId, locationId: Number(values.locationId), status: values.status,
-        isPubliclyBookable: values.isPubliclyBookable,
-        publicSlug: values.isPubliclyBookable ? values.publicSlug.trim() : null,
+        isPubliclyBookable: !consultation && values.isPubliclyBookable,
+        publicSlug: !consultation && values.isPubliclyBookable ? values.publicSlug.trim() : null,
         publicCapacity: formPayload.publicCapacity ?? null,
         eventRules: formPayload.eventRules,
         registrationClosesBeforeMinutes: formPayload.registrationClosesBeforeMinutes,
         cancellationClosesBeforeMinutes: formPayload.cancellationClosesBeforeMinutes,
-        plannedSessionType: values.isPubliclyBookable ? "Group" : values.plannedSessionType || null,
+        plannedSessionType: formPayload.plannedSessionType ?? (values.isPubliclyBookable ? "Group" : values.plannedSessionType || null),
         outlookCategories: values.outlookCategories.split(",").map(value => value.trim()).filter(Boolean),
-        participants: values.participantIds.map(id => ({ clientId: Number(id), countsAgainstPackage: values.newParticipantCountsAgainstPackage === true, sessionsCharged, note: null })),
+        participants: consultation ? [] : values.participantIds.map(id => ({ clientId: Number(id), countsAgainstPackage: values.newParticipantCountsAgainstPackage === true, sessionsCharged, note: null })),
       };
       saving.current = true;
       setIsSaving(true);
@@ -208,10 +209,11 @@ export default function TrainerSchedulePage() {
     try {
       if (Number(values.trainerId) !== session.trainerId) throw new Error("Możesz edytować tylko własne zajęcia.");
       if (Number(values.locationId) !== session.locationId && !locations.some(location => location.id === Number(values.locationId))) throw new Error("Wybierz dostępną lokalizację.");
-      if (!values.title.trim()) throw new Error("Podaj tytuł zajęć.");
+      const consultation = isConsultationForm(values);
+      if (!consultation && !values.title.trim()) throw new Error("Podaj tytuł zajęć.");
       if (session.status === "Completed" && !values.correctionReason?.trim()) throw new Error("Podaj powód korekty.");
       const payload = toSessionPayload(values, session);
-      if (values.participantsEdited) {
+      if (values.participantsEdited && !consultation) {
         if (!session.participants) throw new Error("Lista uczestników jest niedostępna. Odśwież zajęcia przed zmianą zapisów.");
         const oldIds = new Set((session.participants || []).map(participant => participant.clientId));
         if (values.participantIds.some(id => !oldIds.has(Number(id)) && !clients.some(client => client.id === Number(id)))) throw new Error("Wybierz uczestników z dostępnej listy klientów.");
@@ -228,7 +230,7 @@ export default function TrainerSchedulePage() {
         notifySessionCorrected();
       } else await updateTrainerPortalSession(session.id, {
         ...payload,
-        title: values.title.trim(),
+        title: values.title.trim() || (consultation ? "Konsultacja" : ""),
         status: payload.status ?? undefined,
         correctionReason: values.correctionReason?.trim() || null,
       });

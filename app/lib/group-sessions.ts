@@ -28,6 +28,14 @@ export function isGroupTraining(session: { isPubliclyBookable?: boolean; planned
   return session.isPubliclyBookable === true || ["Group", "GroupTraining"].includes(session.plannedSessionType?.trim() || "") || ["Group", "GroupTraining"].includes(session.actualSessionType?.trim() || "");
 }
 
+export const CONSULTATION_SESSION_TYPE = "Consultation";
+
+// A consultation is trainer working time without a CRM client: no participants, packages or public booking.
+export function isConsultationSession(session: { plannedSessionType?: string | null; actualSessionType?: string | null }) {
+  return session.actualSessionType?.trim() === CONSULTATION_SESSION_TYPE
+    || (!session.actualSessionType?.trim() && session.plannedSessionType?.trim() === CONSULTATION_SESSION_TYPE);
+}
+
 export function groupSeatsLabel(session: GroupSessionFields) {
   if (session.bookedSeats == null) return "Liczba zapisanych niedostępna";
   return session.capacity != null ? `${session.bookedSeats}/${session.capacity}` : `${session.bookedSeats} zapisanych`;
