@@ -29,7 +29,7 @@ export default function TrainerSettingsPage() {
             </p>
           </div>
         </div>
-        <OutlookIntegrationCard allowAdministration={false} />
+        <OutlookIntegrationCard allowAdministration={false} allowContactsSync />
       </section>
     </div>
   );

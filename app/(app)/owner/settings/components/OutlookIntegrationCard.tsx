@@ -46,7 +46,13 @@ function formatConnectedDate(value: string | null) {
   });
 }
 
-export default function OutlookIntegrationCard({ allowAdministration = true }: { allowAdministration?: boolean }) {
+export default function OutlookIntegrationCard({
+  allowAdministration = true,
+  allowContactsSync = allowAdministration,
+}: {
+  allowAdministration?: boolean;
+  allowContactsSync?: boolean;
+}) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [status, setStatus] = useState<OutlookStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -230,7 +236,7 @@ export default function OutlookIntegrationCard({ allowAdministration = true }: {
   }
 
   async function handleSyncClients() {
-    if (!allowAdministration) return;
+    if (!allowContactsSync) return;
     try {
       setIsSyncing(true);
       await syncOutlookClients();
@@ -344,7 +350,7 @@ export default function OutlookIntegrationCard({ allowAdministration = true }: {
         </div>
 
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap lg:max-w-[440px]">
-          {allowAdministration ? <>
+          {allowAdministration ? (
           <Button
             icon={<RefreshCw size={16} className={isReconciling ? "animate-spin" : ""} />}
             onClick={handleReconcile}
@@ -353,6 +359,8 @@ export default function OutlookIntegrationCard({ allowAdministration = true }: {
           >
             {isReconciling ? "Synchronizowanie..." : "Synchronizuj teraz"}
           </Button>
+          ) : null}
+          {allowContactsSync ? (
           <Button
             variant="secondary"
             icon={
@@ -373,7 +381,7 @@ export default function OutlookIntegrationCard({ allowAdministration = true }: {
           >
             {isSyncing ? "Synchronizowanie kontaktów..." : "Synchronizuj kontakty"}
           </Button>
-          </> : null}
+          ) : null}
           <Button variant="secondary" icon={<RefreshCw size={16} />} disabled={isLoading || isConnecting || isDisconnecting || busy} onClick={() => void loadStatus()}>Odśwież status</Button>
           {connected ? (
             <Button
