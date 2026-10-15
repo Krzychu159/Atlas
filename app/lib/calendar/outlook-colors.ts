@@ -1,32 +1,35 @@
-// Paleta UI aplikacji, nie oficjalne HEX-y Outlooka. Edytuj bg, border i text tutaj.
-export type OutlookColor = { bg: string; border: string; text: string };
+// Kolory kategorii z ciemnego motywu Outlooka. Klucze (preset0–preset24) to kody Microsoft
+// zapisywane w backendzie — nie zmieniaj ich. Kolejność = kolejność w wyborze koloru w Outlooku.
+export type OutlookColor = { name: string; bg: string; border: string; text: string };
+
+const color = (name: string, hex: string): OutlookColor => ({ name, bg: hex, border: hex, text: "#ffffff" });
 
 export const OUTLOOK_COLORS = {
-  preset0: { bg: "#fde2e2", border: "#dc2626", text: "#991b1b" },
-  preset1: { bg: "#ffedd5", border: "#f97316", text: "#9a3412" },
-  preset2: { bg: "#ffedd5", border: "#b45309", text: "#78350f" },
-  preset3: { bg: "#fef9c3", border: "#eab308", text: "#854d0e" },
-  preset4: { bg: "#dcfce7", border: "#22c55e", text: "#166534" },
-  preset5: { bg: "#ccfbf1", border: "#14b8a6", text: "#115e59" },
-  preset6: { bg: "#ecfccb", border: "#65a30d", text: "#365314" },
-  preset7: { bg: "#dbeafe", border: "#2563eb", text: "#1e3a8a" },
-  preset8: { bg: "#ede9fe", border: "#7c3aed", text: "#4c1d95" },
-  preset9: { bg: "#fce7f3", border: "#db2777", text: "#831843" },
-  preset10: { bg: "#f1f5f9", border: "#64748b", text: "#334155" },
-  preset11: { bg: "#e4e4e7", border: "#71717a", text: "#3f3f46" },
-  preset12: { bg: "#e5e7eb", border: "#6b7280", text: "#374151" },
-  preset13: { bg: "#d4d4d8", border: "#52525b", text: "#27272a" },
-  preset14: { bg: "#cbd5e1", border: "#334155", text: "#0f172a" },
-  preset15: { bg: "#fecaca", border: "#991b1b", text: "#7f1d1d" },
-  preset16: { bg: "#fed7aa", border: "#c2410c", text: "#7c2d12" },
-  preset17: { bg: "#fde68a", border: "#92400e", text: "#78350f" },
-  preset18: { bg: "#fef08a", border: "#a16207", text: "#713f12" },
-  preset19: { bg: "#bbf7d0", border: "#15803d", text: "#14532d" },
-  preset20: { bg: "#99f6e4", border: "#0f766e", text: "#134e4a" },
-  preset21: { bg: "#d9f99d", border: "#4d7c0f", text: "#365314" },
-  preset22: { bg: "#bfdbfe", border: "#1d4ed8", text: "#1e3a8a" },
-  preset23: { bg: "#ddd6fe", border: "#6d28d9", text: "#4c1d95" },
-  preset24: { bg: "#fbcfe8", border: "#be185d", text: "#831843" },
+  preset15: color("Ciemnoczerwony", "#420610"),
+  preset0: color("Czerwony", "#6E0811"),
+  preset1: color("Pomarańczowy", "#7A2101"),
+  preset16: color("Ciemnopomarańczowy", "#5E2405"),
+  preset2: color("Brązowy", "#4D2A00"),
+  preset3: color("Żółty", "#463100"),
+  preset18: color("Ciemnożółty", "#3A2F00"),
+  preset17: color("Ciemnobrązowy", "#2B1710"),
+  preset6: color("Oliwkowy", "#22330B"),
+  preset21: color("Ciemnooliwkowy", "#162702"),
+  preset4: color("Zielony", "#063004"),
+  preset19: color("Ciemnozielony", "#032003"),
+  preset5: color("Morski", "#00373A"),
+  preset20: color("Ciemnomorski", "#003939"),
+  preset10: color("Stalowy", "#00333F"),
+  preset7: color("Niebieski", "#004659"),
+  preset22: color("Granatowy", "#002039"),
+  preset8: color("Fioletowy", "#3F3682"),
+  preset23: color("Ciemnofioletowy", "#240F3C"),
+  preset9: color("Żurawinowy", "#80215D"),
+  preset24: color("Ciemnożurawinowy", "#43002B"),
+  preset12: color("Szary", "#444241"),
+  preset13: color("Ciemnoszary", "#343231"),
+  preset11: color("Ciemnostalowy", "#282D2E"),
+  preset14: color("Czarny", "#000000"),
 } satisfies Record<string, OutlookColor>;
 
 export function getOutlookColor(key?: string | null): OutlookColor {

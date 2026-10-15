@@ -273,10 +273,10 @@ export default function EditTrainerModal({
                 label="Kolor kategorii Outlook"
                 value={outlookColor}
                 onChange={setOutlookColor}
-                options={Object.keys(OUTLOOK_COLORS).map((value) => ({
+                options={Object.entries(OUTLOOK_COLORS).map(([value, option]) => ({
                   value,
-                  label: value.replace("preset", "kolor"),
-                  color: getOutlookColor(value).border,
+                  label: option.name,
+                  color: option.border,
                 }))}
                 icon={
                   <span

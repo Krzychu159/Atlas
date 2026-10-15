@@ -38,7 +38,7 @@ function hasCategoryColor(session: CalendarSession) {
 
 // Uncategorized sessions follow the studio accent instead of a fixed Outlook blue.
 function sessionAccent(session: CalendarSession) {
-  return hasCategoryColor(session) ? getSessionOutlookColor(session).border : "var(--color-primary)";
+  return hasCategoryColor(session) ? getSessionOutlookColor(session).border : "var(--color-primary-container)";
 }
 
 function shortPersonName(fullName?: string | null) {
@@ -105,10 +105,10 @@ export default function SessionBlock<TSession extends CalendarSession>({
       title={label}
       style={{ ...style, "--session-accent": sessionAccent(session) } as CSSProperties}
       className={[
-        "@container group absolute flex flex-col overflow-hidden rounded-[var(--radius-default)] border-l-[3px] border-[var(--session-accent)] text-left outline-none transition-[background-color,box-shadow,opacity] duration-150",
-        "bg-[color-mix(in_srgb,var(--session-accent)_20%,var(--color-surface-container))] hover:z-10 hover:bg-[color-mix(in_srgb,var(--session-accent)_30%,var(--color-surface-container))] hover:shadow-ambient",
+        "@container group absolute flex flex-col overflow-hidden rounded-[var(--radius-default)] border-l-[3px] border-[color-mix(in_srgb,var(--session-accent)_55%,white)] text-left outline-none transition-[background-color,box-shadow,opacity] duration-150",
+        "bg-[var(--session-accent)] shadow-[inset_0_0_0_1px_rgb(255_255_255/0.06)] hover:z-10 hover:bg-[color-mix(in_srgb,var(--session-accent)_88%,white)] hover:shadow-ambient",
         "focus-visible:z-10 focus-visible:shadow-[0_0_0_2px_var(--color-primary-light)]",
-        selected ? "z-10 bg-[color-mix(in_srgb,var(--session-accent)_34%,var(--color-surface-container))] shadow-[0_0_0_2px_var(--color-primary-light)]" : "",
+        selected ? "z-10 bg-[color-mix(in_srgb,var(--session-accent)_85%,white)] shadow-[0_0_0_2px_var(--color-primary-light)]" : "",
         cancelled ? "opacity-55 hover:opacity-90" : "",
         tier === "line" ? "justify-center px-2" : "px-2 py-1.5",
       ].join(" ")}
@@ -116,7 +116,7 @@ export default function SessionBlock<TSession extends CalendarSession>({
       {tier === "line" ? (
         <span className="flex min-w-0 items-center gap-1.5 text-[11px] leading-4">
           <StatusMark status={session.status} pending={pending} />
-          <span className="shrink-0 font-semibold tabular-nums text-[color-mix(in_srgb,var(--session-accent)_45%,white)]">
+          <span className="shrink-0 font-semibold tabular-nums text-[color-mix(in_srgb,var(--session-accent)_30%,white)]">
             {formatTime(session.startAt)}
           </span>
           <span className={`min-w-0 truncate font-semibold text-on-surface ${cancelled ? "line-through" : ""}`}>{primary}</span>
@@ -124,7 +124,7 @@ export default function SessionBlock<TSession extends CalendarSession>({
       ) : (
         <>
           <span className="flex min-w-0 items-center gap-1.5 text-[11px] leading-4">
-            <span className="min-w-0 truncate font-semibold tabular-nums text-[color-mix(in_srgb,var(--session-accent)_45%,white)]">
+            <span className="min-w-0 truncate font-semibold tabular-nums text-[color-mix(in_srgb,var(--session-accent)_30%,white)]">
               {formatTime(session.startAt)}
               <span className="hidden @[110px]:inline"> – {formatTime(session.endAt)}</span>
             </span>
