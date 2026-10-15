@@ -34,20 +34,17 @@ export default function OwnerClientFilters({ value, trainerOptions, onChange }: 
 
   return (
     <FilterToolbar
-      gridClassName="md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_220px_240px_auto_auto]"
+      gridClassName="md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_240px_240px_auto_auto]"
       advancedId="client-advanced-filters"
       advancedOpen={advancedOpen}
-      advancedActiveCount={value.trainerFilter !== defaultOwnerClientFilters.trainerFilter ? 1 : 0}
+      advancedActiveCount={value.packageFilter !== defaultOwnerClientFilters.packageFilter ? 1 : 0}
       onAdvancedOpenChange={setAdvancedOpen}
       advanced={
         <CustomSelect
-          label="Trener"
-          value={value.trainerFilter}
-          onChange={(nextValue) => update("trainerFilter", nextValue)}
-          options={[
-            { value: "all", label: "Wszyscy trenerzy" },
-            ...trainerOptions.map((trainer) => ({ value: trainer, label: trainer })),
-          ]}
+          label="Pakiet"
+          value={value.packageFilter}
+          onChange={(nextValue) => update("packageFilter", nextValue as ClientPackageFilter)}
+          options={packageOptions}
         />
       }
       canClear={
@@ -64,10 +61,13 @@ export default function OwnerClientFilters({ value, trainerOptions, onChange }: 
         placeholder="Imię, nazwisko, e-mail lub telefon"
       />
       <CustomSelect
-        label="Pakiet"
-        value={value.packageFilter}
-        onChange={(nextValue) => update("packageFilter", nextValue as ClientPackageFilter)}
-        options={packageOptions}
+        label="Trener"
+        value={value.trainerFilter}
+        onChange={(nextValue) => update("trainerFilter", nextValue)}
+        options={[
+          { value: "all", label: "Wszyscy trenerzy" },
+          ...trainerOptions.map((trainer) => ({ value: trainer, label: trainer })),
+        ]}
       />
       <CustomSelect
         label="Sortuj"
