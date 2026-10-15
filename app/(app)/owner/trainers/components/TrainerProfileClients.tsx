@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, Users } from "lucide-react";
+import { ChevronRight, Users } from "lucide-react";
+import { PanelEmpty, PanelHeader } from "./TrainerProfilePanel";
 import type { Client } from "@/app/lib/owner/clients";
 import { formatTrainingStartDate } from "@/app/lib/formatters/date";
 
@@ -31,78 +32,55 @@ export default function TrainerProfileClients({
   });
 
   return (
-    <section className="card-shell p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-section-title">Aktywni klienci</p>
-          <p className="mt-2 text-sm text-on-surface-variant">
-            Obecnie pod opieką: {activeClients.length || clients.length} osób
-          </p>
-        </div>
-        <Link
-          href="/owner/clients"
-          className="inline-flex items-center gap-2 text-label text-primary-light"
-          prefetch={false}
-        >
-          Zobacz wszystkich
-          <ArrowRight size={15} />
-        </Link>
-      </div>
+    <section className="card-shell min-w-0 p-4 md:p-5">
+      <PanelHeader
+        icon={<Users size={15} />}
+        title="Klienci"
+        meta={`${activeClients.length} z aktywnym pakietem · ${clients.length} łącznie`}
+        href="/owner/clients"
+        linkLabel="Wszyscy klienci"
+      />
 
-      <div className="mt-5 flex flex-col gap-3">
-        {clients.length > 0 ? (
-          clients.slice(0, 5).map((client) => {
+      {clients.length > 0 ? (
+        <ul className="mt-3 flex flex-col gap-1">
+          {clients.slice(0, 5).map((client) => {
             const fullName = getClientName(client);
+            const detail = client.goal || client.email;
 
             return (
-              <Link
-                key={client.id}
-                href={`/owner/clients/${client.id}`}
-                prefetch={false}
-                className="grid grid-cols-[56px_1fr_auto] items-center gap-4 rounded-[var(--radius-lg)] bg-surface-container-low p-4 transition hover:bg-surface-container-high"
-              >
-                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-surface-container-lowest">
-                  {client.avatarUrl ? (
-                    <img
-                      src={client.avatarUrl}
-                      alt={fullName}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-sm font-semibold text-primary-light">
-                      {getInitials(client)}
-                    </span>
-                  )}
-                </div>
+              <li key={client.id}>
+                <Link
+                  href={`/owner/clients/${client.id}`}
+                  prefetch={false}
+                  className="group flex items-center gap-3 rounded-[var(--radius-md)] px-2 py-2 transition hover:bg-surface-container-low focus-visible:bg-surface-container-low focus-visible:outline-none"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-container-lowest ring-1 ring-white/5">
+                    {client.avatarUrl ? (
+                      <img src={client.avatarUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-[11px] font-semibold text-primary-light">{getInitials(client)}</span>
+                    )}
+                  </span>
 
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-on-surface">
-                    {fullName}
-                  </p>
-                  <p className="mt-1 truncate text-xs text-on-surface-muted">
-                    {client.goal || client.email || "Brak celu"}
-                  </p>
-                  <p className="mt-1 text-xs text-on-surface-muted sm:hidden">Rozpoczęcie treningów: {formatTrainingStartDate(client.trainingStartDate)}</p>
-                </div>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-on-surface">{fullName}</span>
+                    <span className="block truncate text-xs text-on-surface-muted">{detail || "Brak celu"}</span>
+                  </span>
 
-                <div className="hidden min-w-[120px] sm:block">
-                  <p className="text-xs text-on-surface-muted">
-                    Rozpoczęcie treningów
-                  </p>
-                  <p className="mt-1 text-xs font-semibold text-primary-light">{formatTrainingStartDate(client.trainingStartDate)}</p>
-                </div>
+                  <span className="hidden shrink-0 text-right sm:block">
+                    <span className="block text-[10px] uppercase tracking-wide text-on-surface-muted">Start</span>
+                    <span className="block text-xs font-semibold text-on-surface-variant">{formatTrainingStartDate(client.trainingStartDate)}</span>
+                  </span>
 
-                <ArrowRight size={18} className="text-primary-light sm:hidden" />
-              </Link>
+                  <ChevronRight size={15} className="shrink-0 text-on-surface-muted transition group-hover:translate-x-0.5 group-hover:text-primary-light" />
+                </Link>
+              </li>
             );
-          })
-        ) : (
-          <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-8 text-center text-on-surface-variant">
-            <Users className="mx-auto mb-3 text-primary-light" />
-            Ten trener nie ma jeszcze przypisanych klientów.
-          </div>
-        )}
-      </div>
+          })}
+        </ul>
+      ) : (
+        <PanelEmpty icon={<Users size={16} />}>Ten trener nie ma jeszcze przypisanych klientów.</PanelEmpty>
+      )}
     </section>
   );
 }

@@ -5,16 +5,29 @@ import Link from "next/link";
 import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 import {
   ArrowLeft,
+  Banknote,
+  CalendarCheck,
   FileSignature,
   Mail,
-  Phone,
+  MapPin,
   Pencil,
+  Phone,
   ReceiptText,
-  ShieldCheck,
+  Sparkles,
 } from "lucide-react";
-import { Button, ButtonLink } from "@/app/components/ui/button";
+import { Tooltip } from "@/app/components/ui/tooltip";
+import {
+  ProfileChip,
+  ProfileIconAction,
+  ProfileIconActions,
+  ProfileInfoStat,
+  ProfileMetaItem,
+  profilePrimaryActionClassName,
+  profileSecondaryActionClassName,
+} from "@/app/components/ui/profile-hero";
 import { getActiveTrainerHourlyRate, type TrainerRate } from "@/app/lib/owner/settlements";
 import type { Trainer } from "@/app/lib/owner/trainers";
+import { trainerStatus, trainerStatusLabel, type TrainerStatus } from "../trainer-list-display";
 
 function getInitials(trainer: Trainer) {
   const name = trainer.fullName || `${trainer.firstName} ${trainer.lastName}`;
@@ -33,6 +46,13 @@ function getRateLabel(trainer: Trainer, rates: TrainerRate[]) {
 
   return `${value} zł / h`;
 }
+
+const statusToneClasses: Record<TrainerStatus, string> = {
+  active: "bg-tertiary/15 text-tertiary-light",
+  paused: "bg-warning-light/15 text-warning-light",
+  inactive: "bg-surface-container-lowest text-on-surface-muted",
+  unknown: "bg-surface-container-lowest text-on-surface-muted",
+};
 
 export default function TrainerProfileHeader({
   trainer,
@@ -53,117 +73,107 @@ export default function TrainerProfileHeader({
   const settlementsHref = `/owner/trainers/${trainer.id}/settlements${
     selectedLocationId == null ? "" : `?locationId=${selectedLocationId}`
   }`;
+  const status = trainerStatus(trainer);
+  const locationNames = trainer.locationNames?.filter(Boolean) ?? [];
+  const bio = trainer.bio?.trim();
 
   return (
-    <section className="card-shell overflow-hidden p-5 md:p-8">
-      <div className="mb-7 flex items-center justify-between gap-4">
-        <Link
-          href="/owner/trainers"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-primary-light"
-        >
-          <ArrowLeft size={18} />
-          Lista trenerów
-        </Link>
-        <p className="text-label text-on-surface-muted">Profil trenera</p>
-      </div>
+    <section className="card-shell p-4 md:p-6">
+      <Link
+        href="/owner/trainers"
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-on-surface-muted transition hover:text-primary-light"
+      >
+        <ArrowLeft size={14} />
+        Lista trenerów
+      </Link>
 
-      <div className="grid gap-7 lg:grid-cols-[190px_1fr_190px] lg:items-start">
-        <div className="flex justify-center lg:justify-start">
-          <div className="relative shrink-0">
-            <div style={{ outlineColor: getOutlookColor(trainer.outlookCategoryColor).border }} className="flex h-40 w-40 items-center justify-center overflow-hidden rounded-[28px] bg-surface-container-lowest outline outline-4 outline-secondary">
-              {trainer.avatarUrl ? (
-                <img
-                  src={trainer.avatarUrl}
-                  alt={fullName}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <span className="text-[2.5rem] font-semibold text-primary-light">
-                  {getInitials(trainer)}
-                </span>
-              )}
+      <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <div
+            style={{ borderColor: getOutlookColor(trainer.outlookCategoryColor).border }}
+            className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-lg)] border-2 bg-surface-container-lowest md:h-[72px] md:w-[72px]"
+          >
+            {trainer.avatarUrl ? (
+              <img src={trainer.avatarUrl} alt={fullName} className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-xl font-semibold text-primary-light">{getInitials(trainer)}</span>
+            )}
+          </div>
+
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <ProfileChip className={statusToneClasses[status]}>{trainerStatusLabel(status)}</ProfileChip>
+              {trainer.role ? (
+                <ProfileChip className="bg-surface-container-lowest text-primary-light">{trainer.role}</ProfileChip>
+              ) : null}
             </div>
 
-            <div className="absolute -right-2 bottom-4 flex h-11 w-11 items-center justify-center rounded-full bg-tertiary-light text-on-tertiary shadow-soft">
-              <ShieldCheck size={18} />
+            <h1 className="mt-1.5 break-words font-display text-2xl font-semibold leading-tight tracking-tight md:text-[1.9rem]">
+              {fullName}
+            </h1>
+
+            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant">
+              <ProfileMetaItem icon={<Mail size={13} />} muted={!trainer.email}>
+                {trainer.email || "Brak e-maila"}
+              </ProfileMetaItem>
+              <ProfileMetaItem icon={<Phone size={13} />} muted={!trainer.phone}>
+                {trainer.phone || "Brak telefonu"}
+              </ProfileMetaItem>
             </div>
           </div>
         </div>
 
-        <div className="min-w-0">
-          <p className="text-label text-primary-light">
-            {trainer.role || "Personal performance coach"}
-          </p>
-
-          <h1 className="mt-3 font-display text-[2.7rem] font-semibold leading-[0.92] tracking-tight md:text-[4rem]">
-            {fullName}
-          </h1>
-
-          <div className="mt-5 flex flex-wrap gap-3">
-            <div className="inline-flex items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm text-on-surface">
-              <Mail size={16} className="text-primary-light" />
-              {trainer.email || "Brak e-maila"}
-            </div>
-
-            <div className="inline-flex items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3 text-sm text-on-surface">
-              <Phone size={16} className="text-primary-light" />
-              {trainer.phone || "Brak telefonu"}
-            </div>
-          </div>
-
-          <div className="mt-7 grid grid-cols-2 gap-4 border-t border-secondary/30 pt-6 md:grid-cols-4">
-            <HeroStat label="Sesje" value={trainer.sessionsCount ?? 0} />
-            <HeroStat label="Stawka" value={ratesAvailable ? getRateLabel(trainer, rates) : "Niedostępne"} />
-            <HeroStat label="BIO" value={trainer.bio || "Brak specjalizacji"} />
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-          <Button
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Link href={settlementsHref} className={profilePrimaryActionClassName}>
+            <ReceiptText size={15} />
+            Rozliczenia
+          </Link>
+          <button
             type="button"
             onClick={onEdit}
             disabled={!ratesAvailable}
-            size="lg"
-            icon={<Pencil size={16} />}
-            className="flex-1 p-4"
+            className={profileSecondaryActionClassName}
           >
-            Edytuj profil
-          </Button>
+            <Pencil size={14} className="text-primary-light" />
+            Edytuj
+          </button>
+          <ProfileIconActions>
+            <ProfileIconAction label="Umowa" onClick={onContracts} align="end">
+              <FileSignature size={15} />
+            </ProfileIconAction>
+          </ProfileIconActions>
+        </div>
+      </div>
 
-          <ButtonLink
-            type="button"
-            href={settlementsHref}
-            variant="secondary"
-            size="lg"
-            icon={<ReceiptText size={16} />}
-            className="flex-1 p-4 "
-          >
-            Rozliczenia
-          </ButtonLink>
-
-          <Button
-            type="button"
-            onClick={onContracts}
-            variant="outline"
-            size="lg"
-            icon={<FileSignature size={16} />}
-            className="flex-1 p-4"
-          >
-            Umowa
-          </Button>
+      <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-white/5 pt-4 lg:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,1.4fr)]">
+        <ProfileInfoStat icon={<CalendarCheck size={13} />} label="Sesje">
+          {trainer.sessionsCount ?? 0}
+        </ProfileInfoStat>
+        <ProfileInfoStat icon={<Banknote size={13} />} label="Stawka" muted={!ratesAvailable}>
+          {ratesAvailable ? getRateLabel(trainer, rates) : "Niedostępne"}
+        </ProfileInfoStat>
+        <ProfileInfoStat icon={<MapPin size={13} />} label="Lokalizacje" muted={!locationNames.length}>
+          {locationNames.length > 1 ? (
+            <Tooltip label={locationNames.join(", ")} align="start">
+              <span tabIndex={0} className="focus-visible:text-primary-light focus-visible:outline-none">
+                {locationNames[0]}
+                <span className="ml-1 text-xs font-medium text-on-surface-muted">+{locationNames.length - 1}</span>
+              </span>
+            </Tooltip>
+          ) : locationNames[0] || "Brak lokalizacji"}
+        </ProfileInfoStat>
+        <div className="col-span-2 min-w-0 lg:col-span-1">
+          <ProfileInfoStat icon={<Sparkles size={13} />} label="Specjalizacja" muted={!bio}>
+            {bio ? (
+              <Tooltip label={bio} align="start" className="max-w-full">
+                <span tabIndex={0} className="line-clamp-2 font-medium text-on-surface-variant focus-visible:text-primary-light focus-visible:outline-none">
+                  {bio}
+                </span>
+              </Tooltip>
+            ) : "Brak specjalizacji"}
+          </ProfileInfoStat>
         </div>
       </div>
     </section>
-  );
-}
-
-function HeroStat({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-label text-on-surface-muted">{label}</p>
-      <p className="mt-2 flex min-h-8 items-center text-2xl font-semibold leading-none text-on-surface">
-        {value}
-      </p>
-    </div>
   );
 }

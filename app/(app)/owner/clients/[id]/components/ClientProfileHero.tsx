@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 import {
   ArrowLeft,
   Archive,
@@ -21,6 +20,15 @@ import type { Client } from "@/app/lib/owner/clients";
 import { formatTrainingStartDate } from "@/app/lib/formatters/date";
 import ClientRewardProgress from "@/app/components/clients/ClientRewardProgress";
 import { Tooltip } from "@/app/components/ui/tooltip";
+import {
+  ProfileChip as Chip,
+  ProfileIconAction as IconAction,
+  ProfileIconActions,
+  ProfileInfoStat as InfoStat,
+  ProfileMetaItem as MetaItem,
+  profilePrimaryActionClassName,
+  profileSecondaryActionClassName,
+} from "@/app/components/ui/profile-hero";
 import type { MilestoneAccess } from "@/app/lib/milestones";
 import {
   getClientName,
@@ -140,7 +148,7 @@ export default function ClientProfileHero({
               type="button"
               onClick={onRestore}
               disabled={isRestorePending}
-              className="inline-flex h-10 items-center gap-2 rounded-[var(--radius-md)] bg-primary px-4 text-sm font-semibold text-on-primary shadow-soft transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-60"
+              className={profilePrimaryActionClassName}
             >
               <RotateCcw size={15} />
               {isRestorePending ? "Przywracanie..." : "Przywróć klienta"}
@@ -149,7 +157,7 @@ export default function ClientProfileHero({
           {!client.isArchived ? (
             <Link
               href={resolvedPaymentsHref}
-              className="inline-flex h-10 items-center gap-2 rounded-[var(--radius-md)] bg-primary px-4 text-sm font-semibold text-on-primary shadow-soft transition hover:bg-primary-container focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_35%,transparent)]"
+              className={profilePrimaryActionClassName}
             >
               <ReceiptText size={15} />
               Płatności
@@ -159,14 +167,14 @@ export default function ClientProfileHero({
             <button
               type="button"
               onClick={onEdit}
-              className="inline-flex h-10 items-center gap-2 rounded-[var(--radius-md)] bg-surface-container-low px-4 text-sm font-semibold text-on-surface transition hover:bg-surface-container-high focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_35%,transparent)]"
+              className={profileSecondaryActionClassName}
             >
               <Pencil size={14} className="text-primary-light" />
               Edytuj
             </button>
           ) : null}
           {onFiles || onPortalAction || onArchive || onEndCooperation ? (
-            <div className="flex items-center gap-1 rounded-[var(--radius-md)] bg-surface-container-lowest p-1">
+            <ProfileIconActions>
               {onFiles ? (
                 <IconAction label="Pliki klienta" onClick={onFiles}>
                   <Files size={15} />
@@ -194,7 +202,7 @@ export default function ClientProfileHero({
                   <UserRoundX size={15} />
                 </IconAction>
               ) : null}
-            </div>
+            </ProfileIconActions>
           ) : null}
         </div>
       </div>
@@ -231,98 +239,6 @@ export default function ClientProfileHero({
         )}
       </div>
     </section>
-  );
-}
-
-function InfoStat({
-  icon,
-  label,
-  muted = false,
-  children,
-}: {
-  icon: ReactNode;
-  label: string;
-  muted?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div className="min-w-0">
-      <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
-        <span className="text-primary-light">{icon}</span>
-        {label}
-      </p>
-      <div className={`mt-1 break-words text-sm font-semibold ${muted ? "text-on-surface-muted" : "text-on-surface"}`}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-
-function Chip({ className, children }: { className: string; children: ReactNode }) {
-  return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${className}`}>
-      {children}
-    </span>
-  );
-}
-
-function MetaItem({
-  icon,
-  label,
-  muted = false,
-  children,
-}: {
-  icon: ReactNode;
-  label?: string;
-  muted?: boolean;
-  children: ReactNode;
-}) {
-  const content = (
-    <span className={`inline-flex min-w-0 items-center gap-1.5 ${muted ? "text-on-surface-muted" : ""}`}>
-      <span className="shrink-0 text-primary-light">{icon}</span>
-      {label ? <span className="sr-only">{label}: </span> : null}
-      <span className="min-w-0 break-words">{children}</span>
-    </span>
-  );
-
-  return label ? <Tooltip label={label} align="start">{content}</Tooltip> : content;
-}
-
-function IconAction({
-  label,
-  href,
-  onClick,
-  disabled = false,
-  tone = "default",
-  align = "center",
-  children,
-}: {
-  label: string;
-  href?: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  tone?: "default" | "danger";
-  align?: "center" | "end";
-  children: ReactNode;
-}) {
-  const className = [
-    "inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] transition disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_35%,transparent)]",
-    tone === "danger" ? "text-error-light hover:bg-error-container/25" : "text-primary-light hover:bg-surface-container-high",
-  ].join(" ");
-
-  return (
-    <Tooltip label={label} align={align}>
-      {href ? (
-        <Link href={href} aria-label={label} className={className}>
-          {children}
-        </Link>
-      ) : (
-        <button type="button" aria-label={label} onClick={onClick} disabled={disabled} className={className}>
-          {children}
-        </button>
-      )}
-    </Tooltip>
   );
 }
 
