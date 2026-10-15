@@ -1,24 +1,19 @@
 "use client";
 
 import {
-  Building2,
   CreditCard,
-  MapPin,
   SlidersHorizontal,
-  UserRound,
-  UsersRound,
   X,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
+import { OwnerRemoteSelect } from "../../components/OwnerRemoteSelect";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { DateRangeFilter } from "@/app/components/ui/date-range-filter";
-import { TextField } from "@/app/components/ui/input";
+
 import { paymentMethodOptions } from "@/app/lib/owner/billing";
-import type { Client } from "@/app/lib/owner/clients";
 import type { Location } from "@/app/lib/owner/locations";
-import type { Trainer } from "@/app/lib/owner/trainers";
 import {
-  getCurrentMonthRange,
+
   type DictionaryOption,
   type LegalEntityOption,
 } from "../../expenses/expense-config";
@@ -78,8 +73,6 @@ type StatisticsFiltersProps = {
   advancedOpen: boolean;
   legalEntities: LegalEntityOption[];
   locations: Location[];
-  trainers: Trainer[];
-  clients: Client[];
   categories: DictionaryOption[];
   paymentStatuses: DictionaryOption[];
   hasFilters: boolean;
@@ -97,10 +90,8 @@ type StatisticsFiltersProps = {
 export default function StatisticsFilters({
   value,
   advancedOpen,
-  legalEntities,
-  locations,
-  trainers,
-  clients,
+
+
   categories,
   paymentStatuses,
   hasFilters,
@@ -157,32 +148,8 @@ export default function StatisticsFilters({
           ]}
           onChange={(nextValue) => onChange("locationId", nextValue)}
         /> */}
-        <CustomSelect
-          label="Trener"
-          value={value.trainerId}
-          icon={<UserRound size={16} />}
-          options={[
-            { value: "all", label: "Wszyscy" },
-            ...trainers.map((item) => ({
-              value: String(item.id),
-              label: item.fullName,
-            })),
-          ]}
-          onChange={(nextValue) => onChange("trainerId", nextValue)}
-        />
-        <CustomSelect
-          label="Klient"
-          value={value.clientId}
-          icon={<UsersRound size={16} />}
-          options={[
-            { value: "all", label: "Wszyscy" },
-            ...clients.map((item) => ({
-              value: String(item.id),
-              label: item.fullName,
-            })),
-          ]}
-          onChange={(nextValue) => onChange("clientId", nextValue)}
-        />
+        <OwnerRemoteSelect kind="trainers" label="Trener" value={value.trainerId} locationId={value.locationId === "all" ? null : Number(value.locationId)} onChange={nextValue => onChange("trainerId", nextValue)} />
+        <OwnerRemoteSelect kind="clients" label="Klient" value={value.clientId} locationId={value.locationId === "all" ? null : Number(value.locationId)} onChange={nextValue => onChange("clientId", nextValue)} />
         <Button
           type="button"
           variant={advancedOpen ? "primary" : "secondary"}

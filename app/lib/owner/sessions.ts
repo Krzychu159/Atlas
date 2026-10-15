@@ -1,5 +1,10 @@
 import type { GroupSessionFields, GroupSessionSettings } from "../group-sessions";
 import { backendDelete, backendGet, backendPost, backendPut } from "../backend";
+import type { PagedResult } from "./billing";
+
+export function getOwnerSessionPage(query: SessionFilterParams & { page: number; pageSize: number; order?: "asc" | "desc" }, signal?: AbortSignal) {
+  return backendGet<PagedResult<OwnerSession>>("sessions/filter", query, signal);
+}
 
 export type OwnerSessionParticipant = {
   id: number;

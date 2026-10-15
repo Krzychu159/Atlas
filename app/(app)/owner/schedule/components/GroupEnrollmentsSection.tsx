@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createStaffPaymentIntent } from "@/app/lib/owner/staff-payment-intent";
 import { Plus, RefreshCw, Users } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { OrganizationPortalScope } from "@/app/components/organization-theme";
 import SessionAccordion from "@/app/components/schedule/SessionAccordion";
 import { PaymentEntryModal } from "@/app/components/payments/PaymentEntryModal";
 import { PaymentActionConfirmModal } from "@/app/components/payments/PaymentActionConfirmModal";
-import { getClientBilling, createClientPayment, confirmClientPayment, paymentMethodOptions, type PaymentMethod, type ClientPayment, type ClientBillingSummary, type PagedResult } from "@/app/lib/owner/billing";
+import { getClientBilling, getPackagePaymentStatusLabel, confirmClientPayment, paymentMethodOptions, type PaymentMethod, type ClientPayment, type ClientBillingSummary, type PagedResult } from "@/app/lib/owner/billing";
 import { prepareGroupEnrollment, type PrepareGroupEnrollmentPayload, confirmGroupEnrollment, getGroupEnrollment, getGroupEnrollments, groupEnrollmentError, groupEnrollmentStatus, type GroupEnrollment } from "@/app/lib/owner/group-enrollments";
 import { attendanceLabel, groupSeatsLabel, isCancelledParticipant, type GroupSessionFields } from "@/app/lib/group-sessions";
 import { formatMoney } from "@/app/lib/formatters/money";
@@ -45,6 +46,8 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
   const [method, setMethod] = useState("3");
   const [note, setNote] = useState("");
   const lock = useRef(false);
+  const paymentIntent = useRef<ReturnType<typeof createStaffPaymentIntent> | null>(null);
+  const [paymentUnresolved, setPaymentUnresolved] = useState(false);
   const alive = useRef(true);
   const prepared = useRef<GroupEnrollment | null>(null);
   const observedPaymentRevision = useRef(0);
@@ -73,30 +76,11 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
     return request.then(async result => {
       if (!result || (result.items !== null && !Array.isArray(result.items)) || !Number.isSafeInteger(result.page) || result.page < 1 || !Number.isSafeInteger(result.pageSize) || result.pageSize < 1 || !Number.isSafeInteger(result.totalPages) || result.totalPages < 0 || !Number.isSafeInteger(result.totalCount) || result.totalCount < 0) throw new Error("Nie udało się pobrać zgłoszeń.");
       if (signal.aborted) return;
-      // The list already supplies current enrollments. Re-read awaiting rows after
-      // a payment change, and always revalidate the recently prepared enrollment.
-      const paymentChanged = paymentRevision !== observedPaymentRevision.current;
-      const last = prepared.current;
-      const rows = paymentChanged
-        ? await Promise.all((result.items || []).map(item => item.status === "Booked" ? item : getGroupEnrollment(item.id, signal)))
-        : [...(result.items || [])];
-      if (last && last.status !== "Booked") {
-        const index = rows.findIndex(item => item.id === last.id);
-        if (!paymentChanged || index < 0) {
-          const latest = await getGroupEnrollment(last.id, signal);
-          if (index < 0) rows.unshift(latest); else rows[index] = latest;
-        }
-      }
-      if (signal.aborted) return;
-      const ids = [...new Set(rows.filter(item => item.status !== "Booked").map(item => item.clientId))];
-      const snapshots = await Promise.allSettled(ids.map(id => getClientBilling(id, signal)));
-      if (signal.aborted) return;
-      const next: Record<number, ClientBillingSummary> = {};
-      snapshots.forEach((snapshot, index) => { if (snapshot.status === "fulfilled") next[ids[index]] = snapshot.value; });
+      const rows = result.items || [];
+      if (paymentRevision !== observedPaymentRevision.current) setBilling({});
       observedPaymentRevision.current = paymentRevision;
-      setBilling(next); setData({ ...result, items: rows });
+      setData(result);
       if (prepared.current) { const latest = rows.find(item => item.id === prepared.current?.id); if (latest) { prepared.current = latest; setRecent(latest); } }
-      if (snapshots.some(snapshot => snapshot.status === "rejected")) setBillingError("Nie udało się pobrać wszystkich płatności.");
     }).catch(err => { if (!signal.aborted) { setData(null); setBilling({}); setError(groupEnrollmentError(err)); } }).finally(() => { if (!signal.aborted) setLoading(false); });
   }, [sessionId, page, paymentRevision]);
 
@@ -135,7 +119,7 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
     finally { lock.current = false; if (alive.current) { setBusy(false); setRevision(value => value + 1); } }
   }
   async function confirm(item: GroupEnrollment) {
-    if (lock.current || !editable || !hasSession || full) return;
+    if (lock.current || !editable || !hasSession || full || item.clientIsArchived === true || !item.allowedActions?.includes("Confirm")) return;
     lock.current = true; setBusy(true); setActionError(""); setNotice("");
     try {
       const latest = await getGroupEnrollment(item.id);
@@ -148,6 +132,22 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
     } catch (err) { if (alive.current) setActionError(groupEnrollmentError(err)); }
     finally { await refreshSession(); lock.current = false; if (alive.current) { setBusy(false); setRevision(value => value + 1); } }
   }
+  async function loadPaymentContext(item: GroupEnrollment, openForm: boolean) {
+    if (lock.current || !editable || item.clientIsArchived === true) return;
+    lock.current = true; setBusy(true); setBillingError("");
+    try {
+      const snapshot = await getClientBilling(item.clientId);
+      if (!alive.current) return;
+      setBilling(current => ({ ...current, [item.clientId]: snapshot }));
+      if (openForm) {
+        const pkg = snapshot.packages?.find(pkg => pkg.clientPackageId === item.clientPackageId);
+        if (!pkg) throw new Error("Nie można odczytać wybranego pakietu. Sprawdź płatności klienta.");
+        setAmount(String(pkg.amountDue)); setNote(""); setMethod("3"); setPaymentItem(item);
+      }
+    } catch (err) { if (alive.current) setBillingError(groupEnrollmentError(err)); }
+    finally { lock.current = false; if (alive.current) setBusy(false); }
+  }
+
   async function savePayment() {
     if (lock.current || !paymentItem || !editable || !paymentPackage) return;
     const value = Number(amount.replace(",", "."));
@@ -155,13 +155,15 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
     lock.current = true; setBusy(true); setActionError("");
     const item = paymentItem;
     try {
-      await createClientPayment({ clientId: item.clientId, clientPackageId: item.clientPackageId, amount: value, method: Number(method) as PaymentMethod, note: note.trim() || null });
+      if (!paymentIntent.current) paymentIntent.current = createStaffPaymentIntent();
+      await paymentIntent.current.execute({ clientId: item.clientId, clientPackageId: item.clientPackageId, amount: value, method: Number(method) as PaymentMethod, note: note.trim() || null });
+      paymentIntent.current = null;
       if (alive.current) { setPaymentItem(null); setNotice("Wpłata została dodana. Sprawdź status zgłoszenia."); }
       notifyClientPaymentChanged(item.clientId);
       try { prepared.current = await getGroupEnrollment(item.id); if (alive.current) setRecent(prepared.current); }
       catch { if (alive.current) setActionError("Wpłata jest zapisana. Nie udało się odświeżyć zgłoszenia."); }
     } catch (err) { if (alive.current) setActionError(groupEnrollmentError(err)); }
-    finally { await refreshSession(); lock.current = false; if (alive.current) { setBusy(false); setRevision(value => value + 1); } }
+    finally { setPaymentUnresolved(paymentIntent.current?.unresolved ?? false); await refreshSession(); lock.current = false; if (alive.current) { setBusy(false); setRevision(value => value + 1); } }
   }
   async function confirmPayment() {
     if (lock.current || !paymentToConfirm || !editable) return;
@@ -204,12 +206,15 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
       const pkg = snapshot?.packages?.find(pkg => pkg.clientPackageId === item.clientPackageId);
       const payments = snapshot?.payments?.filter(payment => payment.clientPackageId === item.clientPackageId && isPaymentPending(payment)) || [];
       return <li key={item.id} className="rounded-[var(--radius-lg)] bg-surface-container-low p-3">
-        <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="break-words text-sm font-semibold">{snapshot?.clientName || labels[item.id]?.clientName || `Klient #${item.clientId}`}</p><p className="mt-1 text-xs text-on-surface-muted">{pkg?.packageName || labels[item.id]?.packageName || "Pakiet klienta"}</p></div><span className="rounded-full bg-surface-container px-2 py-1 text-xs text-info-light">{groupEnrollmentStatus(item.status)}</span></div>
-        {item.status === "AwaitingPayment" && pkg ? <p className="mt-2 text-sm text-on-surface-variant">Do opłacenia: {pkg.currency ? formatMoney(pkg.amountDue, pkg.currency) : pkg.amountDue.toFixed(2)}</p> : null}
+        <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="break-words text-sm font-semibold">{item.clientName || snapshot?.clientName || labels[item.id]?.clientName || `Klient #${item.clientId}`}</p><p className="mt-1 text-xs text-on-surface-muted">{item.packageName || pkg?.packageName || labels[item.id]?.packageName || "Pakiet klienta"}</p></div><span className="rounded-full bg-surface-container px-2 py-1 text-xs text-info-light">{groupEnrollmentStatus(item.status)}</span></div>
+        {item.status === "AwaitingPayment" ? <p className="mt-2 text-sm text-on-surface-variant">Do opłacenia: {item.amountDue.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p> : null}
+        {item.clientEmail || item.clientPhone ? <p className="mt-1 text-xs text-on-surface-muted">{[item.clientEmail, item.clientPhone].filter(Boolean).join(" · ")}</p> : null}
+        {item.packageTotalPrice != null ? <p className="mt-1 text-xs text-on-surface-muted">Pakiet teraz: {item.packageAmountPaid ?? "—"} z {item.packageTotalPrice} · {getPackagePaymentStatusLabel(item.packagePaymentStatus)} · wejścia {item.packageUsedEntries ?? "—"}/{item.packageTotalEntries ?? "—"}{item.packageIsActive === false ? " · nieaktywny" : ""}{item.packageValidUntil ? ` · ważny do ${new Intl.DateTimeFormat("pl-PL", { timeZone: "Europe/Warsaw" }).format(new Date(item.packageValidUntil))}` : ""}</p> : null}
         <div className="mt-3 flex flex-wrap gap-2">
-          {editable && item.status === "ReadyToBook" ? <Button type="button" size="sm" disabled={busy || full} onClick={() => void confirm(item)}>Potwierdź udział</Button> : null}
-          {editable && item.status === "AwaitingPayment" && pkg ? <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => { setAmount(String(pkg.amountDue)); setNote(""); setMethod("3"); setPaymentItem(item); }}>Dodaj wpłatę</Button> : null}
-          {editable ? payments.map(payment => <Button key={payment.id} type="button" variant="secondary" size="sm" disabled={busy} onClick={() => setPaymentToConfirm(payment)}>Potwierdź wpłatę {formatMoney(payment.amount, payment.currency)}</Button>) : null}
+          {editable && item.clientIsArchived !== true && item.allowedActions?.includes("Confirm") && item.status === "ReadyToBook" ? <Button type="button" size="sm" disabled={busy || full} onClick={() => void confirm(item)}>Potwierdź udział</Button> : null}
+          {editable && item.clientIsArchived !== true && item.allowedActions?.includes("RecordPayment") ? <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => void loadPaymentContext(item, true)}>Dodaj wpłatę</Button> : null}
+          {editable && item.clientIsArchived !== true && item.status === "AwaitingPayment" ? <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => void loadPaymentContext(item, false)}>Sprawdź wpłaty</Button> : null}
+          {editable && item.clientIsArchived !== true ? payments.map(payment => <Button key={payment.id} type="button" variant="secondary" size="sm" disabled={busy} onClick={() => setPaymentToConfirm(payment)}>Potwierdź wpłatę {formatMoney(payment.amount, payment.currency)}</Button>) : null}
           {item.status === "AwaitingPayment" ? <Link href={`/owner/clients/${item.clientId}/payments?clientPackageId=${item.clientPackageId}&groupEnrollmentId=${item.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center text-xs font-semibold text-primary-light">Historia płatności</Link> : null}
           {item.status === "PackageUnavailable" || item.status === "Unavailable" ? <span className="text-xs text-on-surface-muted">{item.status === "PackageUnavailable" ? "Wybierz inny pakiet, dodając uczestnika ponownie." : "Nie można teraz potwierdzić udziału."}</span> : null}
         </div>
@@ -219,7 +224,7 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
     {data && data.totalPages > 1 ? <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-on-surface-muted"><span>Strona {data.page} z {data.totalPages}</span><div className="flex gap-2"><Button type="button" size="sm" variant="secondary" disabled={busy || loading || page <= 1} onClick={() => setPage(value => value - 1)}>Poprzednia</Button><Button type="button" size="sm" variant="secondary" disabled={busy || loading || page >= data.totalPages} onClick={() => setPage(value => value + 1)}>Następna</Button></div></div> : null}
     {!loading && !error ? <Button type="button" variant="ghost" size="sm" icon={<RefreshCw size={14} />} disabled={busy} onClick={() => { setRevision(value => value + 1); void refreshSession(); }}>Odśwież</Button> : null}
     {paymentItem && typeof document !== "undefined" ? createPortal(<OrganizationPortalScope onSubmit={event => event.stopPropagation()}>
-      <PaymentEntryModal open eyebrow="Wpłata do pakietu" title="Dodaj wpłatę" description={billing[paymentItem.clientId]?.clientName || "Wpłata za pakiet uczestnika"} amount={amount} packageId={String(paymentItem.clientPackageId)} method={method} note={note} packageOptions={paymentPackage ? [{ value: String(paymentPackage.clientPackageId), label: paymentPackage.packageName || "Pakiet klienta", amountDue: paymentPackage.amountDue, currency: paymentPackage.currency }] : []} methodOptions={paymentMethodOptions.filter(option => option.value !== "4")} isSubmitting={busy} submitLabel="Dodaj wpłatę" submittingLabel="Zapisywanie…" emptyPackagesMessage="Nie udało się pobrać pakietu." onAmountChange={setAmount} onPackageChange={() => {}} onMethodChange={setMethod} onNoteChange={setNote} onClose={() => { if (!lock.current) setPaymentItem(null); }} onSubmit={() => void savePayment()} />
+      <PaymentEntryModal open eyebrow="Wpłata do pakietu" title="Dodaj wpłatę" description={billing[paymentItem.clientId]?.clientName || "Wpłata za pakiet uczestnika"} amount={amount} packageId={String(paymentItem.clientPackageId)} method={method} note={note} packageOptions={paymentPackage ? [{ value: String(paymentPackage.clientPackageId), label: paymentPackage.packageName || "Pakiet klienta", amountDue: paymentPackage.amountDue, currency: paymentPackage.currency }] : []} methodOptions={paymentMethodOptions.filter(option => option.value !== "4")} isSubmitting={busy} unresolved={paymentUnresolved} error={actionError} submitLabel="Dodaj wpłatę" submittingLabel="Zapisywanie…" emptyPackagesMessage="Nie udało się pobrać pakietu." onAmountChange={setAmount} onPackageChange={() => {}} onMethodChange={setMethod} onNoteChange={setNote} onClose={() => { if (!lock.current && !paymentIntent.current?.unresolved) { paymentIntent.current = null; setPaymentItem(null); } }} onSubmit={() => void savePayment()} />
       {actionError ? <p role="alert" className="fixed bottom-4 left-4 right-4 z-[60] rounded-lg bg-error-container p-3 text-sm text-error-light">{actionError}</p> : null}
     </OrganizationPortalScope>, document.body) : null}
     {paymentToConfirm && typeof document !== "undefined" ? createPortal(<OrganizationPortalScope><PaymentActionConfirmModal payment={paymentToConfirm} title="Potwierdź otrzymaną wpłatę" description="Potwierdź tylko pieniądze, które studio już otrzymało." confirmLabel="Potwierdź wpłatę" processing={busy} onClose={() => { if (!lock.current) setPaymentToConfirm(null); }} onConfirm={() => void confirmPayment()} />{actionError ? <p role="alert" className="fixed bottom-4 left-4 right-4 z-[60] rounded-lg bg-error-container p-3 text-sm text-error-light">{actionError}</p> : null}</OrganizationPortalScope>, document.body) : null}

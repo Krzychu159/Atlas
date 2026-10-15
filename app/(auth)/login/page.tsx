@@ -6,7 +6,7 @@ import { getErrorMessage } from "@/app/lib/backend";
 import { getLoginRedirectPath } from "@/app/lib/auth/redirect";
 import type { SessionRole } from "@/app/lib/auth/user";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AtSign,
@@ -35,24 +35,6 @@ function getLoginNotice(reason: string | null) {
   }
 
   return "";
-}
-
-function getInitialEmail() {
-  if (typeof window === "undefined") return "";
-
-  return new URLSearchParams(window.location.search).get("email") || "";
-}
-
-function getInitialResetToken() {
-  if (typeof window === "undefined") return "";
-
-  const params = new URLSearchParams(window.location.search);
-
-  return params.get("resetToken") || "";
-}
-
-function getInitialAuthMode(): AuthMode {
-  return getInitialResetToken() ? "reset" : "login";
 }
 
 function getAuthCopy(mode: AuthMode) {
@@ -139,10 +121,10 @@ function LoginLoadingOverlay({ mode }: { mode: AuthMode }) {
 export default function LoginPage() {
   const router = useRouter();
 
-  const [mode, setMode] = useState<AuthMode>(getInitialAuthMode);
-  const [email, setEmail] = useState(getInitialEmail);
+  const [mode, setMode] = useState<AuthMode>("login");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [resetToken, setResetToken] = useState(getInitialResetToken);
+  const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
@@ -150,13 +132,20 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [notice] = useState(() => {
-    if (typeof window === "undefined") return "";
-
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    let active = true;
     const params = new URLSearchParams(window.location.search);
-
-    return getLoginNotice(params.get("reason"));
-  });
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      const token = params.get("resetToken") || "";
+      setEmail(params.get("email") || "");
+      setResetToken(token);
+      setMode(token ? "reset" : "login");
+      setNotice(getLoginNotice(params.get("reason")));
+    });
+    return () => { active = false; };
+  }, []);
   const authCopy = getAuthCopy(mode);
 
   function changeMode(nextMode: AuthMode) {

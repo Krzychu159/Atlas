@@ -60,7 +60,7 @@ function profileFixture(trainer = false) {
     "@/app/lib/session-corrections": { useSessionCorrectionRevision: () => correction, usePaymentDateCorrectionRevision: () => 0 },
     "@/app/lib/owner/clients": Object.fromEntries(["getClient", "getClientSubscription", "getClientTrainingPlan", "getClientLegalConsents", "getClientRefunds", "getClientsByTrainer", "getClientClosurePreview"].map(name => [name, io.read(name)])),
     "@/app/lib/owner/billing": { getClientBilling: io.read("getClientBilling"), getClientPayments: io.read("getClientPayments") },
-    "@/app/lib/owner/sessions": { getClientSessions: io.read("getClientSessions"), getTrainerSessions: io.read("getTrainerSessions") },
+    "@/app/lib/owner/sessions": { getOwnerSessionPage: io.read("getOwnerSessionPage") },
     "@/app/lib/owner/trainers": { getTrainer: io.read("getTrainer") },
     "@/app/lib/owner/settlements": { getTrainerRates: io.read("getTrainerRates") },
   };
@@ -84,7 +84,7 @@ for (const trainer of [false, true]) test(`${trainer ? "trainer" : "client"} pro
   const core = calls.find(call => call.name === (trainer ? "getTrainer" : "getClient"));
   core.resolve({ id: 1, status: "active", isArchived: false }); await settle();
   assert.ok(find(render(), node => node.props[trainer ? "trainer" : "client"]?.id === 1));
-  const failed = calls.find(call => call.name === (trainer ? "getClientsByTrainer" : "getClientSessions"));
+  const failed = calls.find(call => call.name === (trainer ? "getClientsByTrainer" : "getOwnerSessionPage"));
   failed.reject(new Error("raw English failure")); await settle();
   const state = find(render(), node => node.props.error?.includes(trainer ? "klientów trenera" : "historii treningów"));
   assert.ok(state); state.props.retry(); await settle();
@@ -105,7 +105,7 @@ test("client changes cancel every old section; session corrections exclude folde
   assert.ok(find(render(), node => node.props.client?.id === 2));
   fixture.correction(); render(); h.commit(); await settle();
   assert.equal(calls.length, 22);
-  assert.deepEqual(calls.slice(16).map(call => call.name).sort(), ["getClient", "getClientSubscription", "getClientBilling", "getClientSessions", "getClientPayments", "getClientRefunds"].sort());
+  assert.deepEqual(calls.slice(16).map(call => call.name).sort(), ["getClient", "getClientSubscription", "getClientBilling", "getOwnerSessionPage", "getClientPayments", "getClientRefunds"].sort());
   h.unmount(); fixture.resolveAll(); await settle();
 });
 
@@ -115,7 +115,7 @@ test("package refresh retains its seven reads and propagates a partial read fail
   const packages = find(render(), node => "activeClientPackageId" in node.props && typeof node.props.onSaved === "function");
   const outcome = packages.props.onSaved().then(() => "ok", () => "failed"); await settle();
   assert.equal(calls.length, 15);
-  assert.deepEqual(calls.slice(8).map(call => call.name).sort(), ["getClient", "getClientSubscription", "getClientBilling", "getClientSessions", "getClientPayments", "getClientRefunds", "getClientClosurePreview"].sort());
+  assert.deepEqual(calls.slice(8).map(call => call.name).sort(), ["getClient", "getClientSubscription", "getClientBilling", "getOwnerSessionPage", "getClientPayments", "getClientRefunds", "getClientClosurePreview"].sort());
   calls.slice(8).forEach(call => {
     if (call.name === "getClientBilling") call.reject(new Error("failed refresh"));
     else if (call.name === "getClient") call.resolve({ id: 1, status: "active" });
@@ -253,24 +253,24 @@ test("schedule retains Outlook gate, cancels old dates, deduplicates local statu
   io.calls[3].reject(new Error("late error")); await settle(); assert.equal(errors.length, 0);
 });
 
-test("client list renders exactly one responsive row per client without introducing pagination", async () => {
+test("client list renders one responsive row per returned client and preserves server pagination", async () => {
   const h = hooks();
   const clients = Array.from({ length: 500 }, (_, index) => ({ id: index + 1, fullName: "Klient " + index, firstName: "Klient", lastName: String(index) }));
   const Page = load("app/(app)/owner/clients/page.tsx", {
-    react: h.react, "next/navigation": { useSearchParams: () => new URLSearchParams(), useRouter: () => ({ replace: stub }) },
-    "@/app/lib/owner/clients": { getClients: async () => clients },
+    react: h.react, "../components/use-owner-read": reader(h), "next/navigation": { useSearchParams: () => new URLSearchParams(), useRouter: () => ({ replace: stub }) },
+    "@/app/lib/owner/clients": { getOwnerClients: async () => ({ items: clients.slice(0, 25), page: 1, pageSize: 25, totalCount: 500, totalPages: 20, summary: { withActivePackageCount: 0 } }) },
     "@/app/lib/owner/location-filter": { useOwnerLocationFilter: () => ({ selectedLocationId: null }), matchesOwnerLocationId: () => true },
     "@/app/(app)/owner/clients/components/client-display": {
       getClientName: client => client.fullName, getClientBalance: () => 0, formatClientBalance: () => "0 zł",
       getClientPackageUsage: () => ({ percent: 0, label: "Brak", packageName: "Brak" }), hasActiveClientPackage: () => false, getPortalAccessLabel: () => "Brak konta",
     },
     "@/app/(app)/owner/clients/components/OwnerClientFilters": {
-      default: stub, defaultOwnerClientFilters: { search: "", packageFilter: "all", trainerFilter: "all", sort: "package-usage" },
+      default: stub, defaultOwnerClientFilters: { search: "", packageFilter: "all", trainerFilter: "all", sort: "newest" },
     },
     "@/app/(app)/owner/clients/components/client-list-display": { pluralizeClients: count => `${count} klientów` },
   }).default;
   const root = Page().props.children; const render = () => h.render(root.type, root.props);
-  render(); h.commit(); await settle();
+  render(); h.commit(); h.timers(); await settle();
   const rowIds = []; let pageLevelProfileLinks = 0, pagination = 0;
   function count(node) {
     if (!node || typeof node !== "object") return;
@@ -281,10 +281,10 @@ test("client list renders exactly one responsive row per client without introduc
     (Array.isArray(children) ? children.flat(Infinity) : [children]).forEach(count);
   }
   count(render());
-  assert.equal(rowIds.length, 500);
-  assert.equal(new Set(rowIds).size, 500);
+  assert.equal(rowIds.length, 25);
+  assert.equal(new Set(rowIds).size, 25);
   assert.equal(pageLevelProfileLinks, 0, "the page must not render a second, duplicated representation of each client");
-  assert.equal(pagination, 0);
+  assert.equal(pagination, 1);
   h.unmount();
 });
 

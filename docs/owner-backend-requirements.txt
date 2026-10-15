@@ -1,0 +1,96 @@
+ATLAS CRM — POTRZEBY FRONTENDU OWNERA OD BACKENDU
+Aktualizacja: 2026-10-15
+Podstawa: BACKEND_FOR_FRONTEND_OPTIMIZATION.md i stan integracji frontendu.
+Poniżej prośby o uzupełnienie lub potwierdzenie kontraktów, a nie opis nowych,
+już istniejących parametrów. Nazwy nowych sortowań powinien ustalić backend.
+
+1. NAJPIERW ZGODNOŚĆ WDROŻONEGO ODCZYTU KLIENTÓW
+GET /api/clients?page=1&pageSize=25
+W otrzymanej odpowiedzi brakuje summary (zaobserwowane przez błąd ekranu).
+Prosimy sprawdzić wdrożenie i rzeczywistą odpowiedź w organizacji użytkownika.
+Oczekiwany kształt według przekazanego dokumentu:
+{ items, page, pageSize, totalCount, totalPages,
+  summary: { activeClientsCount, withActivePackageCount } }
+- totalCount i oba liczniki z całego przefiltrowanego zbioru, nie bieżącej strony.
+- activeClientsCount = status Active; withActivePackageCount = aktywny pakiet.
+- Puste wyniki: items=[], totalCount=0, totalPages=0; poprawna strona/pageSize.
+Frontend został zabezpieczony: brak summary nie wyłącza listy, licznik pokazuje
+„—” z informacją o niedostępności. Brak koperty paginacji daje czytelny błąd,
+zamiast pustej listy. Nie wyliczamy globalnego licznika z 25 klientów.
+
+2. BRAKUJĄCE SORTOWANIA I WYSZUKIWANIE KLIENTÓW
+GET /api/clients (tryb paginowany)
+- Sortowanie po wykorzystaniu pakietu, saldzie rosnąco/malejąco i trenerze.
+- Sortowanie po dacie archiwizacji (archivedAt) dla archiwum.
+- Wyszukiwanie również po numerze telefonu.
+Każde sortowanie i filtr przed paginacją, stabilna dogrywka po identyfikatorze.
+Aktualnie zaakceptowano domyślnie „Najnowsi”, a brakujące warianty są oznaczone
+jako niedostępne. Główna lokalizacja klienta w filtrze jest już zatwierdzona.
+
+3. BRAKUJĄCE SORTOWANIA WPŁAT
+GET /api/billing/payments
+- Po nazwie klienta.
+- Po kwocie nadpłaty (balanceCreditAmount/overpaymentAmount).
+Potrzebne sortowanie całego zbioru przed paginacją, z jednoznaczną dogrywką.
+Nie jest potrzebna nowa decyzja o lokalizacji: używamy locationMatch=effective,
+zgodnie z decyzją użytkownika (lokalizacja wpłaty, potem główna klienta).
+
+4. PEŁNE PODSUMOWANIE ROZLICZEŃ TRENERÓW
+GET /api/owner/trainer-settlements
+- Dodać do summary globalne totalHours i totalSessions.
+- Definicja zgodna z pozycjami: tylko sesje objęte umową; nie nonContracted*.
+- Cały przefiltrowany zbiór, przed paginacją.
+- Zapewnić już opisane totalAmount, paidAmount, unpaidAmount, trainersCount,
+  paidTrainersCount również przy pustym wyniku.
+Bez summary frontend pokaże błąd, a nie sumę bieżącej strony jako globalną.
+Bez godzin/sesji odpowiednie kafelki pokazują brak danych.
+
+5. RODZAJ ROZLICZENIA W WYBORZE PAKIETU GRUPOWEGO
+GET /api/group-enrollments/sessions/{sessionId}/package-options?clientId=...
+- Dodać billingMode (SessionBased/PeriodBased) lub istniejący dyskryminator
+  packageType do offers[] i ownedPackages[].
+- Alternatywnie potwierdzić i opisać gwarancję wykluczenia usług okresowych.
+Obecne canSelect i liczba wejść nie zastępują informacji o rodzaju rozliczenia.
+Frontend nie pobiera katalogu; przed zapisem weryfikuje jedną wybraną ofertę
+przez istniejące GET packages/{id}. Usługa okresowa jest odrzucana przed POST.
+Po uzupełnieniu kontraktu zniknie ten dodatkowy odczyt i nieodpowiednia oferta
+nie pojawi się na liście wyboru.
+
+6. PEŁNE DANE POJEDYNCZEGO ZGŁOSZENIA GRUPOWEGO
+GET /api/group-enrollments/{id} i odpowiedź POST przygotowania zgłoszenia
+- Zwracać allowedActions i nowe dane klienta/pakietu tak jak w liście sesji,
+  albo udostępnić odczyt pojedynczego wzbogaconego zgłoszenia.
+Teraz pola te są null zgodnie z dokumentacją. Gdy nowe zgłoszenie nie trafi
+na pierwszą stronę listy, frontend nie ma autorytatywnego allowedActions.
+Nie chcemy odtwarzać dozwolonych akcji tylko ze statusu ani pobierać wszystkich stron.
+Opcjonalnie dodać walutę pakietu i identyfikatory oczekujących wpłat.
+Ich brak obecnie obsługuje zaakceptowany przez użytkownika odczyt rozliczenia
+dopiero po kliknięciu „Sprawdź wpłaty” lub „Dodaj wpłatę”.
+
+7. OPCJE WYBORU W FORMULARZACH
+GET /api/owner/filter-options
+- Przydatne metadane trenera: status i locationIds, bez pełnego profilu.
+- Możliwość odczytu/zachowania aktualnie przypisanej osoby, także nieaktywnej.
+- Dla wyboru uczestnika: warunek groupAccessEnabled zgodny z clients/filter.
+To usprawnienia, nie blokada działania obecnych formularzy. Bez rozszerzenia
+frontend może docelowo pobierać szczegóły jedynie wybranego trenera.
+Nie wolno zastąpić grupowego warunku dostępu samym przypisaniem do lokalizacji.
+
+8. DECYZJE BIZNESOWE I WERYFIKACJA PO STRONIE BACKENDU
+- Opłacenie rozliczenia trenera per lokalizacja: obecnie stan trener+miesiąc.
+  Zmiana wymaga ustalenia modelu i migracji; frontend tego nie naprawia.
+- Kwota opłaconego rozliczenia: obecnie odczyt przelicza ją na bieżąco.
+  Ustalić, czy po opłaceniu pokazywać zapisaną migawkę.
+- Idempotencja innych operacji finansowych: osobny kontrakt i ewentualna migracja.
+  Obecny Idempotency-Key dotyczy wyłącznie tworzenia wpłat przez personel.
+- Uruchomić OwnerPanelReadTests na PostgreSQL z TPAY_TEST_DB.
+  Dokument backendu podaje, że lokalnie testy te były pominięte.
+- Udostępnić środowisko do E2E: duże zbiory, paginacja, izolacja organizacji,
+  filtry, błędy i utrata odpowiedzi podczas tworzenia wpłaty.
+
+NAPRAWY FRONTENDU — NIE SĄ ZADANIEM DLA BACKENDU
+- Hydration mismatch logowania: parametry URL były odczytywane podczas pierwszego
+  renderu wyłącznie w przeglądarce. Teraz odczyt następuje po zamontowaniu;
+  początkowy HTML serwera i klienta jest identyczny.
+- Awaria przy braku summary: zabezpieczony odczyt i jawny brak licznika.
+- Rozliczenia: brak globalnego summary nie może uruchomić sumowania jednej strony.

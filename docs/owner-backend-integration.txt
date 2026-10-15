@@ -1,0 +1,193 @@
+ATLAS CRM — INTEGRACJA OPTYMALIZACJI FRONTENDU OWNERA
+Data: 2026-10-15
+Branch: main
+
+STAN
+Zintegrowano główne odczyty w etapach 1, 2, 4, 5 i 6 oraz tworzenie wpłat Ownera (etap 7).
+Etap 3 obejmuje filtry listy klientów i statystyk; pozostałe selektory opisano poniżej.
+Zmiany są lokalne. Nie wykonano builda, commita, push ani merge. Nie zmieniano backendu.
+Zachowano wcześniejszy redesign i istniejące akcje. Nie modyfikowano .claude/.
+Źródło kontraktów: docs/BACKEND_FOR_FRONTEND_OPTIMIZATION.md, skopiowane z dokumentu użytkownika.
+
+1. ZMIENIONE I NOWE PLIKI
+ - app/(app)/owner/clients/[id]/components/ClientSessionHistory.tsx
+ - app/(app)/owner/clients/[id]/page.tsx
+ - app/(app)/owner/clients/[id]/payments/ClientPaymentsPageClient.tsx
+ - app/(app)/owner/clients/components/OwnerClientFilters.tsx
+ - app/(app)/owner/clients/page.tsx
+ - app/(app)/owner/payments/components/PaymentFilters.tsx
+ - app/(app)/owner/payments/page.tsx
+ - app/(app)/owner/schedule/components/GroupEnrollmentsSection.tsx
+ - app/(app)/owner/settlements/components/SettlementSummary.tsx
+ - app/(app)/owner/settlements/components/SettlementTrainerRow.tsx
+ - app/(app)/owner/settlements/page.tsx
+ - app/(app)/owner/statistics/components/StatisticsFilters.tsx
+ - app/(app)/owner/statistics/page.tsx
+ - app/(app)/owner/trainers/[id]/page.tsx
+ - app/(app)/owner/trainers/components/TrainerSchedulePanel.tsx
+ - app/api/backend/[...path]/route.ts
+ - app/components/payments/PaymentDisplay.tsx
+ - app/components/payments/PaymentEntryModal.tsx
+ - app/components/payments/PaymentPagination.tsx
+ - app/lib/owner/billing.ts
+ - app/lib/owner/clients.ts
+ - app/lib/owner/group-enrollments.ts
+ - app/lib/owner/sessions.ts
+ - app/lib/owner/settlements.ts
+ - app/lib/payments/display.ts
+ - tests/owner-public-packages.test.mjs
+ - tests/owner-public-sessions.test.mjs
+ - tests/owner-stage-two.test.mjs
+ - tests/public-group-classes.test.mjs
+ - app/(app)/owner/components/OwnerRemoteSelect.tsx
+ - app/lib/owner/filter-options.ts
+ - app/lib/owner/payment-list-query.ts
+ - app/lib/owner/staff-payment-intent.ts
+ - tests/owner-backend-integration.test.mjs
+ - docs/BACKEND_FOR_FRONTEND_OPTIMIZATION.md
+ - docs/owner-backend-integration.txt
+
+2. INTEGRACJE
+- GET billing/payments: paginacja Ownera po 8, totalCount/totalPages z serwera,
+  filtry i obsługiwane sortowania przed paginacją, debounce 250 ms, anulowanie,
+  błędy i ponowienie. Nie pobiera klientów ani ich rozliczeń do ustalenia lokalizacji.
+  Nowe pola lokalizacji efektywnej, nadpłat i bieżącego stanu pakietu.
+  Stan pakietu oznaczony jako „Pakiet teraz”, bez interpretacji historycznej.
+  Pozostawiono dotychczasową odrębną ścieżkę trenera; zawiera legacy pageSize=1000.
+- GET owner/trainer-settlements: pojedynczy odczyt, strona 25, wyszukiwanie,
+  kwoty całego zbioru z summary. Szczegóły i oznaczanie rozliczenia bez zmian.
+  Błąd nie jest zastępowany kwotą 0 zł. Godziny/sesje globalne pokazują brak danych,
+  ponieważ summary nie zawiera tych sum. Nie sumowano wyłącznie bieżącej strony.
+- GET owner/filter-options: klient/trener w statystykach, trener na liście klientów.
+  Wyszukiwanie 250 ms, limit 20, lokalizacja, odczyt po otwarciu, anulowanie,
+  retry, zachowanie wybranej osoby, obsługa Escape i klawiatury.
+- GET clients?page=...: aktywna lista klientów po 25, filtry trener/lokalizacja/
+  pakiet/isArchived=false, wyszukiwanie nazwiska lub e-maila, sortowanie newest/name.
+  Liczniki z totalCount i summary.withActivePackageCount, zachowane responsywne wiersze.
+  Nieobsługiwane sortowania oznaczone jako niedostępne i nie wysyłają zapytań.
+- GET sessions/filter?page=...: historia klienta po 25; sesje profilu trenera po 4.
+  Kolejne strony bez pobierania całości. Liczniki sekcji klienta opisane „na tej stronie”.
+  Grafik nadal korzysta z dotychczasowego trybu bez paginacji.
+- GET group-enrollments/sessions/{sessionId}: lista po 25 z danymi klienta/pakietu
+  i allowedActions. Brak dodatkowego odczytu rozliczenia dla każdego wiersza.
+  „Sprawdź wpłaty”/„Dodaj wpłatę” pobiera jedno rozliczenie wybranego klienta.
+  Potwierdzanie nadal sprawdza szczegóły wybranego zgłoszenia przed zapisem.
+- GET .../package-options: komplet danych oferty z odpowiedzi; bez całego katalogu.
+  Dokument nie zawiera billingMode. Przed przygotowaniem zapisu jeden odczyt wybranej
+  oferty przez istniejące GET packages/{id} chroni wykluczenie usług okresowych.
+  Lista ofert bez dyskryminatora nadal może pokazać usługę, którą zapis następnie odrzuci.
+- POST billing/payments + GET owner/operations/{key}: podłączone do formularza
+  płatności klienta Ownera i wpłaty w zgłoszeniu grupowym. UUID na intencję,
+  identyczne ponowienie z tym samym kluczem, blokada podwójnego kliknięcia,
+  sprawdzenie niepewnego wyniku, odzyskanie Completed bez drugiego POST,
+  jawne ponowienie po NotFound, konflikt 409 bez automatycznego powtórzenia.
+  Niepewny wynik zachowuje i blokuje edycję/zamykanie formularza.
+  BFF przekazuje nagłówek tylko dla POST billing/payments.
+  Potwierdzanie, odrzucanie, cofanie i paragony nie otrzymały nowych kluczy.
+  Formularz trenera zachowuje swój odrębny kontrakt.
+
+3. LICZBA ODCZYTÓW PRZED / PO
+To analiza kodu i testów z atrapami, nie pomiar Network na rzeczywistym backendzie.
+Nie uwzględnia stałych słowników, autoryzacji ani reakcji na zapis/odświeżenie.
+U = liczba klientów wymagających dociągnięcia; T = liczba trenerów.
+- Płatności Ownera z lokalizacją: 2+U -> 1 odczyt strony (8 pozycji).
+- Rozliczenia trenerów: 1+T -> 1 odczyt strony (25) z globalnym summary.
+- Lista klientów: 1 pełna tablica -> 1 strona (25); następna strona = 1 odczyt.
+- Statystyki: usunięte dwa pełne odczyty klientów i trenerów dla filtrów;
+  otwarcie/wyszukanie w selektorze = 1 odczyt, do 20 opcji każdego rodzaju.
+- Historia: 1 pełna tablica -> 1 strona (25 klient / 4 trener), przejście = 1 odczyt.
+- Zgłoszenia grupowe: lista + U rozliczeń -> 1 lista; jawne sprawdzenie = 1 rozliczenie.
+- Oferty grupowe: opcje + katalog + ewentualne brakujące szczegóły -> 1 opcje;
+  przygotowanie zapisu dodatkowo sprawdza wyłącznie wybraną ofertę (1 odczyt).
+- Niepewny POST wpłaty: 1 POST + 1 sprawdzenie operacji; brak automatycznego retry zapisu.
+
+4. ZATWIERDZONE DECYZJE UŻYTKOWNIKA
+- Lokalizacja płatności: effective (wpłata, potem główna lokalizacja klienta).
+- Lista klientów: główna lokalizacja zamiast uwzględniania członkostwa grupowego.
+- Domyślnie Najnowsi; brakujące sortowania pozostają widoczne jako niedostępne.
+- Rozliczenie uczestnika grupowego dopiero po kliknięciu odpowiedniej akcji.
+- Zachowano znaczenie licznika klientów z aktywnym pakietem,
+  bez zastępowania go liczbą klientów ze statusem Active.
+
+5. WALIDACJA
+- TypeScript: npx tsc --noEmit --incremental false — OK.
+- ESLint zmienionych plików TS/TSX i nowych adapterów/komponentu — OK.
+- Testy: node --test tests/*.test.mjs — końcowy wynik zapisany poniżej.
+- Nowe testy: idempotencja, timeout/Completed, NotFound i ten sam klucz,
+  brak ponownego POST przy awarii sprawdzenia, 409, 400/401/403/404,
+  równoległe kliknięcie, niezgodny odzyskany wynik, filtry/paginacja/anulowanie,
+  brak katalogu ofert, odrzucenie usługi okresowej, brak N+1 listy zgłoszeń.
+- Zaktualizowano testy etap 2 do paginowanych historii i listy klientów.
+- Naprawiono przestarzałe atrapy importów w testach publicznych pakietów/sesji
+  i BFF; test uczestników respektuje istniejącą obsługę zapisów grupowych.
+  Nie zmieniano przy tym produkcyjnej logiki kalendarza ani pakietów.
+- git diff --check — końcowy wynik poniżej.
+- Nie wykonywano rzeczywistych wywołań backendu, testów przeglądarkowych,
+  pomiarów czasu ani testów motywów ATLAS/BSworkout na uruchomionej aplikacji.
+
+6. POZOSTAŁE PRACE FRONTENDU
+- Selektory w AddClientModal i InviteUserModal nadal pobierają listę trenerów.
+  Ich aktualna logika używa statusu oraz locationIds, których filter-options nie zwraca.
+  Do dalszej integracji: wyszukiwany selektor i walidacja szczegółów wybranego trenera,
+  albo rozszerzenie opcji o te dane. Nie podmieniono ich przez uproszczoną listę,
+  która zmieniłaby dotychczasowe ograniczenia wyboru.
+- EditClientModal także używa szczegółów trenerów do ostrzeżenia o lokalizacji.
+  Wymaga zachowania przypisanego (również nieaktywnego) trenera i jego metadanych.
+- Archiwum klientów pozostaje na dotychczasowym odczycie: potrzebuje sortowania
+  archivedAt, którego paginowany kontrakt nie obsługuje.
+- Wybór klienta w zapisie grupowym zachowuje clients/filter z groupAccessEnabled=true.
+  filter-options nie przyjmuje tego warunku i nie zastępuje go dokładnie.
+- Pełne dane Grafiku nie są traktowane jako zbędne opcje: służą też do edycji
+  i wyświetlania sesji; ich mechaniki nie zmieniano.
+- Nie przenoszono tej integracji na osobne endpointy portalu trenera ani klienta.
+- Wykonać E2E z rzeczywistym backendem i zbiorem 1000+ wpłat, zmianami stron,
+  lokalizacji, pustymi wynikami, błędami i przerwaniem połączenia podczas zapisu.
+
+7. POTRZEBY BACKENDU / DECYZJE
+Wymagane do pełnego odtworzenia dotychczasowych możliwości:
+- clients: sortowanie według wykorzystania pakietu, salda i trenera;
+  wyszukiwanie telefonu, sortowanie archivedAt dla archiwum.
+- billing/payments: sortowanie klienta i nadpłaty.
+- trainer-settlements.summary: globalne totalHours i totalSessions z tą samą
+  definicją co pozycje, aby przywrócić oba kafelki bez pobierania wszystkich stron.
+- package-options: billingMode/packageType w offers i ownedPackages, albo jawna
+  gwarancja, że usługi okresowe są wykluczone. Wtedy można usunąć sprawdzenie
+  wybranej oferty i nie pokazywać nieodpowiednich usług na liście.
+- group-enrollments: allowedActions i dane listy również w odpowiedzi POST/GET {id},
+  albo możliwość odczytu pojedynczego wzbogaconego zgłoszenia. Dziś niedawno dodane
+  zgłoszenie spoza aktualnej strony może nie mieć przycisku do czasu odnalezienia
+  na liście; nie wywnioskowano uprawnień wyłącznie ze statusu.
+Opcjonalne usprawnienia (obecne obejścia są jawne):
+- Opcje trenera z metadanymi status/locationIds i odczyt zachowanej wybranej osoby;
+  opcje klientów z groupAccessEnabled dla wyboru uczestnika.
+- Waluta i identyfikatory oczekujących wpłat w zgłoszeniu grupowym usunęłyby
+  zatwierdzony przez użytkownika dodatkowy odczyt rozliczenia po kliknięciu.
+Decyzje biznesowe pozostawione po stronie backendu:
+- Opłacenie rozliczenia trenera per lokalizacja (obecnie trener+miesiąc).
+- Wyświetlanie migawki opłaconej kwoty zamiast bieżącej kalkulacji.
+- Idempotencja pozostałych operacji finansowych wymaga osobnego kontraktu/migracji.
+- Uruchomienie OwnerPanelReadTests na PostgreSQL z TPAY_TEST_DB: dokument backendu
+  podaje, że te testy były pominięte; frontend ich nie uruchamiał.
+
+8. RYZYKA I GOTOWOŚĆ E2E
+- Kod nadaje się do rozpoczęcia E2E głównych zintegrowanych ścieżek,
+  z powyższymi ograniczeniami; nie jest potwierdzony jako gotowy do produkcji.
+- Nowe kwoty pakietu i odzyskany wynik operacji opisują stan bieżący.
+- Historie są dzielone na strony; sekcje klienta pokazują grupy z bieżącej strony.
+- Klucze wpłat i formularze żyją w pamięci zamontowanego widoku. Pełne przeładowanie
+  lub opuszczenie strony kończy ten kontekst; po nim należy sprawdzić historię wpłat.
+  Nie zapisano danych finansowych w localStorage ani globalnym cache.
+- Nowych odczytów Ownera nie stosowano automatycznie w portalu trenera.
+- Zachowano tematyczne klasy komponentów; wizualna regresja obu motywów wymaga E2E.
+
+WYNIK KOŃCOWY: 201 testów, 200 zaliczonych, 0 błędów, 1 pominięty (PUBLIC_TEST_ORIGIN). Nowy zestaw integracji: 13/13. TypeScript i ESLint zmienionych TS/TSX: OK. Sprawdzono też przekazanie Idempotency-Key przez BFF wyłącznie do tworzenia wpłaty. Formularz ostrzega przed przeładowaniem podczas zapisu lub przy niepewnym wyniku.
+git diff --check: OK. Brak zmian backendu, builda, commitów, push i merge.
+
+POPRAWKI PO ZGŁOSZENIU REGRESJI (2026-10-15):
+- Logowanie: stały stan początkowy SSR/przeglądarki; reason/email/resetToken odczytywane po zamontowaniu. Bez wyłączania SSR i bez suppressHydrationWarning.
+- Klienci: opcjonalne summary, brak licznika pokazany jako — i komunikat; lista nadal dostępna. Zabezpieczenie przed starą tablicą i niepoprawną paginacją.
+- Rozliczenia: niekompletne globalne summary daje czytelny błąd; bez zastępowania sumami strony.
+- Nowe testy regresji porównują początkowy HTML logowania, komunikaty sesji/zaproszenia, reset hasła oraz brak/null/puste/zerowe summary.
+- Lista potrzeb backendu: docs/owner-backend-requirements.txt.
+- Aktualne testy: 211 testów, 210 zaliczonych, 0 błędów, 1 pominięty (PUBLIC_TEST_ORIGIN).
+Kontrola poprawek: TypeScript OK; ESLint 0 błędów, 1 istniejące ostrzeżenie img w logowaniu; git diff --check OK. Testy porównują HTML w izolacji — nie zastępują testu hydratacji w przeglądarce ani rzeczywistego backendu.

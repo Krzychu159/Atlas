@@ -5,6 +5,21 @@ import {
   backendPost,
   backendPut,
 } from "../backend";
+import type { PagedResult } from "./billing";
+
+export type OwnerClientsQuery = { page: number; pageSize: number; search?: string; trainerId?: number; locationId?: number | null; isArchived?: boolean; status?: "New" | "Active" | "Inactive"; packageStatus?: "active" | "none"; sort?: "createdDesc" | "created" | "name" | "nameDesc"; order?: "asc" | "desc" };
+export type OwnerClientsPage = PagedResult<Client> & { summary?: { activeClientsCount?: number; withActivePackageCount?: number } | null };
+export async function getOwnerClients(query: OwnerClientsQuery, signal?: AbortSignal) {
+  const result = await backendGet<OwnerClientsPage>("clients", query, signal);
+  if (!result || Array.isArray(result) || !Array.isArray(result.items) ||
+    !Number.isSafeInteger(result.page) || result.page < 1 ||
+    !Number.isSafeInteger(result.pageSize) || result.pageSize < 1 ||
+    !Number.isSafeInteger(result.totalCount) || result.totalCount < 0 ||
+    !Number.isSafeInteger(result.totalPages) || result.totalPages < 0) {
+    throw new Error("Nie udało się odczytać listy klientów. Spróbuj ponownie.");
+  }
+  return result;
+}
 
 export type ClientStatus = "active" | "suspended" | "new" | string;
 export type PortalAccessStatus =

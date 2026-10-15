@@ -68,6 +68,8 @@ async function handler(req: NextRequest, context: RouteContext) {
             }
           : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(req.method === "POST" && backendPath.toLowerCase() === "billing/payments" && req.headers.get("idempotency-key")
+          ? { "Idempotency-Key": req.headers.get("idempotency-key")! } : {}),
       },
       body: body?.byteLength ? body : undefined,
       cache: "no-store",

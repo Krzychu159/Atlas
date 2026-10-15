@@ -3,12 +3,16 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
+import { load } from "./owner-read-harness.mjs";
 
 const api = {};
 vm.runInNewContext(ts.transpileModule(
   fs.readFileSync("app/(app)/owner/packages/package-form.ts", "utf8"),
   { compilerOptions: { module: ts.ModuleKind.CommonJS } },
-).outputText, { exports: api });
+).outputText, { exports: api, require: name => {
+  if (name === "@/app/lib/period-packages") return load("app/lib/period-packages.ts");
+  throw new Error(`Unexpected dependency: ${name}`);
+} });
 
 const standard = { ...api.createPackageForm(), name: "Pakiet", price: "199", sessionsLimit: "4", durationDays: "30" };
 const group = { ...standard, billingType: "5", locationId: "4", participantsCount: "20", isPubliclyAvailable: true, publicSlug: "grupowe-4-wejscia" };

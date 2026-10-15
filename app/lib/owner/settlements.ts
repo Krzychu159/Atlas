@@ -4,7 +4,7 @@ import {
   backendPost,
   backendPut,
 } from "../backend";
-import { getTrainers, type Trainer } from "./trainers";
+import type { PagedResult } from "./billing";
 
 export type TrainerRate = {
   id: number;
@@ -58,33 +58,6 @@ export type TrainerMonthlySettlement = {
   items: TrainerSettlementItem[] | null;
   nonContractedItems: TrainerSettlementItem[] | null;
 };
-
-function emptySettlement(
-  trainer: Trainer,
-  year: number,
-  month: number,
-): TrainerMonthlySettlement {
-  return {
-    trainerId: trainer.id,
-    locationId: null,
-    trainerFullName:
-      trainer.fullName || `${trainer.firstName} ${trainer.lastName}`,
-    year,
-    month,
-    totalHours: 0,
-    totalSessions: 0,
-    totalAmount: 0,
-    contractedTotalHours: 0,
-    contractedTotalSessions: 0,
-    contractedTotalAmount: 0,
-    nonContractedTotalHours: 0,
-    nonContractedTotalSessions: 0,
-    isPaid: false,
-    paidAt: null,
-    items: [],
-    nonContractedItems: [],
-  };
-}
 
 export function getTrainerRates(trainerId: number, signal?: AbortSignal) {
   return backendGet<TrainerRate[]>(`Trainers/${trainerId}/rates`, undefined, signal);
@@ -150,19 +123,15 @@ export function downloadTrainerWorkHoursDocument(
   );
 }
 
-export async function getOwnerTrainerSettlements(year: number, month: number, locationId: number | null = null) {
-  const trainers = await getTrainers();
-  const results = await Promise.allSettled(
-    trainers.map((trainer) => getTrainerSettlement(trainer.id, year, month, locationId ?? undefined)),
-  );
-
-  return trainers.map((trainer, index) => {
-    const result = results[index];
-
-    if (result.status === "fulfilled") {
-      return result.value;
-    }
-
-    return emptySettlement(trainer, year, month);
-  }).filter((settlement) => locationId === null || settlement.totalSessions > 0);
+export type OwnerSettlementSummary = { totalAmount: number; paidAmount: number; unpaidAmount: number; trainersCount: number; paidTrainersCount: number };
+export type OwnerSettlementItem = Pick<TrainerMonthlySettlement, "trainerId" | "trainerFullName" | "totalHours" | "totalSessions" | "totalAmount" | "isPaid" | "paidAt" | "nonContractedTotalHours" | "nonContractedTotalSessions">;
+export type OwnerSettlementPage = PagedResult<OwnerSettlementItem> & { year: number; month: number; locationId: number | null; summary: OwnerSettlementSummary; asOf: string; timeZone: string };
+export async function getOwnerTrainerSettlements(year: number, month: number, locationId: number | null = null, query: { search?: string; page?: number; pageSize?: number } = {}, signal?: AbortSignal) {
+  const result = await backendGet<OwnerSettlementPage>("owner/trainer-settlements", { year, month, locationId, ...query }, signal);
+  const summary = result?.summary;
+  if (!summary || ![summary.totalAmount, summary.paidAmount, summary.unpaidAmount].every(value => typeof value === "number" && Number.isFinite(value)) ||
+    ![summary.trainersCount, summary.paidTrainersCount].every(value => Number.isSafeInteger(value) && value >= 0)) {
+    throw new Error("Nie udało się odczytać podsumowania rozliczeń. Spróbuj ponownie.");
+  }
+  return result;
 }

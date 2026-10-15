@@ -9,6 +9,7 @@ type PaymentPaginationProps = {
   onPageChange: (page: number) => void;
   itemLabel?: string;
   ariaLabel?: string;
+  totalPages?: number;
 };
 
 export function PaymentPagination({
@@ -18,8 +19,9 @@ export function PaymentPagination({
   onPageChange,
   itemLabel = "płatności",
   ariaLabel = "Paginacja płatności",
+  totalPages: serverTotalPages,
 }: PaymentPaginationProps) {
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const totalPages = Math.max(1, serverTotalPages ?? Math.ceil(totalItems / pageSize));
   const firstItem = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
   const lastItem = Math.min(page * pageSize, totalItems);
   const visiblePages = getVisiblePages(page, totalPages);

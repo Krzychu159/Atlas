@@ -11,13 +11,14 @@ import { ListState } from "@/app/components/ui/list/ListState";
 
 import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, SearchX, Users } from "lucide-react";
 import {
   getOwnerTrainerSettlements,
-  type TrainerMonthlySettlement,
 } from "@/app/lib/owner/settlements";
-import { showOwnerError } from "../components/owner-toast";
+import { useOwnerRead } from "../components/use-owner-read";
+import { OwnerReadState } from "../components/OwnerReadState";
+import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import SettlementSummary from "./components/SettlementSummary";
 import SettlementTrainerRow, { settlementGridClass, settlementGridStyle } from "./components/SettlementTrainerRow";
 
@@ -66,7 +67,7 @@ function normalize(value: string) {
 export default function OwnerSettlementsPage() {
   const { selectedLocationId } = useOwnerLocationFilter();
   const locationId = selectedLocationId;
-  return <OwnerSettlementsPageContent key={locationId ?? "all"} locationId={locationId} />;
+  return <OwnerSettlementsPageContent locationId={locationId} />;
 }
 
 function OwnerSettlementsPageContent({ locationId }: { locationId: number | null }) {
@@ -74,67 +75,18 @@ function OwnerSettlementsPageContent({ locationId }: { locationId: number | null
   const ratesRevision = useTrainerRatesRevision();
   const [monthValue, setMonthValue] = useState("");
   const [search, setSearch] = useState("");
-  const [settlements, setSettlements] = useState<TrainerMonthlySettlement[]>(
-    [],
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [refreshRevision, setRefreshRevision] = useState(0);
-
-  useEffect(() => {
-    void Promise.resolve().then(() => setMonthValue(getMonthValueFromUrl()));
-  }, []);
-
-  useEffect(() => {
-    // A slower response for a previous month must not replace the current one.
-    let stale = false;
-
-    async function loadSettlements() {
-      if (!monthValue) return;
-
-      const { year, month } = parseMonth(monthValue);
-
-      if (!year || !month) return;
-
-      try {
-        setIsLoading(true);
-        const data = await getOwnerTrainerSettlements(year, month, locationId);
-        if (stale) return;
-        setSettlements(data);
-        setLoadFailed(false);
-      } catch (err) {
-        if (stale) return;
-        setSettlements([]);
-        setLoadFailed(true);
-        showOwnerError(err, "Nie udało się pobrać rozliczeń.", {
-          id: "owner-settlements-load-error",
-        });
-      } finally {
-        if (!stale) setIsLoading(false);
-      }
-    }
-
-    loadSettlements();
-    return () => {
-      stale = true;
-    };
-  }, [monthValue, locationId, correctionRevision, refreshRevision, ratesRevision]);
-
-  function refresh() {
-    setIsLoading(true);
-    setRefreshRevision((revision) => revision + 1);
-  }
-
-  const filteredSettlements = useMemo(() => {
-    const query = normalize(search);
-
-    if (!query) return settlements;
-
-    return settlements.filter((settlement) =>
-      normalize(settlement.trainerFullName || "").includes(query),
-    );
-  }, [settlements, search]);
-
+  const [pagination, setPagination] = useState({ page: 1, locationId });
+  const page = pagination.locationId === locationId ? pagination.page : 1;
+  const setPage = (next: number) => setPagination({ page: next, locationId });
+  useEffect(() => { let active = true; void Promise.resolve().then(() => { if (active) setMonthValue(getMonthValueFromUrl()); }); return () => { active = false; }; }, []);
+  const { year, month } = parseMonth(monthValue);
+  const load = useCallback((signal: AbortSignal) => getOwnerTrainerSettlements(year, month, locationId, { search: search.trim(), page, pageSize: 25 }, signal), [year, month, locationId, search, page]);
+  const valid = year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && search.length <= 100;
+  const list = useOwnerRead(JSON.stringify([year, month, locationId, search, page]), load, "Nie udało się pobrać rozliczeń.", correctionRevision + ":" + ratesRevision, 250, valid);
+  const isLoading = list.loading;
+  const loadFailed = Boolean(list.error) || !valid;
+  const filteredSettlements = (list.data?.items ?? []).map(item => ({ ...item, year, month, items: null }));
+  const refresh = list.retry;
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -172,8 +124,7 @@ function OwnerSettlementsPageContent({ locationId }: { locationId: number | null
                 aria-label="Wybierz miesiąc rozliczenia"
                 onChange={(event) => {
                   if (!event.target.value || event.target.value === monthValue) return;
-                  setIsLoading(true);
-                  setMonthValue(event.target.value);
+                  setMonthValue(event.target.value); setPage(1);
                   updateUrlMonth(event.target.value);
                 }}
                 className="h-full w-full bg-transparent text-sm font-semibold text-on-surface outline-none"
@@ -183,22 +134,23 @@ function OwnerSettlementsPageContent({ locationId }: { locationId: number | null
         }
         gridClassName="md:grid-cols-[220px_minmax(0,1fr)_auto]"
         canClear={Boolean(search)}
-        onClear={() => setSearch("")}
+        onClear={() => (setSearch(""), setPage(1))}
       >
         <FilterSearchField
           value={search}
-          onChange={setSearch}
+          onChange={(value) => { setSearch(value); setPage(1); }}
           placeholder="Imię i nazwisko trenera"
           label="Szukaj trenera"
         />
       </FilterToolbar>
 
-      <SettlementSummary settlements={settlements} isLoading={isLoading} />
+      <OwnerReadState loading={isLoading} error={list.error || (!valid && monthValue ? "Wybierz poprawny miesiąc i wpisz maksymalnie 100 znaków wyszukiwania." : undefined)} retry={refresh} label="Ładowanie rozliczeń..." />
+      {list.data && !loadFailed ? <SettlementSummary settlements={filteredSettlements} summary={list.data.summary} isLoading={isLoading} /> : null}
 
       <ListSection
         title="Lista trenerów"
         description="Szczegóły pracy i wypłat zespołu w wybranym miesiącu."
-        meta={!isLoading && !loadFailed ? `${filteredSettlements.length} ${pluralizeTrainers(filteredSettlements.length)}` : null}
+        meta={!isLoading && !loadFailed ? `${list.data?.totalCount ?? 0} ${pluralizeTrainers(list.data?.totalCount ?? 0)}` : null}
         busy={isLoading}
       >
         {isLoading ? (
@@ -255,6 +207,7 @@ function OwnerSettlementsPageContent({ locationId }: { locationId: number | null
             message="Wybierz inny miesiąc lub lokalizację."
           />
         )}
+        {list.data && list.data.totalPages > 1 && !isLoading && !list.error ? <PaymentPagination page={list.data.page} pageSize={list.data.pageSize} totalItems={list.data.totalCount} totalPages={list.data.totalPages} onPageChange={setPage} itemLabel="trenerów" ariaLabel="Strony rozliczeń trenerów" /> : null}
       </ListSection>
     </div>
   );

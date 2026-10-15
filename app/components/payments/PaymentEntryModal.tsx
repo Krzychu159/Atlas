@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent } from "react";
+import { type FormEvent, useEffect } from "react";
 import { CheckCircle2, Landmark, ReceiptText } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import {
@@ -30,6 +30,8 @@ type PaymentEntryModalProps = {
   packageOptions: PaymentPackageOption[];
   methodOptions: SelectOption[];
   isSubmitting: boolean;
+  unresolved?: boolean;
+  error?: string;
   submitLabel: string;
   submittingLabel: string;
   emptyPackagesMessage: string;
@@ -56,6 +58,8 @@ export function PaymentEntryModal({
   packageOptions,
   methodOptions,
   isSubmitting,
+  unresolved = false,
+  error,
   submitLabel,
   submittingLabel,
   emptyPackagesMessage,
@@ -67,6 +71,12 @@ export function PaymentEntryModal({
   onClose,
   onSubmit,
 }: PaymentEntryModalProps) {
+  useEffect(() => {
+    if (!open || (!unresolved && !isSubmitting)) return;
+    const protectDraft = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", protectDraft);
+    return () => window.removeEventListener("beforeunload", protectDraft);
+  }, [open, unresolved, isSubmitting]);
   if (!open) return null;
 
   const selectedPackage = packageOptions.find(
@@ -98,7 +108,7 @@ export function PaymentEntryModal({
   }
 
   return (
-    <ModalOverlay onClose={onClose}>
+    <ModalOverlay onClose={() => { if (!isSubmitting && !unresolved) onClose(); }}>
       <form
         onSubmit={handleSubmit}
         className="relative z-10 flex max-h-[92vh] w-full max-w-[680px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient"
@@ -107,18 +117,20 @@ export function PaymentEntryModal({
           eyebrow={eyebrow}
           title={title}
           description={description}
-          onClose={onClose}
+          onClose={() => { if (!isSubmitting && !unresolved) onClose(); }}
           className="px-5 pt-5 md:px-6 md:pt-6"
         />
 
         <div className="mt-5 flex-1 overflow-y-auto px-5 pb-5 md:px-6">
+          {error ? <p role="alert" className="mb-4 text-sm text-error-light">{error}</p> : null}
           {!packageOptions.length ? (
             <div className="rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest p-4 text-sm leading-6 text-on-surface-variant">
               {emptyPackagesMessage}
             </div>
           ) : null}
 
-          <div className="grid gap-4">
+          {unresolved ? <p role="status" className="mb-4 text-sm text-on-surface-variant">Sprawdzamy wynik poprzedniej próby. Zachowaj dane wpłaty i kliknij „Sprawdź i ponów”.</p> : null}
+          <fieldset disabled={isSubmitting || unresolved} className="grid min-w-0 gap-4">
             <TextField
               label="Kwota"
               value={amount}
@@ -181,7 +193,7 @@ export function PaymentEntryModal({
               placeholder={notePlaceholder}
               className="[&_textarea]:min-h-[96px] [&_textarea]:resize-y"
             />
-          </div>
+          </fieldset>
         </div>
 
         <ModalFooter>
@@ -189,7 +201,7 @@ export function PaymentEntryModal({
             type="button"
             variant="secondary"
             onClick={onClose}
-            disabled={isSubmitting}
+            disabled={isSubmitting || unresolved}
           >
             Zamknij
           </Button>
@@ -198,7 +210,7 @@ export function PaymentEntryModal({
             icon={<CheckCircle2 size={16} />}
             disabled={!canSubmit}
           >
-            {isSubmitting ? submittingLabel : submitLabel}
+            {isSubmitting ? submittingLabel : unresolved ? "Sprawdź i ponów" : submitLabel}
           </Button>
         </ModalFooter>
       </form>

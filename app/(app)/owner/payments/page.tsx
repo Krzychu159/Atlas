@@ -6,7 +6,7 @@ import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 import { usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { PaymentActionConfirmModal } from "@/app/components/payments/PaymentActionConfirmModal";
 import { PaymentReasonModal } from "@/app/components/payments/PaymentReasonModal";
@@ -14,14 +14,14 @@ import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { PaymentsList } from "@/app/components/payments/PaymentsList";
 import { Button } from "@/app/components/ui/button";
 import { ListSection } from "@/app/components/ui/list/ListSection";
-import { getClients } from "@/app/lib/owner/clients";
-import { matchesOwnerLocationId } from "@/app/lib/owner/location-filter";
+import { useOwnerRead } from "../components/use-owner-read";
+import { OwnerReadState } from "../components/OwnerReadState";
+import { paymentListQuery } from "@/app/lib/owner/payment-list-query";
 import { getPaymentBreakdown } from "@/app/lib/payments/display";
 import {
   cancelPaymentReceipt,
   confirmClientPayment,
   getOwnerPayments,
-  getClientBilling,
   issuePaymentReceipt,
   isPendingPayment,
   rejectClientPayment,
@@ -55,7 +55,6 @@ export default function OwnerPaymentsPage() {
     : selectedLocationId;
   return (
     <OwnerPaymentsPageContent
-      key={locationId ?? "all"}
       locationId={locationId}
     />
   );
@@ -89,7 +88,9 @@ function OwnerPaymentsPageContent({
     defaultPaymentFilters,
   );
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
-  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, locationId });
+  const page = pagination.locationId === locationId ? pagination.page : 1;
+  const setPage = (next: number) => setPagination({ page: next, locationId });
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -104,77 +105,60 @@ function OwnerPaymentsPageContent({
     return () => window.clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadPayments();
-    }, 250);
+  const owner = basePath === "/owner";
+  const queryState = useMemo(() => {
+    try { return { query: paymentListQuery(filters, page, PAYMENTS_PER_PAGE, locationId), error: undefined }; }
+    catch (error) { return { query: undefined, error: error instanceof Error ? error.message : "Sprawdź wybrane filtry." }; }
+  }, [filters, page, locationId]);
+  const readPayments = useCallback((signal: AbortSignal) => getOwnerPayments(queryState.query, signal), [queryState.query]);
+  const list = useOwnerRead(JSON.stringify(queryState.query), readPayments, "Nie udało się pobrać płatności.", paymentDateRevision, 250, owner && !queryState.error);
+  const loading = owner ? list.loading : isLoading;
+  const readError = owner ? queryState.error || list.error : undefined;
 
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    paymentDateRevision,
-    locationId,
-    filters.amountMax,
-    filters.amountMin,
-    filters.client,
-    filters.dateFrom,
-    filters.dateTo,
-    filters.overpayment,
-    filters.source,
-    filters.status,
-  ]);
+  function buildBackendPaymentQuery() {
+    const clientId = parseClientIdFilter(filters.client);
+
+    return {
+      clientId,
+      status:
+        filters.status === "all"
+          ? null
+          : (Number(filters.status) as ClientPaymentStatus),
+      source:
+        filters.source === "all"
+          ? null
+          : (Number(filters.source) as ClientPaymentSource),
+      hasOverpayment:
+        filters.overpayment === "all" ? null : filters.overpayment === "yes",
+      from: filters.dateFrom
+        ? new Date(`${filters.dateFrom}T00:00:00`).toISOString()
+        : null,
+      to: filters.dateTo
+        ? new Date(`${filters.dateTo}T23:59:59`).toISOString()
+        : null,
+      amountMin: parseMoneyFilter(filters.amountMin),
+      amountMax: parseMoneyFilter(filters.amountMax),
+      page: 1,
+      pageSize: 1000,
+    };
+  }
 
   async function loadPayments() {
+    if (owner) { try { await list.reload(); } catch { /* The list displays its error. */ } return; }
     try {
       setIsLoading(true);
-      try {
-        const data = await getOwnerPayments(buildBackendPaymentQuery());
-        const items = data.items || [];
-        if (locationId === null) {
-          setPayments(items);
-        } else {
-          const [clients, billing] = await Promise.all([
-            getClients(),
-            Promise.all(
-              [...new Set(items.map((payment) => payment.clientId))].map(
-                (clientId) => getClientBilling(clientId),
-              ),
-            ),
-          ]);
-          const packageIds = new Set(
-            billing.flatMap((summary) =>
-              (summary.packages || [])
-                .filter((pkg) => pkg.locationId === locationId)
-                .map((pkg) => pkg.clientPackageId),
-            ),
-          );
-          const clientIds = new Set(
-            clients
-              .filter((client) => matchesOwnerLocationId(client, locationId))
-              .map((client) => client.id),
-          );
-          setPayments(
-            items.filter((payment) =>
-              payment.clientPackageId !== null
-                ? packageIds.has(payment.clientPackageId)
-                : clientIds.has(payment.clientId),
-            ),
-          );
-        }
-      } catch (err) {
-        if (basePath !== "/trainer" || !isForbiddenError(err)) throw err;
-
-        const pendingPayments = await getTrainerPortalPendingPayments();
-        setPayments(pendingPayments);
-      }
-    } catch (err) {
-      showOwnerError(err, "Nie udało się pobrać płatności.", {
-        id: "owner-payments-load-error",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+      try { const data = await getOwnerPayments(buildBackendPaymentQuery()); setPayments(data.items || []); }
+      catch (err) { if (!isForbiddenError(err)) throw err; setPayments(await getTrainerPortalPendingPayments()); }
+    } catch (err) { showOwnerError(err, "Nie udało się pobrać płatności.", { id: "owner-payments-load-error" }); }
+    finally { setIsLoading(false); }
   }
+  useEffect(() => {
+    if (owner) return;
+    const timer = window.setTimeout(() => { void loadPayments(); }, 250);
+    return () => window.clearTimeout(timer);
+    // Legacy trainer screen retains its existing contract.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owner, paymentDateRevision, filters.amountMax, filters.amountMin, filters.client, filters.dateFrom, filters.dateTo, filters.overpayment, filters.source, filters.status]);
 
   async function handleConfirm(payment: ClientPayment) {
     if (!isPendingPayment(payment)) {
@@ -318,8 +302,9 @@ function OwnerPaymentsPageContent({
     1,
     Math.ceil(filteredPayments.length / PAYMENTS_PER_PAGE),
   );
-  const currentPage = Math.min(page, totalPages);
-  const visiblePayments = filteredPayments.slice(
+  const currentPage = owner ? list.data?.page ?? page : Math.min(page, totalPages);
+  const totalItems = owner ? list.data?.totalCount : filteredPayments.length;
+  const visiblePayments = owner ? list.data?.items || [] : filteredPayments.slice(
     (currentPage - 1) * PAYMENTS_PER_PAGE,
     currentPage * PAYMENTS_PER_PAGE,
   );
@@ -334,33 +319,6 @@ function OwnerPaymentsPageContent({
     setPage(1);
   }
 
-  function buildBackendPaymentQuery() {
-    const clientId = parseClientIdFilter(filters.client);
-
-    return {
-      clientId,
-      status:
-        filters.status === "all"
-          ? null
-          : (Number(filters.status) as ClientPaymentStatus),
-      source:
-        filters.source === "all"
-          ? null
-          : (Number(filters.source) as ClientPaymentSource),
-      hasOverpayment:
-        filters.overpayment === "all" ? null : filters.overpayment === "yes",
-      from: filters.dateFrom
-        ? new Date(`${filters.dateFrom}T00:00:00`).toISOString()
-        : null,
-      to: filters.dateTo
-        ? new Date(`${filters.dateTo}T23:59:59`).toISOString()
-        : null,
-      amountMin: parseMoneyFilter(filters.amountMin),
-      amountMax: parseMoneyFilter(filters.amountMax),
-      page: 1,
-      pageSize: 1000,
-    };
-  }
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
@@ -378,16 +336,17 @@ function OwnerPaymentsPageContent({
         <Button
           variant="secondary"
           icon={
-            <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           }
           onClick={loadPayments}
-          disabled={isLoading}
+          disabled={loading}
         >
           Odśwież
         </Button>
       </div>
 
       <PaymentFilters
+        serverPagination={owner}
         value={filters}
         advancedOpen={advancedFiltersOpen}
         onAdvancedOpenChange={setAdvancedFiltersOpen}
@@ -399,15 +358,16 @@ function OwnerPaymentsPageContent({
         title="Operacje płatnicze"
         description="Kwota, sposób rozliczenia i najważniejsze akcje w jednym wierszu."
         meta={
-          !isLoading
-            ? `${filteredPayments.length} ${pluralizePayments(filteredPayments.length)}`
+          !loading && !readError && totalItems !== undefined
+            ? `${totalItems} ${pluralizePayments(totalItems)}`
             : null
         }
       >
-        <PaymentsList
+        <OwnerReadState loading={false} error={readError} retry={list.retry} label="Ładowanie płatności..." />
+        {!readError || list.data ? <PaymentsList
           dateCorrectionPortal={basePath === "/trainer" ? "trainer" : "owner"}
           payments={visiblePayments}
-          isLoading={isLoading}
+          isLoading={loading}
           processingId={processingId}
           getDetailsHref={(payment) =>
             `${basePath}/clients/${payment.clientId}/payments`
@@ -429,13 +389,14 @@ function OwnerPaymentsPageContent({
             setPaymentToReverse(payment);
             setReversalReason("");
           }}
-        />
+        /> : null}
 
-        {!isLoading && filteredPayments.length > 0 ? (
+        {!loading && !readError && (totalItems ?? 0) > 0 ? (
           <PaymentPagination
             page={currentPage}
             pageSize={PAYMENTS_PER_PAGE}
-            totalItems={filteredPayments.length}
+            totalItems={totalItems ?? 0}
+            totalPages={owner ? list.data?.totalPages : undefined}
             onPageChange={setPage}
           />
         ) : null}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Archive, SearchX, UserPlus, UsersRound } from "lucide-react";
@@ -8,15 +8,13 @@ import { Button } from "@/app/components/ui/button";
 import { ListSection } from "@/app/components/ui/list/ListSection";
 import { ListState } from "@/app/components/ui/list/ListState";
 import {
-  getClients,
-  type Client,
+  getOwnerClients,
+  type OwnerClientsQuery,
 } from "@/app/lib/owner/clients";
 import {
-  matchesOwnerLocationId,
   useOwnerLocationFilter,
 } from "@/app/lib/owner/location-filter";
 import AddClientModal from "@/app/(app)/owner/clients/components/AddClientModal";
-import type { ClientPackageFilter } from "@/app/(app)/owner/clients/components/ClientFilters";
 import OwnerClientFilters, {
   defaultOwnerClientFilters,
   type OwnerClientFiltersValue,
@@ -24,31 +22,9 @@ import OwnerClientFilters, {
 import OwnerClientList from "@/app/(app)/owner/clients/components/OwnerClientList";
 import OwnerClientListRow from "@/app/(app)/owner/clients/components/OwnerClientListRow";
 import { pluralizeClients } from "@/app/(app)/owner/clients/components/client-list-display";
-import {
-  getClientBalance,
-  getClientName,
-  getClientPackageUsage,
-  hasActiveClientPackage,
-} from "@/app/(app)/owner/clients/components/client-display";
-import { showOwnerError } from "@/app/(app)/owner/components/owner-toast";
-
-function normalize(value: string) {
-  return value.toLowerCase().trim();
-}
-
-function matchesPackageFilter(client: Client, filter: ClientPackageFilter) {
-  if (filter === "active-package") return hasActiveClientPackage(client);
-  if (filter === "inactive-package") return !hasActiveClientPackage(client);
-  return true;
-}
-
-function getTime(value?: string | null) {
-  if (!value) return 0;
-
-  const date = new Date(value);
-
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
-}
+import { useOwnerRead } from "../components/use-owner-read";
+import { OwnerReadState } from "../components/OwnerReadState";
+import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 
 export default function ClientsPage() {
   return <Suspense><ClientsContent /></Suspense>;
@@ -58,131 +34,33 @@ function ClientsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const showInvitations = searchParams.get("invitations") === "true";
-  const [clients, setClients] = useState<Client[]>([]);
   const { selectedLocationId } = useOwnerLocationFilter();
   const [filters, setFilters] = useState<OwnerClientFiltersValue>(defaultOwnerClientFilters);
   const { search, packageFilter, trainerFilter, sort } = filters;
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadFailed, setLoadFailed] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const loadRequestRef = useRef(0);
-
-  useEffect(() => {
-    if (showInvitations) void Promise.resolve().then(() => setIsModalOpen(true));
-  }, [showInvitations]);
-
-  async function loadClients() {
-    const requestId = ++loadRequestRef.current;
-
-    try {
-      setIsLoading(true);
-      const data = await getClients();
-      if (requestId !== loadRequestRef.current) return;
-      setClients(data);
-      setLoadFailed(false);
-    } catch (err) {
-      if (requestId !== loadRequestRef.current) return;
-      setLoadFailed(true);
-      showOwnerError(err, "Błąd ładowania klientów", {
-        id: "owner-clients-load-error",
-      });
-    } finally {
-      if (requestId === loadRequestRef.current) setIsLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void Promise.resolve().then(() => loadClients());
-  }, []);
-
-  const scopedClients = useMemo(
-    () =>
-      clients.filter(
-        (client) =>
-          !client.isArchived &&
-          matchesOwnerLocationId(client, selectedLocationId),
-      ),
-    [clients, selectedLocationId],
-  );
-
-  const trainerOptions = useMemo(() => {
-    const uniqueTrainers = new Set<string>();
-
-    scopedClients.forEach((client) => {
-      if (client.trainerFullName) uniqueTrainers.add(client.trainerFullName);
-    });
-
-    return Array.from(uniqueTrainers).sort((first, second) =>
-      first.localeCompare(second, "pl"),
-    );
-  }, [scopedClients]);
-
-  useEffect(() => {
-    if (trainerFilter === "all") return;
-
-    if (!trainerOptions.includes(trainerFilter)) {
-      void Promise.resolve().then(() =>
-        setFilters((current) => ({ ...current, trainerFilter: "all" })),
-      );
-    }
-  }, [trainerFilter, trainerOptions]);
-
-  const filteredClients = useMemo(() => {
-    const query = normalize(search);
-
-    const result = scopedClients.filter((client) => {
-      const fullName = normalize(getClientName(client));
-      const email = normalize(client.email || "");
-      const phoneNumber = normalize(client.phoneNumber || "");
-      const trainerName = client.trainerFullName || "";
-
-      const matchesSearch =
-        !query ||
-        fullName.includes(query) ||
-        email.includes(query) ||
-        phoneNumber.includes(query);
-      const matchesTrainer =
-        trainerFilter === "all" || trainerName === trainerFilter;
-
-      return (
-        matchesSearch &&
-        matchesTrainer &&
-        matchesPackageFilter(client, packageFilter)
-      );
-    });
-
-    return [...result].sort((first, second) => {
-      if (sort === "name") {
-        return getClientName(first).localeCompare(getClientName(second), "pl");
-      }
-
-      if (sort === "trainer") {
-        return (first.trainerFullName || "").localeCompare(
-          second.trainerFullName || "",
-          "pl",
-        );
-      }
-
-      if (sort === "balance-desc") {
-        return getClientBalance(second) - getClientBalance(first);
-      }
-
-      if (sort === "balance-asc") {
-        return getClientBalance(first) - getClientBalance(second);
-      }
-
-      if (sort === "package-usage") {
-        return (
-          getClientPackageUsage(second).percent -
-          getClientPackageUsage(first).percent
-        );
-      }
-
-      return getTime(second.createdAt) - getTime(first.createdAt);
-    });
-  }, [scopedClients, search, trainerFilter, packageFilter, sort]);
-
-  const activeClientsCount = scopedClients.filter(hasActiveClientPackage).length;
+  const [pagination, setPagination] = useState({ page: 1, locationId: selectedLocationId });
+  const page = pagination.locationId === selectedLocationId ? pagination.page : 1;
+  const setPage = (next: number) => setPagination({ page: next, locationId: selectedLocationId });
+  useEffect(() => { let active = true; if (showInvitations) void Promise.resolve().then(() => { if (active) setIsModalOpen(true); }); return () => { active = false; }; }, [showInvitations]);
+  const unsupportedSort = sort !== "newest" && sort !== "name";
+  const invalidSearch = search.trim().length > 100;
+  const query = useMemo<OwnerClientsQuery>(() => ({ page, pageSize: 25, isArchived: false, search: search.trim() || undefined,
+    trainerId: trainerFilter === "all" ? undefined : Number(trainerFilter), locationId: selectedLocationId,
+    packageStatus: packageFilter === "active-package" ? "active" : packageFilter === "inactive-package" ? "none" : undefined,
+    sort: sort === "name" ? "name" : "createdDesc",
+  }), [page, search, trainerFilter, selectedLocationId, packageFilter, sort]);
+  const load = useCallback((signal: AbortSignal) => getOwnerClients(query, signal), [query]);
+  const list = useOwnerRead(JSON.stringify(query), load, "Nie udało się pobrać klientów.", 0, 250, !unsupportedSort && !invalidSearch);
+  const readError = unsupportedSort ? "To sortowanie nie jest jeszcze dostępne. Wybierz Najnowsi lub Alfabetycznie." : invalidSearch ? "Wpisz maksymalnie 100 znaków wyszukiwania." : list.error;
+  const clients = list.data?.items ?? [];
+  const filteredClients = clients;
+  const scopedClients = clients;
+  const isLoading = list.loading;
+  const loadFailed = Boolean(readError);
+  const packageCount = list.data?.summary?.withActivePackageCount;
+  const activeClientsCount = typeof packageCount === "number" && Number.isSafeInteger(packageCount) && packageCount >= 0 ? packageCount : undefined;
+  async function loadClients() { try { await list.reload(); } catch { /* Visible read error. */ } }
+  function changeFilters(next: OwnerClientFiltersValue) { setFilters(next); setPage(1); }
 
   function renderList() {
     if (isLoading && clients.length === 0) {
@@ -229,7 +107,7 @@ function ClientsContent() {
           title="Brak klientów spełniających wybrane kryteria"
           message="Zmień lub wyczyść filtry, aby zobaczyć więcej wyników."
           action={
-            <Button variant="secondary" size="sm" onClick={() => setFilters(defaultOwnerClientFilters)}>
+            <Button variant="secondary" size="sm" onClick={() => changeFilters(defaultOwnerClientFilters)}>
               Wyczyść filtry
             </Button>
           }
@@ -246,7 +124,7 @@ function ClientsContent() {
     );
   }
 
-  const countsReady = !(isLoading && clients.length === 0) && !(loadFailed && clients.length === 0);
+  const countsReady = list.data !== undefined && !loadFailed;
 
   return (
     <>
@@ -266,13 +144,13 @@ function ClientsContent() {
             <div className="flex gap-3">
               <div className="flex flex-1 items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3 sm:flex-none">
                 <p className="text-2xl font-semibold leading-none">
-                  {countsReady ? scopedClients.length : "–"}
+                  {countsReady ? list.data?.totalCount : "–"}
                 </p>
                 <p className="text-sm text-on-surface-variant">łącznie</p>
               </div>
               <div className="flex flex-1 items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3 sm:flex-none">
                 <p className="text-2xl font-semibold leading-none text-tertiary-light">
-                  {countsReady ? activeClientsCount : "–"}
+                  {countsReady ? activeClientsCount ?? "—" : "–"}
                 </p>
                 <p className="text-sm text-on-surface-variant">z aktywnym pakietem</p>
               </div>
@@ -298,14 +176,17 @@ function ClientsContent() {
           </div>
         </div>
 
-        <OwnerClientFilters value={filters} trainerOptions={trainerOptions} onChange={setFilters} />
+        <OwnerClientFilters value={filters} locationId={selectedLocationId} onChange={changeFilters} />
+        <OwnerReadState loading={false} error={readError} retry={list.retry} label="Ładowanie klientów..." />
+        {countsReady && activeClientsCount === undefined ? <p role="status" className="text-sm text-on-surface-muted">Podsumowanie klientów z aktywnym pakietem jest chwilowo niedostępne.</p> : null}
 
         <ListSection
           title="Lista klientów"
           description="Trener, pakiet, saldo i status klienta w jednym wierszu."
-          meta={countsReady ? pluralizeClients(filteredClients.length) : null}
+          meta={countsReady ? pluralizeClients(list.data?.totalCount ?? 0) : null}
         >
-          {renderList()}
+          {!readError || list.data ? renderList() : null}
+          {list.data && list.data.totalPages > 1 && !isLoading && !readError ? <PaymentPagination page={list.data.page} pageSize={list.data.pageSize} totalItems={list.data.totalCount} totalPages={list.data.totalPages} onPageChange={setPage} itemLabel="klientów" ariaLabel="Strony klientów" /> : null}
         </ListSection>
       </div>
 

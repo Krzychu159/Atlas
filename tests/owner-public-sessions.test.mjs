@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
+import { load } from "./owner-read-harness.mjs";
 
 const api = {};
 vm.runInNewContext(ts.transpileModule(
@@ -12,12 +13,15 @@ vm.runInNewContext(ts.transpileModule(
   exports: api, Date, Intl,
   require: (name) => name === "./date-utils"
     ? { toDateTimeLocalValue: (date) => date.toISOString().slice(0, 16) }
+    : name === "@/app/lib/group-sessions" ? load("app/lib/group-sessions.ts")
+    : name === "@/app/lib/user-messages" ? load("app/lib/user-messages.ts", { "./group-sessions": load("app/lib/group-sessions.ts") })
     : { getOwnerSessionPackageName: () => "" },
 });
 const values = {
   title: "Full Body", note: "Poziom średni", startAt: "2026-09-20T18:00", endAt: "2026-09-20T19:00",
   trainerId: "2", locationId: "4", status: "", plannedSessionType: "Individual", outlookCategories: "",
   participantIds: [], participantsEdited: false, isPubliclyBookable: true, publicCapacity: "12", publicSlug: "full-body-2026-09-20-18-00",
+  eventRules: "", registrationClosesBeforeMinutes: "", cancellationClosesBeforeMinutes: "",
 };
 const existing = { id: 88, isPubliclyBookable: true, participants: [{ clientId: 55, sessionsCharged: 1, countsAgainstPackage: true }],
   title: "Full Body", startAt: "2026-09-20T18:00:00", endAt: "2026-09-20T19:00:00", trainerId: 2, locationId: 4,
@@ -38,8 +42,12 @@ test("public UPDATE omits participants even when their DTO collection is missing
   assert.equal("participants" in api.toSessionPayload(values, existing), false);
   assert.equal("participants" in api.toSessionPayload(values, { ...existing, participants: null }), false);
 });
-test("explicit participant editing can remove all participants", () => {
-  assert.equal(api.toSessionPayload({ ...values, participantsEdited: true }, existing).participants.length, 0);
+test("group participant changes require the enrollment flow; individual editing can remove participants", () => {
+  assert.throws(() => api.toSessionPayload({ ...values, participantsEdited: true }, existing), /zgłoszeniach/);
+  const individual = { ...existing, isPubliclyBookable: false, plannedSessionType: "Individual" };
+  const result = api.toSessionPayload({ ...values, isPubliclyBookable: false, participantsEdited: true, participantIds: ["56"] }, individual);
+  assert.equal(result.participants.length, 1);
+  assert.equal(result.participants[0].clientId, 56);
 });
 test("unpublishing preserves bookings and capacity reduction is left to backend", () => {
   const result = api.toSessionPayload({ ...values, isPubliclyBookable: false }, existing);

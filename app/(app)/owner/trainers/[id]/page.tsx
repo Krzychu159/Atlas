@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { getClientsByTrainer } from "@/app/lib/owner/clients";
 import { getTrainerRates, type TrainerRate } from "@/app/lib/owner/settlements";
 import {
-  getTrainerSessions,
+  getOwnerSessionPage,
 } from "@/app/lib/owner/sessions";
 import { getTrainer, type Trainer } from "@/app/lib/owner/trainers";
 import EditTrainerModal from "../components/EditTrainerModal";
@@ -27,11 +27,12 @@ function TrainerProfile({ trainerId }: { trainerId: number }) {
   const loadTrainer = useCallback((signal: AbortSignal) => getTrainer(trainerId, signal), [trainerId]);
   const loadClients = useCallback((signal: AbortSignal) => getClientsByTrainer(trainerId, signal), [trainerId]);
   const loadRates = useCallback((signal: AbortSignal) => getTrainerRates(trainerId, signal), [trainerId]);
-  const loadSessions = useCallback((signal: AbortSignal) => getTrainerSessions(trainerId, signal), [trainerId]);
+  const [sessionPage, setSessionPage] = useState(1);
+  const loadSessions = useCallback((signal: AbortSignal) => getOwnerSessionPage({ trainerId, page: sessionPage, pageSize: 4, order: "asc" }, signal), [trainerId, sessionPage]);
   const profile = useOwnerRead(String(trainerId), loadTrainer, "Nie udało się pobrać profilu trenera.");
   const clientList = useOwnerRead(String(trainerId), loadClients, "Nie udało się pobrać klientów trenera.");
   const rateList = useOwnerRead(String(trainerId), loadRates, "Nie udało się pobrać stawek trenera.");
-  const sessionList = useOwnerRead(String(trainerId), loadSessions, "Nie udało się pobrać grafiku trenera.");
+  const sessionList = useOwnerRead(`${trainerId}:${sessionPage}`, loadSessions, "Nie udało się pobrać grafiku trenera.");
   const trainer = profile.data;
   const rates = rateList.data ?? [];
   const setTrainer = profile.setData;
@@ -62,7 +63,7 @@ function TrainerProfile({ trainerId }: { trainerId: number }) {
             <OwnerReadState loading={rateList.loading && rateList.data === undefined} error={rateList.error} retry={rateList.retry} label="Ładowanie stawek trenera..." />
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               <OwnerReadState loading={clientList.loading} error={clientList.error} retry={clientList.retry} label="Ładowanie klientów trenera...">{clientList.data !== undefined ? <TrainerProfileClients clients={clientList.data} /> : null}</OwnerReadState>
-              <OwnerReadState loading={sessionList.loading} error={sessionList.error} retry={sessionList.retry} label="Ładowanie grafiku trenera...">{sessionList.data !== undefined ? <TrainerSchedulePanel sessions={sessionList.data} /> : null}</OwnerReadState>
+              <OwnerReadState loading={sessionList.loading} error={sessionList.error} retry={sessionList.retry} label="Ładowanie grafiku trenera...">{sessionList.data !== undefined ? <TrainerSchedulePanel sessions={sessionList.data.items ?? []} pagination={{ ...sessionList.data, onPageChange: setSessionPage }} /> : null}</OwnerReadState>
             </div>
           </div>
 

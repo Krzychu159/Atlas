@@ -1,4 +1,4 @@
-import { backendDelete, backendGet, backendPost, backendPatch } from "../backend";
+import { backendDelete, backendGet, backendPost, backendPatch, backendFetch } from "../backend";
 import type { PackageBillingMode } from "../period-packages";
 
 export type PaymentMethod = 1 | 2 | 3 | 4;
@@ -13,6 +13,15 @@ export const paymentMethodOptions = [
 ];
 
 export type ClientPayment = {
+  effectiveLocationId?: number | null;
+  effectiveLocationName?: string | null;
+  effectiveLocationSource?: string | null;
+  overpaymentAmount?: number;
+  hasOverpayment?: boolean;
+  packageTotalPrice?: number | null;
+  packageAmountPaid?: number | null;
+  packageAmountDue?: number | null;
+  packagePaymentStatus?: string | null;
   canConfirm?: boolean;
   id: number;
   clientId: number;
@@ -154,6 +163,11 @@ export type PagedResult<T> = {
 };
 
 export type PaymentsQuery = {
+  search?: string;
+  locationId?: number | null;
+  locationMatch?: "payment" | "effective";
+  sort?: "paymentDateDesc" | "paymentDate" | "amountDesc" | "amount";
+  order?: "asc" | "desc";
   clientId?: number | null;
   status?: ClientPaymentStatus | null;
   source?: ClientPaymentSource | null;
@@ -181,10 +195,11 @@ export function getPendingPayments() {
   return backendGet<ClientPayment[]>("billing/payments/pending");
 }
 
-export function getOwnerPayments(query?: PaymentsQuery) {
+export function getOwnerPayments(query?: PaymentsQuery, signal?: AbortSignal) {
   return backendGet<PagedResult<ClientPayment>>(
     "billing/payments",
     toPaymentsQuery(query),
+    signal,
   );
 }
 
@@ -219,8 +234,10 @@ export function getClientBilling(clientId: number, signal?: AbortSignal) {
   return backendGet<ClientBillingSummary>(`billing/clients/${clientId}`, undefined, signal);
 }
 
-export function createClientPayment(payload: CreateClientPaymentPayload) {
-  return backendPost<ClientPayment>("billing/payments", payload);
+export function createClientPayment(payload: CreateClientPaymentPayload, idempotencyKey?: string) {
+  return idempotencyKey
+    ? backendFetch<ClientPayment>("billing/payments", { method: "POST", json: payload, headers: { "Idempotency-Key": idempotencyKey } })
+    : backendPost<ClientPayment>("billing/payments", payload);
 }
 
 export type UpdatePaymentDatePayload = { paymentDate: string; expectedPaymentDate: string; reason: string };
@@ -485,6 +502,11 @@ export function getPaymentSourceLabel(source?: number | null) {
 
 function toPaymentsQuery(query?: PaymentsQuery) {
   return {
+    Search: query?.search,
+    LocationId: query?.locationId,
+    LocationMatch: query?.locationMatch,
+    Sort: query?.sort,
+    Order: query?.order,
     ClientId: query?.clientId,
     Status: query?.status,
     Source: query?.source,

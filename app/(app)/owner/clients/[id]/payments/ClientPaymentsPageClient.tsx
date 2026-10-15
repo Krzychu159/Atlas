@@ -9,6 +9,7 @@ import { packageTrainingKind } from "@/app/lib/package-validity";
 import { useSessionCorrectionRevision, usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createStaffPaymentIntent } from "@/app/lib/owner/staff-payment-intent";
 import {
   Banknote,
   CalendarRange,
@@ -48,7 +49,6 @@ import {
   cancelPaymentReceipt,
   confirmClientPayment,
   createClientPackage,
-  createClientPayment,
   getClientBilling,
   getClientPayments,
   getPackagePaymentStatusLabel,
@@ -105,6 +105,8 @@ export default function ClientPaymentsPageClient({
   basePath = "/owner",
 }: ClientPaymentsPageClientProps) {
   const mutationLock = useRef(false);
+  const paymentIntent = useRef<ReturnType<typeof createStaffPaymentIntent> | null>(null);
+  const [paymentUnresolved, setPaymentUnresolved] = useState(false);
   const loadRevision = useRef(0);
   const trainerLoad = useRef<AbortController | null>(null);
   const mounted = useRef(true);
@@ -569,18 +571,20 @@ export default function ClientPaymentsPageClient({
         paymentDate: paymentDateTime,
         note: paymentNote.trim() || null,
       };
-      const createdPayment =
+      if (!paymentIntent.current) paymentIntent.current = createStaffPaymentIntent();
+      const outcome =
         basePath === "/trainer"
-          ? await createTrainerPortalClientPayment(clientId, paymentPayload)
-          : await createClientPayment(paymentPayload);
+          ? { recovered: false as const, payment: await createTrainerPortalClientPayment(clientId, paymentPayload) }
+          : await paymentIntent.current.execute(paymentPayload);
 
       notifyClientPaymentChanged(clientId);
       void refreshLinkedEnrollment();
-      showOwnerSuccess(getCreatedPaymentMessage(createdPayment), {
+      showOwnerSuccess(outcome.recovered ? "Wpłata została odnaleziona. Sprawdź jej aktualny stan w historii." : getCreatedPaymentMessage(outcome.payment), {
         id: "owner-client-payment-created",
       });
       setPaymentNote("");
       setIsPaymentModalOpen(false);
+      paymentIntent.current = null;
       if (basePath === "/trainer") await refreshTrainerBilling(clientId);
       else await loadClientPayments(clientId);
     } catch (err) {
@@ -588,6 +592,7 @@ export default function ClientPaymentsPageClient({
         id: "owner-client-payment-create-error",
       });
     } finally {
+      setPaymentUnresolved(paymentIntent.current?.unresolved ?? false);
       mutationLock.current = false;
       setIsSaving(false);
     }
@@ -915,6 +920,7 @@ export default function ClientPaymentsPageClient({
         packageOptions={clientPackageOptions}
         methodOptions={paymentMethodOptions}
         isSubmitting={isSaving}
+        unresolved={paymentUnresolved}
         submitLabel="Dodaj wpłatę"
         submittingLabel="Dodawanie..."
         emptyPackagesMessage="Klient nie ma pakietu, do którego można przypisać wpłatę."
@@ -923,7 +929,7 @@ export default function ClientPaymentsPageClient({
         onPackageChange={handlePaymentPackageChange}
         onMethodChange={setPaymentMethod}
         onNoteChange={setPaymentNote}
-        onClose={() => { if (!mutationLock.current) setIsPaymentModalOpen(false); }}
+        onClose={() => { if (!mutationLock.current && !paymentIntent.current?.unresolved) { paymentIntent.current = null; setIsPaymentModalOpen(false); } }}
         onSubmit={handleCreatePayment}
       />
       {basePath === "/owner" ? <RefundConfirmationModal refund={refundToConfirm} submitting={isConfirmingRefund} onClose={() => setRefundToConfirm(null)} onConfirm={handleConfirmRefund} /> : null}

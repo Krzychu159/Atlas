@@ -1,4 +1,6 @@
 export type PaymentBreakdownSource = {
+  overpaymentAmount?: number;
+  hasOverpayment?: boolean;
   amount?: number | null;
   appliedToPackageAmount?: number | null;
   balanceCreditAmount?: number | null;
@@ -27,10 +29,11 @@ export function getPaymentBreakdown(
 ): PaymentBreakdown {
   const amount = toMoneyNumber(payment.amount);
   let appliedToPackageAmount = toMoneyNumber(payment.appliedToPackageAmount);
-  const balanceCreditAmount = toMoneyNumber(payment.balanceCreditAmount);
+  const balanceCreditAmount = toMoneyNumber(payment.overpaymentAmount ?? payment.balanceCreditAmount);
 
   if (
     amount > 0 &&
+    payment.overpaymentAmount === undefined &&
     appliedToPackageAmount === 0 &&
     balanceCreditAmount === 0 &&
     (payment.clientPackageId || payment.packageName)
@@ -46,7 +49,7 @@ export function getPaymentBreakdown(
 }
 
 export function hasPaymentOverpayment(payment: PaymentBreakdownSource) {
-  return getPaymentBreakdown(payment).balanceCreditAmount > 0;
+  return payment.hasOverpayment ?? (getPaymentBreakdown(payment).balanceCreditAmount > 0);
 }
 
 export function hasPaymentBalanceMovement(payment: PaymentBreakdownSource) {

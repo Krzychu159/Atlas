@@ -19,7 +19,7 @@ function formatMoney(value: number) {
 }
 
 export default function SettlementTrainerRow({ settlement, locationId }: {
-  settlement: TrainerMonthlySettlement;
+  settlement: Pick<TrainerMonthlySettlement, "trainerId" | "trainerFullName" | "year" | "month" | "totalHours" | "totalSessions" | "totalAmount" | "isPaid">;
   locationId?: number | null;
 }) {
   const trainerName = settlement.trainerFullName || `Trener #${settlement.trainerId}`;

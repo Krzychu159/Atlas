@@ -25,7 +25,7 @@ import {
   type ClientTrainingPlan,
   type CloseCooperationPayload,
 } from "@/app/lib/owner/clients";
-import { getClientSessions } from "@/app/lib/owner/sessions";
+import { getOwnerSessionPage } from "@/app/lib/owner/sessions";
 import {
   getClientBilling,
   getClientPayments,
@@ -73,7 +73,8 @@ function ClientDetails({ clientId }: { clientId: number }) {
   const loadClient = useCallback((signal: AbortSignal) => getClient(clientId, signal), [clientId]);
   const loadSubscription = useCallback((signal: AbortSignal) => getClientSubscription(clientId, signal), [clientId]);
   const loadBilling = useCallback((signal: AbortSignal) => getClientBilling(clientId, signal), [clientId]);
-  const loadSessions = useCallback((signal: AbortSignal) => getClientSessions(clientId, signal), [clientId]);
+  const [sessionPage, setSessionPage] = useState(1);
+  const loadSessions = useCallback((signal: AbortSignal) => getOwnerSessionPage({ clientId, page: sessionPage, pageSize: 25, order: "desc" }, signal), [clientId, sessionPage]);
   const loadPlan = useCallback(async (signal: AbortSignal) => {
     try { return await getClientTrainingPlan(clientId, signal); }
     catch (error) { if (isNotFoundError(error)) return null; throw error; }
@@ -84,7 +85,7 @@ function ClientDetails({ clientId }: { clientId: number }) {
   const profile = useOwnerRead(String(clientId), loadClient, "Nie udało się pobrać profilu klienta.", revision);
   const renewal = useOwnerRead(String(clientId), loadSubscription, "Nie udało się pobrać danych o przedłużaniu pakietu.", revision);
   const account = useOwnerRead(String(clientId), loadBilling, "Nie udało się pobrać rozliczeń i pakietów klienta.", revision);
-  const history = useOwnerRead(String(clientId), loadSessions, "Nie udało się pobrać historii treningów.", revision);
+  const history = useOwnerRead(`${clientId}:${sessionPage}`, loadSessions, "Nie udało się pobrać historii treningów.", revision);
   const plan = useOwnerRead<ClientTrainingPlan | null>(String(clientId), loadPlan, "Nie udało się pobrać folderu klienta.");
   const paymentList = useOwnerRead(String(clientId), loadPayments, "Nie udało się pobrać wpłat klienta.", revision);
   const consents = useOwnerRead(String(clientId), loadConsents, "Nie udało się pobrać zgód klienta.");
@@ -95,7 +96,7 @@ function ClientDetails({ clientId }: { clientId: number }) {
   const billing = account.data ?? null;
   const trainingPlan = plan.data ?? null;
   const setTrainingPlan = plan.setData;
-  const sessions = history.data ?? [];
+  const sessions = history.data?.items ?? [];
   const payments = paymentList.data?.items ?? [];
   const legalConsents = consents.data ?? [];
   const refunds = refundList.data?.items ?? [];
@@ -413,8 +414,8 @@ function ClientDetails({ clientId }: { clientId: number }) {
 
             <OwnerReadState loading={history.loading} error={history.error} retry={history.retry} label="Ładowanie historii treningów...">
               {history.data !== undefined ? (
-                <CollapsibleSection title="Historia treningów" icon={<Dumbbell size={15} />} meta={sessions.length}>
-                  <ClientSessionHistory embedded clientId={client.id} sessions={sessions} />
+                <CollapsibleSection title="Historia treningów" icon={<Dumbbell size={15} />} meta={history.data.totalCount}>
+                  <ClientSessionHistory embedded clientId={client.id} sessions={sessions} pagination={{ ...history.data, onPageChange: setSessionPage }} />
                 </CollapsibleSection>
               ) : null}
             </OwnerReadState>

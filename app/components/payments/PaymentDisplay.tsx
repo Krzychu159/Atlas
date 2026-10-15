@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { formatDateTime } from "@/app/lib/formatters/date";
+import { getPackagePaymentStatusLabel } from "@/app/lib/owner/billing";
 import {
   getPaymentBreakdown,
   getPaymentMethodLabel,
@@ -27,6 +28,12 @@ import {
 } from "@/app/lib/payments/display";
 
 export type PaymentDisplaySource = PaymentBreakdownSource & {
+  effectiveLocationName?: string | null;
+  effectiveLocationSource?: string | null;
+  packageTotalPrice?: number | null;
+  packageAmountPaid?: number | null;
+  packageAmountDue?: number | null;
+  packagePaymentStatus?: string | null;
   id: number;
   clientId: number;
   clientName?: string | null;
@@ -192,6 +199,8 @@ export function PaymentOperationRow({
               {payment.note}
             </p>
           ) : null}
+          {payment.effectiveLocationName ? <p className="mt-1 text-xs text-on-surface-muted">{payment.effectiveLocationName}{payment.effectiveLocationSource === "ClientHome" ? " · lokalizacja klienta" : ""}</p> : null}
+          {payment.packageTotalPrice != null ? <p className="mt-1 text-xs text-on-surface-muted">Pakiet teraz: {payment.packageAmountPaid == null ? "—" : formatPaymentMoney(payment.packageAmountPaid, payment.currency)} z {formatPaymentMoney(payment.packageTotalPrice, payment.currency)} · do zapłaty {payment.packageAmountDue == null ? "—" : formatPaymentMoney(payment.packageAmountDue, payment.currency)}{payment.packagePaymentStatus ? ` · ${getPackagePaymentStatusLabel(payment.packagePaymentStatus)}` : ""}</p> : null}
         </div>
 
         <PaymentSplitSummary payment={payment} />

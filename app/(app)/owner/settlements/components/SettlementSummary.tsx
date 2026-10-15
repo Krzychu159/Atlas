@@ -1,5 +1,5 @@
 import { Clock3, ReceiptText, Wallet } from "lucide-react";
-import type { TrainerMonthlySettlement } from "@/app/lib/owner/settlements";
+import type { TrainerMonthlySettlement, OwnerSettlementSummary } from "@/app/lib/owner/settlements";
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("pl-PL", {
@@ -45,11 +45,12 @@ function SummaryCard({ label, value, icon, description, tone, isLoading }: {
   );
 }
 
-export default function SettlementSummary({ settlements, isLoading = false }: {
-  settlements: TrainerMonthlySettlement[];
+export default function SettlementSummary({ settlements, summary, isLoading = false }: {
+  settlements: Pick<TrainerMonthlySettlement, "totalHours" | "totalSessions" | "totalAmount" | "isPaid">[];
+  summary?: OwnerSettlementSummary;
   isLoading?: boolean;
 }) {
-  const totalAmount = settlements.reduce((sum, item) => sum + (item.isPaid ? 0 : item.totalAmount), 0);
+  const totalAmount = summary?.unpaidAmount ?? settlements.reduce((sum, item) => sum + (item.isPaid ? 0 : item.totalAmount), 0);
   const totalHours = settlements.reduce((sum, item) => sum + item.totalHours, 0);
   const totalSessions = settlements.reduce((sum, item) => sum + item.totalSessions, 0);
 
@@ -59,22 +60,22 @@ export default function SettlementSummary({ settlements, isLoading = false }: {
         label="Do wypłaty"
         value={formatMoney(totalAmount)}
         icon={<Wallet size={17} />}
-        description={totalAmount > 0 ? `${formatMoney(totalAmount)} czeka na rozliczenie` : "Wszystko rozliczone"}
+        description={summary ? `Opłacone: ${formatMoney(summary.paidAmount)} z ${formatMoney(summary.totalAmount)} · ${summary.paidTrainersCount}/${summary.trainersCount} trenerów` : totalAmount > 0 ? `${formatMoney(totalAmount)} czeka na rozliczenie` : "Wszystko rozliczone"}
         tone={totalAmount > 0 ? "pending" : "success"}
         isLoading={isLoading}
       />
       <SummaryCard
         label="Roboczogodziny"
-        value={`${totalHours.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h`}
+        value={summary ? "—" : `${totalHours.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h`}
         icon={<Clock3 size={17} />}
-        description="Łączny czas sesji w tym miesiącu"
+        description={summary ? "Podsumowanie godzin niedostępne" : "Łączny czas sesji w tym miesiącu"}
         isLoading={isLoading}
       />
       <SummaryCard
         label="Sesje"
-        value={totalSessions}
+        value={summary ? "—" : totalSessions}
         icon={<ReceiptText size={17} />}
-        description="Zrealizowane treningi"
+        description={summary ? "Podsumowanie sesji niedostępne" : "Zrealizowane treningi"}
         isLoading={isLoading}
       />
     </div>

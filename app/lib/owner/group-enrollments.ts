@@ -2,9 +2,11 @@ import { ApiError, backendGet, backendPost, getErrorMessage } from "../backend";
 import type { PagedResult } from "./billing";
 import type { Client } from "./clients";
 import { isSessionPackage, type PackageBillingMode } from "../period-packages";
-import { getPackage, getPackages, type Package } from "./packages";
+import { getPackage } from "./packages";
 
 export type GroupPackageOffer = {
+  description?: string | null; sessionsPerWeek?: number; participantsCount?: number;
+  locationId?: number | null; locationName?: string | null; isPubliclyAvailable?: boolean; unitPrice?: number;
   billingMode?: PackageBillingMode | null; packageType?: string | null;
   packageId: number; name: string | null; price: number; currency: string | null;
   sessionsLimit: number; durationDays: number; canSelect: boolean; reasons: string[] | null;
@@ -32,18 +34,9 @@ export function getGroupEnrollmentClients(locationId: number, search: string, si
 export async function getGroupPackageOptions(sessionId: number, clientId: number, signal?: AbortSignal) {
   const result = await backendGet<GroupPackageOptions>(`group-enrollments/sessions/${sessionId}/package-options`, { clientId }, signal);
   if (!Array.isArray(result.offers) || !Array.isArray(result.ownedPackages)) return result;
-  // The group-options DTO omits billingMode. Join actual offer metadata by packageId,
-  // never by the owned clientPackageId or by entry counts/name.
-  const missingIds = [...new Set([...result.offers, ...result.ownedPackages].filter(item => item.billingMode == null && item.packageType == null).map(item => item.packageId))];
-  const metadata = new Map<number, Package>();
-  if (missingIds.length) {
-    const catalog = await getPackages(undefined, signal);
-    catalog.forEach(item => metadata.set(item.id, item));
-    const absent = missingIds.filter(id => !metadata.has(id));
-    const details = await Promise.all(absent.map(id => getPackage(id, signal)));
-    details.forEach(item => metadata.set(item.id, item));
-  }
-  const sessionBased = (item: GroupPackageOffer | GroupOwnedPackage) => isSessionPackage(metadata.get(item.packageId) || item);
+  // Eligibility and full offer fields come from the session-specific response.
+  // Preserve explicit mode exclusions without inferring a mode from entry counts.
+  const sessionBased = (item: GroupPackageOffer | GroupOwnedPackage) => isSessionPackage(item);
   return { ...result, offers: result.offers.filter(sessionBased), ownedPackages: result.ownedPackages.filter(sessionBased) };
 }
 
@@ -58,6 +51,21 @@ export function groupPackageReason(code: string) {
 }
 
 export type GroupEnrollment = {
+  clientName?: string | null;
+  clientEmail?: string | null;
+  clientPhone?: string | null;
+  clientIsArchived?: boolean | null;
+  packageName?: string | null;
+  packageTotalPrice?: number | null;
+  packageAmountPaid?: number | null;
+  packagePaymentStatus?: string | null;
+  packageValidUntil?: string | null;
+  packageIsActive?: boolean | null;
+  packageTotalEntries?: number | null;
+  packageUsedEntries?: number | null;
+  sessionParticipantId?: number | null;
+  attendanceStatus?: string | null;
+  allowedActions?: ("Confirm" | "RecordPayment")[] | null;
   id: number;
   sessionId: number;
   clientId: number;
@@ -77,7 +85,11 @@ export function getGroupEnrollment(id: number, signal?: AbortSignal) {
 
 // packageId identifies the offer; clientPackageId optionally selects an owned package.
 // Omitting clientPackageId allows the backend to reuse an existing package of that offer.
-export function prepareGroupEnrollment(sessionId: number, payload: PrepareGroupEnrollmentPayload) {
+export async function prepareGroupEnrollment(sessionId: number, payload: PrepareGroupEnrollmentPayload) {
+  // Options omit billingMode. Verify only the chosen offer before writing;
+  // do not load the catalog or issue one metadata request per visible option.
+  const offer = await getPackage(payload.packageId);
+  if (!isSessionPackage(offer)) throw new Error("Ta usługa nie służy do zapisywania na zajęcia. Wybierz pakiet treningowy.");
   return backendPost<GroupEnrollment>(`group-enrollments/sessions/${sessionId}`, payload);
 }
 

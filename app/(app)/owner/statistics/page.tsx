@@ -15,7 +15,6 @@ import {
   type TrainerCostsQuery,
   type TrainerCostStatistics,
 } from "@/app/lib/owner/analytics";
-import { getClients, type Client } from "@/app/lib/owner/clients";
 import {
   getExpenseCategories,
   getExpensePaymentStatuses,
@@ -24,7 +23,6 @@ import {
   type ExpenseStatistics,
 } from "@/app/lib/owner/expenses";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
-import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
 import { showOwnerError } from "../components/owner-toast";
 import {
   fallbackCategories,
@@ -72,8 +70,6 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
     emptyTrainerCostStatistics,
   );
   const [locations, setLocations] = useState<Location[]>([]);
-  const [trainers, setTrainers] = useState<Trainer[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
   const [categories, setCategories] =
     useState<DictionaryOption[]>(fallbackCategories);
   const [paymentStatuses, setPaymentStatuses] = useState<DictionaryOption[]>(
@@ -203,27 +199,17 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
     const timer = window.setTimeout(() => {
       Promise.allSettled([
         getLocations(),
-        getTrainers(),
-        getClients(),
         getExpenseCategories(),
         getExpensePaymentStatuses(),
       ]).then(
         ([
           locationResult,
-          trainerResult,
-          clientResult,
           categoryResult,
           statusResult,
         ]) => {
           if (!active) return;
           if (locationResult.status === "fulfilled") {
             setLocations(locationResult.value.filter((item) => item.isActive));
-          }
-          if (trainerResult.status === "fulfilled") {
-            setTrainers(trainerResult.value);
-          }
-          if (clientResult.status === "fulfilled") {
-            setClients(clientResult.value);
           }
           if (categoryResult.status === "fulfilled") {
             setCategories(
@@ -287,8 +273,6 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
         advancedOpen={advancedOpen}
         legalEntities={legalEntities}
         locations={locations}
-        trainers={trainers}
-        clients={clients}
         categories={categories}
         paymentStatuses={paymentStatuses}
         hasFilters={hasFilters}

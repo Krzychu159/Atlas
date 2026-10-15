@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { FilterSearchField, FilterToolbar } from "@/app/components/ui/list/FilterToolbar";
+import { OwnerRemoteSelect } from "../../components/OwnerRemoteSelect";
 import type { ClientPackageFilter, ClientSort } from "./ClientFilters";
 
 export type OwnerClientFiltersValue = {
@@ -16,16 +17,16 @@ export const defaultOwnerClientFilters: OwnerClientFiltersValue = {
   search: "",
   packageFilter: "all",
   trainerFilter: "all",
-  sort: "package-usage",
+  sort: "newest",
 };
 
 type OwnerClientFiltersProps = {
   value: OwnerClientFiltersValue;
-  trainerOptions: string[];
+  locationId?: number | null;
   onChange: (value: OwnerClientFiltersValue) => void;
 };
 
-export default function OwnerClientFilters({ value, trainerOptions, onChange }: OwnerClientFiltersProps) {
+export default function OwnerClientFilters({ value, locationId, onChange }: OwnerClientFiltersProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const update = <Key extends keyof OwnerClientFiltersValue>(
     key: Key,
@@ -38,7 +39,7 @@ export default function OwnerClientFilters({ value, trainerOptions, onChange }: 
         <FilterSearchField
           value={value.search}
           onChange={(nextValue) => update("search", nextValue)}
-          placeholder="Imię, nazwisko, e-mail lub telefon"
+          placeholder="Imię, nazwisko lub e-mail"
         />
       }
       gridClassName="md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_240px_240px_auto_auto]"
@@ -62,15 +63,7 @@ export default function OwnerClientFilters({ value, trainerOptions, onChange }: 
       }
       onClear={() => onChange(defaultOwnerClientFilters)}
     >
-      <CustomSelect
-        label="Trener"
-        value={value.trainerFilter}
-        onChange={(nextValue) => update("trainerFilter", nextValue)}
-        options={[
-          { value: "all", label: "Wszyscy trenerzy" },
-          ...trainerOptions.map((trainer) => ({ value: trainer, label: trainer })),
-        ]}
-      />
+      <OwnerRemoteSelect kind="trainers" label="Trener" value={value.trainerFilter} locationId={locationId} onChange={nextValue => update("trainerFilter", nextValue)} />
       <CustomSelect
         label="Sortuj"
         value={value.sort}
@@ -88,10 +81,10 @@ const packageOptions = [
 ];
 
 const sortOptions = [
-  { value: "package-usage", label: "Wykorzystanie pakietu" },
+  { value: "package-usage", label: "Wykorzystanie pakietu (niedostępne)" },
   { value: "newest", label: "Najnowsi" },
   { value: "name", label: "Alfabetycznie" },
-  { value: "trainer", label: "Po trenerze" },
-  { value: "balance-desc", label: "Saldo malejąco" },
-  { value: "balance-asc", label: "Saldo rosnąco" },
+  { value: "trainer", label: "Po trenerze (niedostępne)" },
+  { value: "balance-desc", label: "Saldo malejąco (niedostępne)" },
+  { value: "balance-asc", label: "Saldo rosnąco (niedostępne)" },
 ];

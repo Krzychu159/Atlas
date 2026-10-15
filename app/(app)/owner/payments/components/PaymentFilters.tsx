@@ -31,6 +31,7 @@ export const defaultPaymentFilters: PaymentFiltersValue = {
 const advancedKeys: (keyof PaymentFiltersValue)[] = ["status", "source", "overpayment", "amountMin", "amountMax"];
 
 type PaymentFiltersProps = {
+  serverPagination?: boolean;
   value: PaymentFiltersValue;
   advancedOpen: boolean;
   onAdvancedOpenChange: (open: boolean) => void;
@@ -39,6 +40,7 @@ type PaymentFiltersProps = {
 };
 
 export function PaymentFilters({
+  serverPagination = false,
   value,
   advancedOpen,
   onAdvancedOpenChange,
@@ -56,7 +58,7 @@ export function PaymentFilters({
         <FilterSearchField
           value={value.client}
           onChange={(nextValue) => update("client", nextValue)}
-          placeholder="Imię, nazwisko lub ID klienta"
+          placeholder={serverPagination ? "Imię, nazwisko, e-mail lub ID klienta" : "Imię, nazwisko lub ID klienta"}
         />
       }
       gridClassName="md:grid-cols-2 xl:grid-cols-[minmax(280px,1fr)_260px_220px_auto_auto]"
@@ -110,7 +112,7 @@ export function PaymentFilters({
         label="Sortuj"
         value={value.sortBy}
         onChange={(nextValue) => update("sortBy", nextValue)}
-        options={paymentSortOptions}
+        options={paymentSortOptions.map(option => serverPagination && ["clientAsc", "overpaymentDesc"].includes(option.value) ? { ...option, label: `${option.label} (niedostępne)` } : option)}
       />
     </FilterToolbar>
   );

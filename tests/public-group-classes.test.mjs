@@ -3,10 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { load as loadModule } from './owner-read-harness.mjs';
 
 function load(file, extra = {}) {
   const exports = {};
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports, Date, Intl, URLSearchParams, Headers, Response, ...extra });
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports, Date, Intl, URLSearchParams, Headers, Response, require: name => {
+    if (name === './user-messages') return loadModule('app/lib/user-messages.ts', { './group-sessions': loadModule('app/lib/group-sessions.ts') });
+    throw new Error(`Unexpected dependency: ${name}`);
+  }, ...extra });
   return exports;
 }
 test('Warsaw wall-clock dates stay unchanged and explicit offsets are respected', () => {
