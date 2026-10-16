@@ -49,6 +49,18 @@ export default function ClientSessionHistory({
     [sessions],
   );
 
+  if (pagination) {
+    const visibleSessions = sessions.filter(session => !isConsultationSession(session));
+    return <section className={embedded ? "min-w-0" : "card-shell p-5 md:p-6"}>
+      {!embedded ? <h2 className="font-display text-[1.65rem] font-semibold leading-tight">Historia treningów</h2> : null}
+      <p className="mb-3 text-xs text-on-surface-muted">Treningi według daty, od najnowszych. Każda strona obejmuje wszystkie rodzaje treningów, także anulowane.</p>
+      <div className="flex flex-col gap-1.5">
+        {visibleSessions.length ? visibleSessions.map(session => <SessionRow key={session.id} clientId={clientId} session={session} />) : <p className="rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-2.5 text-xs text-on-surface-variant">Brak treningów na tej stronie.</p>}
+      </div>
+      {pagination.totalPages > 1 ? <PaymentPagination page={pagination.page} pageSize={pagination.pageSize} totalItems={pagination.totalCount} totalPages={pagination.totalPages} onPageChange={pagination.onPageChange} itemLabel="treningów" ariaLabel="Strony historii treningów" /> : null}
+    </section>;
+  }
+
   return (
     <section className={embedded ? "min-w-0" : "card-shell p-5 md:p-6"}>
       {embedded ? null : <div className="flex flex-wrap items-end justify-between gap-3">
@@ -59,21 +71,21 @@ export default function ClientSessionHistory({
           </h2>
         </div>
         <p className="text-label text-on-surface-muted">
-          {pagination?.totalCount ?? sessions.length} przypisanych
+          {sessions.length} przypisanych
         </p>
       </div>}
 
       <div className={`flex flex-col gap-5 ${embedded ? "" : "mt-6"}`}>
         {SESSION_GROUPS.map((group) => {
           const items = groupedSessions[group];
-          const visibleItems = pagination ? items : items.slice(0, visibleCounts[group]);
+          const visibleItems = items.slice(0, visibleCounts[group]);
 
           return (
             <div key={group}>
               <div className="flex items-center gap-3">
                 <h3 className="text-sm font-semibold text-on-surface">{groupLabels[group]}</h3>
                 <span className="rounded-full bg-surface-container-lowest px-2 py-0.5 text-[10px] font-semibold text-primary-light">
-                  {items.length}{pagination ? " na tej stronie" : ""}
+                  {items.length}
                 </span>
               </div>
 
@@ -93,7 +105,7 @@ export default function ClientSessionHistory({
                 )}
               </div>
 
-              {!pagination && visibleItems.length < items.length ? (
+              {visibleItems.length < items.length ? (
                 <Button
                   type="button"
                   variant="secondary"
@@ -113,7 +125,6 @@ export default function ClientSessionHistory({
           );
         })}
       </div>
-      {pagination && pagination.totalPages > 1 ? <PaymentPagination page={pagination.page} pageSize={pagination.pageSize} totalItems={pagination.totalCount} totalPages={pagination.totalPages} onPageChange={pagination.onPageChange} itemLabel="treningów" ariaLabel="Strony historii treningów" /> : null}
     </section>
   );
 }

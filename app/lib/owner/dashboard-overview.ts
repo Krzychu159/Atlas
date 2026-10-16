@@ -19,17 +19,19 @@ export type DashboardAttention = {
   asOf: string; inactivityDays: 30; clientsWithoutTraining30Days: number;
   clientsWithOneRemainingSession: number; clientsWithoutAttendanceBaseline: number;
 };
-export function getDashboardSummary(period: string, signal?: AbortSignal) {
-  return backendGet<DashboardSummary>("owner/dashboard/summary", { period }, signal);
+// locationId is sent only for a selected location; without it the backend returns the whole studio.
+const scoped = (locationId?: number | null) => (locationId ? { locationId } : {});
+export function getDashboardSummary(period: string, signal?: AbortSignal, locationId?: number | null) {
+  return backendGet<DashboardSummary>("owner/dashboard/summary", { period, ...scoped(locationId) }, signal);
 }
-export function getDashboardRevenue(period: string, months: 6 | 12, signal?: AbortSignal) {
-  return backendGet<DashboardRevenue>("owner/dashboard/revenue", { months, period }, signal);
+export function getDashboardRevenue(period: string, months: 6 | 12, signal?: AbortSignal, locationId?: number | null) {
+  return backendGet<DashboardRevenue>("owner/dashboard/revenue", { months, period, ...scoped(locationId) }, signal);
 }
-export function getDashboardRecentClients(signal?: AbortSignal) {
-  return backendGet<DashboardRecentClient[]>("owner/dashboard/recent-clients", { limit: 4 }, signal);
+export function getDashboardRecentClients(signal?: AbortSignal, locationId?: number | null) {
+  return backendGet<DashboardRecentClient[]>("owner/dashboard/recent-clients", { limit: 4, ...scoped(locationId) }, signal);
 }
-export function getDashboardAttention(signal?: AbortSignal) {
-  return backendGet<DashboardAttention>("owner/dashboard/attention", undefined, signal);
+export function getDashboardAttention(signal?: AbortSignal, locationId?: number | null) {
+  return backendGet<DashboardAttention>("owner/dashboard/attention", locationId ? { locationId } : undefined, signal);
 }
 export function currentDashboardPeriod(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit" }).formatToParts(now);

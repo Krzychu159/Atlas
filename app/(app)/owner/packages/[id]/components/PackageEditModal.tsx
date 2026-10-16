@@ -94,7 +94,7 @@ export default function PackageEditModal({
   }
 
   return (
-    <ModalOverlay onClose={close}>
+    <ModalOverlay onClose={close} closeDisabled={isSaving}>
       <div role="dialog" aria-modal="true" aria-label={periodBased ? "Edytuj ofertę usługi" : "Edytuj pakiet"} className="relative z-10 flex max-h-[92vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[var(--radius-xl)] bg-surface-container-high shadow-ambient">
         <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6 [&_input]:min-w-0 [&_textarea]:resize-y">
           <ModalHeader

@@ -1,6 +1,7 @@
 "use client";
 
-import { FieldDensityProvider, compactFieldLabelClassName } from "@/app/components/ui/field-density";
+import { compactFieldLabelClassName } from "@/app/components/ui/field-density";
+import { ModalOverlay } from "@/app/components/ui/modal";
 import SessionToggle from "@/app/components/schedule/SessionToggle";
 import SessionAccordion from "@/app/components/schedule/SessionAccordion";
 import { groupSeatsLabel, isConsultationSession, isGroupTraining } from "@/app/lib/group-sessions";
@@ -263,14 +264,7 @@ export default function SessionEditorModal({
   }
 
   return (
-    <FieldDensityProvider value="compact">
-    <div data-atlas-modal="" className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6">
-      <button
-        type="button"
-        aria-label="Zamknij"
-        className="absolute inset-0 bg-black/70 backdrop-blur-[4px]"
-        onClick={() => { if (!groupEnrollmentBusy && !isSaving) onClose(); }}
-      />
+    <ModalOverlay onClose={groupEnrollmentBusy || isSaving ? undefined : onClose} className="backdrop-blur-[4px] md:p-6">
 
       <form
         onSubmit={(event) => {
@@ -714,8 +708,7 @@ export default function SessionEditorModal({
           </Button>
         </div>
       </form>
-    </div>
-    </FieldDensityProvider>
+    </ModalOverlay>
   );
 }
 

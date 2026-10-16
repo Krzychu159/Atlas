@@ -28,7 +28,8 @@ function TrainerProfile({ trainerId }: { trainerId: number }) {
   const loadClients = useCallback((signal: AbortSignal) => getClientsByTrainer(trainerId, signal), [trainerId]);
   const loadRates = useCallback((signal: AbortSignal) => getTrainerRates(trainerId, signal), [trainerId]);
   const [sessionPage, setSessionPage] = useState(1);
-  const loadSessions = useCallback((signal: AbortSignal) => getOwnerSessionPage({ trainerId, page: sessionPage, pageSize: 4, order: "asc" }, signal), [trainerId, sessionPage]);
+  const [sessionsFrom] = useState(() => new Date().toISOString());
+  const loadSessions = useCallback((signal: AbortSignal) => getOwnerSessionPage({ trainerId, from: sessionsFrom, page: sessionPage, pageSize: 4, order: "asc" }, signal), [trainerId, sessionsFrom, sessionPage]);
   const profile = useOwnerRead(String(trainerId), loadTrainer, "Nie udało się pobrać profilu trenera.");
   const clientList = useOwnerRead(String(trainerId), loadClients, "Nie udało się pobrać klientów trenera.");
   const rateList = useOwnerRead(String(trainerId), loadRates, "Nie udało się pobrać stawek trenera.");

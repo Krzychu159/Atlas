@@ -8,6 +8,7 @@ export type SelectOption = {
   value: string;
   label: string;
   color?: string;
+  disabled?: boolean;
 };
 
 type CustomSelectProps = {
@@ -17,6 +18,8 @@ type CustomSelectProps = {
   onChange: (value: string) => void;
   icon?: React.ReactNode;
   className?: string;
+  /** Accessible name for a select shown without a visible label. */
+  ariaLabel?: string;
 };
 
 export function CustomSelect({
@@ -26,6 +29,7 @@ export function CustomSelect({
   onChange,
   icon,
   className,
+  ariaLabel,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const compact = useFieldDensity() === "compact";
@@ -48,13 +52,24 @@ export function CustomSelect({
   }, []);
 
   return (
-    <div ref={rootRef} className={["relative", className].filter(Boolean).join(" ")}>
+    <div
+      ref={rootRef}
+      className={["relative", className].filter(Boolean).join(" ")}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape" || !isOpen) return;
+        event.preventDefault();
+        setIsOpen(false);
+        rootRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+      }}
+    >
       {outsideLabel ? <span aria-hidden="true" className={`mb-1.5 block ${compactFieldLabelClassName}`}>{label}</span> : null}
       <div className="relative">
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
-        aria-label={outsideLabel ? `${label}: ${selectedOption?.label ?? ""}` : undefined}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-label={outsideLabel ? `${label}: ${selectedOption?.label ?? ""}` : ariaLabel ? `${ariaLabel}: ${selectedOption?.label ?? ""}` : undefined}
         className={[
           compact ? compactControlHeightClassName : "h-12",
           "flex w-full items-center gap-3 rounded-[var(--radius-lg)] border border-white/5 bg-surface-container-lowest px-3 text-left transition",
@@ -91,12 +106,14 @@ export function CustomSelect({
               <button
                 key={option.value}
                 type="button"
+                disabled={option.disabled}
                 onClick={() => {
+                  if (option.disabled) return;
                   onChange(option.value);
                   setIsOpen(false);
                 }}
                 className={[
-                  "flex min-h-10 w-full items-center gap-2 rounded-[var(--radius-md)] px-3 text-left text-sm transition",
+                  "flex min-h-10 w-full items-center gap-2 rounded-[var(--radius-md)] px-3 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-50",
                   active
                     ? "bg-surface-container-high text-on-surface"
                     : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface",

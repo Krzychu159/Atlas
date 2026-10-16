@@ -47,7 +47,8 @@ import {
 import { toDateInputValue } from "@/app/lib/formatters/date";
 
 import { getLocations, type Location } from "@/app/lib/owner/locations";
-import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
+import { getTrainer, type Trainer } from "@/app/lib/owner/trainers";
+import { OwnerTrainerAssignmentSelect } from "../../../components/OwnerTrainerAssignmentSelect";
 
 import {
   getTrainerPortalClient,
@@ -111,17 +112,18 @@ export default function EditClientModal({
   const [planReady, setPlanReady] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTrainerChecking, setIsTrainerChecking] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     let active = true;
-    Promise.all([getTrainersForEditModal(access, trainerMe), getLocationsForEditModal(access, trainerMe)])
+    Promise.all([getTrainersForEditModal(access, trainerMe, client?.trainerId), getLocationsForEditModal(access, trainerMe)])
       .then(([trainersData, locationsData]) => {
         if (!active) return;
-        setTrainers(trainersData); setLocations(locationsData);
+        setTrainers(current => [...trainersData.filter(trainer => !current.some(item => item.id === trainer.id)), ...current]); setLocations(locationsData);
       }).catch(() => { if (active) { setTrainers([]); setLocations([]); } });
     return () => { active = false; };
-  }, [access, open, trainerMe]);
+  }, [access, open, trainerMe, client?.trainerId]);
 
   const currentClientId = client?.id;
   useEffect(() => {
@@ -213,7 +215,7 @@ export default function EditClientModal({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saveLock.current || !planReady) return;
+    if (saveLock.current || !planReady || isTrainerChecking) return;
     const revision = lifecycle.current;
 
     const resolvedLocationId = Number(locationId);
@@ -386,7 +388,7 @@ export default function EditClientModal({
   }
 
   return (
-    <ModalOverlay onClose={onClose} className="px-4 py-8">
+    <ModalOverlay onClose={isSaving ? undefined : onClose} className="px-4 py-8">
       <form
         onSubmit={handleSubmit}
         className="relative z-10 flex max-h-full w-full max-w-[820px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient"
@@ -452,12 +454,12 @@ export default function EditClientModal({
                 Trener
               </span>
 
-              <CustomSelect
+              {access === "owner" ? <OwnerTrainerAssignmentSelect key={clientId} value={trainerId} onChange={setTrainerId} onCheckingChange={setIsTrainerChecking} requireActive={false} initialName={trainerId === String(currentClient.trainerId) ? currentClient.trainerFullName || undefined : undefined} onTrainerLoaded={trainer => setTrainers(trainer ? [trainer] : [])} /> : <CustomSelect
                 value={trainerId}
                 onChange={setTrainerId}
                 className="mt-2"
                 options={trainerOptions}
-              />
+              />}
             </div>
 
             <div>
@@ -582,7 +584,7 @@ export default function EditClientModal({
 
           <Button
             type="submit"
-            disabled={isSaving || !planReady}
+            disabled={isSaving || !planReady || isTrainerChecking}
             icon={<Save size={16} />}
           >
             {isSaving ? "Zapisywanie..." : "Zapisz zmiany"}
@@ -601,8 +603,12 @@ function formatLocationLabel(location: Location) {
   );
 }
 
-async function getTrainersForEditModal(access: "owner" | "trainer", trainerMe?: TrainerPortalMe | null) {
-  if (access === "owner") return getTrainers();
+async function getTrainersForEditModal(access: "owner" | "trainer", trainerMe?: TrainerPortalMe | null, trainerId?: number | null) {
+  if (access === "owner") {
+    if (!trainerId) return [];
+    try { return [await getTrainer(trainerId)]; }
+    catch (error) { if (isNotFoundError(error)) return []; throw error; }
+  }
   const me = trainerMe || await getTrainerPortalMe();
   const trainer = trainerPortalMeToTrainer(me);
   return trainer ? [trainer] : [];

@@ -150,7 +150,7 @@ export default function InviteClientPortalModal({
   }
 
   return (
-    <ModalOverlay onClose={onClose}>
+    <ModalOverlay onClose={isSubmitting ? undefined : onClose}>
       <div className="relative z-10 w-full max-w-[480px] rounded-[var(--radius-xl)] bg-surface-container shadow-ambient">
         <div className="p-6">
           <ModalHeader

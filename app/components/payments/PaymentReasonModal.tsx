@@ -39,7 +39,7 @@ export function PaymentReasonModal({
   const Icon = action === "reject" ? XCircle : RotateCcw;
 
   return (
-    <ModalOverlay onClose={onClose}>
+    <ModalOverlay onClose={processing ? undefined : onClose}>
       <div className="relative z-10 flex max-h-[90vh] w-full max-w-[560px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient">
         <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
           <ModalHeader

@@ -10,6 +10,7 @@ import {
   dashboardChange, dashboardClientCount, dashboardJoinedDate, dashboardMonth, getDashboardAttention, getDashboardRecentClients,
   getDashboardRevenue, getDashboardSummary, validDashboardPeriod,
 } from "@/app/lib/owner/dashboard-overview";
+import { OWNER_LOCATION_ALL, useOwnerLocationFilter, useOwnerLocationOptions } from "@/app/lib/owner/location-filter";
 import { useDashboardResource } from "./use-dashboard-resource";
 import OverviewRevenueChart from "./OverviewRevenueChart";
 import OverviewInfo from "./OverviewInfo";
@@ -49,19 +50,27 @@ function Overview({ currentPeriod }: { currentPeriod: string }) {
   const [months, setMonths] = useState<6 | 12>(12);
   const selectPeriod = (value: string) => { if (validDashboardPeriod(value, currentPeriod)) setPeriod(value); };
   const paymentRevision = usePaymentDateCorrectionRevision();
-  const loadSummary = useCallback((signal: AbortSignal) => getDashboardSummary(period, signal), [period]);
-  const loadRevenue = useCallback((signal: AbortSignal) => getDashboardRevenue(period, months, signal), [period, months]);
-  const summary = useDashboardResource(`summary:${period}:${paymentRevision}`, loadSummary);
-  const revenue = useDashboardResource(`revenue:${period}:${months}:${paymentRevision}`, loadRevenue);
-  const clients = useDashboardResource("clients", getDashboardRecentClients);
-  const attention = useDashboardResource("attention", getDashboardAttention);
+  const { selectedLocationId } = useOwnerLocationFilter();
+  const { options: locationOptions, selectedLocationValue } = useOwnerLocationOptions(true);
+  // Display uses the hydration-safe value; requests use the stored selection.
+  const displayScoped = selectedLocationValue !== OWNER_LOCATION_ALL;
+  const scopeLabel = !displayScoped ? "Wszystkie lokalizacje" : locationOptions.find(option => option.value === selectedLocationValue)?.label ?? "Wybrana lokalizacja";
+  const scope = selectedLocationId ?? "all";
+  const loadSummary = useCallback((signal: AbortSignal) => getDashboardSummary(period, signal, selectedLocationId), [period, selectedLocationId]);
+  const loadRevenue = useCallback((signal: AbortSignal) => getDashboardRevenue(period, months, signal, selectedLocationId), [period, months, selectedLocationId]);
+  const loadClients = useCallback((signal: AbortSignal) => getDashboardRecentClients(signal, selectedLocationId), [selectedLocationId]);
+  const loadAttention = useCallback((signal: AbortSignal) => getDashboardAttention(signal, selectedLocationId), [selectedLocationId]);
+  const summary = useDashboardResource(`summary:${scope}:${period}:${paymentRevision}`, loadSummary);
+  const revenue = useDashboardResource(`revenue:${scope}:${period}:${months}:${paymentRevision}`, loadRevenue);
+  const clients = useDashboardResource(`clients:${scope}`, loadClients);
+  const attention = useDashboardResource(`attention:${scope}`, loadAttention);
   const stats = summary.data;
   const partial = stats?.isPartial || revenue.data?.items.some(item => item.isPartial);
   const comparison = stats ? `Porównanie z poprzednim miesiącem (${dashboardMonth(stats.previousPeriod)}).${stats.isPartial ? " Dane od początku bieżącego miesiąca porównujemy z pełnym poprzednim miesiącem." : ""}` : "";
   const percentHelp = " Brak podstawy do porównania oznacza, że nie można wyznaczyć zmiany procentowej względem poprzedniego miesiąca; nie oznacza zmiany o 0%.";
   return <div className={styles.dashboard}>
     <header className={styles.header}>
-      <div><h1>Przegląd</h1><p>Najważniejsze informacje o Twoim studiu</p><div className={styles.scopeNote}>Wszystkie lokalizacje <OverviewInfo label="Zakres danych dashboardu">Dane dotyczą całego studia. Filtr lokalizacji w górnym pasku nie zmienia informacji na tym ekranie.</OverviewInfo></div></div>
+      <div><h1>Przegląd</h1><p>Najważniejsze informacje o Twoim studiu</p><div className={styles.scopeNote}>{scopeLabel} <OverviewInfo label="Zakres danych przeglądu">{!displayScoped ? "Dane dotyczą całego studia. Wybierz lokalizację w górnym pasku, aby zobaczyć dane jednej lokalizacji." : `Dane dotyczą lokalizacji: ${scopeLabel}. Zmienisz ją w górnym pasku.`}</OverviewInfo></div></div>
       <div className={styles.headerControls}>
       <label className={styles.period}><CalendarDays size={18} aria-hidden="true" /><span className={styles.srOnly}>Miesiąc przeglądu</span>
         <input type="month" aria-label="Miesiąc przeglądu" min="2000-01" max={currentPeriod} value={period} required

@@ -223,7 +223,7 @@ export default function EditTrainerModal({
   }
 
   return (
-    <ModalOverlay onClose={onClose} className="px-4 py-8">
+    <ModalOverlay onClose={isSaving ? undefined : onClose} className="px-4 py-8">
       <form
         onSubmit={handleSubmit}
         className="relative z-10 flex max-h-full w-full max-w-[760px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, Mail, MapPin, UserRound } from "lucide-react";
+import { ArrowRight, Mail, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
@@ -20,7 +20,7 @@ import {
 } from "@/app/lib/owner/invitations";
 import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
-import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
+import { OwnerTrainerAssignmentSelect } from "../../components/OwnerTrainerAssignmentSelect";
 
 type AddClientMode = "record" | "invitation";
 type AddClientModalProps = {
@@ -45,7 +45,7 @@ export default function AddClientModal({ open, onClose, onCreated, initialMode =
   const [mode, setMode] = useState<AddClientMode>("record");
   const [form, setForm] = useState(initialForm);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const [isTrainerChecking, setIsTrainerChecking] = useState(false);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
@@ -68,13 +68,16 @@ export default function AddClientModal({ open, onClose, onCreated, initialMode =
   useEffect(() => {
     if (!open) return;
 
+    const controller = new AbortController();
     void Promise.resolve()
       .then(() => {
+        controller.signal.throwIfAborted();
         setMode(initialMode);
         setIsLoadingOptions(true);
-        return Promise.all([getLocations(), getTrainers()]);
+        return getLocations(controller.signal);
       })
-      .then(([locationsData, trainersData]) => {
+      .then((locationsData) => {
+        if (controller.signal.aborted) return;
         const availableLocations = locationsData.filter((location) => location.isActive);
         const preferredLocationId = selectedLocationId ? String(selectedLocationId) : "";
         const locationId = availableLocations.some(
@@ -84,17 +87,17 @@ export default function AddClientModal({ open, onClose, onCreated, initialMode =
           : String(availableLocations[0]?.id || "");
 
         setLocations(availableLocations);
-        setTrainers(trainersData);
         setForm({ ...initialForm, locationId });
       })
       .catch((err) => {
+        if (controller.signal.aborted) return;
         setLocations([]);
-        setTrainers([]);
-        showOwnerError(err, "Nie udało się pobrać lokalizacji i trenerów.", {
+        showOwnerError(err, "Nie udało się pobrać lokalizacji.", {
           id: "owner-client-options-load-error",
         });
       })
-      .finally(() => setIsLoadingOptions(false));
+      .finally(() => { if (!controller.signal.aborted) setIsLoadingOptions(false); });
+    return () => controller.abort();
   }, [open, selectedLocationId, initialMode]);
 
   useEffect(() => {
@@ -104,30 +107,17 @@ export default function AddClientModal({ open, onClose, onCreated, initialMode =
 
   if (!open) return null;
 
-  const selectedLocationIdNumber = Number(form.locationId);
   const locationOptions = locations.map((location) => ({
     value: String(location.id),
     label: formatLocationLabel(location),
   }));
-  const trainerOptions = [
-    { value: "", label: "Bez przypisanego trenera" },
-    ...trainers
-      .filter(
-        (trainer) =>
-          trainer.locationIds.includes(selectedLocationIdNumber) &&
-          trainer.status.toLowerCase().includes("active"),
-      )
-      .map((trainer) => ({
-        value: String(trainer.id),
-        label: trainer.fullName || `${trainer.firstName} ${trainer.lastName}`.trim(),
-      })),
-  ];
 
   function updateForm(field: keyof typeof initialForm, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
   async function handleSubmit() {
+    if (isTrainerChecking || isSubmitting) return;
     const locationId = Number(form.locationId);
 
     if (!locationId) {
@@ -228,14 +218,14 @@ export default function AddClientModal({ open, onClose, onCreated, initialMode =
 
   const isSubmitDisabled =
     isSubmitting ||
-    isLoadingOptions ||
+    isLoadingOptions || isTrainerChecking ||
     !form.locationId ||
     (mode === "record"
       ? !form.firstName.trim() || !form.lastName.trim()
       : !form.email.trim());
 
   return (
-    <ModalOverlay onClose={onClose} className="items-end md:items-center">
+    <ModalOverlay onClose={isSubmitting ? undefined : onClose} className="items-end md:items-center">
       <div className="relative z-10 flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[34px] bg-surface-container-high shadow-ambient md:max-w-[640px] md:rounded-[var(--radius-xl)]">
         <div className="min-h-0 flex-1 overflow-y-auto p-6 md:p-8">
           <ModalHeader
@@ -273,7 +263,7 @@ export default function AddClientModal({ open, onClose, onCreated, initialMode =
 
             <div>
               <span className="text-label text-on-surface-muted">Trener</span>
-              <CustomSelect value={form.trainerId} onChange={(value) => updateForm("trainerId", value)} icon={<UserRound size={17} />} className="mt-2" options={trainerOptions} />
+              <OwnerTrainerAssignmentSelect key={form.locationId} value={form.trainerId} onChange={(value) => updateForm("trainerId", value)} locationId={Number(form.locationId) || null} onCheckingChange={setIsTrainerChecking} />
             </div>
 
             <TextField

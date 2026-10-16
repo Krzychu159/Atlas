@@ -25,6 +25,32 @@ import { pluralizeClients } from "@/app/(app)/owner/clients/components/client-li
 import { useOwnerRead } from "../components/use-owner-read";
 import { OwnerReadState } from "../components/OwnerReadState";
 import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
+import { listUrlKey, readPositiveInt, useListScrollRestoration, useListUrlSync } from "../components/list-url-state";
+import type { ClientPackageFilter } from "./components/ClientFilters";
+
+const CLIENT_URL_KEYS = ["q", "package", "trainer", "sort", "page"] as const;
+const PACKAGE_FILTERS: readonly ClientPackageFilter[] = ["all", "active-package", "inactive-package"];
+
+function clientFiltersFromUrl(params: URLSearchParams): OwnerClientFiltersValue {
+  const trainerId = readPositiveInt(params.get("trainer"));
+  return {
+    search: (params.get("q") ?? "").slice(0, 100),
+    packageFilter: PACKAGE_FILTERS.find((value) => value === params.get("package")) ?? defaultOwnerClientFilters.packageFilter,
+    trainerFilter: trainerId ? String(trainerId) : defaultOwnerClientFilters.trainerFilter,
+    // Only sorts the server supports can come from the address.
+    sort: params.get("sort") === "name" ? "name" : defaultOwnerClientFilters.sort,
+  };
+}
+
+function clientFiltersToUrl(filters: OwnerClientFiltersValue, page: number) {
+  return {
+    q: filters.search.trim() || null,
+    package: filters.packageFilter === defaultOwnerClientFilters.packageFilter ? null : filters.packageFilter,
+    trainer: filters.trainerFilter === defaultOwnerClientFilters.trainerFilter ? null : filters.trainerFilter,
+    sort: filters.sort === defaultOwnerClientFilters.sort ? null : filters.sort,
+    page: page > 1 ? String(page) : null,
+  };
+}
 
 export default function ClientsPage() {
   return <Suspense><ClientsContent /></Suspense>;
@@ -35,10 +61,10 @@ function ClientsContent() {
   const router = useRouter();
   const showInvitations = searchParams.get("invitations") === "true";
   const { selectedLocationId } = useOwnerLocationFilter();
-  const [filters, setFilters] = useState<OwnerClientFiltersValue>(defaultOwnerClientFilters);
+  const [filters, setFilters] = useState<OwnerClientFiltersValue>(() => clientFiltersFromUrl(searchParams));
   const { search, packageFilter, trainerFilter, sort } = filters;
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [pagination, setPagination] = useState({ page: 1, locationId: selectedLocationId });
+  const [pagination, setPagination] = useState(() => ({ page: readPositiveInt(searchParams.get("page")) ?? 1, locationId: selectedLocationId }));
   const page = pagination.locationId === selectedLocationId ? pagination.page : 1;
   const setPage = (next: number) => setPagination({ page: next, locationId: selectedLocationId });
   useEffect(() => { let active = true; if (showInvitations) void Promise.resolve().then(() => { if (active) setIsModalOpen(true); }); return () => { active = false; }; }, [showInvitations]);
@@ -51,10 +77,14 @@ function ClientsContent() {
   }), [page, search, trainerFilter, selectedLocationId, packageFilter, sort]);
   const load = useCallback((signal: AbortSignal) => getOwnerClients(query, signal), [query]);
   const list = useOwnerRead(JSON.stringify(query), load, "Nie udało się pobrać klientów.", 0, 250, !unsupportedSort && !invalidSearch);
+  const urlParams = clientFiltersToUrl(filters, page);
+  useListUrlSync(urlParams, CLIENT_URL_KEYS);
+  useListScrollRestoration(listUrlKey("clients", urlParams), Boolean(list.data) && !list.loading);
   const readError = unsupportedSort ? "To sortowanie nie jest jeszcze dostępne. Wybierz Najnowsi lub Alfabetycznie." : invalidSearch ? "Wpisz maksymalnie 100 znaków wyszukiwania." : list.error;
   const clients = list.data?.items ?? [];
   const filteredClients = clients;
-  const scopedClients = clients;
+  const hasLocalFilters = Boolean(search.trim()) || packageFilter !== "all" || trainerFilter !== "all";
+  const hasFilters = hasLocalFilters || selectedLocationId !== null;
   const isLoading = list.loading;
   const loadFailed = Boolean(readError);
   const packageCount = list.data?.summary?.withActivePackageCount;
@@ -83,7 +113,11 @@ function ClientsContent() {
       );
     }
 
-    if (scopedClients.length === 0) {
+    if (clients.length === 0 && (list.data?.totalCount ?? 0) > 0) {
+      return <ListState variant="empty" title="Brak klientów na tej stronie" message="Lista klientów zmieniła się. Wróć na pierwszą stronę." action={<Button variant="secondary" size="sm" onClick={() => setPage(1)}>Przejdź na pierwszą stronę</Button>} />;
+    }
+
+    if (clients.length === 0 && !hasFilters) {
       return (
         <ListState
           variant="empty"
@@ -105,12 +139,12 @@ function ClientsContent() {
           variant="empty"
           icon={<SearchX size={28} />}
           title="Brak klientów spełniających wybrane kryteria"
-          message="Zmień lub wyczyść filtry, aby zobaczyć więcej wyników."
-          action={
+          message={selectedLocationId !== null ? "Zmień lokalizację lub pozostałe filtry, aby zobaczyć więcej wyników." : "Zmień lub wyczyść filtry, aby zobaczyć więcej wyników."}
+          action={hasLocalFilters ? (
             <Button variant="secondary" size="sm" onClick={() => changeFilters(defaultOwnerClientFilters)}>
               Wyczyść filtry
             </Button>
-          }
+          ) : undefined}
         />
       );
     }

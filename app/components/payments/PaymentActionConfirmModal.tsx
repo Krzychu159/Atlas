@@ -35,7 +35,7 @@ export function PaymentActionConfirmModal({
     icon === "receipt" ? ReceiptText : icon === "reverse" ? RotateCcw : CheckCircle2;
 
   return (
-    <ModalOverlay onClose={onClose}>
+    <ModalOverlay onClose={processing ? undefined : onClose}>
       <div className="relative z-10 w-full max-w-[520px] overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient">
         <ModalHeader
           title={title}

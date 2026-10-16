@@ -87,10 +87,19 @@
 @media (prefers-reduced-motion: reduce) { .skeleton span { animation: none; } }
 @media (max-width: 1200px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .mainGrid { grid-template-columns: minmax(0, 1fr); } .clients { min-height: 0; } .kpi > strong { font-size: 34px; } }
 @media (max-width: 600px) {
-  .header { align-items: flex-start; flex-direction: column; gap: 14px; margin-bottom: 12px; }
-  .header p { font-size: 14px; }
-  .kpis, .alerts { grid-template-columns: minmax(0, 1fr); gap: 14px; }
-  .kpi { min-height: 140px; padding: 16px 20px; }
+  .header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px 12px; padding-bottom: 12px; margin-bottom: 12px; }
+  .header h1 { font-size: 26px; }
+  .header p { font-size: 13px; margin-top: 4px; }
+  .period { padding: 7px 10px; gap: 8px; }
+  .period input { width: 112px; font-size: 14px; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .alerts { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .kpi { min-height: 0; padding: 12px 12px 12px 14px; }
+  .kpi h2 { font-size: 11px; letter-spacing: .04em; line-height: 1.35; }
+  .kpi > strong { font-size: 22px; margin: 8px 0 4px; }
+  .kpi > p, .kpi .change { font-size: 12px; }
+  .metricHeading { align-items: flex-start; }
+  .metricHeading .infoButton { width: 24px; height: 24px; margin: -4px -4px 0 0; }
   .mainGrid { margin-top: 18px; gap: 18px; }
   .revenue, .clients { padding: 18px 16px; }
   .revenue .cardHeader { align-items: flex-start; flex-direction: column; }
@@ -123,4 +132,4 @@
 .infoTooltip { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; width: min(280px, calc(100vw - 48px)); padding: 12px 14px; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--color-surface-container-high); color: var(--color-on-surface-variant); box-shadow: var(--shadow-soft); font-size: 12px; font-weight: 400; line-height: 1.6; text-align: left; }
 .infoTooltip[hidden] { display: none; }
 .scopeNote .infoTooltip, .revenueHeading .infoTooltip { right: auto; left: 0; }
-@media (max-width: 600px) { .headerControls { align-items: flex-start; } .partial { justify-content: flex-start; } .scopeNote .infoTooltip, .partial .infoTooltip { left: -100px; right: auto; } .revenueHeading .infoTooltip { left: -110px; } }
+@media (max-width: 600px) { .header > div:first-child > p { display: none; } .period input { width: 136px; } .headerControls { align-items: flex-end; } .partial { justify-content: flex-end; } .scopeNote .infoTooltip { left: 0; right: auto; } .partial .infoTooltip { left: auto; right: 0; } .revenueHeading .infoTooltip { left: -110px; } .kpis > :nth-child(even) .infoTooltip { right: 0; left: auto; } .kpis > :nth-child(odd) .infoTooltip { left: -150px; right: auto; } }

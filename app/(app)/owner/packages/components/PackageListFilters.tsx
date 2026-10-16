@@ -46,6 +46,8 @@ export default function PackageListFilters({ value, onChange }: PackageListFilte
     value.durationFilter !== "all",
     value.activityFilter !== "all",
   ].filter(Boolean).length;
+  // Sorting only reorders the list, so it does not count as an active filter.
+  const narrowsList = advancedActiveCount > 0 || value.search.trim() !== "" || value.billingModeFilter !== "all";
 
   const update = <Key extends keyof PackageListFiltersValue>(
     key: Key,
@@ -66,7 +68,8 @@ export default function PackageListFilters({ value, onChange }: PackageListFilte
       advancedOpen={advancedOpen}
       advancedActiveCount={advancedActiveCount}
       onAdvancedOpenChange={setAdvancedOpen}
-      onClear={() => onChange(defaultPackageListFilters)}
+      canClear={narrowsList}
+      onClear={() => onChange({ ...defaultPackageListFilters, sort: value.sort })}
       advanced={
         <>
           <CustomSelect

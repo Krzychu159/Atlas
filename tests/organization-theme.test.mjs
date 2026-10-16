@@ -82,6 +82,8 @@ test("shell shows static logos only in BSworkout and retains the ATLAS platform 
     "@/app/components/organization-theme": scope,
     "@/app/components/bsworkout-logo": logoComponents,
     "@/app/components/app-toaster": { AppToaster: () => null },
+    "@/app/components/ui/modal": { lockBodyScroll: () => () => {} },
+    "@/app/components/owner-mobile-location": { OwnerLocationIconPicker: () => null },
   });
   for (const role of ["owner", "trainer", "client"]) {
     const atlas = renderToStaticMarkup(React.createElement(shell.AppShell, { role }, "screen"));
@@ -103,8 +105,12 @@ test("topbar logo comes between search and location filter and is absent in ATLA
     "@/app/components/current-user-provider": { useCurrentUser: () => ({ user: user("Owner") }) },
     "@/app/components/organization-theme": scope,
     "@/app/components/bsworkout-logo": logoComponents,
-    "@/app/lib/owner/clients": {}, "@/app/lib/owner/trainers": {}, "@/app/lib/owner/locations": {},
-    "@/app/lib/owner/location-filter": { useOwnerLocationFilter: () => ({ selectedLocationValue: "all" }), OWNER_LOCATION_ALL: "all" },
+    "@/app/lib/owner/filter-options": {},
+    "@/app/components/owner-mobile-location": { OwnerLocationIconPicker: () => null },
+    "@/app/lib/owner/location-filter": {
+      useOwnerLocationFilter: () => ({ selectedLocationId: null }),
+      useOwnerLocationOptions: () => ({ options: [], status: "ready", selectedLocationValue: "all", setSelectedLocationValue: () => {} }),
+    },
   });
   const element = React.createElement(header.Header, { role: "owner", unreadNotificationCount: 0, onUnreadCountChange: () => {} });
   assert.doesNotMatch(renderToStaticMarkup(element), /logo_bsw/);

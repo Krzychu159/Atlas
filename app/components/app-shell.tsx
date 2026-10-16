@@ -13,6 +13,8 @@ import { useCurrentUser } from "@/app/components/current-user-provider";
 import { OrganizationThemeScope } from "@/app/components/organization-theme";
 import { BsworkoutLogo, BsworkoutOrganizationPanel } from "@/app/components/bsworkout-logo";
 import { AppToaster } from "@/app/components/app-toaster";
+import { lockBodyScroll } from "@/app/components/ui/modal";
+import { OwnerLocationIconPicker } from "@/app/components/owner-mobile-location";
 import type { OrganizationTheme } from "@/app/lib/organization-theme";
 
 type AppShellProps = {
@@ -87,14 +89,13 @@ export function AppShell({ children, role, theme = "atlas" }: AppShellProps) {
   useEffect(() => {
     if (!mobileMenuOpen) return;
     const previousFocus = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const releaseScroll = lockBodyScroll();
     drawerRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
     const desktop = window.matchMedia("(min-width: 768px)");
     const closeOnDesktop = () => { if (desktop.matches) setMobileMenuOpen(false); };
     desktop.addEventListener("change", closeOnDesktop);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      releaseScroll();
       desktop.removeEventListener("change", closeOnDesktop);
       previousFocus?.focus();
     };
@@ -235,8 +236,9 @@ export function AppShell({ children, role, theme = "atlas" }: AppShellProps) {
                 Atlas
               </p>
             </div>
-            {theme === "bsworkout" ? <BsworkoutLogo className="h-6 w-16 min-w-12 shrink" /> : null}
+            {theme === "bsworkout" ? <BsworkoutLogo className="ml-auto h-6 w-16 min-w-12 shrink" /> : null}
             <div className="flex shrink-0 items-center gap-1">
+              {role === "owner" ? <OwnerLocationIconPicker /> : null}
               <Link href={`/${role}/notifications`} aria-label={unreadCount > 0 ? `Powiadomienia, nieprzeczytane: ${unreadCount}` : "Powiadomienia"} className="relative flex h-11 w-11 items-center justify-center rounded-full text-primary-light hover:bg-surface-container-high">
                 <Bell size={21} />
                 {unreadCount > 0 && <span aria-hidden="true" className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-tertiary-light px-1 text-[0.625rem] font-bold text-on-tertiary">{unreadCount > 99 ? "99+" : unreadCount}</span>}

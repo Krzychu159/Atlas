@@ -240,7 +240,7 @@ export default function PackagesPage() {
 
       {packageToDelete ? (
         <ModalOverlay
-          onClose={() => setPackageToDelete(null)}
+          onClose={isDeleting ? undefined : () => setPackageToDelete(null)}
           className="p-4"
         >
           <div className="relative z-10 flex max-h-[90vh] w-full max-w-[420px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient">
@@ -260,6 +260,7 @@ export default function PackagesPage() {
             <ModalFooter>
               <Button
                 variant="secondary"
+                disabled={isDeleting}
                 onClick={() => setPackageToDelete(null)}
               >
                 Anuluj

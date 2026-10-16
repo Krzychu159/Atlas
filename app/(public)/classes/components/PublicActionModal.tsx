@@ -221,7 +221,7 @@ export function PublicActionModal({ action, user, onUser, onClose, onRefresh }: 
   const isPaid = purchase?.paymentStatus === "Paid" || checkout?.status === ClientPaymentStatus.Confirmed;
   const awaitingPayment = checkout?.status === ClientPaymentStatus.PendingConfirmation && !checkout.checkoutUrl;
   const title = verificationPending ? "Potwierdź adres e-mail" : !user ? (register ? "Utwórz konto" : "Zaloguj się") : purchase ? "Twój pakiet" : action.type === "buy" ? "Kup pakiet" : action.type === "cancel" ? "Odwołać zapis?" : "Zarezerwuj miejsce";
-  return <ModalOverlay onClose={busy ? undefined : onClose}>
+  return <ModalOverlay onClose={busy ? undefined : onClose} manageFocus={false}>
     <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onKeyDown={(event) => {
       if (event.key === "Escape" && !busy) onClose();
       if (event.key !== "Tab") return;

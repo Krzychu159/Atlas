@@ -1,96 +1,266 @@
-ATLAS CRM — POTRZEBY FRONTENDU OWNERA OD BACKENDU
-Aktualizacja: 2026-10-15
-Podstawa: BACKEND_FOR_FRONTEND_OPTIMIZATION.md i stan integracji frontendu.
-Poniżej prośby o uzupełnienie lub potwierdzenie kontraktów, a nie opis nowych,
-już istniejących parametrów. Nazwy nowych sortowań powinien ustalić backend.
+ATLAS CRM — SCALONA NOTATKA DLA BACKENDU PO POPRAWKACH FRONTENDU
+Data: 2026-10-16
 
-1. NAJPIERW ZGODNOŚĆ WDROŻONEGO ODCZYTU KLIENTÓW
+PROSIMY ODPOWIEDZIEĆ DOKŁADNIE W PUNKTACH 1–14, ZACHOWUJĄC ICH NUMERY.
+Dla każdego punktu podać:
+- Status: Wykonano / Potwierdzono / Wymaga decyzji / Nieobsługiwane.
+- Co zmieniono albo co potwierdzono w istniejącej implementacji.
+- Dokładną ścieżkę, nazwy parametrów, obsługiwane wartości i kształt odpowiedzi.
+- Przykładowe żądanie i JSON odpowiedzi oraz wynik testu akceptacyjnego.
+- Informację o migracji, kompatybilności, wdrożonym środowisku/wersji i ograniczeniach.
+Nie wystarczy odpowiedź „obsługiwane” bez kontraktu i testu.
+Nazwy NOWYCH sortowań/pól są do opisania przez backend; frontend nie będzie ich zgadywał.
+Nie zmieniać znaczenia istniejących filtrów ani definicji kwot bez wskazania różnicy.
+
+CO SPRAWDZONO
+Sprawdzono aktualny kod, dokument BACKEND_FOR_FRONTEND_OPTIMIZATION.md oraz testy.
+Wyniki końcowych kontroli podano na końcu dokumentu. Testy są izolowane
+z atrapami; nie stanowią pomiaru wdrożonego backendu ani testu przeglądarkowego.
+Na początku poprawek zmieniona była tylko ta notatka; .claude/ nietknięte.
+Ograniczenia opisane niżej są widoczne w kodzie. Nie zakładamy, że każda luka
+w dokumencie oznacza brak funkcji na serwerze — dlatego prosimy „poprawić LUB potwierdzić”.
+
+1. PRIORYTET: SORTOWANIE KLIENTÓW PO WYKORZYSTANIU PAKIETU
+GET /api/clients w trybie paginowanym.
+Problem: frontend ma wariant „Wykorzystanie pakietu”, ale po integracji jest
+niedostępny. Udokumentowane sortowania to tylko createdDesc/created/name/nameDesc.
+Potrzebujemy:
+- Sortowania całego przefiltrowanego zbioru po wykorzystaniu, przed paginacją.
+- Podstawowy kierunek: największe wykorzystanie najpierw.
+- Procent wykorzystanych wejść, a nie sama liczba wykorzystanych/pozostałych wejść.
+- Ten sam pakiet, który prezentujemy klientowi w wierszu: activeClientPackageId.
+  Przy kilku aktywnych pakietach backend ma wskazać jednoznacznie pakiet główny.
+- Opisać zachowanie bez pakietu głównego, dla braku danych, limitu 0,
+  pakietu bez limitu, pakietu przekroczonego i usług PeriodBased.
+- Propozycja do potwierdzenia: brak porównywalnego wykorzystania na końcu,
+  bez udawania 0%; usług okresowych nie traktować jak pakietu wejść.
+- Określić, czy sortujemy po dokładnej proporcji czy procencie zaokrąglonym.
+  Wyświetlany procent jest obecnie zaokrąglany; serwer ma udokumentować regułę.
+- Stabilna dogrywka, np. nazwisko/imię/id, oraz zgodność z danymi wiersza.
+Test: 2/2 przed 6/10 przed 1/10 przy kierunku malejącym; te osoby celowo
+umieścić pierwotnie na różnych stronach. Dodatkowo klient z dwoma pakietami,
+klient bez pakietu i usługa okresowa. Bez duplikatów przy przejściu stron
+na niezmienionym zbiorze.
+
+2. SORTOWANIE KLIENTÓW PO SALDZIE I TRENERZE
+GET /api/clients?page=...&pageSize=...
+Potrzebujemy wariantów odpowiadających UI:
+- Saldo rosnąco i malejąco: według currentBalance, nie ceny pakietu ani amountDue.
+- Trener: sortowanie według danych przypisanego trenera, nie samego trainerId.
+- Potwierdzić znak salda i walutę; brak salda nie może być sztucznym zerem.
+- Opisać klientów bez trenera, trenera bez nazwy i wartości null.
+- Stabilna kolejność i sortowanie przed paginacją, z wszystkimi filtrami.
+Test: salda ujemne/0/dodatnie, powtarzające się salda, trenerzy o tych samych
+nazwiskach i klienci bez trenera; poprawna kolejność na granicy stron.
+
+3. PAGINOWANE ARCHIWUM KLIENTÓW
+GET /api/clients?isArchived=true&page=...&pageSize=...
+Potrzebujemy sortowania po archivedAt, domyślnie najnowsze archiwizacje pierwsze.
+Zachować datę archiwizacji i pola potrzebne istniejącym wierszom archiwum.
+Opisać pozycję brakujących dat i dogrywkę po id.
+Test: klient założony wcześniej, ale zarchiwizowany później, trafia wyżej;
+przy jednakowym archivedAt strony pozostają stabilne.
+Obecnie frontend archiwum nadal pobiera pełną listę i sortuje ją lokalnie.
+
+4. WYSZUKIWANIE KLIENTÓW PO TELEFONIE
+GET /api/clients, parametr search.
+Przywrócić wyszukiwanie po telefonie obok imienia/nazwiska/e-maila.
+Opisać normalizację spacji, myślników, nawiasów i prefiksu kraju.
+Nie zakładać, że dowolny fragment numeru jest identyfikatorem klienta.
+Test: zapisany +48 600-123-456 znajduje się po zgodnych z ustaloną regułą
+wariantach 600123456 i +48600123456; filtr działa przed paginacją.
+Potwierdzić limit 100 znaków i walidację przekroczenia.
+
+5. KOMPLETNA ODPOWIEDŹ LISTY KLIENTÓW I GLOBALNE LICZNIKI
 GET /api/clients?page=1&pageSize=25
-W otrzymanej odpowiedzi brakuje summary (zaobserwowane przez błąd ekranu).
-Prosimy sprawdzić wdrożenie i rzeczywistą odpowiedź w organizacji użytkownika.
-Oczekiwany kształt według przekazanego dokumentu:
+Zgłoszony wcześniej błąd wskazał brak summary. Nie mamy z tego audytu przechwyconej
+odpowiedzi Network; prosimy sprawdzić rzeczywistą wersję wdrożenia i odpowiedź.
+Potwierdzić albo poprawić kontrakt:
 { items, page, pageSize, totalCount, totalPages,
   summary: { activeClientsCount, withActivePackageCount } }
-- totalCount i oba liczniki z całego przefiltrowanego zbioru, nie bieżącej strony.
+- Oba liczniki oraz totalCount z całego przefiltrowanego zbioru.
 - activeClientsCount = status Active; withActivePackageCount = aktywny pakiet.
-- Puste wyniki: items=[], totalCount=0, totalPages=0; poprawna strona/pageSize.
-Frontend został zabezpieczony: brak summary nie wyłącza listy, licznik pokazuje
-„—” z informacją o niedostępności. Brak koperty paginacji daje czytelny błąd,
-zamiast pustej listy. Nie wyliczamy globalnego licznika z 25 klientów.
+- Pola wiersza ClientDto, activePackages, pakiet główny, wykorzystanie i saldo
+  muszą być dostępne bez odczytu profilu/rozliczenia każdej osoby.
+- Zdefiniować pakiet aktywny przy kilku pakietach, usługach okresowych,
+  zamknięciu, przyszłym rozpoczęciu i wygaśnięciu; zgodnie z packageStatus.
+- Pusty wynik: poprawna koperta i liczniki 0, nie brak summary.
+- Opisać stronę poza totalPages po zmianie danych: przycięcie numeru albo pusta
+  strona z prawdziwym totalCount. Nie zerować liczby klientów całego zbioru.
+- Bez parametrów paginacji zachować dotychczasową tablicę, jak w dokumentacji.
+Test: więcej niż 25 klientów, filtr trenera/lokalizacji/pakietu, pusty wynik;
+liczniki nie zmieniają się tylko od przejścia na następną stronę.
+Frontend już obsługuje brak summary bez awarii i bez wymyślonego zera.
 
-2. BRAKUJĄCE SORTOWANIA I WYSZUKIWANIE KLIENTÓW
-GET /api/clients (tryb paginowany)
-- Sortowanie po wykorzystaniu pakietu, saldzie rosnąco/malejąco i trenerze.
-- Sortowanie po dacie archiwizacji (archivedAt) dla archiwum.
-- Wyszukiwanie również po numerze telefonu.
-Każde sortowanie i filtr przed paginacją, stabilna dogrywka po identyfikatorze.
-Aktualnie zaakceptowano domyślnie „Najnowsi”, a brakujące warianty są oznaczone
-jako niedostępne. Główna lokalizacja klienta w filtrze jest już zatwierdzona.
-
-3. BRAKUJĄCE SORTOWANIA WPŁAT
+6. SORTOWANIE I ZNACZENIE NOWYCH PÓL WPŁAT
 GET /api/billing/payments
-- Po nazwie klienta.
-- Po kwocie nadpłaty (balanceCreditAmount/overpaymentAmount).
-Potrzebne sortowanie całego zbioru przed paginacją, z jednoznaczną dogrywką.
-Nie jest potrzebna nowa decyzja o lokalizacji: używamy locationMatch=effective,
-zgodnie z decyzją użytkownika (lokalizacja wpłaty, potem główna klienta).
+Dodać/potwierdzić sortowania: klient A–Z i największa nadpłata.
+Nadpłata to overpaymentAmount/balanceCreditAmount, nie pełne amount.
+Potwierdzić:
+- Sortowanie i filtry przed paginacją, stabilna dogrywka paymentDate/id.
+- overpaymentAmount, hasOverpayment, appliedToPackageAmount i balanceCreditAmount
+  są spójne; zero jest poprawną wartością, null/brak ma opisaną semantykę.
+- packageTotalPrice/packageAmountPaid/packageAmountDue/packagePaymentStatus
+  opisują stan BIEŻĄCY, nie historyczny stan pakietu z chwili wpłaty.
+- Wpłata bez pakietu ma package* = null; podać rzeczywiste wartości statusów.
+Test: wpłata 1000 zł z nadpłatą 10 zł jest niżej niż wpłata 200 zł z nadpłatą
+100 zł przy sortowaniu nadpłaty malejąco; również przy rozdzieleniu na strony.
+Wykluczyć niezgodne waluty albo opisać bezpieczną regułę porównywania.
 
-4. PEŁNE PODSUMOWANIE ROZLICZEŃ TRENERÓW
+7. GLOBALNE GODZINY I SESJE W ROZLICZENIACH
 GET /api/owner/trainer-settlements
-- Dodać do summary globalne totalHours i totalSessions.
-- Definicja zgodna z pozycjami: tylko sesje objęte umową; nie nonContracted*.
-- Cały przefiltrowany zbiór, przed paginacją.
-- Zapewnić już opisane totalAmount, paidAmount, unpaidAmount, trainersCount,
-  paidTrainersCount również przy pustym wyniku.
-Bez summary frontend pokaże błąd, a nie sumę bieżącej strony jako globalną.
-Bez godzin/sesji odpowiednie kafelki pokazują brak danych.
+Dodać do summary: totalHours i totalSessions z CAŁEGO przefiltrowanego zbioru.
+Definicja zgodna z wierszami: tylko sesje objęte umową; nonContracted* osobno.
+Potwierdzić komplet już opisanych pól:
+totalAmount, paidAmount, unpaidAmount, trainersCount, paidTrainersCount.
+Potwierdzić walutę rozliczeń (frontend obecnie pokazuje PLN) i obsługę zaokrągleń.
+Test: więcej niż 25 trenerów; strona 1 i 2 mają te same globalne sumy,
+zmiana miesiąca/lokalizacji/wyszukiwania zmienia cały zbiór i podsumowanie.
+Pusty prawidłowy zbiór ma zera, błąd nie może udawać pustego podsumowania.
+Obecnie kafelki godzin/sesji pokazują brak danych, a nie sumę jednej strony.
 
-5. RODZAJ ROZLICZENIA W WYBORZE PAKIETU GRUPOWEGO
+8. TYP PAKIETU W OFERTACH ZAPISU GRUPOWEGO
 GET /api/group-enrollments/sessions/{sessionId}/package-options?clientId=...
-- Dodać billingMode (SessionBased/PeriodBased) lub istniejący dyskryminator
-  packageType do offers[] i ownedPackages[].
-- Alternatywnie potwierdzić i opisać gwarancję wykluczenia usług okresowych.
-Obecne canSelect i liczba wejść nie zastępują informacji o rodzaju rozliczenia.
-Frontend nie pobiera katalogu; przed zapisem weryfikuje jedną wybraną ofertę
-przez istniejące GET packages/{id}. Usługa okresowa jest odrzucana przed POST.
-Po uzupełnieniu kontraktu zniknie ten dodatkowy odczyt i nieodpowiednia oferta
-nie pojawi się na liście wyboru.
+Dodać billingMode (SessionBased/PeriodBased) lub opisać równoważny dyskryminator
+w offers[] i ownedPackages[]. Alternatywnie potwierdzić ścisłą gwarancję,
+że ta odpowiedź nie zawiera usług okresowych i backend nie pozwoli ich użyć.
+canSelect i liczba wejść same nie stanowią informacji o rodzaju rozliczenia.
+Zachować pełne dane oferty, canSelect i reasons, bez potrzeby katalogu.
+Test: klient ma usługę okresową i pakiet treningowy; okresowa nie jest
+wybieralną ofertą treningową i nie może przejść przygotowania zapisu.
+Obecne obejście: jeden GET packages/{id} wybranej oferty przed POST;
+bez odczytu całego katalogu. Brak typu może nadal pokazywać nieodpowiednią ofertę.
 
-6. PEŁNE DANE POJEDYNCZEGO ZGŁOSZENIA GRUPOWEGO
-GET /api/group-enrollments/{id} i odpowiedź POST przygotowania zgłoszenia
-- Zwracać allowedActions i nowe dane klienta/pakietu tak jak w liście sesji,
-  albo udostępnić odczyt pojedynczego wzbogaconego zgłoszenia.
-Teraz pola te są null zgodnie z dokumentacją. Gdy nowe zgłoszenie nie trafi
-na pierwszą stronę listy, frontend nie ma autorytatywnego allowedActions.
-Nie chcemy odtwarzać dozwolonych akcji tylko ze statusu ani pobierać wszystkich stron.
-Opcjonalnie dodać walutę pakietu i identyfikatory oczekujących wpłat.
-Ich brak obecnie obsługuje zaakceptowany przez użytkownika odczyt rozliczenia
-dopiero po kliknięciu „Sprawdź wpłaty” lub „Dodaj wpłatę”.
+9. ALLOWEDACTIONS TAKŻE DLA POJEDYNCZEGO I NOWEGO ZGŁOSZENIA
+GET /api/group-enrollments/{id} oraz odpowiedzi POST przygotowania/potwierdzenia.
+Zwracać wzbogacone dane klienta/pakietu i allowedActions jak na liście sesji,
+albo udostępnić pojedynczy odczyt o tym samym kształcie.
+Dokument obecnie mówi, że nowe pola w szczegółach/POST są null.
+Test: sesja ma ponad 25 zgłoszeń; nowe zgłoszenie nie mieści się na stronie 1.
+Bez skanowania wszystkich stron frontend dostaje właściwe akcje tego zgłoszenia.
+Po wpłacie/potwierdzeniu dostaje aktualne akcje; klient archiwalny ich nie ma.
+Backend musi ponownie sprawdzać uprawnienia/warunki przy zapisie — allowedActions
+jest wskazówką do UI, a nie zastępstwem autoryzacji ani blokady miejsc.
 
-7. OPCJE WYBORU W FORMULARZACH
+10. DANE ROZLICZENIA W ZGŁOSZENIU GRUPOWYM — OPCJONALNE USPRAWNIENIE
+Rozważyć currency oraz dane oczekujących wpłat: co najmniej identyfikator,
+kwotę i stan potrzebne do potwierdzenia właściwej wpłaty.
+Zdefiniować częściowe wpłaty i kilka oczekujących wpłat do tego samego pakietu.
+Test: kliknięcie potwierdzenia dotyczy konkretnej wpłaty, nie całego pakietu.
+Nie blokuje to obecnej integracji: użytkownik zatwierdził jeden odczyt
+rozliczenia dopiero po „Sprawdź wpłaty” / „Dodaj wpłatę”. Nie wracamy do N+1.
+
+11. OPCJE OSÓB DLA FILTRÓW I FORMULARZY
 GET /api/owner/filter-options
-- Przydatne metadane trenera: status i locationIds, bez pełnego profilu.
-- Możliwość odczytu/zachowania aktualnie przypisanej osoby, także nieaktywnej.
-- Dla wyboru uczestnika: warunek groupAccessEnabled zgodny z clients/filter.
-To usprawnienia, nie blokada działania obecnych formularzy. Bez rozszerzenia
-frontend może docelowo pobierać szczegóły jedynie wybranego trenera.
-Nie wolno zastąpić grupowego warunku dostępu samym przypisaniem do lokalizacji.
+Potrzebujemy/potwierdzamy:
+- Dla trenera: status i locationIds albo osobny lekki odczyt wybranej osoby.
+- Możliwość zachowania aktualnie przypisanej osoby poza limitem 20 wyników,
+  także osoby nieaktywnej, jeśli edytujemy istniejące przypisanie.
+- Rozróżnić „status Active” od „niezarchiwizowany”; nie są automatycznie tym samym.
+- Opcjonalny warunek groupAccessEnabled zgodny z dotychczasowym clients/filter,
+  zanim ten selektor zastąpi wybór uczestnika grupowego.
+- Limit po filtrowaniu; search przed limitem; izolacja organizacji.
+- Dla przypisania nowego trenera przydatny filtr dokładnego statusu Active albo
+  informacja o możliwości przypisania. Inactive nie powinien zajmować limitu
+  wyników przeznaczonego dla aktywnych trenerów. Podać dokładny nowy parametr.
+Test: ponad 20 osób, wybrana osoba poza pierwszym wynikiem wyszukiwania,
+nieaktywny przypisany trener i klient mający dostęp grupowy w innej lokalizacji.
+Formularze dodania, zaproszenia i edycji klienta zostały już zoptymalizowane:
+wyszukiwany selektor i jeden odczyt wybranego trenera. Edycja pobiera też
+pojedynczego dotychczasowego trenera. Status i lokalizacja są sprawdzane przed
+zatwierdzeniem wyboru; zapis formularza czeka na wynik. Metadane opcji pozwolą
+usunąć ten dodatkowy odczyt, ale nie blokują obecnego działania.
 
-8. DECYZJE BIZNESOWE I WERYFIKACJA PO STRONIE BACKENDU
-- Opłacenie rozliczenia trenera per lokalizacja: obecnie stan trener+miesiąc.
-  Zmiana wymaga ustalenia modelu i migracji; frontend tego nie naprawia.
-- Kwota opłaconego rozliczenia: obecnie odczyt przelicza ją na bieżąco.
-  Ustalić, czy po opłaceniu pokazywać zapisaną migawkę.
-- Idempotencja innych operacji finansowych: osobny kontrakt i ewentualna migracja.
-  Obecny Idempotency-Key dotyczy wyłącznie tworzenia wpłat przez personel.
-- Uruchomić OwnerPanelReadTests na PostgreSQL z TPAY_TEST_DB.
-  Dokument backendu podaje, że lokalnie testy te były pominięte.
-- Udostępnić środowisko do E2E: duże zbiory, paginacja, izolacja organizacji,
-  filtry, błędy i utrata odpowiedzi podczas tworzenia wpłaty.
+12. POTWIERDZENIE PAGINOWANEJ HISTORII I LOKALIZACJI — BEZ NOWYCH REGUŁ
+GET /api/sessions/filter
+Potwierdzić page/pageSize/order oraz filtry clientId/trainerId/locationId/
+status/from/to przed paginacją, stabilną dogrywkę startAt/id i format dat.
+Podać dokładne wartości status i włączność granic from/to.
+Bez page/pageSize zachować dotychczasową odpowiedź Grafiku.
+Test: wiele sesji o tym samym startAt, wiele stron, przeszłość/przyszłość,
+anulowane sesje; brak gubienia/duplikacji na niezmienionym zbiorze.
+Potwierdzić już ZATWIERDZONE znaczenia lokalizacji:
+- lista klientów: lokalizacja główna;
+- wpłaty locationMatch=effective: lokalizacja wpłaty, potem główna klienta;
+- opcje klientów: główna lokalizacja lub członkostwo grupowe według kontraktu.
+Nie ujednolicać ich milcząco. Frontend nie potrzebuje nowego endpointu tylko
+po to, żeby naprawić błędny tytuł „Najbliższe sesje” lub podział sekcji historii.
 
-NAPRAWY FRONTENDU — NIE SĄ ZADANIEM DLA BACKENDU
-- Hydration mismatch logowania: parametry URL były odczytywane podczas pierwszego
-  renderu wyłącznie w przeglądarce. Teraz odczyt następuje po zamontowaniu;
-  początkowy HTML serwera i klienta jest identyczny.
-- Awaria przy braku summary: zabezpieczony odczyt i jawny brak licznika.
-- Rozliczenia: brak globalnego summary nie może uruchomić sumowania jednej strony.
+13. BEZPIECZEŃSTWO WPŁAT I DECYZJE O ROZLICZENIACH
+POST /api/billing/payments + GET /api/owner/operations/{key}
+Potwierdzić implementację i testy, bez zmiany istniejącego kontraktu:
+- Równoległe identyczne żądania, ten sam użytkownik/organizacja/klucz -> jedna wpłata.
+- Ten sam klucz z inną kwotą, datą, metodą, notatką, pakietem lub klientem -> 409.
+- Utrata odpowiedzi po zatwierdzeniu -> Completed, bez konieczności nowego POST.
+- 404 ze state=NotFound oznacza brak zatwierdzenia; ponowienie tym samym kluczem
+  pozostaje bezpieczne także przy nadal kończącym się pierwszym zapisie.
+- Test także z paymentDate=null/brak: domyślny czas nie może zepsuć ponowienia.
+- Operacja widoczna tylko dla właściwego użytkownika i organizacji.
+Osobno opisać, BEZ samodzielnej zmiany reguł:
+- isPaid trenera obecnie jest per trener+miesiąc, nie per lokalizacja;
+- czy kwota opłaconego rozliczenia ma być migawką czy bieżącą kalkulacją;
+- jakie pozostałe operacje wymagają osobnego magazynu idempotencji i migracji.
+To decyzje biznesowe/migracyjne, a nie poprawki do wykonania milcząco.
+
+14. WERYFIKACJA I DOKUMENT PRZEKAZANIA
+- Uzupełnić BACKEND_FOR_FRONTEND_OPTIMIZATION.md o wszystkie nowe kontrakty,
+  dokładne sort/order, pola nullable, statusy, błędy i przykłady JSON.
+- Uruchomić OwnerPanelReadTests na PostgreSQL z TPAY_TEST_DB i podać wynik;
+  w dotychczasowym dokumencie testy były pominięte.
+- Sprawdzić 1000+ wpłat, klientów i wielostronicowe rozliczenia, mieszane filtry,
+  puste wyniki, 400/401/403/404/409/5xx, anulowanie i współbieżne wpłaty.
+- Potwierdzić brak N+1 także wewnątrz odczytów zbiorczych backendu.
+- Potwierdzić izolację organizacji i zgodność danych liczników z listami.
+- Przekazać wersję/środowisko do wspólnego E2E. Testy jednostkowe nie zastępują E2E.
+- Odpowiedzieć w tych samych 14 punktach; wskazać także to, czego nie wdrożono.
+
+POPRAWKI FRONTENDU — WYKONANE, NIE ZLECAĆ ICH BACKENDOWI
+F1. Wcześniejsze poprawki hydratacji logowania i opcjonalnego summary zachowane.
+F2. Niedostępne sortowania są widoczne, ale nie można ich wybrać myszą ani
+    klawiaturą; dotychczasowa lista i filtry nie znikają. Po stronie trenera
+    dotychczasowe sortowania wpłat pozostają dostępne.
+F3. Puste wyszukiwanie/filtry pokazują brak pasujących klientów zamiast braku
+    klientów w studiu. Sam filtr lokalizacji kieruje do zmiany lokalizacji.
+    Pusta strona z niezerowym totalCount pozwala wrócić na pierwszą stronę.
+F4. Paginowana historia klienta to jedna lista według dat, obejmująca wszystkie
+    rodzaje treningów, także anulowane. Usunięto puste lokalne sekcje, które
+    sugerowały brak sesji istniejących na innych stronach. Bez pobierania całości.
+    Pozostałe, niepaginowane użycia komponentu zachowują dotychczasowe sekcje.
+F5. Najbliższe sesje trenera mają from z chwili otwarcia profilu i order=asc.
+    Granica daty jest stała podczas przechodzenia stron; stare sesje nie zajmują
+    pierwszej strony. Nie zmieniano pobierania sesji do Grafiku.
+F6. Nowy wybór trenera w dodaniu/zaproszeniu wymaga dokładnego statusu Active
+    i właściwej lokalizacji. Inactive nie przechodzi przez includes("active").
+    Formularze Ownera nie pobierają już całej listy trenerów dla selektora.
+    Edycja zachowuje dotychczasowego trenera, również nieaktywnego.
+    Stare odpowiedzi po zamknięciu wyboru nie zmieniają przypisania.
+F7. filter-options waliduje obie listy, identyfikatory i nazwy; brak pola lub
+    wadliwy typ daje komunikat błędu i możliwość ponowienia, a nie fałszywy brak osób.
+F8. Niepoprawny packageValidUntil pokazuje brak terminu, zamiast przerwać render.
+F9. Selektor zachowuje poznaną nazwę wybranej osoby, także po zniknięciu jej
+    z bieżących wyników wyszukiwania/odświeżenia.
+F10. Przerwane pobieranie lokalizacji formularza nie nadpisuje nowego formularza.
+
+POZOSTAŁE OGRANICZENIE FRONTENDU — JAWNE, NIE JEST BRAKIEM BACKENDU
+Klucz niepewnej wpłaty pozostaje w pamięci zamontowanego formularza.
+Ostrzeżenie przed przeładowaniem chroni przed przypadkowym opuszczeniem strony,
+ale nie jest trwałym odzyskiwaniem po zamknięciu karty/przeglądarki. Nie dodano
+przechowywania danych finansowych ani globalnego cache. Po wymuszonym opuszczeniu
+widoku należy sprawdzić historię wpłat przed nową próbą. Ewentualne trwałe
+odtwarzanie formularza jest osobnym zadaniem frontendu, nie częścią punktu 13.
+
+GOTOWOŚĆ I DALSZE KROKI
+Notatka scala wcześniejsze wymagania: liczniki klientów, sortowania klientów
+oraz wpłat, globalne sumy rozliczeń, billingMode ofert, allowedActions zgłoszeń,
+opcjonalne metadane selektorów, dostęp grupowy, walutę i oczekujące wpłaty.
+Odpowiedź backendu ma zachować numery 1–14. Nie uznajemy nowych możliwości
+za wdrożone, dopóki nie otrzymamy kontraktu, przykładów i wyniku testów.
+Zmiany frontendu nie wymagają zgadywania nowych parametrów backendu.
+Nie wykonywano builda, commita, push ani merge. Rzeczywiste E2E nadal wymagane.
+
+WYNIK KOŃCOWY POPRAWEK FRONTENDU (2026-10-16)
+TypeScript: OK. ESLint zmienionych TS/TSX i nowego komponentu: 0 błędów i 0 ostrzeżeń.
+Testy: 240 ogółem, 239 zaliczonych, 0 błędów, 1 pominięty (wymaga PUBLIC_TEST_ORIGIN).
+Nowe testy poprawek UI/formularzy: 16/16. git diff --check: OK.
+Nie wykonywano testów przeglądarkowych ani wywołań rzeczywistego backendu.
+Dodatkowe ustalenia dopisane do punktów 5 i 11: strona poza totalPages po zmianie danych oraz filtrowanie Active przed limitem opcji trenera.

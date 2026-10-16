@@ -499,7 +499,7 @@ export default function OutlookIntegrationCard({
       )}
 
       {allowAdministration && deleteTarget && (
-        <ModalOverlay onClose={() => { if (!busy) setDeleteTarget(null); }}>
+        <ModalOverlay onClose={() => { if (!busy) setDeleteTarget(null); }} closeDisabled={busy}>
           <div role="dialog" aria-modal="true" aria-label="Usunięcie błędnej serii"
             className="relative z-10 w-full max-w-lg overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient">
             <div className="p-5 md:p-6">

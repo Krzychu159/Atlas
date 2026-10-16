@@ -88,6 +88,7 @@ function overview(overrides = {}, role = "owner", resourceCalls = []) {
     "@/app/components/current-user-provider": { useCurrentUser: () => ({ user: { role } }) },
     "@/app/lib/formatters/money": money, "@/app/lib/owner/dashboard-overview": api,
     "@/app/lib/session-corrections": { usePaymentDateCorrectionRevision: () => 0 },
+    "@/app/lib/owner/location-filter": { OWNER_LOCATION_ALL: "all", useOwnerLocationFilter: () => ({ selectedLocationId: null }), useOwnerLocationOptions: () => ({ options: [], selectedLocationValue: "all" }) },
     "./OverviewInfo": { default: info, __esModule: true }, "./OverviewRevenueChart": { default: chart, __esModule: true }, "./owner-overview.module.css": css,
     "next/link": { default: ({ href, children, ...props }) => React.createElement("a", { href, ...props }, children), __esModule: true },
     "./use-dashboard-resource": { useDashboardResource: (key, loader) => {
@@ -189,7 +190,7 @@ test("late results cannot overwrite a newer month", async () => {
 });
 test("period-independent clients and attention use stable loading keys", () => {
   const calls = []; overview({}, "owner", calls);
-  assert.deepEqual(calls.map(call => call.key), ["summary:2026-10:0", "revenue:2026-10:12:0", "clients", "attention"]);
+  assert.deepEqual(calls.map(call => call.key), ["summary:all:2026-10:0", "revenue:all:2026-10:12:0", "clients:all", "attention:all"]);
 });
 
 if (process.env.ATLAS_DASHBOARD_PREVIEW) {
@@ -249,6 +250,7 @@ test("month and 6/12 controls request selected periods while clients and alerts 
     "@/app/components/current-user-provider": { useCurrentUser: () => ({ user: { role: "owner" } }) },
     "@/app/lib/formatters/money": money, "@/app/lib/owner/dashboard-overview": api,
     "@/app/lib/session-corrections": { usePaymentDateCorrectionRevision: () => 0 },
+    "@/app/lib/owner/location-filter": { OWNER_LOCATION_ALL: "all", useOwnerLocationFilter: () => ({ selectedLocationId: null }), useOwnerLocationOptions: () => ({ options: [], selectedLocationValue: "all" }) },
     "./OverviewInfo": { default: info, __esModule: true }, "./OverviewRevenueChart": { default: chart, __esModule: true }, "./owner-overview.module.css": css,
     "next/link": { default: () => null, __esModule: true },
     "./use-dashboard-resource": { useDashboardResource: (key, loader) => {
@@ -271,20 +273,20 @@ test("month and 6/12 controls request selected periods while clients and alerts 
   assert.doesNotThrow(() => input.props.onClick({ currentTarget: { showPicker() { throw new Error("Not supported"); } } }));
   assert.doesNotThrow(() => input.props.onClick({ currentTarget: {} }));
   input.props.onInput({ currentTarget: { value: "2026-08" } });
-  tree = render(); assert.equal(requests[0].key, "summary:2026-08:0");
+  tree = render(); assert.equal(requests[0].key, "summary:all:2026-08:0");
   find(tree, node => node.type === "input").props.onChange({ target: { value: "2026-09" } });
   tree = render();
-  assert.deepEqual(requests.map(request => request.key), ["summary:2026-09:0", "revenue:2026-09:12:0", "clients", "attention"]);
+  assert.deepEqual(requests.map(request => request.key), ["summary:all:2026-09:0", "revenue:all:2026-09:12:0", "clients:all", "attention:all"]);
   find(tree, node => node.type === "button" && node.props.children?.[0] === 6).props.onClick();
   tree = render();
-  assert.equal(requests[1].key, "revenue:2026-09:6:0");
+  assert.equal(requests[1].key, "revenue:all:2026-09:6:0");
   await requests[1].loader(new AbortController().signal);
   assert.equal(calls.at(-1).query.months, 6); assert.equal(calls.at(-1).query.period, "2026-09");
   find(tree, node => node.type === "button" && node.props.children?.[0] === 12).props.onClick();
-  tree = render(); assert.equal(requests[1].key, "revenue:2026-09:12:0");
+  tree = render(); assert.equal(requests[1].key, "revenue:all:2026-09:12:0");
   for (const invalid of ["2026-11", "1999-12", ""]) {
     find(tree, node => node.type === "input").props.onChange({ target: { value: invalid } });
-    tree = render(); assert.equal(requests[0].key, "summary:2026-09:0");
+    tree = render(); assert.equal(requests[0].key, "summary:all:2026-09:0");
   }
 });
 
@@ -318,4 +320,16 @@ test("information tooltips open with focus and touch, dismiss with Escape and bl
   button.props.onBlur(); assert.equal(render().props.children[1].props.hidden, true);
   tree.props.onMouseEnter(); assert.equal(render().props.children[1].props.hidden, false);
   tree.props.onMouseLeave(); assert.equal(render().props.children[1].props.hidden, true);
+});
+
+test("dashboard reads send the selected location and omit it for all locations", async () => {
+  calls.length = 0;
+  await api.getDashboardSummary("2026-10", undefined, 3);
+  await api.getDashboardRevenue("2026-10", 6, undefined, 3);
+  await api.getDashboardRecentClients(undefined, 3);
+  await api.getDashboardAttention(undefined, 3);
+  assert.ok(calls.every(call => call.query?.locationId === 3));
+  calls.length = 0;
+  await api.getDashboardAttention(undefined, null);
+  assert.equal(calls[0].query, undefined);
 });

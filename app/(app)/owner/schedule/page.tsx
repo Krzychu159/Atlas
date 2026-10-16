@@ -27,7 +27,7 @@ import {
 } from "@/app/lib/owner/sessions";
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
 import { DateNavigator, ViewSwitch } from "./components/ScheduleControls";
-import ScheduleFilters from "./components/ScheduleFilters";
+import ScheduleFilters, { countScheduleFilters, ScheduleFiltersToggle } from "./components/ScheduleFilters";
 import { OutlookRequiredState } from "./components/ScheduleStates";
 import { DaySchedule, WeekSchedule } from "./components/ScheduleViews";
 import { completeConsultation, correctCompletedSession, isConsultationForm } from "@/app/(app)/owner/schedule/session-utils";
@@ -77,6 +77,8 @@ export default function SchedulePage() {
   const [statusFilter, setStatusFilter] =
     useState<SessionStatusFilter>("without-cancelled");
   const [trainerFilter, setTrainerFilter] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilterCount = countScheduleFilters(statusFilter, trainerFilter);
   const [selectedSession, setSelectedSession] = useState<OwnerSession | null>(
     null,
   );
@@ -273,20 +275,51 @@ export default function SchedulePage() {
 
   return (
     <>
-      <div className="flex w-full flex-col gap-4 pb-10">
-        <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
-          <div>
-            <p className="text-label text-primary-light">Grafik</p>
-            <h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
-              Sesje treningowe
-            </h1>
-            <p className="mt-3 max-w-[680px] text-sm leading-6 text-on-surface-variant">
-              Planuj sesje i zarządzaj nimi. Grafik jest połączony z kalendarzem Microsoft Outlook.
-            </p>
+      <div className="flex w-full flex-col gap-3 pb-10 md:gap-4">
+        <div className="flex flex-col gap-3 md:gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-label text-primary-light max-md:hidden">Grafik</p>
+              <h1 className="font-display text-[1.5rem] font-semibold leading-[0.95] tracking-tight md:mt-2 md:text-[2.25rem]">
+                Sesje treningowe
+              </h1>
+              <p className="mt-3 max-w-[680px] text-sm leading-6 text-on-surface-variant max-md:hidden">
+                Planuj sesje i zarządzaj nimi. Grafik jest połączony z kalendarzem Microsoft Outlook.
+              </p>
+            </div>
+            {connected ? (
+              <Button
+                icon={<Plus size={16} />}
+                className="shrink-0 md:hidden"
+                onClick={() => openCreateModal()}
+                disabled={isResourcesLoading || resources.data === undefined}
+              >
+                Dodaj sesję
+              </Button>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <ViewSwitch value={view} onChange={setView} />
+            <div className="flex gap-2 max-md:order-2">
+              <div className="min-w-0 flex-1 [&>div]:h-full">
+                <ViewSwitch value={view} onChange={setView} />
+              </div>
+              {connected ? (
+                <>
+                  <ScheduleFiltersToggle open={filtersOpen} activeCount={activeFilterCount} onOpenChange={setFiltersOpen} />
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-12 w-12 shrink-0 md:hidden"
+                    icon={<RefreshCw size={16} className={isSessionsLoading ? "animate-spin" : ""} />}
+                    onClick={loadSessions}
+                    disabled={isSessionsLoading}
+                    aria-label="Odśwież grafik"
+                    title="Odśwież grafik"
+                  />
+                </>
+              ) : null}
+            </div>
             <DateNavigator
               view={view}
               anchorDate={anchorDate}
@@ -295,7 +328,7 @@ export default function SchedulePage() {
               onMove={movePeriod}
             />
             {connected ? (
-              <div className="flex gap-2 sm:ml-auto 2xl:ml-0">
+              <div className="hidden gap-2 md:ml-auto md:flex 2xl:ml-0">
                 <Button
                   variant="secondary"
                   size="icon"
@@ -330,8 +363,13 @@ export default function SchedulePage() {
             trainerFilter={trainerFilter}
             trainers={scopedTrainers}
             visibleCount={visibleSessions.length}
+            mobileOpen={filtersOpen}
             onStatusFilterChange={setStatusFilter}
             onTrainerFilterChange={setTrainerFilter}
+            onClear={() => {
+              setStatusFilter("without-cancelled");
+              setTrainerFilter("");
+            }}
           />
         ) : null}
 

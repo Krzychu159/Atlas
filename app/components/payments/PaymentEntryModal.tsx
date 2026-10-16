@@ -108,7 +108,7 @@ export function PaymentEntryModal({
   }
 
   return (
-    <ModalOverlay onClose={() => { if (!isSubmitting && !unresolved) onClose(); }}>
+    <ModalOverlay onClose={() => { if (!isSubmitting && !unresolved) onClose(); }} closeDisabled={isSubmitting || unresolved}>
       <form
         onSubmit={handleSubmit}
         className="relative z-10 flex max-h-[92vh] w-full max-w-[680px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient"

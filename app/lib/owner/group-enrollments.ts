@@ -115,3 +115,11 @@ export function groupEnrollmentStatus(value: string | null) {
   };
   return value && Object.hasOwn(labels, value) ? labels[value] : "Status zgłoszenia niedostępny";
 }
+
+export function groupPackageValidityLabel(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime())
+    ? `ważny do ${new Intl.DateTimeFormat("pl-PL", { timeZone: "Europe/Warsaw" }).format(date)}`
+    : "Termin ważności niedostępny";
+}

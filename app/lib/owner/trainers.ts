@@ -1,5 +1,9 @@
 import { backendGet, backendPatch, backendPost } from "../backend";
 
+export function isActiveTrainer(trainer: { status?: string | null }) {
+  return trainer.status?.trim().toLowerCase() === "active";
+}
+
 export type Trainer = {
   id: number;
   userId: number;

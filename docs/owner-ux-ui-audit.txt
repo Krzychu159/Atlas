@@ -1,0 +1,287 @@
+ATLAS — AUDYT UX/UI PANELU OWNERA
+Data: 16.10.2026
+
+CEL I ZAKRES
+Ocena wygody codziennej pracy, hierarchii informacji, formularzy, dostępności,
+responsywności i kierunku wizualnego. To raport i propozycje, nie wdrożenie zmian.
+Dotychczasowe zmiany optymalizacyjne pozostają zachowane.
+
+Dowody:
+- PRZEGLĄDARKA: zalogowana sesja localhost:3000, motyw BSworkout; pulpit,
+  klienci, formularz dodawania klienta, profil klienta, płatności, grafik,
+  pakiety, rozliczenia, statystyki i główny widok ustawień.
+- Rozmiary wykorzystane w ocenie: około 387x581, 390x844, 1280x900, 1440x900.
+  Nie każdy ekran był sprawdzany w każdym rozmiarze.
+- KOD: komponenty wspólne, nawigacja, filtry i powyższe moduły, również
+  selektory, zgłoszenia grupowe i konfiguracja ustawień.
+- Nie wykonywano zapisów, płatności, cofania wpłat, archiwizacji ani zmian konta.
+  Nie sprawdzono wszystkich formularzy, wszystkich zakładek ustawień i wszystkich
+  wariantów danych. Wydatki, szczegóły trenera, historia zmian i powiadomienia
+  nie przeszły pełnego testu wizualnego w tej sesji.
+- Nie przeprowadzono pomiaru kontrastu, testu czytnikiem ekranu ani pełnego
+  audytu WCAG. Nie należy traktować tego dokumentu jako certyfikacji dostępności.
+
+OCENA OGÓLNA
+Produkt ma spójny kierunek wizualny. Nie potrzebuje wymiany całego interfejsu.
+Największe problemy dotyczą kontekstu danych, zachowania stanu, obsługi okien
+i hierarchii na małych ekranach. Odświeżenie powinno zwiększać czytelność
+i szybkość pracy, zachowując ciemny motyw, branding studia i obecny grafik.
+
+WARTO ZACHOWAĆ
+- Listy z układem tabelarycznym na komputerze i kartami na telefonie.
+- Wyraźne nazwy głównych działań, statusy opisane tekstem i podgląd wykorzystania.
+- Grafik z widokiem dnia/tygodnia, wyborem dnia na telefonie i filtrem trenera.
+- Rozróżnienie pakietów sesyjnych i usług okresowych.
+- Jawne komunikaty o niedostępnych podsumowaniach zamiast wymyślonych zer.
+- Istniejące zabezpieczenia formularza płatności i częściowe błędy statystyk.
+- Obsługę klawiatury zakładek ustawień i mechanizmy panelu powiadomień.
+  Wspólne okna nie mają tych samych zabezpieczeń; nie uogólniać problemu na wszystko.
+
+PRIORYTETY
+P1: ryzyko błędnego kontekstu lub istotna przeszkoda w obsłudze.
+P2: częsty koszt dodatkowych kliknięć, przewijania lub interpretacji.
+P3: dopracowanie wizualne i spójność.
+
+01. P1 — LOKALIZACJA MUSI BYĆ DOSTĘPNA NA TELEFONIE
+Dowód: PRZEGLĄDARKA + KOD, header.tsx i AppShell.
+Stan: globalny wybór lokalizacji ukrywa się poniżej xl. Na telefonie nie ma go
+także w otwartym menu. Wybór jest zapamiętywany, więc zawężenie danych może
+pozostać aktywne bez możliwości wygodnego sprawdzenia i zmiany.
+Zmiana: dostępny na każdej szerokości przełącznik i krótka etykieta zakresu
+obok tytułu, np. „Kłaj” / „Wszystkie lokalizacje”. Na telefonie w menu lub pasku.
+Odbiór: po zmianie szerokości wybrana lokalizacja nadal jest widoczna i edytowalna.
+Zależność: frontend.
+
+02. P1 — NIE ZMIENIAĆ ZAKRESU PO BŁĘDZIE WCZYTANIA LOKALIZACJI
+Dowód: KOD, app/components/header.tsx.
+Stan: błąd pobierania może pozostawić pustą listę uznaną za wczytaną; walidacja
+wyboru może wtedy przełączyć lokalizację na wszystkie. Nie odtwarzano awarii.
+Zmiana: odróżnić brak lokalizacji od błędu; zachować wybór i dać ponowienie.
+Odbiór: błąd nie poszerza samoczynnie zakresu danych.
+Zależność: frontend.
+
+03. P1 — WSPÓLNY STANDARD OKIEN I FOKUSU
+Dowód: PRZEGLĄDARKA + KOD, app/components/ui/modal.tsx.
+Stan: po otwarciu „Dodaj klienta” fokus pozostał na przycisku otwierającym.
+Escape użyty wewnątrz formularza nie zamknął okna. Wspólny komponent nie zapewnia
+semantyki dialogu, przeniesienia/ograniczenia/przywrócenia fokusu ani Escape.
+Zmiana: jeden standard dialogu z nazwą, fokusem wewnątrz, obsługą Tab/Shift+Tab,
+Escape oraz powrotem do przycisku otwierającego. Obsłużyć także zagnieżdżone okna.
+Ujednolicić X, tło i Anuluj podczas zapisu; chronić niezapisane zmiany tam,
+gdzie utrata danych ma znaczenie. Zachować istniejącą ochronę wpłat.
+Odbiór: pełna ścieżka otwarcie–edycja–anulowanie działa samą klawiaturą;
+fokus nie trafia pod okno, zamknięcie nie zostawia zablokowanego przewijania.
+Zależność: frontend. Wzorzec: https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/
+
+04. P1 — WYSZUKIWARKA GLOBALNA: BŁĄD NIE JEST BRAKIEM WYNIKÓW
+Dowód: KOD, app/components/header.tsx.
+Stan: pierwszy fokus uruchamia pobranie pełnych katalogów klientów i trenerów.
+Po błędzie katalog może być uznany za wczytany; puste wyniki nie wyjaśniają awarii.
+Zmiana: odrębne stany szukania, pustego wyniku, błędu i ponowienia; ograniczone
+wyszukiwanie serwerowe; jawny zakres lokalizacji. Udostępnić wyszukiwanie mobilne.
+Dodać poprawne etykiety i obsługę wyboru klawiaturą. Opcjonalnie skrót Ctrl/Cmd+K.
+Odbiór: błąd nie daje komunikatu „Brak wyników”; krótki tekst nie pobiera całej bazy.
+Zależność: frontend; backend dla wyszukiwania łączonego, jeśli brak takiej funkcji.
+
+05. P2 — ZACHOWANIE FILTRÓW I STRONY PO POWROCIE
+Dowód: KOD, clients/page.tsx, payments/page.tsx, zakładki ustawień.
+Stan: wiele filtrów, sortowanie i numer strony żyją lokalnie w komponencie;
+adres nie odtwarza całego widoku. Powrót do listy może wymagać ponownej konfiguracji.
+Zmiana: odtwarzalny adres dla wyszukiwania, filtrów, sortowania, strony, dat
+i zakładki ustawień. Zachować pozycję listy przy powrocie z profilu.
+Odbiór: „strona 3 + trener + status” przeżywa profil/powrót i odświeżenie;
+wyczyszczenie filtrów resetuje stronę; zmiana parametrów nie miesza starych wyników.
+Zależność: frontend, w granicach sortowań obsługiwanych przez backend.
+
+06. P2 — BŁĘDNY SYGNAŁ AKTYWNYCH FILTRÓW PAKIETÓW
+Dowód: PRZEGLĄDARKA + KOD, PackageListFilters.tsx i FilterToolbar.tsx.
+Stan: przy domyślnych ustawieniach widać znacznik przy „Filtry” na telefonie
+i aktywne „Wyczyść” na komputerze. Pakiety nie przekazują canClear, domyślnie true.
+Zmiana: liczyć rzeczywiste odchylenia od wartości domyślnych; wspólny wzorzec
+„Filtry (2)” i usuwalne etykiety wybranych warunków na wszystkich listach.
+Odbiór: domyślny widok nie udaje zawężonego, każdy aktywny warunek jest do odkrycia.
+Zależność: frontend.
+
+07. P2 — PULPIT POWINIEN PROWADZIĆ DO DZIAŁANIA
+Dowód: PRZEGLĄDARKA + KOD, OwnerOverview.tsx.
+Stan: „Warto sprawdzić” pokazuje liczby klientów bez treningu / z ostatnią sesją,
+ale bez przejścia do właściwej grupy. Pulpit obejmuje wszystkie lokalizacje,
+niezależnie od globalnego wyboru; etykieta i wyjaśnienie już istnieją.
+Zmiana: klikalne pozycje z konkretną listą klientów; jawne rozdzielenie danych
+za miesiąc od bieżących spraw. Wzmocnić widoczność zakresu całego studia.
+Nie zmieniać znaczenia agregacji bez decyzji produktowej.
+Odbiór: kliknięta liczba prowadzi do dokładnie tej grupy, również przy paginacji.
+Zależność: frontend + backend, jeśli brakuje filtrów takich grup.
+
+08. P2 — WIĘCEJ TREŚCI OPERACYJNEJ W PIERWSZYM EKRANIE TELEFONU
+Dowód: PRZEGLĄDARKA, pulpit i grafik 390x844 / około 387x581.
+Stan: KPI pulpitu układają się w wysoką kolumnę. W grafiku tytuł, opis, przełączniki,
+akcje i filtry wypychają treningi prawie pod dolną krawędź ekranu.
+Zmiana: zwarte KPI, krótsze opisy mobilne, jeden zwięzły pasek daty i widoku,
+filtry rozwijane z podsumowaniem. Zachować duży, łatwy do trafienia główny przycisk.
+Odbiór: przy 390x844 użytkownik widzi termin i użyteczny fragment grafiku bez
+przewijania przez cały panel sterujący. Nie zmniejszać tekstu tylko po to, by zmieścić UI.
+Zależność: frontend.
+
+09. P2 — PŁATNOŚCI: KONTEKST ROZLICZENIA W FAKTYCZNIE UŻYWANEJ LIŚCIE
+Dowód: PRZEGLĄDARKA + KOD, PaymentsList.tsx i PaymentDisplay.tsx.
+Stan: główna lista nie pokazuje efektywnej lokalizacji ani bieżącego stanu
+rozliczenia pakietu. Odpowiednie elementy istnieją w PaymentOperationRow,
+ale wyszukiwanie użyć wskazuje jedynie definicję tego komponentu.
+Zmiana: przenieść potrzebne informacje do używanej listy lub jej rozwijanych
+szczegółów. Oddzielić historyczną wpłatę od aktualnego stanu całego pakietu.
+Nie mnożyć kolumn; kwota i stan wpłaty pozostają najważniejsze.
+Odbiór: owner wyjaśnia rozliczenie bez szukania po kilku ekranach; brak wartości
+jest opisany jako brak danych, nie zero. Sprawdzić różne waluty i nadpłaty.
+Zależność: głównie frontend; potwierdzenie obecności pól w rzeczywistej odpowiedzi.
+
+10. P2 — MNIEJ RÓWNORZĘDNYCH IKON W AKCJACH
+Dowód: PRZEGLĄDARKA + KOD, PaymentsList i ClientProfileHero/profile-hero.
+Stan: w płatnościach kilka małych ikon przy każdym wierszu, w profilu podobny
+pasek akcji. Etykiety dostępności i tooltipy istnieją, lecz dotyk ich nie zastępuje.
+Zmiana: główne działanie tekstowe, pozostałe w menu „Więcej”; wyraźna separacja
+cofnięcia wpłaty / archiwizacji od neutralnych czynności. Projektowy cel pola
+dotyku ok. 44px; sam rozmiar ikony nie musi rosnąć.
+Odbiór: działanie jest zrozumiałe przed kliknięciem także na telefonie;
+operacje finansowe zachowują osobne potwierdzenie i jasne skutki.
+Zależność: frontend.
+
+11. P2 — PROFIL KLIENTA: NAJPIERW STAN I NASTĘPNY KROK
+Dowód: PRZEGLĄDARKA + KOD, profil klienta.
+Stan: nagłówek poprawnie pokazuje trenera, lokalizację, należność i saldo.
+Dalszy ekran to stos zwijanych sekcji; pakiety i informacje historyczne mają
+zbliżoną rangę. Nie należy usuwać już obecnego podsumowania finansowego.
+Zmiana: wyróżnić bieżący pakiet / usługę i najbliższy trening, jeżeli dane są
+dostępne; administrację, zgody i historię pogrupować niżej lub w sekcjach z kotwicami.
+Domyślne otwarcie dopasować do najczęstszej pracy; nie pobierać całej historii od razu.
+Odbiór: owner szybko ustala „co klient ma i co zrobić dalej” również bez pakietu.
+Zależność: frontend; dodatkowe dane tylko jeżeli brak w istniejących odczytach.
+
+12. P2 — LISTA KLIENTÓW: WYJAŚNIĆ SALDO I AKTYWNOŚĆ
+Dowód: PRZEGLĄDARKA, lista klientów.
+Stan: saldo jest liczbą ze znakiem i kolorem, a status „Aktywny/Nieaktywny”
+wymaga znajomości znaczenia. Można pomylić aktywność pakietu, konta i współpracy.
+Zmiana: krótki opis znaczenia statusu i salda; w szczegółach „Do zapłaty” /
+„Nadpłata” zgodnie z potwierdzoną konwencją. Zostawić kompaktowe liczby w tabeli.
+Odbiór: bez zgadywania znaku użytkownik rozpoznaje należność i nadpłatę;
+etykieta statusu nie sugeruje uprawnień do panelu.
+Zależność: frontend + potwierdzenie definicji biznesowych, jeśli nie są udokumentowane.
+
+13. P2 — SELEKTORY: SPÓJNA OBSŁUGA KLAWIATURY
+Dowód: KOD, custom-select.tsx i OwnerRemoteSelect.tsx.
+Stan: przyciski działają Tab/Enter, ale własny select nie zapewnia kompletnego
+wzorca listy/combobox, strzałek, Escape ani zawsze powiązanej etykiety.
+Selektor z wyszukiwaniem ma część tych mechanizmów; nie jest identycznym problemem.
+Zmiana: natywny select dla krótkich list albo jeden poprawny wzorzec własny.
+W wyszukiwaniu jasno wskazać ograniczoną liczbę wyników i potrzebę doprecyzowania.
+Odbiór: wybór i anulowanie bez myszy, widoczny fokus, czytelna nazwa i wartość;
+warianty niedostępne nadal pozostają zablokowane i wyjaśnione.
+Zależność: frontend. Wzorzec: https://www.w3.org/WAI/ARIA/apg/patterns/combobox/
+
+14. P2 — STATYSTYKI: ZAKRES FILTRÓW I ZNACZENIE MIAR
+Dowód: PRZEGLĄDARKA + KOD, StatisticsFilters.tsx.
+Stan: wspólny pasek łączy status kosztu, trenera i klienta nad różnymi zestawieniami.
+Nie jest oczywiste, które filtry wpływają na które wykresy. Koszty opisano brutto,
+a wynik jako netto — znaczenie porównania trzeba jednoznacznie potwierdzić.
+Zmiana: wspólne data/lokalizacja, filtry kontekstowe przy właściwych sekcjach,
+widoczne aktywne warunki. Opis definicji przychodu, kosztów, marży i zysku.
+W kodzie operator płatności ma wpisane Stripe; potwierdzić pełną listę operatorów,
+zanim zmienimy lub rozszerzymy filtr. Nie zakładać, że obserwowane zera są błędem.
+Odbiór: każda miara ma jasną podstawę i zakres, częściowy błąd nie udaje zera.
+Zależność: frontend + backend/potwierdzenie definicji i operatorów.
+
+15. P2 — ROZLICZENIA: NIEDOSTĘPNE KPI NIE POWINNY DOMINOWAĆ
+Dowód: PRZEGLĄDARKA + KOD, SettlementSummary.tsx.
+Stan: dwie duże karty godzin i sesji pokazują „—” i jawny brak podsumowania.
+To uczciwy komunikat, ale zabiera dużą część głównego ekranu.
+Zmiana: po dostarczeniu globalnych sum pokazać prawdziwe KPI; do tego czasu
+skromniejsza informacja obok działającej sumy wypłat.
+Odbiór: wartości obejmują cały wybrany zakres, nie tylko aktualną stronę trenerów.
+Zależność: backend summary.totalHours i summary.totalSessions + frontend.
+
+16. P2 — GRAFIK: PODGLĄD BEZ WCHODZENIA W EDYCJĘ
+Dowód: PRZEGLĄDARKA + KOD, SessionBlock.
+Stan: przy równoległych sesjach nazwy są skracane, a krótkie karty ukrywają
+część informacji. Kolor karty odpowiada kategorii Outlook — zachować tę semantykę.
+Zmiana: szybki podgląd po fokusie/najechaniu lub dotknięciu z pełną godziną,
+trenerem, miejscem i uczestnikami; osobne przejście do edycji. Rozważyć widok
+agendy na telefonie jako dodatkowy widok. Czytelnie odróżniać typ i status sesji.
+Odbiór: pełne dane dostępne bez zapisu i bez polegania wyłącznie na kolorze.
+Zależność: frontend; najpierw wykorzystać dane już obecne na karcie.
+
+17. P2 — ZGŁOSZENIA GRUPOWE: JASNY KOLEJNY KROK
+Dowód: KOD, GroupEnrollmentsSection i odczyty ofert/zgłoszeń.
+Zmiana: pokazać kolejność klient → oferta/pakiet → rozliczenie → udział;
+oddzielić „sprawdź wpłaty” od potwierdzenia pieniędzy. Dostępność akcji opierać
+na allowedActions, a typ oferty na billingMode. Zachować zaakceptowane pobieranie
+rozliczenia dopiero po kliknięciu. Nie ukrywać przyczyny zablokowanego działania.
+Odbiór: żadna akcja zapisu nie potwierdza wpłaty przy okazji; usługi okresowe
+nie udają pakietów z liczbą sesji. Wymaga osobnego testu wizualnego całego procesu.
+Zależność: frontend + istniejące braki kontraktu zgłoszone wcześniej backendowi.
+
+18. P3 — SPOJNY, BARDZIEJ ZWARTY SYSTEM WIZUALNY
+Dowód: PRZEGLĄDARKA + KOD.
+Zmiana: ograniczyć powtarzane nadtytuły i opisy oczywistych tabel; mniej warstw
+karta-w-karcie, delikatniejsze obramowania, jedna skala odstępów i wysokości pól.
+Ważne etykiety zwykle 12–13px, dane 14–16px, liczby tabelaryczne. To kierunek
+projektowy do oceny na ekranie, nie deklaracja zgodności z normą.
+Nie upychać wszystkiego w kolorowe pigułki. Kolor marki BSworkout może pozostać
+czerwony; działania ryzykowne rozróżniać także nazwą, położeniem i potwierdzeniem.
+Na mniejszych laptopach rozważyć zwijany boczny pasek; zachować czytelne nazwy
+przy rozwinięciu i dostępną nawigację klawiaturą.
+Odbiór: długie polskie nazwy, duże kwoty i powiększenie 200% nie chowają akcji;
+obie marki zachowują czytelność i własną tożsamość.
+Zależność: frontend/design.
+
+19. P3 — DOPRACOWANIE TEKSTÓW I STANÓW PUSTYCH
+Dowód: PRZEGLĄDARKA + KOD.
+Zmiana: „Właściciel” zamiast „Owner”; naturalna odmiana liczby sesji;
+konkretne stany puste: „Nie ma wpłat dla tych filtrów” + „Wyczyść filtry”,
+„Nie udało się wczytać wpłat” + „Spróbuj ponownie”. Rozdzielić pierwsze użycie,
+brak pasujących wyników i awarię. Utrzymać polskie, nietechniczne komunikaty.
+Odbiór: brak surowych komunikatów technicznych i niejednoznacznego „Brak danych”.
+Zależność: frontend, tłumaczenie znanych błędów według ich znaczenia.
+
+KOLEJNOŚĆ WDROŻENIA
+1. Lokalizacja, okna/fokus, błędy wyszukiwania, fałszywy znacznik filtrów.
+2. Stan list w adresie, kontekst wpłat, czytelne akcje i mobilny pasek grafiku.
+3. Użyteczny pulpit, profil i statystyki; równolegle uzupełnienia danych backendu.
+4. Ujednolicenie selektorów, typografii, kart, menu i tekstów.
+Nie wdrażać całości jako jednej dużej przebudowy; odbierać pełne ścieżki pracy.
+
+ZALEŻNOŚCI OD BACKENDU — UZUPEŁNIENIE, NIE ZASTĄPIENIE POPRZEDNIEJ NOTATKI
+Szczegółowy wcześniejszy zakres: docs/owner-backend-requirements.txt.
+- Nadal: summary.activeClientsCount / withActivePackageCount i ich definicje;
+  sortowania klientów po wykorzystaniu, saldzie, trenerze i archiwizacji;
+  wyszukiwanie telefonu; sortowania wpłat po kliencie i nadpłacie;
+  globalne godziny/sesje; billingMode ofert i posiadanych pakietów;
+  allowedActions w szczegółach i wyniku przygotowania zgłoszenia.
+- Dla pulpitu: możliwość pobrania dokładnych grup klientów „bez treningu od
+  30 dni” i „ostatnia sesja”, z paginacją i zgodnymi definicjami liczników.
+- Dla globalnego wyszukiwania: potwierdzić dostępność ograniczonego wyszukiwania
+  klientów i trenerów z jednoznacznym zakresem lokalizacji i limitem wyników.
+- Dla statystyk: potwierdzić definicję netto/brutto i zysku, wpływ każdego filtra
+  na każde zestawienie oraz listę operatorów płatności. To prośba o potwierdzenie,
+  nie stwierdzenie, że obliczenia są błędne.
+- Dla wpłat: potwierdzić dostępność efektywnej lokalizacji i rozbicia rozliczenia
+  na używanej liście. Część problemu jest już po stronie niewykorzystanego UI.
+- Opcjonalne wcześniejsze rozszerzenia pozostają: metadane trenerów,
+  filtr dostępu grupowego, waluta i oczekujące wpłaty w zgłoszeniach.
+- Zachować uzgodnienia: klienci według głównej lokalizacji, wpłaty według
+  efektywnej lokalizacji, domyślnie klienci „Najnowsi”, brakujące sortowania
+  jawnie niedostępne, rozliczenie zgłoszenia pobierane dopiero po kliknięciu.
+
+ODBIÓR PO WDROŻENIU
+- Komputer 1280/1440, telefon 390, tablet i punkt tuż poniżej xl; obie marki.
+- Klawiatura: menu, selektory, okna, Escape, fokus i powrót po zamknięciu.
+- Duże nazwy, brak pakietu, usługa okresowa, nadpłata, zaległość, różne waluty.
+- Pusta lista, brak dopasowań, błąd odczytu, częściowy błąd, ponowienie.
+- Powrót z profilu do odfiltrowanej strony; odświeżenie i link do zakładki.
+- Próba opuszczenia zmienionego formularza i zamknięcia podczas zapisu.
+- Liczniki i podsumowania obejmują właściwy zakres, nie aktualną stronę.
+- Osobna dalsza sesja wizualna: wydatki, trener i jego rozliczenie, powiadomienia,
+  historia zmian, wszystkie ustawienia oraz pełny proces zapisu grupowego.
+
+ŹRÓDŁA WZORCÓW DOSTĘPNOŚCI
+https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/
+https://www.w3.org/WAI/ARIA/apg/patterns/combobox/

@@ -35,7 +35,7 @@ export function ActivityDetails({ entry, onClose, onRelated }: {
   const snapshot = created ? entry.after : deleted ? entry.before : null;
   const fields = created || deleted ? Object.keys(snapshot ?? {}) : [...new Set(entry.changedFields ?? [])];
 
-  return <ModalOverlay onClose={onClose} className="md:justify-end">
+  return <ModalOverlay onClose={onClose} manageFocus={false} className="md:justify-end">
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={`Szczegóły zmiany: ${objectLabel(entry)}`} tabIndex={-1} className="relative max-h-[calc(100dvh-1.5rem)] w-full max-w-[660px] overflow-y-auto rounded-[var(--radius-xl)] bg-surface-container p-5 shadow-ambient outline-none md:max-h-[calc(100dvh-2rem)] md:p-6">
       <ModalHeader eyebrow={operationLabel(entry.operation)} title={objectLabel(entry)} onClose={onClose} />
       <div className="mt-4 grid gap-3 rounded-[var(--radius-lg)] bg-surface-container-low p-4 text-sm sm:grid-cols-2">

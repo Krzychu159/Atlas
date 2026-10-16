@@ -291,7 +291,7 @@ export default function TrainerContractsModal({
 
   return (
     <>
-    <ModalOverlay onClose={onClose} className="px-3 py-3 md:px-4 md:py-6">
+    <ModalOverlay onClose={isSaving || isDeleting ? undefined : onClose} className="px-3 py-3 md:px-4 md:py-6">
       <form
         onSubmit={handleSubmit}
         className="relative z-10 flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[980px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-white/8 bg-surface-container shadow-ambient md:max-h-[calc(100dvh-3rem)]"
@@ -519,14 +519,7 @@ function DeleteContractConfirmModal({
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4 backdrop-blur-[3px]">
-      <button
-        type="button"
-        aria-label="Anuluj usuwanie umowy"
-        onClick={onClose}
-        disabled={isDeleting}
-        className="absolute inset-0 cursor-default"
-      />
+    <ModalOverlay onClose={isDeleting ? undefined : onClose} className="bg-black/75 p-4 backdrop-blur-[3px]">
       <div
         role="alertdialog"
         aria-modal="true"
@@ -573,6 +566,6 @@ function DeleteContractConfirmModal({
           </Button>
         </ModalFooter>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

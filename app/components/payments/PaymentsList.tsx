@@ -137,6 +137,24 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
   );
 }
 
+// The current package state comes from the backend and is labelled separately from this payment's own status.
+function PaymentPackageContext({ payment }: { payment: PaymentDisplaySource }) {
+  const due = payment.packageAmountDue;
+  const packageNow = typeof due === "number" && Number.isFinite(due) && due > 0
+    ? `Pakiet teraz: ${payment.packagePaymentStatus === "Overdue" ? "zaległość" : "do zapłaty"} ${formatMoney(due, payment.currency)}`
+    : payment.packagePaymentStatus === "Paid" ? "Pakiet teraz: opłacony" : null;
+  const location = payment.effectiveLocationName
+    ? `${payment.effectiveLocationName}${payment.effectiveLocationSource === "ClientHome" ? " (lokalizacja klienta)" : ""}`
+    : null;
+  if (!packageNow && !location) return null;
+  const text = [packageNow, location].filter(Boolean).join(" · ");
+  return (
+    <p className="mt-1 text-xs text-on-surface-muted max-xl:line-clamp-2 xl:truncate" title={text}>
+      {text}
+    </p>
+  );
+}
+
 type PaymentListRowProps = {
   payment: PaymentDisplaySource;
   processing: boolean;
@@ -185,6 +203,7 @@ function PaymentListRow(props: PaymentListRowProps) {
           <p className="truncate text-sm font-medium text-on-surface-variant">
             {payment.packageName || "Bez przypisanego pakietu"}
           </p>
+          <PaymentPackageContext payment={payment} />
           {payment.note ? (
             <p className="mt-1 truncate text-xs text-on-surface-muted">
               {payment.note}
@@ -232,6 +251,7 @@ function PaymentListRow(props: PaymentListRowProps) {
             <p className="mt-1 line-clamp-2 text-sm text-on-surface-variant">
               {payment.packageName || "Bez przypisanego pakietu"}
             </p>
+            <PaymentPackageContext payment={payment} />
           </div>
           <div className="shrink-0 text-right">
             <p className="text-base font-bold text-on-surface">

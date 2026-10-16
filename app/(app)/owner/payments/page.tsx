@@ -5,8 +5,8 @@ import { notifyClientPaymentChanged } from "@/app/lib/session-corrections";
 import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 import { usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
-import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { PaymentActionConfirmModal } from "@/app/components/payments/PaymentActionConfirmModal";
 import { PaymentReasonModal } from "@/app/components/payments/PaymentReasonModal";
@@ -42,6 +42,7 @@ import {
   PaymentFilters,
   type PaymentFiltersValue,
 } from "./components/PaymentFilters";
+import { listUrlKey, readOption, readPositiveInt, useListScrollRestoration, useListUrlSync } from "../components/list-url-state";
 
 type PaymentAction = "confirm" | "issueReceipt" | "cancelReceipt";
 
@@ -54,10 +55,55 @@ export default function OwnerPaymentsPage() {
     ? null
     : selectedLocationId;
   return (
-    <OwnerPaymentsPageContent
-      locationId={locationId}
-    />
+    <Suspense>
+      <OwnerPaymentsPageContent
+        locationId={locationId}
+      />
+    </Suspense>
   );
+}
+
+const PAYMENT_URL_KEYS = ["q", "clientId", "status", "source", "overpayment", "from", "to", "min", "max", "sort", "page"] as const;
+const SERVER_PAYMENT_SORTS = ["newest", "oldest", "amountDesc", "amountAsc"] as const;
+const DATE_PARAM = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
+const AMOUNT_PARAM = /^[0-9]{1,9}([.,][0-9]{1,2})?$/;
+
+function paymentFiltersFromUrl(params: URLSearchParams): PaymentFiltersValue {
+  const clientId = readPositiveInt(params.get("clientId"));
+  const text = (name: string, pattern: RegExp) => {
+    const value = params.get(name) ?? "";
+    return pattern.test(value) ? value : "";
+  };
+  return {
+    client: clientId ? String(clientId) : (params.get("q") ?? "").slice(0, 100),
+    status: readOption(params.get("status"), ["all", "1", "2", "3", "4", "5"], defaultPaymentFilters.status),
+    source: readOption(params.get("source"), ["all", "1", "2", "3"], defaultPaymentFilters.source),
+    overpayment: readOption(params.get("overpayment"), ["all", "yes", "no"], defaultPaymentFilters.overpayment),
+    dateFrom: text("from", DATE_PARAM),
+    dateTo: text("to", DATE_PARAM),
+    amountMin: text("min", AMOUNT_PARAM),
+    amountMax: text("max", AMOUNT_PARAM),
+    sortBy: readOption(params.get("sort"), SERVER_PAYMENT_SORTS, "newest"),
+  };
+}
+
+function paymentFiltersToUrl(filters: PaymentFiltersValue, page: number) {
+  const client = filters.client.trim();
+  const clientId = parseClientIdFilter(client);
+  const changed = (key: keyof PaymentFiltersValue) => filters[key] !== defaultPaymentFilters[key] ? filters[key].trim() || null : null;
+  return {
+    q: clientId ? null : client || null,
+    clientId: clientId ? String(clientId) : null,
+    status: changed("status"),
+    source: changed("source"),
+    overpayment: changed("overpayment"),
+    from: changed("dateFrom"),
+    to: changed("dateTo"),
+    min: changed("amountMin"),
+    max: changed("amountMax"),
+    sort: changed("sortBy"),
+    page: page > 1 ? String(page) : null,
+  };
 }
 
 function OwnerPaymentsPageContent({
@@ -84,26 +130,16 @@ function OwnerPaymentsPageContent({
   } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [reversalReason, setReversalReason] = useState("");
+  const searchParams = useSearchParams();
   const [filters, setFilters] = useState<PaymentFiltersValue>(
-    defaultPaymentFilters,
+    () => paymentFiltersFromUrl(searchParams),
   );
-  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
-  const [pagination, setPagination] = useState({ page: 1, locationId });
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(
+    () => ["status", "source", "overpayment", "min", "max"].some((key) => searchParams.has(key)),
+  );
+  const [pagination, setPagination] = useState(() => ({ page: readPositiveInt(searchParams.get("page")) ?? 1, locationId }));
   const page = pagination.locationId === locationId ? pagination.page : 1;
   const setPage = (next: number) => setPagination({ page: next, locationId });
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const params = new URLSearchParams(window.location.search);
-      const clientId = params.get("clientId");
-
-      if (clientId) {
-        setFilters((current) => ({ ...current, client: clientId }));
-      }
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, []);
 
   const owner = basePath === "/owner";
   const queryState = useMemo(() => {
@@ -114,6 +150,9 @@ function OwnerPaymentsPageContent({
   const list = useOwnerRead(JSON.stringify(queryState.query), readPayments, "Nie udało się pobrać płatności.", paymentDateRevision, 250, owner && !queryState.error);
   const loading = owner ? list.loading : isLoading;
   const readError = owner ? queryState.error || list.error : undefined;
+  const urlParams = paymentFiltersToUrl(filters, page);
+  useListUrlSync(urlParams, PAYMENT_URL_KEYS, owner);
+  useListScrollRestoration(listUrlKey("payments", urlParams), owner && Boolean(list.data) && !list.loading);
 
   function buildBackendPaymentQuery() {
     const clientId = parseClientIdFilter(filters.client);

@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Bell,
   Building2,
   ChevronDown,
   CircleUserRound,
+  LoaderCircle,
   LogOut,
   MapPin,
   Search,
@@ -18,14 +19,12 @@ import { CustomSelect } from "@/app/components/ui/custom-select";
 import { useCurrentUser } from "@/app/components/current-user-provider";
 import { useOrganizationTheme } from "@/app/components/organization-theme";
 import { BsworkoutLogo } from "@/app/components/bsworkout-logo";
-import { getClients, type Client } from "@/app/lib/owner/clients";
+import { getOwnerFilterOptions } from "@/app/lib/owner/filter-options";
+import { OwnerLocationIconPicker } from "@/app/components/owner-mobile-location";
 import {
-  matchesOwnerLocationId,
-  OWNER_LOCATION_ALL,
   useOwnerLocationFilter,
+  useOwnerLocationOptions,
 } from "@/app/lib/owner/location-filter";
-import { getLocations, type Location } from "@/app/lib/owner/locations";
-import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
 
 
 type HeaderProps = {
@@ -42,21 +41,15 @@ type SearchResult = {
   href: string;
 };
 
-function normalize(value: string) {
-  return value.toLowerCase().trim();
-}
+type SearchResponse =
+  | { key: string; status: "ready"; query: string; results: SearchResult[] }
+  | { key: string; status: "error"; query: string };
 
-function getClientName(client: Client) {
-  return (
-    client.fullName || `${client.firstName || ""} ${client.lastName || ""}`
-  ).trim();
-}
+type SearchState = { status: "idle" } | { status: "loading" } | SearchResponse;
 
-function getTrainerName(trainer: Trainer) {
-  return (
-    trainer.fullName || `${trainer.firstName || ""} ${trainer.lastName || ""}`
-  ).trim();
-}
+const SEARCH_MIN_LENGTH = 2;
+const SEARCH_LIMIT = 5;
+const SEARCH_DEBOUNCE_MS = 250;
 
 function getRoleLabel(role: string) {
   switch (role.toLowerCase()) {
@@ -71,6 +64,208 @@ function getRoleLabel(role: string) {
   }
 }
 
+function OwnerGlobalSearch({ className }: { className: string }) {
+  const { selectedLocationId } = useOwnerLocationFilter();
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [response, setResponse] = useState<SearchResponse | null>(null);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [retryToken, setRetryToken] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const resultRefs = useRef<Array<HTMLAnchorElement | null>>([]);
+  const listId = useId();
+  const term = query.trim();
+  const requestKey = `${selectedLocationId ?? "all"}|${retryToken}|${term}`;
+  const state: SearchState = term.length < SEARCH_MIN_LENGTH
+    ? { status: "idle" }
+    : response?.key === requestKey ? response : { status: "loading" };
+
+  // Server-side search limited to a few people in the selected location; the full lists are never downloaded.
+  useEffect(() => {
+    if (term.length < SEARCH_MIN_LENGTH) return;
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      getOwnerFilterOptions({ search: term, locationId: selectedLocationId, limit: SEARCH_LIMIT }, controller.signal)
+        .then((options) => {
+          if (controller.signal.aborted) return;
+          const results: SearchResult[] = [
+            ...options.clients.map((client) => ({
+              id: client.id,
+              type: "client" as const,
+              title: client.name,
+              subtitle: "Klient",
+              href: `/owner/clients/${client.id}`,
+            })),
+            ...options.trainers.map((trainer) => ({
+              id: trainer.id,
+              type: "trainer" as const,
+              title: trainer.name,
+              subtitle: "Trener",
+              href: `/owner/trainers/${trainer.id}`,
+            })),
+          ];
+          setActiveIndex(-1);
+          setResponse({ key: requestKey, status: "ready", query: term, results });
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setResponse({ key: requestKey, status: "error", query: term });
+        });
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [requestKey, selectedLocationId, term]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handlePointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [open]);
+
+  const results = state.status === "ready" ? state.results : [];
+  const showPanel = open && term.length > 0;
+
+  function close() {
+    setOpen(false);
+    setActiveIndex(-1);
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      if (showPanel) {
+        event.preventDefault();
+        close();
+      } else if (query) {
+        event.preventDefault();
+        setQuery("");
+      }
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (!results.length) return;
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex((current) => {
+        if (event.key === "ArrowDown") return current >= results.length - 1 ? 0 : current + 1;
+        return current <= 0 ? results.length - 1 : current - 1;
+      });
+      return;
+    }
+    if (event.key === "Enter" && showPanel) {
+      const index = activeIndex >= 0 ? activeIndex : results.length === 1 ? 0 : -1;
+      if (index < 0) return;
+      event.preventDefault();
+      resultRefs.current[index]?.click();
+    }
+  }
+
+  return (
+    <div
+      ref={rootRef}
+      className={className}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) close();
+      }}
+    >
+      <Search
+        aria-hidden="true"
+        className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-muted"
+        size={17}
+      />
+      <input
+        type="text"
+        role="combobox"
+        aria-label="Szukaj klientów i trenerów"
+        aria-autocomplete="list"
+        aria-expanded={showPanel}
+        aria-controls={listId}
+        aria-activedescendant={showPanel && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
+        autoComplete="off"
+        value={query}
+        onFocus={() => setOpen(true)}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder="Szukaj klientów i trenerów..."
+        className="h-12 w-full rounded-full bg-surface-container-lowest pl-12 pr-5 text-sm text-on-surface outline-none placeholder:text-on-surface-muted focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_24%,transparent)]"
+      />
+
+      {showPanel ? (
+        <div className="absolute left-0 top-[calc(100%+0.75rem)] z-40 w-full overflow-hidden rounded-[var(--radius-lg)] bg-surface-container shadow-ambient">
+          {term.length < SEARCH_MIN_LENGTH ? (
+            <p className="px-4 py-5 text-sm text-on-surface-variant">Wpisz co najmniej {SEARCH_MIN_LENGTH} znaki.</p>
+          ) : state.status === "loading" ? (
+            <p role="status" className="flex items-center gap-2 px-4 py-5 text-sm text-on-surface-variant">
+              <LoaderCircle size={16} className="animate-spin text-primary-light" aria-hidden="true" />
+              Szukamy…
+            </p>
+          ) : state.status === "error" ? (
+            <div role="alert" className="flex flex-wrap items-center justify-between gap-3 px-4 py-4">
+              <p className="text-sm text-on-surface-variant">Nie udało się wyszukać. Sprawdź połączenie i spróbuj ponownie.</p>
+              <button
+                type="button"
+                onClick={() => setRetryToken((value) => value + 1)}
+                className="h-9 rounded-full bg-surface-container-high px-4 text-sm font-semibold text-on-surface transition hover:bg-surface-container-highest focus-visible:outline-2 focus-visible:outline-primary-light"
+              >
+                Spróbuj ponownie
+              </button>
+            </div>
+          ) : results.length ? (
+            <ul id={listId} role="listbox" aria-label="Wyniki wyszukiwania">
+              {results.map((result, index) => (
+                <li key={`${result.type}-${result.id}`} role="presentation">
+                  <Link
+                    ref={(element) => { resultRefs.current[index] = element; }}
+                    id={`${listId}-${index}`}
+                    role="option"
+                    aria-selected={index === activeIndex}
+                    href={result.href}
+                    prefetch={false}
+                    onClick={() => {
+                      setQuery("");
+                      close();
+                    }}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    className={`flex items-center gap-3 px-4 py-3 transition hover:bg-surface-container-high focus-visible:bg-surface-container-high focus-visible:outline-none ${index === activeIndex ? "bg-surface-container-high" : ""}`}
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-lowest text-primary-light">
+                      {result.type === "client" ? (
+                        <UserRound size={17} aria-hidden="true" />
+                      ) : (
+                        <Building2 size={17} aria-hidden="true" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-on-surface">
+                        {result.title}
+                      </p>
+                      <p className="truncate text-xs text-on-surface-muted">
+                        {result.subtitle}
+                      </p>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : state.status === "ready" ? (
+            <p role="status" className="px-4 py-5 text-sm text-on-surface-variant">
+              Nie znaleziono klientów ani trenerów pasujących do „{state.query}”.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function Header({ role, unreadNotificationCount, onUnreadCountChange }: HeaderProps) {
   const theme = useOrganizationTheme();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -78,133 +273,13 @@ export function Header({ role, unreadNotificationCount, onUnreadCountChange }: H
   const closeNotifications = useCallback(() => setIsNotificationsOpen(false), []);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const {
+    options: locationOptions,
     selectedLocationValue,
-    selectedLocationId,
     setSelectedLocationValue,
-  } = useOwnerLocationFilter();
+  } = useOwnerLocationOptions(role === "owner");
   const { user } = useCurrentUser();
-  const [query, setQuery] = useState("");
-  const [clients, setClients] = useState<Client[]>([]);
-  const [trainers, setTrainers] = useState<Trainer[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [locationsLoaded, setLocationsLoaded] = useState(false);
-  const [directoriesLoaded, setDirectoriesLoaded] = useState(false);
 
   const notificationsHref = `/${role}/notifications`;
-
-  useEffect(() => {
-    if (role !== "owner") return;
-
-    let active = true;
-
-    getLocations()
-      .then((data) => {
-        if (!active) return;
-
-        setLocations(data.filter((location) => location.isActive));
-        setLocationsLoaded(true);
-      })
-      .catch(() => {
-        if (active) setLocationsLoaded(true);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [role]);
-
-  async function ensureDirectories() {
-    if (directoriesLoaded || role !== "owner") return;
-
-    try {
-      const [clientsData, trainersData] = await Promise.all([
-        getClients(),
-        getTrainers(),
-      ]);
-      setClients(clientsData);
-      setTrainers(trainersData);
-      setDirectoriesLoaded(true);
-    } catch {
-      setDirectoriesLoaded(true);
-    }
-  }
-
-  const searchResults = useMemo<SearchResult[]>(() => {
-    const value = normalize(query);
-
-    if (!value || role !== "owner") return [];
-
-    const clientResults = clients
-      .filter((client) => matchesOwnerLocationId(client, selectedLocationId))
-      .filter((client) => {
-        const name = normalize(getClientName(client));
-        const email = normalize(client.email || "");
-
-        return name.includes(value) || email.includes(value);
-      })
-      .slice(0, 4)
-      .map((client) => ({
-        id: client.id,
-        type: "client" as const,
-        title: getClientName(client),
-        subtitle: client.email || "Klient",
-        href: `/owner/clients/${client.id}`,
-      }));
-
-    const trainerResults = trainers
-      .filter((trainer) => matchesOwnerLocationId(trainer, selectedLocationId))
-      .filter((trainer) => {
-        const name = normalize(getTrainerName(trainer));
-        const email = normalize(trainer.email || "");
-
-        return name.includes(value) || email.includes(value);
-      })
-      .slice(0, 4)
-      .map((trainer) => ({
-        id: trainer.id,
-        type: "trainer" as const,
-        title: getTrainerName(trainer),
-        subtitle: trainer.email || "Trener",
-        href: `/owner/trainers/${trainer.id}`,
-      }));
-
-    return [...clientResults, ...trainerResults].slice(0, 6);
-  }, [clients, query, role, selectedLocationId, trainers]);
-
-  const locationOptions = useMemo(
-    () => [
-      { value: OWNER_LOCATION_ALL, label: "Wszystkie lokalizacje" },
-      ...locations.map((location) => ({
-        value: String(location.id),
-        label: location.name || location.city || `Lokalizacja ${location.id}`,
-      })),
-    ],
-    [locations],
-  );
-
-  useEffect(() => {
-    if (
-      role !== "owner" ||
-      !locationsLoaded ||
-      selectedLocationValue === OWNER_LOCATION_ALL
-    ) {
-      return;
-    }
-
-    const selectedLocationExists = locationOptions.some(
-      (option) => option.value === selectedLocationValue,
-    );
-
-    if (!selectedLocationExists) {
-      setSelectedLocationValue(OWNER_LOCATION_ALL);
-    }
-  }, [
-    locationOptions,
-    locationsLoaded,
-    role,
-    selectedLocationValue,
-    setSelectedLocationValue,
-  ]);
 
   const displayUser = user ?? {
     id: "",
@@ -217,59 +292,11 @@ export function Header({ role, unreadNotificationCount, onUnreadCountChange }: H
   return (
     <>
       <header className="mx-auto mb-8 mt-4 flex w-full max-w-[1400px] items-center justify-between gap-4">
-        <div className={`relative hidden max-w-[640px] flex-1 md:block ${theme === "bsworkout" ? "min-w-0" : "min-w-[280px]"}`}>
-          <Search
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-muted"
-            size={17}
-          />
-          <input
-            type="text"
-            value={query}
-            onFocus={ensureDirectories}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              ensureDirectories();
-            }}
-            placeholder="Szukaj klientów i trenerów..."
-            className="h-12 w-full rounded-full bg-surface-container-lowest pl-12 pr-5 text-sm text-on-surface outline-none placeholder:text-on-surface-muted"
-          />
-
-          {query ? (
-            <div className="absolute left-0 top-[calc(100%+0.75rem)] z-40 w-full overflow-hidden rounded-[var(--radius-lg)] bg-surface-container shadow-ambient">
-              {searchResults.length > 0 ? (
-                searchResults.map((result) => (
-                  <Link
-                    key={`${result.type}-${result.id}`}
-                    href={result.href}
-                    prefetch={false}
-                    onClick={() => setQuery("")}
-                    className="flex items-center gap-3 px-4 py-3 transition hover:bg-surface-container-high"
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-surface-container-lowest text-primary-light">
-                      {result.type === "client" ? (
-                        <UserRound size={17} />
-                      ) : (
-                        <Building2 size={17} />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-on-surface">
-                        {result.title}
-                      </p>
-                      <p className="truncate text-xs text-on-surface-muted">
-                        {result.subtitle}
-                      </p>
-                    </div>
-                  </Link>
-                ))
-              ) : (
-                <div className="px-4 py-5 text-sm text-on-surface-variant">
-                  Brak wyników.
-                </div>
-              )}
-            </div>
-          ) : null}
-        </div>
+        {role === "owner" ? (
+          <OwnerGlobalSearch className={`relative hidden max-w-[640px] flex-1 md:block ${theme === "bsworkout" ? "min-w-0" : "min-w-[280px]"}`} />
+        ) : (
+          <div className="hidden flex-1 md:block" />
+        )}
 
         <div className="flex min-w-0 items-center gap-3">
           {theme === "bsworkout" ? <BsworkoutLogo className="hidden h-7 w-20 shrink-0 lg:flex xl:h-8 xl:w-24" /> : null}
@@ -279,8 +306,12 @@ export function Header({ role, unreadNotificationCount, onUnreadCountChange }: H
               options={locationOptions}
               onChange={setSelectedLocationValue}
               icon={<MapPin size={16} />}
-              className="hidden w-[240px] shrink-0 xl:block"
+              ariaLabel="Lokalizacja"
+              className="hidden w-[200px] shrink-0 lg:block xl:w-[240px]"
             />
+          ) : null}
+          {role === "owner" ? (
+            <OwnerLocationIconPicker className="hidden bg-surface-container-lowest md:flex lg:hidden" />
           ) : null}
 
           {role !== "client" ? (

@@ -191,3 +191,15 @@ POPRAWKI PO ZGŁOSZENIU REGRESJI (2026-10-15):
 - Lista potrzeb backendu: docs/owner-backend-requirements.txt.
 - Aktualne testy: 211 testów, 210 zaliczonych, 0 błędów, 1 pominięty (PUBLIC_TEST_ORIGIN).
 Kontrola poprawek: TypeScript OK; ESLint 0 błędów, 1 istniejące ostrzeżenie img w logowaniu; git diff --check OK. Testy porównują HTML w izolacji — nie zastępują testu hydratacji w przeglądarce ani rzeczywistego backendu.
+
+POPRAWKI FRONTENDU I SCALENIE WYMAGAŃ (2026-10-16):
+- Zablokowane niedostępne opcje sortowania zamiast znikającej listy.
+- Poprawne komunikaty pustego wyszukiwania/lokalizacji oraz pustej strony przy niezerowym totalCount.
+- Paginowana historia klienta bez mylącego podziału na puste sekcje; jedna lista według dat.
+- Najbliższe sesje trenera ograniczone parametrem from, stabilnym między stronami.
+- Formularze dodania/zaproszenia/edycji klienta bez pełnego getTrainers dla selektora; pobierają szczegóły tylko wybranej/dotychczasowej osoby. Walidacja dokładnego Active i lokalizacji w nowym przypisaniu, zachowany nieaktywny trener podczas edycji.
+- Walidacja filter-options, bezpieczna data ważności grupowego pakietu, utrzymanie nazwy wyboru po odświeżeniu.
+- Błędy i późne odpowiedzi wyboru trenera nie zmieniają przypisania; zapis czeka na weryfikację wyboru.
+- Scalona notatka dla backendu: docs/owner-backend-requirements.txt, punkty 1–14.
+- Odtwarzanie niepewnej intencji po zamknięciu karty pozostaje jawnym ograniczeniem; klucz żyje w zamontowanym formularzu.
+Kontrola końcowa 2026-10-16: TypeScript OK; ESLint zmienionych plików i nowego komponentu OK, bez ostrzeżeń; 240 testów, 239 zaliczonych, 0 błędów, 1 pominięty (PUBLIC_TEST_ORIGIN); git diff --check OK. Nowe testy owner-frontend-fixes.test.mjs: 16/16. Bez E2E, builda, commita, push i merge.

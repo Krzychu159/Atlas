@@ -157,6 +157,23 @@ test("trainer identifier changes cancel old reads and never mix clients or rates
   assert.equal(find(render(), node => "ratesAvailable" in node.props).props.rates[0].id, 32); h.unmount();
 });
 
+test("nearest trainer sessions use a stable lower date boundary across pages", async () => {
+  const fixture = profileFixture(true), { h, calls, render } = fixture;
+  const before = Date.now();
+  render(); h.commit(); await settle();
+  const first = calls.find(call => call.name === "getOwnerSessionPage");
+  assert.ok(Date.parse(first.args[0].from) >= before);
+  assert.ok(Date.parse(first.args[0].from) <= Date.now());
+  assert.equal(first.args[0].order, "asc");
+  first.resolve({ items: [], page: 1, pageSize: 4, totalCount: 20, totalPages: 5 });
+  calls.find(call => call.name === "getTrainer").resolve({ id: 1 }); await settle();
+  find(render(), node => node.props.pagination?.pageSize === 4).props.pagination.onPageChange(2);
+  render(); h.commit(); await settle();
+  assert.equal(calls.at(-1).args[0].page, 2);
+  assert.equal(calls.at(-1).args[0].from, first.args[0].from);
+  h.unmount(); fixture.resolveAll(); await settle();
+});
+
 test("trainer section retry preserves the open editor's input data references", async () => {
   const fixture = profileFixture(true), { h, calls, render } = fixture;
   render(); h.commit(); await settle(); fixture.resolveAll(); await settle();

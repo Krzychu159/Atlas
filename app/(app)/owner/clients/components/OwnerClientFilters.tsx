@@ -81,10 +81,10 @@ const packageOptions = [
 ];
 
 const sortOptions = [
-  { value: "package-usage", label: "Wykorzystanie pakietu (niedostępne)" },
+  { value: "package-usage", label: "Wykorzystanie pakietu (niedostępne)", disabled: true },
   { value: "newest", label: "Najnowsi" },
   { value: "name", label: "Alfabetycznie" },
-  { value: "trainer", label: "Po trenerze (niedostępne)" },
-  { value: "balance-desc", label: "Saldo malejąco (niedostępne)" },
-  { value: "balance-asc", label: "Saldo rosnąco (niedostępne)" },
+  { value: "trainer", label: "Po trenerze (niedostępne)", disabled: true },
+  { value: "balance-desc", label: "Saldo malejąco (niedostępne)", disabled: true },
+  { value: "balance-asc", label: "Saldo rosnąco (niedostępne)", disabled: true },
 ];

@@ -95,7 +95,7 @@ test("payment queries preserve zero amount, effective location and server sorts"
 
 test("paged adapters retain filters, server summary and cancellation; legacy schedule stays unpaged", async () => {
   const calls = [], response = { items: [], page: 2, pageSize: 25, totalCount: 2000, totalPages: 80, summary: { totalAmount: 9123, paidAmount: 1000, unpaidAmount: 8123, trainersCount: 2000, paidTrainersCount: 100 } };
-  const backend = { backendGet: async (...args) => { calls.push(args); return response; } };
+  const backend = { backendGet: async (...args) => { calls.push(args); return args[0] === "owner/filter-options" ? { clients: [], trainers: [] } : response; } };
   const signal = new AbortController().signal;
   const clients = load("app/lib/owner/clients.ts", { "../backend": backend });
   const sessions = load("app/lib/owner/sessions.ts", { "../backend": backend });
