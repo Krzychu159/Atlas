@@ -70,7 +70,7 @@ export default function SessionEditorModal({
   trainers: Trainer[];
   locations: Location[];
   clients: Client[];
-  loadClientOptions?: (search: string, page: number, signal: AbortSignal) => Promise<{ items: Client[]; totalCount: number; totalPages: number }>;
+  loadClientOptions?: (search: string, page: number, locationId: number, signal: AbortSignal) => Promise<{ items: Client[]; totalCount: number; totalPages: number }>;
   defaultTrainerId?: number | null;
   trainerAccess?: boolean;
   allowPublicSessions?: boolean;
@@ -117,13 +117,15 @@ export default function SessionEditorModal({
   const [clientAttempt, setClientAttempt] = useState(0);
   const consultationForm = isConsultationForm(values);
   const isGroupForm = !consultationForm && isGroupTraining({ ...session, isPubliclyBookable: values.isPubliclyBookable, plannedSessionType: values.plannedSessionType });
-  const clientLoadKey = JSON.stringify([open, values.locationId, isGroupForm, clientSearch.trim(), clientPage, clientAttempt]);
-  const clientsLoading = Boolean(loadClientOptions) && remoteKey !== clientLoadKey;
+  const selectedLocationId = Number(values.locationId) || null;
+  const needsLocation = Boolean(loadClientOptions) && !selectedLocationId;
+  const clientLoadKey = JSON.stringify([open, selectedLocationId, isGroupForm, clientSearch.trim(), clientPage, clientAttempt]);
+  const clientsLoading = Boolean(loadClientOptions) && !needsLocation && remoteKey !== clientLoadKey;
   useEffect(() => {
-    if (!open || !loadClientOptions || isGroupForm || consultationForm) return;
+    if (!open || !loadClientOptions || isGroupForm || consultationForm || !selectedLocationId) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      loadClientOptions(clientSearch.trim(), clientPage, controller.signal).then(data => {
+      loadClientOptions(clientSearch.trim(), clientPage, selectedLocationId, controller.signal).then(data => {
         if (controller.signal.aborted) return;
         if (clientPage > Math.max(1, data.totalPages)) { setClientPage(Math.max(1, data.totalPages)); return; }
         setRemoteClients(data.items); setRemoteTotal(data.totalCount); setClientLoadError(null); setRemoteKey(clientLoadKey);
@@ -132,7 +134,7 @@ export default function SessionEditorModal({
       });
     }, clientSearch.trim() ? 300 : 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [open, loadClientOptions, isGroupForm, consultationForm, clientSearch, clientPage, clientLoadKey]);
+  }, [open, loadClientOptions, isGroupForm, consultationForm, selectedLocationId, clientSearch, clientPage, clientLoadKey]);
 
   if (!open) return null;
 
@@ -160,7 +162,7 @@ export default function SessionEditorModal({
   const outlookCategoryPlaceholder =
     selectedTrainer?.outlookCategoryName?.trim() || "Np. Trening personalny, Opłacone";
   const clientQuery = normalizeSearch(clientSearch);
-  const clientChoices = loadClientOptions ? (clientsLoading ? [] : [...remoteClients, ...clients.filter(client => selectedClientIds.has(String(client.id)) && !remoteClients.some(item => item.id === client.id))]) : clients;
+  const clientChoices = loadClientOptions ? (clientsLoading ? [] : [...(needsLocation ? [] : remoteClients), ...clients.filter(client => selectedClientIds.has(String(client.id)) && (needsLocation || !remoteClients.some(item => item.id === client.id)))]) : clients;
   const activeClients = clientChoices.filter(
     (client) =>
       trainerAccess || selectedClientIds.has(String(client.id)) ||
@@ -381,7 +383,7 @@ export default function SessionEditorModal({
                     ? locationOptions
                     : [{ value: "", label: "Brak lokalizacji" }]
                 }
-                onChange={(value) => updateValue("locationId", value)}
+                onChange={(value) => { updateValue("locationId", value); setClientPage(1); }}
               />
             </Field>
 
@@ -439,12 +441,14 @@ export default function SessionEditorModal({
                   </span>
                 </div>
 
-                {clientsLoading && loadClientOptions ? <p role="status" className="p-3 text-sm text-on-surface-muted">Pobieranie klientów…</p> : clientLoadError && loadClientOptions ? <div role="alert" className="p-3 text-sm text-on-surface-muted">{clientLoadError}<Button type="button" variant="secondary" onClick={() => setClientAttempt(value => value + 1)}>Spróbuj ponownie</Button></div> : activeClients.length ? (
+                {needsLocation ? <p className="mt-2 rounded-[var(--radius-md)] bg-surface-container px-4 py-3 text-sm text-on-surface-muted">Wybierz lokalizację, aby zobaczyć jej klientów.</p> : null}
+                {clientsLoading && loadClientOptions ? <p role="status" className="p-3 text-sm text-on-surface-muted">Pobieranie klientów…</p> : clientLoadError && loadClientOptions && !needsLocation ? <div role="alert" className="p-3 text-sm text-on-surface-muted">{clientLoadError}<Button type="button" variant="secondary" onClick={() => setClientAttempt(value => value + 1)}>Spróbuj ponownie</Button></div> : activeClients.length ? (
                   visibleClients.length ? (
                     <div className="mt-2 grid max-h-[260px] gap-2 overflow-y-auto overscroll-contain md:grid-cols-2">
                       {visibleClients.map((client) => {
                         const clientId = String(client.id);
                         const selected = selectedClientIds.has(clientId);
+                        const otherLocation = selected && selectedLocationId != null && client.locationId != null && client.locationId !== selectedLocationId;
 
                         return (
                           <button
@@ -468,6 +472,7 @@ export default function SessionEditorModal({
                                   client.phoneNumber ||
                                   "Brak kontaktu"}
                               </span>
+                              {otherLocation ? <span className="mt-0.5 block truncate text-xs font-semibold text-warning-light">Z innego studia</span> : null}
                             </span>
                             <span
                               className={[
@@ -488,12 +493,12 @@ export default function SessionEditorModal({
                       Brak wyników.
                     </div>
                   )
-                ) : (
+                ) : needsLocation ? null : (
                   <div className="mt-2 rounded-[var(--radius-md)] bg-surface-container px-4 py-3 text-sm text-on-surface-muted">
-                    Brak aktywnych klientów do przypisania.
+                    {loadClientOptions ? "Brak aktywnych klientów w tej lokalizacji." : "Brak aktywnych klientów do przypisania."}
                   </div>
                 )}
-                {loadClientOptions && !clientsLoading && !clientLoadError && remoteTotal > 25 ? <PaymentPagination page={clientPage} pageSize={25} totalItems={remoteTotal} onPageChange={setClientPage} itemLabel="klientów" ariaLabel="Strony wyboru klientów" /> : null}
+                {loadClientOptions && !needsLocation && !clientsLoading && !clientLoadError && remoteTotal > 25 ? <PaymentPagination page={clientPage} pageSize={25} totalItems={remoteTotal} onPageChange={setClientPage} itemLabel="klientów" ariaLabel="Strony wyboru klientów" /> : null}
               </div>
             </div>
             {trainerAccess ? <>

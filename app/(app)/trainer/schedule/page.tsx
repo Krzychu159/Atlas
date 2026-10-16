@@ -119,8 +119,8 @@ export default function TrainerSchedulePage() {
       setResourcesError(trainerPaymentError(error, "Nie udało się pobrać danych potrzebnych do dodania zajęć."));
     }).finally(() => { if (revision === resourceRevision.current) setIsResourcesLoading(false); });
   }, []);
-  const loadClientOptions = useCallback(async (search: string, page: number, signal: AbortSignal) => {
-    const result = await getTrainerClientsPage({ Page: page, PageSize: 25, Search: search || undefined }, signal);
+  const loadClientOptions = useCallback(async (search: string, page: number, locationId: number, signal: AbortSignal) => {
+    const result = await getTrainerClientsPage({ Page: page, PageSize: 25, Search: search || undefined, LocationId: locationId }, signal);
     const items = trainerPortalClientsToClients(result.items || [], me);
     if (!signal.aborted && mounted.current) setClients(previous => [...new Map([...previous, ...items].map(client => [client.id, client])).values()]);
     return { items, totalCount: result.totalCount, totalPages: result.totalPages };

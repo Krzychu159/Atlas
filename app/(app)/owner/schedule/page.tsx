@@ -9,7 +9,7 @@ import { useOwnerRead } from "../components/use-owner-read";
 import { OwnerReadState } from "../components/OwnerReadState";
 import { Button } from "@/app/components/ui/button";
 import { getCurrentUser } from "@/app/lib/auth/current-user";
-import { getClients, type Client } from "@/app/lib/owner/clients";
+import { getClients, getOwnerClients, type Client } from "@/app/lib/owner/clients";
 import {
   matchesOwnerLocationId,
   useOwnerLocationFilter,
@@ -103,13 +103,10 @@ export default function SchedulePage() {
         : locations,
     [locations, selectedLocationId],
   );
-  const scopedClients = useMemo(
-    () =>
-      clients.filter((client) =>
-        matchesOwnerLocationId(client, selectedLocationId),
-      ),
-    [clients, selectedLocationId],
-  );
+  const loadClientOptions = useCallback(async (search: string, page: number, locationId: number, signal: AbortSignal) => {
+    const result = await getOwnerClients({ page, pageSize: 25, search: search || undefined, locationId, isArchived: false, sort: "name" }, signal);
+    return { items: result.items ?? [], totalCount: result.totalCount, totalPages: result.totalPages };
+  }, []);
   const modalTrainers = useMemo(() => {
     const currentTrainer = trainers.find(
       (trainer) => trainer.id === defaultTrainerId,
@@ -389,7 +386,8 @@ export default function SchedulePage() {
         defaultStartAt={selectedSession ? null : createSessionStartAt}
         trainers={modalTrainers}
         locations={scopedLocations}
-        clients={scopedClients}
+        clients={clients}
+        loadClientOptions={loadClientOptions}
         defaultTrainerId={defaultTrainerId}
         isSaving={isSavingSession}
         onClose={() => {
