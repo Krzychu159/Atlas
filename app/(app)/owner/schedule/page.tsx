@@ -4,7 +4,7 @@ import { ApiError } from "@/app/lib/backend";
 import { userMessage } from "@/app/lib/user-messages";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, RefreshCw } from "lucide-react";
+import { CircleAlert, Plus, RefreshCw } from "lucide-react";
 import { useOwnerRead } from "../components/use-owner-read";
 import { OwnerReadState } from "../components/OwnerReadState";
 import { Button } from "@/app/components/ui/button";
@@ -58,6 +58,7 @@ const EMPTY_TRAINERS: Trainer[] = [];
 const EMPTY_LOCATIONS: Location[] = [];
 const EMPTY_CLIENTS: Client[] = [];
 const EMPTY_SESSIONS: OwnerSession[] = [];
+const ISSUES_SECTION_ID = "problemy-z-kalendarzem";
 
 export default function SchedulePage() {
   const [view, setView] = useState<ScheduleView>("week");
@@ -91,6 +92,7 @@ export default function SchedulePage() {
   const [pendingSessionId, setPendingSessionId] = useState<number | null>(null);
   const [isSavingSession, setIsSavingSession] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [issueCount, setIssueCount] = useState<number | null>(null);
   const requestedSessionHandled = useRef(false);
   const calendarRevision = useSessionCorrectionRevision();
   const [sessionRevision, setSessionRevision] = useState(0);
@@ -371,6 +373,7 @@ export default function SchedulePage() {
               {connected ? (
                 <>
                   <ScheduleFiltersToggle open={filtersOpen} activeCount={activeFilterCount} onOpenChange={setFiltersOpen} />
+                  <CalendarIssuesButton count={issueCount} className="md:hidden" />
                   <Button
                     variant="secondary"
                     size="icon"
@@ -393,6 +396,7 @@ export default function SchedulePage() {
             />
             {connected ? (
               <div className="hidden gap-2 md:ml-auto md:flex 2xl:ml-0">
+                <CalendarIssuesButton count={issueCount} />
                 <Button
                   variant="secondary"
                   size="icon"
@@ -442,7 +446,6 @@ export default function SchedulePage() {
           <OwnerReadState loading={false} error={resources.error} retry={resources.retry} label="Ładowanie danych grafiku..." />
           <OwnerReadState loading={false} error={sessionList.error} retry={sessionList.retry} label="Ładowanie sesji..." />
         </> : null}
-        {connected ? <OutlookIssuesPanel onOpenSession={id => void openEditModal({ id })} /> : null}
         {outlook.loading ? (
           <div className="card-shell p-6 text-on-surface-variant">
             Sprawdzanie połączenia z Microsoft Outlook...
@@ -470,6 +473,7 @@ export default function SchedulePage() {
             onCreateSession={openCreateModal}
           />
         )}
+        {connected ? <OutlookIssuesPanel id={ISSUES_SECTION_ID} onCountChange={setIssueCount} onOpenSession={id => void openEditModal({ id })} /> : null}
       </div>
 
       <SessionEditorModal
@@ -511,5 +515,24 @@ export default function SchedulePage() {
         }}
       />
     </>
+  );
+}
+
+function CalendarIssuesButton({ count, className = "" }: { count: number | null; className?: string }) {
+  const hasIssues = (count ?? 0) > 0;
+  const label = hasIssues ? `Problemy z kalendarzem: ${count}. Przejdź do listy` : "Brak problemów z kalendarzem";
+  return (
+    <Button
+      variant="secondary"
+      size="icon"
+      className={["relative h-12 w-12 shrink-0", className].join(" ")}
+      icon={<CircleAlert size={18} className={hasIssues ? "text-error-light" : "text-on-surface-muted"} />}
+      disabled={!hasIssues}
+      onClick={() => document.getElementById(ISSUES_SECTION_ID)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+      aria-label={label}
+      title={label}
+    >
+      {hasIssues ? <span aria-hidden="true" className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-error ring-2 ring-surface-container-low" /> : null}
+    </Button>
   );
 }

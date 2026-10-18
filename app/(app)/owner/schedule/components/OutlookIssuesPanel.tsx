@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CalendarPlus, EyeOff, PencilLine, RefreshCw, SquareArrowOutUpRight } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
@@ -31,7 +31,10 @@ function formatIssueDate(value: string | null) {
 }
 
 // Outlook only reports changes here; entries, packages and balances change through CRM actions.
-export default function OutlookIssuesPanel({ onOpenSession, embedded = false, className = "" }: {
+export default function OutlookIssuesPanel({ id, onOpenSession, onCountChange, embedded = false, className = "" }: {
+  id?: string;
+  /** Number of open issues once loaded; null while loading or when the list is unavailable. */
+  onCountChange?: (count: number | null) => void;
   onOpenSession?: (sessionId: number) => void;
   embedded?: boolean;
   className?: string;
@@ -44,6 +47,8 @@ export default function OutlookIssuesPanel({ onOpenSession, embedded = false, cl
   const [actionError, setActionError] = useState<string | null>(null);
   const lock = useRef(false);
   const items = issues.data ?? [];
+  const loadedCount = issues.data && !issues.error ? issues.data.length : null;
+  useEffect(() => { onCountChange?.(loadedCount); }, [loadedCount, onCountChange]);
 
   function closeDialog() {
     if (busy) return;
@@ -79,7 +84,7 @@ export default function OutlookIssuesPanel({ onOpenSession, embedded = false, cl
   if (!issues.loading && !issues.error && items.length === 0) return null;
 
   return (
-    <section aria-label="Problemy z kalendarzem" aria-busy={issues.loading} className={[embedded ? "" : "card-shell p-4 md:p-5", className].filter(Boolean).join(" ")}>
+    <section id={id} aria-label="Problemy z kalendarzem" aria-busy={issues.loading} className={[embedded ? "" : "card-shell scroll-mt-24 p-4 md:p-5", className].filter(Boolean).join(" ")}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-warning-container text-warning-light"><AlertTriangle size={18} /></span>
