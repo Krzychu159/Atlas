@@ -28,11 +28,11 @@ import {
   getOutlookConnectUrl,
   getOutlookStatus,
   syncOutlookClients,
-  reconcileOutlook,
   type OutlookReconcileResult,
   type OutlookSeriesAttention,
   type OutlookStatus,
 } from "@/app/lib/calendar/outlook";
+import OutlookRefreshPanel from "./OutlookRefreshPanel";
 
 function formatConnectedDate(value: string | null) {
   if (!value) return "Brak daty połączenia";
@@ -49,9 +49,11 @@ function formatConnectedDate(value: string | null) {
 export default function OutlookIntegrationCard({
   allowAdministration = true,
   allowContactsSync = allowAdministration,
+  allowCalendarRefresh = allowAdministration,
 }: {
   allowAdministration?: boolean;
   allowContactsSync?: boolean;
+  allowCalendarRefresh?: boolean;
 }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [status, setStatus] = useState<OutlookStatus | null>(null);
@@ -60,7 +62,6 @@ export default function OutlookIntegrationCard({
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isReconciling, setIsReconciling] = useState(false);
-  const [result, setResult] = useState<OutlookReconcileResult | null>(null);
   const [series, setSeries] = useState<OutlookSeriesAttention[]>([]);
   const [seriesAction, setSeriesAction] = useState<{ id: string; action: "retry" | "delete" } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -265,25 +266,15 @@ export default function OutlookIntegrationCard({
     if (warning) showAppInfo(warning);
   }
 
-  async function handleReconcile() {
-    if (!allowAdministration) return;
-    if (syncLock.current) return;
-    syncLock.current = true;
-    setIsReconciling(true);
-    setSyncWarning(null);
-    try {
-      const data = await reconcileOutlook();
-      setResult(data);
-      setSeries(data.seriesRequiringAttention ?? []);
-      showSyncWarning(data);
-    } catch (err) {
-      showAppError(err, "Nie udało się zsynchronizować Outlook.");
-    } finally {
-      notifySessionCorrected();
-      await loadStatus();
-      setIsReconciling(false);
-      syncLock.current = false;
-    }
+  function handleReconcileRunning(running: boolean) {
+    syncLock.current = running;
+    setIsReconciling(running);
+    if (running) setSyncWarning(null);
+  }
+
+  function handleReconcileCompleted(data: OutlookReconcileResult) {
+    if (allowAdministration) setSeries(data.seriesRequiringAttention ?? []);
+    void refreshStatusAfterWrite();
   }
 
   async function handleSeriesAction(id: string, action: "retry" | "delete") {
@@ -350,16 +341,6 @@ export default function OutlookIntegrationCard({
         </div>
 
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap lg:max-w-[440px]">
-          {allowAdministration ? (
-          <Button
-            icon={<RefreshCw size={16} className={isReconciling ? "animate-spin" : ""} />}
-            onClick={handleReconcile}
-            disabled={!connected || isLoading || isConnecting || isDisconnecting || isSyncing || busy}
-            className="w-full sm:w-auto"
-          >
-            {isReconciling ? "Synchronizowanie..." : "Synchronizuj teraz"}
-          </Button>
-          ) : null}
           {allowContactsSync ? (
           <Button
             variant="secondary"
@@ -382,7 +363,7 @@ export default function OutlookIntegrationCard({
             {isSyncing ? "Synchronizowanie kontaktów..." : "Synchronizuj kontakty"}
           </Button>
           ) : null}
-          <Button variant="secondary" icon={<RefreshCw size={16} />} disabled={isLoading || isConnecting || isDisconnecting || busy} onClick={() => void loadStatus()}>Odśwież status</Button>
+          <Button variant="secondary" icon={<RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />} disabled={isLoading || isConnecting || isDisconnecting || busy} onClick={() => void loadStatus()} className="w-full sm:w-auto">Odśwież status</Button>
           {connected ? (
             <Button
               variant="outline"
@@ -442,35 +423,15 @@ export default function OutlookIntegrationCard({
         <p role="status" className="mt-5 rounded-[var(--radius-lg)] bg-warning-container p-4 text-sm text-warning-light">{syncWarning}</p>
       )}
 
-      {result && (
-        <div className="mt-6 space-y-4" aria-live="polite">
-          <h3 className="font-semibold">Wynik synchronizacji</h3>
-          <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {[
-              ["Sprawdzone połączenia", result.integrationsProcessed],
-              ["Znalezione wydarzenia Outlook", result.outlookEventsFound],
-              ["Dodane lub zaktualizowane wydarzenia", result.importedOrUpdatedEvents],
-              ["Brakujące wydarzenia oznaczone jako usunięte", result.missingOutlookEventsMarkedDeleted],
-              ["Treningi z ATLAS przesłane do Outlooka", result.crmSessionsSyncedToOutlook],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">
-                <dt className="text-sm text-on-surface-variant">{label}</dt>
-                <dd className="mt-2 text-xl font-semibold">{value}</dd>
-              </div>
-            ))}
-          </dl>
-          {!!result.errors?.length && (
-            <details className="rounded-[var(--radius-lg)] bg-error-container p-4">
-              <summary className="cursor-pointer font-semibold text-error-light">Błędy synchronizacji ({result.errors.length})</summary>
-              <ul className="mt-3 space-y-2 text-sm">
-                {result.errors.map((error, index) => (
-                  <li key={index} className="whitespace-pre-wrap break-words">{userMessage(typeof error === "string" ? error : error && typeof error === "object" && "message" in error ? error.message : null, "Nie udało się zsynchronizować części danych. Spróbuj ponownie. Jeśli błąd się powtarza, skontaktuj się z obsługą.")}</li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </div>
-      )}
+      {allowCalendarRefresh && !loadError ? (
+        <OutlookRefreshPanel
+          canChooseScope={allowAdministration}
+          connected={connected}
+          disabled={isLoading || isConnecting || isDisconnecting || isSyncing || seriesAction !== null}
+          onRunningChange={handleReconcileRunning}
+          onCompleted={handleReconcileCompleted}
+        />
+      ) : null}
 
       {allowAdministration && series.length > 0 && (
         <div className="mt-6 space-y-3">
