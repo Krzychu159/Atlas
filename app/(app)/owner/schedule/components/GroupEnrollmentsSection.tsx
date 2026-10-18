@@ -9,11 +9,13 @@ import { Button } from "@/app/components/ui/button";
 import { OrganizationPortalScope } from "@/app/components/organization-theme";
 import SessionAccordion from "@/app/components/schedule/SessionAccordion";
 import { PaymentEntryModal } from "@/app/components/payments/PaymentEntryModal";
+import type { PaymentDisplaySource } from "@/app/components/payments/PaymentDisplay";
+import { formatPeriodAmount } from "@/app/lib/period-packages";
 import { PaymentActionConfirmModal } from "@/app/components/payments/PaymentActionConfirmModal";
-import { getClientBilling, getPackagePaymentStatusLabel, confirmClientPayment, paymentMethodOptions, type PaymentMethod, type ClientPayment, type ClientBillingSummary, type PagedResult } from "@/app/lib/owner/billing";
+import { getClientBilling, getPackagePaymentStatusLabel, confirmClientPayment, paymentMethodOptions, type PaymentMethod, type ClientBillingSummary, type PagedResult } from "@/app/lib/owner/billing";
 import { prepareGroupEnrollment, type PrepareGroupEnrollmentPayload, confirmGroupEnrollment, getGroupEnrollment, getGroupEnrollments, groupPackageValidityLabel, groupEnrollmentError, groupEnrollmentStatus, type GroupEnrollment } from "@/app/lib/owner/group-enrollments";
 import { attendanceLabel, groupSeatsLabel, isCancelledParticipant, type GroupSessionFields } from "@/app/lib/group-sessions";
-import { formatMoney } from "@/app/lib/formatters/money";
+
 import { isPaymentPending } from "@/app/lib/payments/display";
 import { notifySessionCorrected, notifyClientPaymentChanged, useClientPaymentRevision } from "@/app/lib/session-corrections";
 import GroupEnrollmentDraft from "./GroupEnrollmentDraft";
@@ -41,7 +43,7 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
   const [paymentItem, setPaymentItem] = useState<GroupEnrollment | null>(null);
-  const [paymentToConfirm, setPaymentToConfirm] = useState<ClientPayment | null>(null);
+  const [paymentToConfirm, setPaymentToConfirm] = useState<PaymentDisplaySource | null>(null);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("3");
   const [note, setNote] = useState("");
@@ -124,6 +126,7 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
     try {
       const latest = await getGroupEnrollment(item.id);
       if (latest.sessionId !== sessionId || latest.clientId !== item.clientId || latest.clientPackageId !== item.clientPackageId) throw new Error("Zgłoszenie zmieniło się. Sprawdź je ponownie.");
+      if (latest.clientIsArchived === true || !latest.allowedActions?.includes("Confirm")) throw new Error("Nie można teraz potwierdzić tego zgłoszenia. Odśwież listę.");
       if (latest.status !== "ReadyToBook") throw new Error(latest.status === "Booked" ? "Uczestnik jest już zapisany." : "Zgłoszenie nie jest jeszcze gotowe do potwierdzenia.");
       const result = await confirmGroupEnrollment(item.id);
       if (prepared.current?.id === result.id) prepared.current = result;
@@ -136,6 +139,11 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
     if (lock.current || !editable || item.clientIsArchived === true) return;
     lock.current = true; setBusy(true); setBillingError("");
     try {
+      if (openForm && !item.allowedActions?.includes("RecordPayment")) throw new Error("Nie można teraz dodać wpłaty do tego zgłoszenia.");
+      if (openForm && item.currency && item.packageTotalPrice != null && item.packageAmountPaid != null) {
+        if (alive.current) { setAmount(String(item.amountDue)); setNote(""); setMethod("3"); setPaymentItem(item); }
+        return;
+      }
       const snapshot = await getClientBilling(item.clientId);
       if (!alive.current) return;
       setBilling(current => ({ ...current, [item.clientId]: snapshot }));
@@ -171,6 +179,15 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
     try {
       await confirmClientPayment(paymentToConfirm.id);
       notifyClientPaymentChanged(paymentToConfirm.clientId);
+      if (prepared.current?.clientId === paymentToConfirm.clientId) {
+        try {
+          const latest = await getGroupEnrollment(prepared.current.id);
+          prepared.current = latest;
+          if (alive.current) setRecent(latest);
+        } catch {
+          if (alive.current) { setRecent(current => current ? { ...current, allowedActions: [], pendingPayments: [] } : current); setActionError("Wpłata jest potwierdzona. Odśwież zgłoszenie, aby sprawdzić udział."); }
+        }
+      }
       if (alive.current) { setPaymentToConfirm(null); setNotice("Płatność została potwierdzona. Możesz sprawdzić udział."); }
     } catch (err) { if (alive.current) setActionError(groupEnrollmentError(err)); }
     finally { await refreshSession(); lock.current = false; if (alive.current) { setBusy(false); setRevision(value => value + 1); } }
@@ -181,7 +198,9 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
   const rows = [...(data?.items || [])];
   if (recent && !rows.some(item => item.id === recent.id)) rows.unshift(recent);
   const pending = rows.filter(item => item.status !== "Booked");
-  const paymentPackage = paymentItem ? billing[paymentItem.clientId]?.packages?.find(pkg => pkg.clientPackageId === paymentItem.clientPackageId) : undefined;
+  const paymentPackage = paymentItem ? (paymentItem.currency && paymentItem.packageTotalPrice != null && paymentItem.packageAmountPaid != null
+    ? { clientPackageId: paymentItem.clientPackageId, packageName: paymentItem.packageName, amountDue: paymentItem.amountDue, currency: paymentItem.currency }
+    : billing[paymentItem.clientId]?.packages?.find(pkg => pkg.clientPackageId === paymentItem.clientPackageId)) : undefined;
   const participantRow = (item: (typeof participants)[number]) => <li key={item.clientId} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3">
     <div className="min-w-0"><Link href={`/owner/clients/${item.clientId}`} className="break-words text-sm font-semibold text-primary-light">{item.clientFullName || "Uczestnik bez nazwy"}</Link>{item.packageName ? <p className="mt-1 text-xs text-on-surface-muted">{item.packageName}</p> : null}</div>
     <span className="text-xs text-on-surface-variant">{attendanceLabel(item.attendanceStatus)}</span>
@@ -204,17 +223,20 @@ export default function GroupEnrollmentsSection({ session, canConfirm, onChanged
     {pending.length ? <div><h4 className="mb-2 text-label text-on-surface-muted">Oczekujące zgłoszenia</h4><ul className="space-y-2">{pending.map(item => {
       const snapshot = billing[item.clientId];
       const pkg = snapshot?.packages?.find(pkg => pkg.clientPackageId === item.clientPackageId);
-      const payments = snapshot?.payments?.filter(payment => payment.clientPackageId === item.clientPackageId && isPaymentPending(payment)) || [];
+      const payments: PaymentDisplaySource[] = snapshot
+        ? snapshot.payments?.filter(payment => payment.clientPackageId === item.clientPackageId && isPaymentPending(payment)) ?? []
+        : item.pendingPayments?.filter(payment => payment.status === "PendingConfirmation").map(payment => ({ ...payment, id: payment.paymentId, clientId: item.clientId, clientName: item.clientName, clientPackageId: item.clientPackageId, packageName: item.packageName })) ?? [];
       return <li key={item.id} className="rounded-[var(--radius-lg)] bg-surface-container-low p-3">
         <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="break-words text-sm font-semibold">{item.clientName || snapshot?.clientName || labels[item.id]?.clientName || `Klient #${item.clientId}`}</p><p className="mt-1 text-xs text-on-surface-muted">{item.packageName || pkg?.packageName || labels[item.id]?.packageName || "Pakiet klienta"}</p></div><span className="rounded-full bg-surface-container px-2 py-1 text-xs text-info-light">{groupEnrollmentStatus(item.status)}</span></div>
-        {item.status === "AwaitingPayment" ? <p className="mt-2 text-sm text-on-surface-variant">Do opłacenia: {item.amountDue.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p> : null}
+        {item.status === "AwaitingPayment" ? <p className="mt-2 text-sm text-on-surface-variant">Do opłacenia: {formatPeriodAmount(item.amountDue, item.currency)}</p> : null}
+        {item.pendingPayments?.length ? <p className="mt-1 text-xs text-warning-light">Wpłaty do potwierdzenia: {item.pendingPayments.map(payment => formatPeriodAmount(payment.amount, payment.currency)).join(" + ")}. Sprawdź je przed dodaniem kolejnej wpłaty.</p> : null}
         {item.clientEmail || item.clientPhone ? <p className="mt-1 text-xs text-on-surface-muted">{[item.clientEmail, item.clientPhone].filter(Boolean).join(" · ")}</p> : null}
-        {item.packageTotalPrice != null ? <p className="mt-1 text-xs text-on-surface-muted">Pakiet teraz: {item.packageAmountPaid ?? "—"} z {item.packageTotalPrice} · {getPackagePaymentStatusLabel(item.packagePaymentStatus)} · wejścia {item.packageUsedEntries ?? "—"}/{item.packageTotalEntries ?? "—"}{item.packageIsActive === false ? " · nieaktywny" : ""}{item.packageValidUntil ? ` · ${groupPackageValidityLabel(item.packageValidUntil)}` : ""}</p> : null}
+        {item.packageTotalPrice != null ? <p className="mt-1 text-xs text-on-surface-muted">Pakiet teraz: {item.packageAmountPaid == null ? "—" : formatPeriodAmount(item.packageAmountPaid, item.currency)} z {formatPeriodAmount(item.packageTotalPrice, item.currency)} · {getPackagePaymentStatusLabel(item.packagePaymentStatus)} · wejścia {item.packageUsedEntries ?? "—"}/{item.packageTotalEntries ?? "—"}{item.packageIsActive === false ? " · nieaktywny" : ""}{item.packageValidUntil ? ` · ${groupPackageValidityLabel(item.packageValidUntil)}` : ""}</p> : null}
         <div className="mt-3 flex flex-wrap gap-2">
           {editable && item.clientIsArchived !== true && item.allowedActions?.includes("Confirm") && item.status === "ReadyToBook" ? <Button type="button" size="sm" disabled={busy || full} onClick={() => void confirm(item)}>Potwierdź udział</Button> : null}
           {editable && item.clientIsArchived !== true && item.allowedActions?.includes("RecordPayment") ? <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => void loadPaymentContext(item, true)}>Dodaj wpłatę</Button> : null}
-          {editable && item.clientIsArchived !== true && item.status === "AwaitingPayment" ? <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => void loadPaymentContext(item, false)}>Sprawdź wpłaty</Button> : null}
-          {editable && item.clientIsArchived !== true ? payments.map(payment => <Button key={payment.id} type="button" variant="secondary" size="sm" disabled={busy} onClick={() => setPaymentToConfirm(payment)}>Potwierdź wpłatę {formatMoney(payment.amount, payment.currency)}</Button>) : null}
+          {editable && item.clientIsArchived !== true && item.status === "AwaitingPayment" && item.pendingPayments === undefined ? <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => void loadPaymentContext(item, false)}>Sprawdź wpłaty</Button> : null}
+          {editable && item.clientIsArchived !== true ? payments.map(payment => <Button key={payment.id} type="button" variant="secondary" size="sm" disabled={busy} onClick={() => setPaymentToConfirm(payment)}>Potwierdź wpłatę {formatPeriodAmount(payment.amount, payment.currency)}</Button>) : null}
           {item.status === "AwaitingPayment" ? <Link href={`/owner/clients/${item.clientId}/payments?clientPackageId=${item.clientPackageId}&groupEnrollmentId=${item.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center text-xs font-semibold text-primary-light">Historia płatności</Link> : null}
           {item.status === "PackageUnavailable" || item.status === "Unavailable" ? <span className="text-xs text-on-surface-muted">{item.status === "PackageUnavailable" ? "Wybierz inny pakiet, dodając uczestnika ponownie." : "Nie można teraz potwierdzić udziału."}</span> : null}
         </div>

@@ -98,7 +98,8 @@ function SettlementContent({ monthValue }: { monthValue: string }) {
         <div className="card-shell p-5">
           <h2 className="text-section-title">Sesje poza umową</h2>
           <p className="mt-3 text-sm text-on-surface-variant">{formatSettlementNumber(settlement.nonContractedTotalSessions)} sesji · {formatSettlementNumber(settlement.nonContractedTotalHours)} godzin rozliczeniowych</p>
-          <p className="mt-3 text-sm leading-6 text-on-surface-muted">Te sesje są pokazane osobno. Nie doliczamy ich do kwoty rozliczenia.</p>
+          {settlement.nonContractedTotalAmount != null ? <p className="mt-3 text-2xl font-semibold tabular-nums text-on-surface-variant">{formatSettlementMoney(settlement.nonContractedTotalAmount)}</p> : null}
+          <p className="mt-3 text-sm leading-6 text-on-surface-muted">Te sesje są pokazane osobno. Nie doliczamy ich do kwoty rozliczenia ani wypłaty.</p>
         </div>
       </section>
       <p className="text-sm leading-6 text-on-surface-muted">Godziny rozliczeniowe wynikają z zasad rozliczenia i mogą różnić się od czasu trwania zajęć.</p>
@@ -106,7 +107,7 @@ function SettlementContent({ monthValue }: { monthValue: string }) {
         <SettlementItems key={`${settlement.year}-${settlement.month}`} title="Sesje objęte umową" items={items} totals={{ sessions: settlement.contractedTotalSessions, hours: settlement.contractedTotalHours, amount: settlement.contractedTotalAmount }} />
       </CollapsibleSection>
       <CollapsibleSection title="Sesje poza umową" icon={<FileX2 size={15} />} meta={nonContractedItems.length} defaultOpen={nonContractedItems.length > 0} flush>
-        <SettlementItems key={`${settlement.year}-${settlement.month}`} title="Sesje poza umową" items={nonContractedItems} totals={{ sessions: settlement.nonContractedTotalSessions, hours: settlement.nonContractedTotalHours }} muteAmounts />
+        <SettlementItems key={`${settlement.year}-${settlement.month}`} title="Sesje poza umową" items={nonContractedItems} totals={{ sessions: settlement.nonContractedTotalSessions, hours: settlement.nonContractedTotalHours, amount: settlement.nonContractedTotalAmount }} muteAmounts />
       </CollapsibleSection>
     </>
   );

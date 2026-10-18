@@ -155,9 +155,10 @@ export function getSession(id: number, signal?: AbortSignal) {
   return backendGet<OwnerSession>(`sessions/${id}`, undefined, signal);
 }
 
+// correctionReason is optional (max 500 characters); the backend sets the type of a consultation itself.
 export function completeSession(id: number, payload: {
-  actualSessionType: string;
-  correctionReason: string;
+  actualSessionType?: string;
+  correctionReason?: string;
   participants: (SessionParticipantPayload & { attendanceStatus: string })[];
 }) {
   return backendPost<OwnerSession>(`sessions/${id}/complete`, payload);

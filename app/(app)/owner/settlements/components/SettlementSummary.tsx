@@ -51,8 +51,8 @@ export default function SettlementSummary({ settlements, summary, isLoading = fa
   isLoading?: boolean;
 }) {
   const totalAmount = summary?.unpaidAmount ?? settlements.reduce((sum, item) => sum + (item.isPaid ? 0 : item.totalAmount), 0);
-  const totalHours = settlements.reduce((sum, item) => sum + item.totalHours, 0);
-  const totalSessions = settlements.reduce((sum, item) => sum + item.totalSessions, 0);
+  const totalHours = summary ? (typeof summary.totalHours === "number" && Number.isFinite(summary.totalHours) && summary.totalHours >= 0 ? summary.totalHours : undefined) : settlements.reduce((sum, item) => sum + item.totalHours, 0);
+  const totalSessions = summary ? (typeof summary.totalSessions === "number" && Number.isSafeInteger(summary.totalSessions) && summary.totalSessions >= 0 ? summary.totalSessions : undefined) : settlements.reduce((sum, item) => sum + item.totalSessions, 0);
 
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -66,16 +66,16 @@ export default function SettlementSummary({ settlements, summary, isLoading = fa
       />
       <SummaryCard
         label="Roboczogodziny"
-        value={summary ? "—" : `${totalHours.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h`}
+        value={totalHours === undefined ? "—" : `${totalHours.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} h`}
         icon={<Clock3 size={17} />}
-        description={summary ? "Podsumowanie godzin niedostępne" : "Łączny czas sesji w tym miesiącu"}
+        description={totalHours === undefined ? "Podsumowanie godzin niedostępne" : "Łączny czas sesji objętych umową"}
         isLoading={isLoading}
       />
       <SummaryCard
         label="Sesje"
-        value={summary ? "—" : totalSessions}
+        value={totalSessions ?? "—"}
         icon={<ReceiptText size={17} />}
-        description={summary ? "Podsumowanie sesji niedostępne" : "Zrealizowane treningi"}
+        description={totalSessions === undefined ? "Podsumowanie sesji niedostępne" : "Zrealizowane treningi objęte umową"}
         isLoading={isLoading}
       />
     </div>

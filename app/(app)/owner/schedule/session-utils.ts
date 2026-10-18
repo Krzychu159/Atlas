@@ -309,12 +309,12 @@ export function isConsultationForm(values: Pick<SessionFormValues, "plannedSessi
   return values.plannedSessionType === CONSULTATION_SESSION_TYPE;
 }
 
-// Manual completion of a planned consultation: no participants and no package usage.
+// Manual completion of a planned consultation: the backend sets the Consultation type and rejects participants.
 export function completeConsultation(
   sessionId: number,
   complete: (id: number, payload: Parameters<typeof completeSession>[1]) => Promise<unknown> = completeSession,
 ) {
-  return complete(sessionId, { actualSessionType: CONSULTATION_SESSION_TYPE, correctionReason: "", participants: [] });
+  return complete(sessionId, { participants: [] });
 }
 
 export async function correctCompletedSession(session: SessionEditorSession, values: SessionFormValues, complete: (id: number, payload: Parameters<typeof completeSession>[1]) => Promise<unknown> = completeSession) {

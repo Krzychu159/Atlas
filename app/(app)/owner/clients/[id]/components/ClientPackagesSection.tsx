@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { Dumbbell, Info, MapPin, UsersRound } from "lucide-react";
+import { useCurrentUser } from "@/app/components/current-user-provider";
 import { Button } from "@/app/components/ui/button";
 import { Tooltip } from "@/app/components/ui/tooltip";
 import { getPackageClosureLabel, getPackageOriginLabel, getPackagePaymentStatusLabel, type ClientPackageBilling } from "@/app/lib/owner/billing";
@@ -60,6 +61,7 @@ export default function ClientPackagesSection({
   audience?: "staff" | "client";
   embedded?: boolean;
 }) {
+  const { user } = useCurrentUser();
   const [managedPackage, setManagedPackage] = useState<ClientPackageBilling | null>(null);
   const [expiryPackage, setExpiryPackage] = useState<ClientPackageBilling | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -78,7 +80,7 @@ export default function ClientPackagesSection({
   const history = sortedPackages.filter((item) => item !== mainPackage && !isGroupClientPackage(item));
   const visiblePackages = history.slice(0, Math.max(visibleCount, history.findIndex((item) => item.clientPackageId === highlightedId) + 1));
   const shellClassName = embedded ? "min-w-0" : "card-shell min-w-0 p-5 md:p-6";
-  const canManage = Boolean(clientId && onSaved);
+  const canManage = user?.role === "owner" && audience === "staff" && Boolean(clientId && onSaved);
 
   async function handleSaved(clientPackageId?: number) {
     if (clientPackageId !== undefined) setHighlightedId(clientPackageId);
@@ -142,9 +144,9 @@ export default function ClientPackagesSection({
       ) : (
         <p className="mt-2 text-xs text-on-surface-variant">Brak pozostałych pakietów indywidualnych.</p>
       )}
-      {managedPackage && clientId && onSaved ? <PackageManagementModal key={managedPackage.clientPackageId} clientId={clientId} packageData={managedPackage} onClose={() => setManagedPackage(null)} onSaved={handleSaved} /> : null}
-      {expiryPackage && clientId && onSaved ? <PackageExpiryDecisionModal key={expiryPackage.clientPackageId} clientId={clientId} packageData={expiryPackage} onClose={() => setExpiryPackage(null)} onSaved={handleSaved} /> : null}
-      {clientId && onSaved ? <ImportClientPackageModal key={clientId} open={isImportOpen} clientId={clientId} onClose={() => setIsImportOpen(false)} onSaved={handleSaved} /> : null}
+      {canManage && managedPackage && clientId && onSaved ? <PackageManagementModal key={managedPackage.clientPackageId} clientId={clientId} packageData={managedPackage} onClose={() => setManagedPackage(null)} onSaved={handleSaved} /> : null}
+      {canManage && expiryPackage && clientId && onSaved ? <PackageExpiryDecisionModal key={expiryPackage.clientPackageId} clientId={clientId} packageData={expiryPackage} onClose={() => setExpiryPackage(null)} onSaved={handleSaved} /> : null}
+      {canManage && clientId && onSaved ? <ImportClientPackageModal key={clientId} open={isImportOpen} clientId={clientId} onClose={() => setIsImportOpen(false)} onSaved={handleSaved} /> : null}
     </section>
   );
 }

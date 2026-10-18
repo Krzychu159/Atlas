@@ -39,7 +39,7 @@ export default function OwnerClientFilters({ value, locationId, onChange }: Owne
         <FilterSearchField
           value={value.search}
           onChange={(nextValue) => update("search", nextValue)}
-          placeholder="Imię, nazwisko lub e-mail"
+          placeholder="Nazwisko, e-mail lub telefon"
         />
       }
       gridClassName="md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_240px_240px_auto_auto]"
@@ -81,10 +81,10 @@ const packageOptions = [
 ];
 
 const sortOptions = [
-  { value: "package-usage", label: "Wykorzystanie pakietu (niedostępne)", disabled: true },
+  { value: "package-usage", label: "Wykorzystanie pakietu" },
   { value: "newest", label: "Najnowsi" },
   { value: "name", label: "Alfabetycznie" },
-  { value: "trainer", label: "Po trenerze (niedostępne)", disabled: true },
-  { value: "balance-desc", label: "Saldo malejąco (niedostępne)", disabled: true },
-  { value: "balance-asc", label: "Saldo rosnąco (niedostępne)", disabled: true },
+  { value: "trainer", label: "Po trenerze" },
+  { value: "balance-desc", label: "Saldo malejąco" },
+  { value: "balance-asc", label: "Saldo rosnąco" },
 ];

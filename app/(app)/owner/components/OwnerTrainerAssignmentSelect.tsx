@@ -37,7 +37,7 @@ export function OwnerTrainerAssignmentSelect({ value, onChange, onCheckingChange
 
   return <div className="mt-2">
     <fieldset disabled={checking} className="min-w-0">
-      <OwnerRemoteSelect kind="trainers" label="Trener" value={value} onChange={next => void choose(next)} locationId={locationId} initialName={initialName} allowAll={false} emptyLabel="Bez przypisanego trenera" />
+      <OwnerRemoteSelect kind="trainers" label="Trener" value={value} onChange={next => void choose(next)} locationId={locationId} initialName={initialName} trainerStatus={requireActive ? "Active" : undefined} includeTrainerDetails allowAll={false} emptyLabel="Bez przypisanego trenera" />
     </fieldset>
     {checking ? <p role="status" className="mt-2 text-xs text-on-surface-muted">Sprawdzanie trenera…</p> : null}
     {error ? <p role="alert" className="mt-2 text-sm text-error-light">{error}</p> : null}

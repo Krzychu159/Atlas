@@ -137,9 +137,10 @@ function matchNotificationUrl(notification: AppNotification, role: NotificationR
   const domainPath = path.replace(/^\/(owner|trainer|client)(?=\/|$)/, "");
   const suffix = safe.slice(url.pathname.length);
   // A payment for a known client opens that client's payments tab, not the general list.
-  const paymentClientId = url.searchParams.get("clientId");
-  if (role && role !== "client" && /^\/(payments|billing)(?:\/[1-9]\d*)?$/.test(domainPath) && paymentClientId && /^[1-9]\d*$/.test(paymentClientId)) {
-    url.searchParams.delete("clientId");
+  const clientKey = Array.from(url.searchParams.keys()).find(key => key.toLowerCase() === "clientid");
+  const paymentClientId = clientKey ? url.searchParams.get(clientKey) : null;
+  if (clientKey && role && role !== "client" && /^\/(payments|billing)(?:\/payments)?(?:\/[1-9]\d*)?$/.test(domainPath) && paymentClientId && /^[1-9]\d*$/.test(paymentClientId)) {
+    url.searchParams.delete(clientKey);
     const query = url.searchParams.toString();
     return `/${role}/clients/${paymentClientId}/payments${query ? `?${query}` : ""}${url.hash}`;
   }
@@ -173,7 +174,7 @@ function matchNotificationUrl(notification: AppNotification, role: NotificationR
 
 export function getNotificationDestination(notification: AppNotification, requestedRole?: string | null) {
   const role = normalizeNotificationRole(requestedRole);
-  const destination = matchNotificationUrl(notification, role);
+  const destination = paymentClientDestination(notification, role, matchNotificationUrl(notification, role));
   if (destination) return destination;
   if (!role) return null;
 
@@ -207,6 +208,36 @@ export function getNotificationDestination(notification: AppNotification, reques
     case "expense": return role === "owner" ? "/owner/expenses" : null;
     default: return null;
   }
+}
+
+/** True for the general payments list, which a payment notification should avoid when the client is known. */
+export function isGeneralPaymentsDestination(destination: string | null, role: NotificationRole | null) {
+  return Boolean(destination && role && role !== "client" && destination.split(/[?#]/, 1)[0].replace(/\/$/, "") === `/${role}/payments`);
+}
+
+/** The payment a notification refers to, when its entity or address identifies one. */
+export function getNotificationPaymentId(notification: AppNotification) {
+  const entity = notification.relatedEntityType ?? "";
+  const id = notification.relatedEntityId;
+  if (/payment/i.test(entity) && !/settlement|configuration|provider/i.test(entity) && typeof id === "number" && Number.isSafeInteger(id) && id > 0) return id;
+  const safe = getSafeNotificationUrl(notification.actionUrl);
+  if (!safe) return null;
+  const url = new URL(safe, "https://atlas.invalid");
+  const fromQuery = Array.from(url.searchParams.entries()).find(([key]) => key.toLowerCase() === "paymentid")?.[1];
+  const fromPath = url.pathname.match(/\/(?:billing\/)?payments\/([1-9]\d*)\/?$/)?.[1];
+  const value = fromQuery ?? fromPath;
+  return value && /^[1-9]\d*$/.test(value) ? Number(value) : null;
+}
+
+// Payment notifications open the client's payments tab whenever the notification itself names the client.
+function paymentClientDestination(notification: AppNotification, role: NotificationRole | null, destination: string | null) {
+  if (!role || role === "client" || getNotificationKind(notification) !== "payment") return destination;
+  const profile = destination?.match(/^\/(?:owner|trainer)\/clients\/([1-9]\d*)\/?([?#].*)?$/);
+  if (profile) return `/${role}/clients/${profile[1]}/payments${profile[2] ?? ""}`;
+  const clientId = notification.relatedEntityId;
+  const knownClient = notification.relatedEntityType?.toLowerCase() === "client" && typeof clientId === "number" && Number.isSafeInteger(clientId) && clientId > 0;
+  if (knownClient && (!destination || isGeneralPaymentsDestination(destination, role))) return `/${role}/clients/${clientId}/payments`;
+  return destination;
 }
 
 // Keep the clicked preview available across client-side navigation if marking it

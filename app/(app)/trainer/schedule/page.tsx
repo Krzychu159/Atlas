@@ -19,7 +19,7 @@ import { DaySchedule, WeekSchedule } from "@/app/(app)/owner/schedule/components
 import SessionEditorModal from "@/app/(app)/owner/schedule/components/SessionEditorModal";
 import { scheduleStatusFilterOptions } from "@/app/(app)/owner/schedule/options";
 import { addDays, getPeriod, startOfWeek, toDateInputValue } from "@/app/(app)/owner/schedule/date-utils";
-import { isConsultationForm, matchesStatusFilter, sortSessions, toSessionPayload } from "@/app/(app)/owner/schedule/session-utils";
+import { completeConsultation, isConsultationForm, matchesStatusFilter, sortSessions, toSessionPayload } from "@/app/(app)/owner/schedule/session-utils";
 import type { CalendarSession, ScheduleView, SessionFormValues, SessionStatusFilter } from "@/app/(app)/owner/schedule/types";
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 import { getTrainerClientsPage } from "@/app/lib/trainer/optimized";
@@ -212,7 +212,9 @@ export default function TrainerSchedulePage() {
       const consultation = isConsultationForm(values);
       if (!consultation && !values.title.trim()) throw new Error("Podaj tytuł zajęć.");
       if (session.status === "Completed" && !values.correctionReason?.trim()) throw new Error("Podaj powód korekty.");
-      const payload = toSessionPayload(values, session);
+      // A planned consultation is completed through the dedicated endpoint after saving other edits.
+      const completingConsultation = consultation && session.status !== "Completed" && values.status === "Completed";
+      const payload = toSessionPayload(completingConsultation ? { ...values, status: session.status || "" } : values, session);
       if (values.participantsEdited && !consultation) {
         if (!session.participants) throw new Error("Lista uczestników jest niedostępna. Odśwież zajęcia przed zmianą zapisów.");
         const oldIds = new Set((session.participants || []).map(participant => participant.clientId));
@@ -234,9 +236,13 @@ export default function TrainerSchedulePage() {
         status: payload.status ?? undefined,
         correctionReason: values.correctionReason?.trim() || null,
       });
+      if (completingConsultation) {
+        await completeConsultation(session.id, correctTrainerSessionBilling);
+        notifySessionCorrected();
+      }
       if (!mounted.current) return;
       setIsEditOpen(false);
-      showAppSuccess("Zmiany w zajęciach zostały zapisane.");
+      showAppSuccess(completingConsultation ? "Konsultacja została zakończona." : "Zmiany w zajęciach zostały zapisane.");
       await reloadSessions();
       await openDetails({ id: session.id });
     } catch (error) {

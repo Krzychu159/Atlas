@@ -58,6 +58,7 @@ function renderCard({ isRead = false, actionUrl = '/owner/payments?clientId=5', 
     'next/navigation': { useRouter: () => ({ push: href => navigations.push(href) }), usePathname: () => '/owner/notifications' },
     './notification-display': load('app/(app)/owner/components/notification-display.ts'),
     '@/app/lib/notifications': api,
+    '@/app/lib/payment-notification-target': { resolvePaymentNotificationTarget: async (_item, _role, destination) => destination },
   }, timers);
   return { navigations, tree: component.default({ item: { id: 1, type, category, createdAt: new Date().toISOString(), title: 'Płatność', isRead, actionUrl }, role: 'owner', variant, expanded, onToggle, onMarkAsRead: mark }) };
 }
@@ -322,4 +323,35 @@ test('notifications are grouped by day and show compact Polish times', () => {
   assert.equal(display.notificationCategoryLabel('unknown'), null);
   assert.equal(display.pluralizeNotifications(3), '3 powiadomienia');
   assert.equal(display.pluralizeNotifications(12), '12 powiadomień');
+});
+
+test('payment notifications use the client named by their entity or profile link', () => {
+  const api = load('app/lib/notifications.ts');
+  const payment = { type: 'PaymentPendingConfirmation' };
+  assert.equal(api.getNotificationDestination({ ...payment, actionUrl: '/owner/clients/5' }, 'owner'), '/owner/clients/5/payments');
+  assert.equal(api.getNotificationDestination({ ...payment, actionUrl: '/clients/7' }, 'trainer'), '/trainer/clients/7/payments');
+  assert.equal(api.getNotificationDestination({ ...payment, actionUrl: '/owner/payments', relatedEntityType: 'Client', relatedEntityId: 9 }, 'owner'), '/owner/clients/9/payments');
+  assert.equal(api.getNotificationDestination({ ...payment, actionUrl: null, relatedEntityType: 'Client', relatedEntityId: 9 }, 'trainer'), '/trainer/clients/9/payments');
+  assert.equal(api.getNotificationDestination({ ...payment, actionUrl: '/owner/payments?ClientId=4' }, 'owner'), '/owner/clients/4/payments');
+  assert.equal(api.getNotificationDestination({ type: 'SessionReminder', actionUrl: '/owner/clients/5' }, 'owner'), '/owner/clients/5');
+  assert.equal(api.getNotificationPaymentId({ relatedEntityType: 'ClientPayment', relatedEntityId: 31 }), 31);
+  assert.equal(api.getNotificationPaymentId({ actionUrl: '/owner/payments?paymentId=12' }), 12);
+  assert.equal(api.getNotificationPaymentId({ actionUrl: '/billing/payments/15' }), 15);
+  assert.equal(api.getNotificationPaymentId({ relatedEntityType: 'TrainerSettlementPayment', relatedEntityId: 3 }), null);
+});
+
+test('a payment known only by id is matched among pending payments of the right portal', async () => {
+  const api = load('app/lib/notifications.ts');
+  const calls = [];
+  const resolver = load('app/lib/payment-notification-target.ts', {
+    '@/app/lib/notifications': api,
+    '@/app/lib/owner/billing': { getPendingPayments: async () => { calls.push('owner'); return [{ id: 31, clientId: 8 }]; } },
+    '@/app/lib/trainer/portal': { getTrainerPortalPendingPayments: async () => { calls.push('trainer'); return [{ id: 31, clientId: 6 }]; } },
+  });
+  const item = { type: 'PaymentPendingConfirmation', relatedEntityType: 'Payment', relatedEntityId: 31, actionUrl: '/owner/payments' };
+  assert.equal(await resolver.resolvePaymentNotificationTarget(item, 'owner', '/owner/payments'), '/owner/clients/8/payments');
+  assert.equal(await resolver.resolvePaymentNotificationTarget(item, 'trainer', '/trainer/payments'), '/trainer/clients/6/payments');
+  assert.equal(await resolver.resolvePaymentNotificationTarget({ ...item, relatedEntityId: 99 }, 'owner', '/owner/payments'), '/owner/payments');
+  assert.equal(await resolver.resolvePaymentNotificationTarget(item, 'owner', '/owner/clients/8/payments'), '/owner/clients/8/payments');
+  assert.deepEqual(calls, ['owner', 'trainer', 'owner']);
 });

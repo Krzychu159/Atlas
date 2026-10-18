@@ -1,8 +1,8 @@
 import { ApiError, backendGet, backendPost, getErrorMessage } from "../backend";
 import type { PagedResult } from "./billing";
-import type { Client } from "./clients";
+import { getOwnerFilterOptions } from "./filter-options";
 import { isSessionPackage, type PackageBillingMode } from "../period-packages";
-import { getPackage } from "./packages";
+
 
 export type GroupPackageOffer = {
   description?: string | null; sessionsPerWeek?: number; participantsCount?: number;
@@ -27,13 +27,14 @@ export type GroupPackageOptions = {
 
 export type PrepareGroupEnrollmentPayload = { clientId: number; packageId: number; clientPackageId?: number };
 
-export function getGroupEnrollmentClients(locationId: number, search: string, signal?: AbortSignal) {
-  return backendGet<Client[]>("clients/filter", { locationId, groupAccessEnabled: true, search }, signal);
+export async function getGroupEnrollmentClients(locationId: number, search: string, signal?: AbortSignal) {
+  const result = await getOwnerFilterOptions({ locationId, groupAccess: true, search, limit: 20 }, signal);
+  return result.clients;
 }
 
 export async function getGroupPackageOptions(sessionId: number, clientId: number, signal?: AbortSignal) {
   const result = await backendGet<GroupPackageOptions>(`group-enrollments/sessions/${sessionId}/package-options`, { clientId }, signal);
-  if (!Array.isArray(result.offers) || !Array.isArray(result.ownedPackages)) return result;
+  if (!result || !Array.isArray(result.offers) || !Array.isArray(result.ownedPackages) || [...result.offers, ...result.ownedPackages].some(item => !item || !["SessionBased", "PeriodBased"].includes(item.billingMode ?? ""))) throw new Error("Nie udało się sprawdzić rodzaju pakietów. Spróbuj ponownie.");
   // Eligibility and full offer fields come from the session-specific response.
   // Preserve explicit mode exclusions without inferring a mode from entry counts.
   const sessionBased = (item: GroupPackageOffer | GroupOwnedPackage) => isSessionPackage(item);
@@ -51,6 +52,10 @@ export function groupPackageReason(code: string) {
 }
 
 export type GroupEnrollment = {
+  currency?: string | null;
+  packageBillingMode?: PackageBillingMode | null;
+  pendingPaymentsAmount?: number;
+  pendingPayments?: { paymentId: number; amount: number; currency: string | null; method: import("./billing").PaymentMethod; source: import("./billing").ClientPaymentSource; paymentDate: string; status: string }[];
   clientName?: string | null;
   clientEmail?: string | null;
   clientPhone?: string | null;
@@ -86,10 +91,7 @@ export function getGroupEnrollment(id: number, signal?: AbortSignal) {
 // packageId identifies the offer; clientPackageId optionally selects an owned package.
 // Omitting clientPackageId allows the backend to reuse an existing package of that offer.
 export async function prepareGroupEnrollment(sessionId: number, payload: PrepareGroupEnrollmentPayload) {
-  // Options omit billingMode. Verify only the chosen offer before writing;
-  // do not load the catalog or issue one metadata request per visible option.
-  const offer = await getPackage(payload.packageId);
-  if (!isSessionPackage(offer)) throw new Error("Ta usługa nie służy do zapisywania na zajęcia. Wybierz pakiet treningowy.");
+  // Session-specific options carry billingMode and exclude period services in the UI.
   return backendPost<GroupEnrollment>(`group-enrollments/sessions/${sessionId}`, payload);
 }
 

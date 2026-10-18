@@ -23,6 +23,7 @@ import {
   type NotificationRole,
 } from "@/app/lib/notifications";
 import { formatNotificationTime, notificationCategoryLabel } from "./notification-display";
+import { resolvePaymentNotificationTarget } from "@/app/lib/payment-notification-target";
 
 export { formatNotificationTime } from "./notification-display";
 
@@ -104,8 +105,9 @@ export default function NotificationItem({
     // A failed or slow "read" request must not block the user.
     await Promise.race([markAsRead(), new Promise(resolve => setTimeout(resolve, MARK_BEFORE_NAVIGATION_MS))]);
     if (!destination) rememberNotificationPreview(item);
+    const target = destination ? await resolvePaymentNotificationTarget(item, notificationRole, href) ?? href : href;
     onNavigate?.();
-    router.push(href);
+    router.push(target);
   }
 
   function activate() {

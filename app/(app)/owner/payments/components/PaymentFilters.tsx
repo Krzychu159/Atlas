@@ -112,7 +112,7 @@ export function PaymentFilters({
         label="Sortuj"
         value={value.sortBy}
         onChange={(nextValue) => update("sortBy", nextValue)}
-        options={paymentSortOptions.map(option => serverPagination && ["clientAsc", "overpaymentDesc"].includes(option.value) ? { ...option, label: `${option.label} (niedostępne)`, disabled: true } : option)}
+        options={paymentSortOptions}
       />
     </FilterToolbar>
   );

@@ -384,7 +384,7 @@ export default function SessionEditorModal({
             <Field label="Status">
               <CustomSelect
                 value={values.status}
-                options={trainerAccess ? statusOptions.filter(option => ["", "Planned", "Active", "Cancelled", session?.status].includes(option.value)).map(option => option.value ? option : { ...option, label: "Wybierz status" }) : session?.status === "Completed" ? statusOptions.filter((option) => ["Completed", "Planned", "Cancelled"].includes(option.value)) : statusOptions}
+                options={trainerAccess ? statusOptions.filter(option => ["", "Planned", "Active", "Cancelled", session?.status, ...(consultationForm && session ? ["Completed"] : [])].includes(option.value)).map(option => option.value ? option : { ...option, label: "Wybierz status" }) : session?.status === "Completed" ? statusOptions.filter((option) => ["Completed", "Planned", "Cancelled"].includes(option.value)) : statusOptions}
                 onChange={(value) => updateValue("status", value)}
               />
             </Field>

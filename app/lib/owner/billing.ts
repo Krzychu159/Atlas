@@ -166,7 +166,7 @@ export type PaymentsQuery = {
   search?: string;
   locationId?: number | null;
   locationMatch?: "payment" | "effective";
-  sort?: "paymentDateDesc" | "paymentDate" | "amountDesc" | "amount";
+  sort?: "paymentDateDesc" | "paymentDate" | "amountDesc" | "amount" | "clientName" | "clientNameDesc" | "overpayment" | "overpaymentDesc";
   order?: "asc" | "desc";
   clientId?: number | null;
   status?: ClientPaymentStatus | null;
@@ -309,12 +309,16 @@ export type PackageManagementPreview = {
   canDelete: boolean;
   canEdit: boolean;
   canCorrect: boolean;
+  canCorrectPrice?: boolean;
+  amountPaid?: number;
+  totalPrice?: number;
   canClose: boolean;
   deleteBlockReason: unknown;
   blockers: unknown[];
 };
 
 export type CorrectClientPackagePayload = {
+  surplusDisposition?: "ToBalance" | "KeepByStudio";
   expectedVersion: unknown;
   reason: string;
   totalSessions?: number;
@@ -395,8 +399,16 @@ export function getClientPackageManagementPreview(clientId: number, clientPackag
   );
 }
 
+export type CorrectClientPackageResult = {
+  corrected?: boolean;
+  surplus?: number;
+  surplusDisposition?: "ToBalance" | "KeepByStudio" | null;
+  amountPaid?: number;
+  amountDue?: number;
+};
+
 export function correctClientPackage(clientId: number, clientPackageId: number, payload: CorrectClientPackagePayload) {
-  return backendPost<void>(
+  return backendPost<CorrectClientPackageResult | undefined>(
     `client-packages/clients/${clientId}/packages/${clientPackageId}/correct`, payload,
   );
 }

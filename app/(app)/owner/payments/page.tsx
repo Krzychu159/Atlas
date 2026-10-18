@@ -64,7 +64,7 @@ export default function OwnerPaymentsPage() {
 }
 
 const PAYMENT_URL_KEYS = ["q", "clientId", "status", "source", "overpayment", "from", "to", "min", "max", "sort", "page"] as const;
-const SERVER_PAYMENT_SORTS = ["newest", "oldest", "amountDesc", "amountAsc"] as const;
+const SERVER_PAYMENT_SORTS = ["newest", "oldest", "amountDesc", "amountAsc", "clientAsc", "overpaymentDesc"] as const;
 const DATE_PARAM = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 const AMOUNT_PARAM = /^[0-9]{1,9}([.,][0-9]{1,2})?$/;
 

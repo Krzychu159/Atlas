@@ -53,6 +53,8 @@ export type TrainerMonthlySettlement = {
   contractedTotalAmount: number;
   nonContractedTotalHours: number;
   nonContractedTotalSessions: number;
+  // Informational only: not part of totalAmount (the payout). Missing on older backends.
+  nonContractedTotalAmount?: number | null;
   isPaid: boolean;
   paidAt: string | null;
   items: TrainerSettlementItem[] | null;
@@ -123,9 +125,9 @@ export function downloadTrainerWorkHoursDocument(
   );
 }
 
-export type OwnerSettlementSummary = { totalAmount: number; paidAmount: number; unpaidAmount: number; trainersCount: number; paidTrainersCount: number };
-export type OwnerSettlementItem = Pick<TrainerMonthlySettlement, "trainerId" | "trainerFullName" | "totalHours" | "totalSessions" | "totalAmount" | "isPaid" | "paidAt" | "nonContractedTotalHours" | "nonContractedTotalSessions">;
-export type OwnerSettlementPage = PagedResult<OwnerSettlementItem> & { year: number; month: number; locationId: number | null; summary: OwnerSettlementSummary; asOf: string; timeZone: string };
+export type OwnerSettlementSummary = { totalHours?: number; totalSessions?: number; nonContractedTotalHours?: number; nonContractedTotalSessions?: number; nonContractedTotalAmount?: number; totalAmount: number; paidAmount: number; unpaidAmount: number; trainersCount: number; paidTrainersCount: number };
+export type OwnerSettlementItem = Pick<TrainerMonthlySettlement, "trainerId" | "trainerFullName" | "totalHours" | "totalSessions" | "totalAmount" | "isPaid" | "paidAt" | "nonContractedTotalHours" | "nonContractedTotalSessions" | "nonContractedTotalAmount">;
+export type OwnerSettlementPage = PagedResult<OwnerSettlementItem> & { year: number; month: number; locationId: number | null; summary: OwnerSettlementSummary; currency?: string; asOf: string; timeZone: string };
 export async function getOwnerTrainerSettlements(year: number, month: number, locationId: number | null = null, query: { search?: string; page?: number; pageSize?: number } = {}, signal?: AbortSignal) {
   const result = await backendGet<OwnerSettlementPage>("owner/trainer-settlements", { year, month, locationId, ...query }, signal);
   const summary = result?.summary;

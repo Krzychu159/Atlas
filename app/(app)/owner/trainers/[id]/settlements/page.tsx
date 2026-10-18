@@ -429,8 +429,8 @@ export default function TrainerSettlementPage() {
               </ProfileInfoStat>
               <ProfileInfoStat icon={<FileX2 size={13} />} label="Poza umową" muted={!settlement.nonContractedTotalSessions}>
                 <span className="inline-flex items-center gap-1.5 text-lg">
-                  {formatSettlementNumber(settlement.nonContractedTotalSessions)} sesji · {formatSettlementNumber(settlement.nonContractedTotalHours)} h
-                  <HintIcon label="Sesje bez umowy są pokazane osobno i nie są doliczane do kwoty rozliczenia." />
+                  {formatSettlementNumber(settlement.nonContractedTotalSessions)} sesji · {formatSettlementNumber(settlement.nonContractedTotalHours)} h{settlement.nonContractedTotalAmount != null ? ` · ${formatSettlementMoney(settlement.nonContractedTotalAmount)}` : ""}
+                  <HintIcon label="Sesje bez umowy są pokazane osobno i nie są doliczane do kwoty rozliczenia ani wypłaty." />
                 </span>
               </ProfileInfoStat>
             </div>
@@ -474,11 +474,11 @@ export default function TrainerSettlementPage() {
           <CollapsibleSection
             title="Sesje poza umową"
             icon={<FileX2 size={15} />}
-            meta={formatSettlementNumber(settlement.nonContractedTotalSessions)}
+            meta={settlement.nonContractedTotalAmount != null ? `${formatSettlementNumber(settlement.nonContractedTotalSessions)} · ${formatSettlementMoney(settlement.nonContractedTotalAmount)}` : formatSettlementNumber(settlement.nonContractedTotalSessions)}
             defaultOpen={nonContractedItems.length > 0}
             flush
           >
-            <SettlementItems key={`${settlement.year}-${settlement.month}`} title="Sesje poza umową" items={nonContractedItems} totals={{ sessions: settlement.nonContractedTotalSessions, hours: settlement.nonContractedTotalHours }} muteAmounts />
+            <SettlementItems key={`${settlement.year}-${settlement.month}`} title="Sesje poza umową" items={nonContractedItems} totals={{ sessions: settlement.nonContractedTotalSessions, hours: settlement.nonContractedTotalHours, amount: settlement.nonContractedTotalAmount }} muteAmounts />
           </CollapsibleSection>
         </>
       ) : !isLoading ? (

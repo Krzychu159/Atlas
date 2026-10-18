@@ -28,6 +28,8 @@ import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { listUrlKey, readPositiveInt, useListScrollRestoration, useListUrlSync } from "../components/list-url-state";
 import type { ClientPackageFilter } from "./components/ClientFilters";
 
+const CLIENT_SORTS: Record<string, NonNullable<OwnerClientsQuery["sort"]>> = { newest: "createdDesc", name: "name", "package-usage": "packageUsageDesc", trainer: "trainer", "balance-desc": "balanceDesc", "balance-asc": "balance" };
+
 const CLIENT_URL_KEYS = ["q", "package", "trainer", "sort", "page"] as const;
 const PACKAGE_FILTERS: readonly ClientPackageFilter[] = ["all", "active-package", "inactive-package"];
 
@@ -37,8 +39,8 @@ function clientFiltersFromUrl(params: URLSearchParams): OwnerClientFiltersValue 
     search: (params.get("q") ?? "").slice(0, 100),
     packageFilter: PACKAGE_FILTERS.find((value) => value === params.get("package")) ?? defaultOwnerClientFilters.packageFilter,
     trainerFilter: trainerId ? String(trainerId) : defaultOwnerClientFilters.trainerFilter,
-    // Only sorts the server supports can come from the address.
-    sort: params.get("sort") === "name" ? "name" : defaultOwnerClientFilters.sort,
+    // Restore only documented server sorts.
+    sort: Object.hasOwn(CLIENT_SORTS, params.get("sort") ?? "") ? params.get("sort") as OwnerClientFiltersValue["sort"] : defaultOwnerClientFilters.sort,
   };
 }
 
@@ -68,15 +70,22 @@ function ClientsContent() {
   const page = pagination.locationId === selectedLocationId ? pagination.page : 1;
   const setPage = (next: number) => setPagination({ page: next, locationId: selectedLocationId });
   useEffect(() => { let active = true; if (showInvitations) void Promise.resolve().then(() => { if (active) setIsModalOpen(true); }); return () => { active = false; }; }, [showInvitations]);
-  const unsupportedSort = sort !== "newest" && sort !== "name";
+  const unsupportedSort = !Object.hasOwn(CLIENT_SORTS, sort);
   const invalidSearch = search.trim().length > 100;
   const query = useMemo<OwnerClientsQuery>(() => ({ page, pageSize: 25, isArchived: false, search: search.trim() || undefined,
     trainerId: trainerFilter === "all" ? undefined : Number(trainerFilter), locationId: selectedLocationId,
     packageStatus: packageFilter === "active-package" ? "active" : packageFilter === "inactive-package" ? "none" : undefined,
-    sort: sort === "name" ? "name" : "createdDesc",
+    sort: CLIENT_SORTS[sort],
   }), [page, search, trainerFilter, selectedLocationId, packageFilter, sort]);
   const load = useCallback((signal: AbortSignal) => getOwnerClients(query, signal), [query]);
   const list = useOwnerRead(JSON.stringify(query), load, "Nie udało się pobrać klientów.", 0, 250, !unsupportedSort && !invalidSearch);
+  const lastPage = list.data?.totalPages;
+  useEffect(() => {
+    if (lastPage == null || lastPage <= 0 || page <= lastPage) return;
+    let live = true;
+    void Promise.resolve().then(() => { if (live) setPagination({ page: lastPage, locationId: selectedLocationId }); });
+    return () => { live = false; };
+  }, [lastPage, page, selectedLocationId]);
   const urlParams = clientFiltersToUrl(filters, page);
   useListUrlSync(urlParams, CLIENT_URL_KEYS);
   useListScrollRestoration(listUrlKey("clients", urlParams), Boolean(list.data) && !list.loading);

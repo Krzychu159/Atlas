@@ -89,7 +89,9 @@ test("payment queries preserve zero amount, effective location and server sorts"
   assert.equal(query.page, 3); assert.equal(query.pageSize, 8);
   assert.equal(query.amountMin, 0); assert.equal(query.amountMax, 120.5);
   assert.equal(query.locationMatch, "effective"); assert.equal(query.sort, "amount"); assert.equal(query.search, "anna"); assert.equal(query.hasOverpayment, true);
-  assert.throws(() => paymentListQuery({ ...filters, sortBy: "clientAsc" }, 1, 8, null), /niedostępne|dostępne/);
+  assert.equal(paymentListQuery({ ...filters, sortBy: "clientAsc" }, 1, 8, null).sort, "clientName");
+  assert.equal(paymentListQuery({ ...filters, sortBy: "overpaymentDesc" }, 1, 8, null).sort, "overpaymentDesc");
+  assert.throws(() => paymentListQuery({ ...filters, sortBy: "unknown" }, 1, 8, null), /niedostępne|dostępne/);
   assert.throws(() => paymentListQuery({ ...filters, amountMin: "200" }, 1, 8, null), /większa/);
 });
 
@@ -115,21 +117,23 @@ test("paged adapters retain filters, server summary and cancellation; legacy sch
   assert.equal(normalized(calls[4][1]).limit, 20);
 });
 
-test("group options use one read; selected period offer is rejected before any write", async () => {
+test("group options use one read, hide period offers and reject options without a billing mode", async () => {
   const calls = [], writes = [];
-  let mode = "PeriodBased";
+  let options = { offers: [{ packageId: 2, billingMode: "PeriodBased" }, { packageId: 3, billingMode: "SessionBased" }], ownedPackages: [{ clientPackageId: 7, billingMode: "SessionBased" }] };
   const { isSessionPackage } = load("app/lib/period-packages.ts");
   const groups = load("app/lib/owner/group-enrollments.ts", {
-    "../backend": { backendGet: async (...args) => { calls.push(args); return { offers: [{ packageId: 2 }], ownedPackages: [] }; }, backendPost: async (...args) => { writes.push(args); return { id: 9 }; } },
+    "../backend": { backendGet: async (...args) => { calls.push(args); return options; }, backendPost: async (...args) => { writes.push(args); return { id: 9 }; } },
     "../period-packages": { isSessionPackage },
-    "./packages": { getPackage: async id => { calls.push(["detail", id]); return { billingMode: mode }; } },
+    "./filter-options": { getOwnerFilterOptions: async () => ({ clients: [], trainers: [] }) },
   });
-  await groups.getGroupPackageOptions(10, 1); assert.equal(calls.length, 1);
-  await assert.rejects(groups.prepareGroupEnrollment(10, { clientId: 1, packageId: 2 }), /pakiet treningowy/);
-  assert.equal(writes.length, 0); assert.equal(calls.length, 2);
-  mode = "SessionBased";
-  await groups.prepareGroupEnrollment(10, { clientId: 1, packageId: 2 });
-  assert.equal(writes.length, 1); assert.equal(calls.length, 3);
+  const result = await groups.getGroupPackageOptions(10, 1);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(Array.from(result.offers, offer => offer.packageId), [3]);
+  assert.equal(result.ownedPackages.length, 1);
+  options = { offers: [{ packageId: 2 }], ownedPackages: [] };
+  await assert.rejects(groups.getGroupPackageOptions(10, 1), /rodzaju pakietów/);
+  await groups.prepareGroupEnrollment(10, { clientId: 1, packageId: 3 });
+  assert.equal(writes.length, 1); assert.equal(calls.length, 2);
 });
 
 test("group list has no per-person reads; payment details load only after explicit action", async () => {

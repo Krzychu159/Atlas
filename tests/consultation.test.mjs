@@ -70,10 +70,13 @@ test("calendar labels say there is no client instead of showing a count", () => 
   assert.equal(utils.getParticipantsLabel({ plannedSessionType: "OneToOne", participantsCount: 2 }), "2");
 });
 
-test("manual completion sends the consultation type without participants", async () => {
+test("manual completion sends only an empty participant list; the backend sets the type", async () => {
   calls.length = 0;
   await utils.completeConsultation(31);
-  assert.deepEqual(plain(calls), [["complete", 31, { actualSessionType: "Consultation", correctionReason: "", participants: [] }]]);
+  assert.deepEqual(plain(calls), [["complete", 31, { participants: [] }]]);
+  const trainerCalls = [];
+  await utils.completeConsultation(32, async (id, payload) => { trainerCalls.push([id, payload]); });
+  assert.deepEqual(plain(trainerCalls), [[32, { participants: [] }]], "the trainer portal endpoint gets the same payload");
 });
 
 test("a completed consultation can be corrected even when its participant list is missing", async () => {

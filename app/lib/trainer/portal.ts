@@ -310,6 +310,8 @@ export type TrainerPortalSettlement = {
   contractedTotalAmount: number;
   nonContractedTotalHours: number;
   nonContractedTotalSessions: number;
+  // Informational only: not part of totalAmount (the payout). Missing on older backends.
+  nonContractedTotalAmount?: number | null;
   isPaid: boolean;
   paidAt: string | null;
   items: TrainerPortalSettlementItem[];

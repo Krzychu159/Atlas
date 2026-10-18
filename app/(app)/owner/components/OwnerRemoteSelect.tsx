@@ -5,16 +5,20 @@ import { getOwnerFilterOptions, type OwnerFilterOption } from "@/app/lib/owner/f
 import { useOwnerRead } from "./use-owner-read";
 const emptyOptions: OwnerFilterOption[] = [];
 
-export function OwnerRemoteSelect({ kind, value, onChange, label, locationId, initialName, allowAll = true, emptyLabel, className = "" }: {
+export function OwnerRemoteSelect({ kind, value, onChange, label, locationId, initialName, allowAll = true, emptyLabel, className = "", trainerStatus, includeTrainerDetails = false }: {
   kind: "clients" | "trainers"; value: string; onChange: (value: string) => void; label: string;
   locationId?: number | null; initialName?: string; allowAll?: boolean; emptyLabel?: string; className?: string;
+  trainerStatus?: string; includeTrainerDetails?: boolean;
 }) {
   const id = useId();
   const root = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null), trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false), [search, setSearch] = useState("");
   const [selected, setSelected] = useState<OwnerFilterOption | null>(null);
-  const load = useCallback((signal: AbortSignal) => getOwnerFilterOptions({ search: search.trim(), locationId, limit: 20 }, signal), [search, locationId]);
-  const list = useOwnerRead(JSON.stringify([search, locationId]), load, "Nie udało się pobrać dostępnych osób.", 0, 250, open);
+  const selectedId = Number(value) > 0 && Number.isSafeInteger(Number(value)) ? Number(value) : undefined;
+  const load = useCallback((signal: AbortSignal) => getOwnerFilterOptions({ search: search.trim(), locationId, limit: 20, trainerStatus, includeTrainerDetails,
+    ...(kind === "clients" ? { selectedClientId: selectedId } : { selectedTrainerId: selectedId }),
+  }, signal), [search, locationId, kind, selectedId, trainerStatus, includeTrainerDetails]);
+  const list = useOwnerRead(JSON.stringify([search, locationId, kind, selectedId, trainerStatus, includeTrainerDetails]), load, "Nie udało się pobrać dostępnych osób.", 0, 250, open);
   const options = list.data?.[kind] ?? emptyOptions;
   const chosen = options.find(option => String(option.id) === value) ?? (String(selected?.id) === value ? selected : null);
   const name = value === "all" || !value ? allowAll ? "Wszyscy" : emptyLabel ?? "Wybierz" : chosen?.name ?? initialName ?? `${kind === "clients" ? "Klient" : "Trener"} #${value}`;
@@ -38,7 +42,7 @@ export function OwnerRemoteSelect({ kind, value, onChange, label, locationId, in
       <span className="min-w-0 flex-1"><span className="block text-[10px] font-semibold uppercase text-on-surface-muted">{label}</span><span className="block truncate text-sm font-semibold">{name}</span></span><ChevronDown size={16} />
     </button>
     {open ? <div id={id} role="dialog" aria-label={`Wybierz: ${label}`} className="absolute left-0 top-full z-50 mt-2 w-full min-w-[220px] rounded-[var(--radius-lg)] border border-white/10 bg-surface-container p-2 shadow-ambient">
-      <input ref={input} type="search" maxLength={100} aria-label={`Szukaj: ${label}`} placeholder="Imię, nazwisko lub e-mail" value={search} onChange={event => setSearch(event.target.value)} className="h-11 w-full rounded-lg bg-surface-container-lowest px-3 text-sm outline-primary-light" />
+      <input ref={input} type="search" maxLength={100} aria-label={`Szukaj: ${label}`} placeholder={kind === "clients" ? "Nazwisko, e-mail lub telefon" : "Imię, nazwisko lub e-mail"} value={search} onChange={event => setSearch(event.target.value)} className="h-11 w-full rounded-lg bg-surface-container-lowest px-3 text-sm outline-primary-light" />
       <div className="mt-2 max-h-64 overflow-y-auto">
         {allowAll || emptyLabel ? <button type="button" onClick={() => choose(null)} className="block min-h-10 w-full rounded-lg px-3 text-left text-sm hover:bg-surface-container-high">{allowAll ? "Wszyscy" : emptyLabel}</button> : null}
         {list.loading ? <p role="status" className="p-3 text-sm text-on-surface-muted">Wyszukiwanie…</p> : list.error ? <div role="alert" className="p-3 text-sm"><p>{list.error}</p><button type="button" onClick={list.retry} className="mt-2 text-primary-light">Spróbuj ponownie</button></div> : options.length ? options.map(option => <button key={option.id} type="button" aria-pressed={String(option.id) === value} onClick={() => choose(option)} className="block min-h-10 w-full rounded-lg px-3 text-left text-sm hover:bg-surface-container-high focus-visible:outline-2 focus-visible:outline-primary-light">{option.name}</button>) : <p className="p-3 text-sm text-on-surface-muted">Nie znaleziono osób.</p>}

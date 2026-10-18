@@ -13,17 +13,16 @@ test("disabled select options cannot change the current filter", () => {
   assert.deepEqual(changes, []);
 });
 
-test("owner sort menus disable unsupported choices while trainer payment sorts stay available", () => {
+test("owner and trainer sort menus expose every sort the server supports", () => {
   const h = hooks();
   const filters = load("app/(app)/owner/clients/components/OwnerClientFilters.tsx", { react: h.react });
   const tree = h.render(filters.default, { value: filters.defaultOwnerClientFilters, onChange() {} });
   const options = find(tree, node => node.props.label === "Sortuj").props.options;
-  assert.deepEqual(Array.from(options.filter(option => !option.disabled), option => option.value), ["newest", "name"]);
+  assert.deepEqual(Array.from(options.filter(option => !option.disabled), option => option.value), ["package-usage", "newest", "name", "trainer", "balance-desc", "balance-asc"]);
   const payments = load("app/(app)/owner/payments/components/PaymentFilters.tsx");
   const render = serverPagination => payments.PaymentFilters({ serverPagination, value: payments.defaultPaymentFilters, advancedOpen: false, onChange() {}, onClear() {}, onAdvancedOpenChange() {} });
   const ownerOptions = find(render(true), node => node.props.label === "Sortuj").props.options;
-  assert.equal(ownerOptions.find(option => option.value === "clientAsc").disabled, true);
-  assert.equal(ownerOptions.find(option => option.value === "overpaymentDesc").disabled, true);
+  assert.ok(ownerOptions.every(option => !option.disabled));
   assert.ok(find(render(false), node => node.props.label === "Sortuj").props.options.every(option => !option.disabled));
 });
 

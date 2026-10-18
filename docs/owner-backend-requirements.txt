@@ -264,3 +264,13 @@ Testy: 240 ogółem, 239 zaliczonych, 0 błędów, 1 pominięty (wymaga PUBLIC_T
 Nowe testy poprawek UI/formularzy: 16/16. git diff --check: OK.
 Nie wykonywano testów przeglądarkowych ani wywołań rzeczywistego backendu.
 Dodatkowe ustalenia dopisane do punktów 5 i 11: strona poza totalPages po zmianie danych oraz filtrowanie Active przed limitem opcji trenera.
+
+
+AKTUALIZACJA 2026-10-17
+Nowy dokument backendu z 2026-10-16 opisuje realizację potrzeb 1–12: sortowania,
+telefon, liczniki, sumy rozliczeń, billingMode, allowedActions, dane wpłat
+i rozszerzone opcje osób. Integracja frontendowa tych możliwości jest opisana
+w końcowej sekcji docs/owner-backend-integration.txt. Historycznych punktów
+nie traktować już jako listy brakujących funkcji. Decyzje biznesowe z punktu 13
+pozostają oddzielne. Nie wymagamy nowego środowiska ani uruchomienia testów
+backendu jako warunku integracji — decyzja użytkownika z 2026-10-17.

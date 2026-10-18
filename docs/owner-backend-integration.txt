@@ -203,3 +203,55 @@ POPRAWKI FRONTENDU I SCALENIE WYMAGAŃ (2026-10-16):
 - Scalona notatka dla backendu: docs/owner-backend-requirements.txt, punkty 1–14.
 - Odtwarzanie niepewnej intencji po zamknięciu karty pozostaje jawnym ograniczeniem; klucz żyje w zamontowanym formularzu.
 Kontrola końcowa 2026-10-16: TypeScript OK; ESLint zmienionych plików i nowego komponentu OK, bez ostrzeżeń; 240 testów, 239 zaliczonych, 0 błędów, 1 pominięty (PUBLIC_TEST_ORIGIN); git diff --check OK. Nowe testy owner-frontend-fixes.test.mjs: 16/16. Bez E2E, builda, commita, push i merge.
+
+
+FINALIZACJA INTEGRACJI — 2026-10-17
+Obowiązujący kontrakt: docs/BACKEND_FOR_FRONTEND_OPTIMIZATION.md,
+aktualizacja backendu 2026-10-16 przekazana w BACKEND_FOR_FRONTEND_OPTIMIZATION (1).md.
+Ta sekcja zastępuje wcześniejsze informacje o brakach poniższych funkcji.
+
+Wykonano:
+- Klienci: serwerowe packageUsageDesc, balance/balanceDesc, trainer; zachowane
+  createdDesc/name i domyślne Najnowsi. Nowe warianty odtwarzane także z adresu.
+- Wyszukiwanie klientów: informacja o telefonie; wyszukiwanie nadal po stronie
+  serwera, zgodnie z normalizacją i minimalną liczbą cyfr opisaną w kontrakcie.
+- Archiwum: clients?isArchived=true&sort=archivedAtDesc, strony po 25, wyszukiwanie,
+  globalna lokalizacja, licznik totalCount, błąd/ponowienie, zapamiętanie adresu
+  i pozycji przewinięcia. Nie pobiera pełnej listy ani nie sortuje jej lokalnie.
+- Pusta strona poza końcem listy klientów i archiwum wraca do ostatniej strony.
+- Wpłaty: serwerowe clientName i overpaymentDesc, także odtwarzanie z adresu.
+  Utrzymane locationMatch=effective i osobna ścieżka portalu trenera.
+- Rozliczenia: globalne totalHours/totalSessions z summary. Prawidłowe zero
+  jest wyświetlane; brak/niepoprawna wartość nie jest zastępowana sumą strony.
+- Opcje osób: statusy, metadane trenerów, selectedClientId/selectedTrainerId,
+  includeTrainerDetails. Przy nowym przypisaniu filtr trainerStatus=Active
+  działa przed limitem; weryfikacja szczegółów wybranego trenera pozostaje.
+- Wybór uczestnika: groupAccess=true i locationId przez filter-options,
+  wyszukiwanie z limitem 20 i komunikat o potrzebie doprecyzowania wyników.
+- Oferty grupowe: wymagany znany billingMode, wykluczenie PeriodBased w UI;
+  brak dodatkowego GET packages/{id} przed przygotowaniem zgłoszenia.
+- Zgłoszenia: dane wzbogacone z odpowiedzi przygotowania/szczegółów/potwierdzenia,
+  ponowne sprawdzenie allowedActions przed potwierdzeniem udziału.
+- Waluta i oczekujące wpłaty z odpowiedzi zgłoszenia; wybór konkretnego paymentId
+  prowadzi do osobnego potwierdzenia. Brak automatycznego potwierdzania pieniędzy.
+- Formularz wpłaty korzysta bezpośrednio z kompletnych danych zgłoszenia.
+  Odczyt rozliczenia po kliknięciu pozostaje jedynie awaryjnym obejściem brakujących
+  pól; nigdy nie jest wykonywany dla każdego wiersza listy.
+- Zachowano klucz jednej intencji wpłaty, rozpoznawanie niepewnego wyniku oraz
+  blokady zamknięcia formularza. Brak zmian w backendzie i operacjach biznesowych.
+
+Poza zakresem tej integracji pozostają: przejścia z ostrzeżeń pulpitu do grup
+klientów, rozliczenia płatne per lokalizacja, migawka opłaconej kwoty oraz magazyn
+idempotencji pozostałych operacji. Dotychczasowe decyzje użytkownika pozostają.
+Nie wykonywano automatycznych testów na życzenie użytkownika; nie wymagano nowego
+środowiska. Zachowano istniejące zmiany pakietów i nie modyfikowano .claude/.
+
+Kontrola końcowa 2026-10-17:
+- TypeScript: npx tsc --noEmit --incremental false — OK.
+- ESLint 16 zmienionych plików TS/TSX — OK, bez błędów i ostrzeżeń.
+- git diff --check — OK (jedynie ostrzeżenia Git o LF/CRLF).
+- Nie uruchamiano zestawów testów, builda, commita ani push.
+- Uruchomiono lokalny frontend na localhost:3000. Przeglądarka doszła do
+  logowania; brak sesji Ownera uniemożliwił sprawdzenie danych i sortowań
+  na rzeczywistym backendzie. Karta została udostępniona do zalogowania.
+- Nie wykonano żadnych zapisów danych biznesowych ani operacji finansowych.

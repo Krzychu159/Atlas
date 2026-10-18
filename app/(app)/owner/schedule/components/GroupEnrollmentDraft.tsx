@@ -5,18 +5,18 @@ import { Check, Search } from "lucide-react";
 import { ApiError } from "@/app/lib/backend";
 import { Button } from "@/app/components/ui/button";
 import { TextField } from "@/app/components/ui/input";
-import type { Client } from "@/app/lib/owner/clients";
+import type { OwnerFilterOption } from "@/app/lib/owner/filter-options";
 import { getGroupEnrollmentClients, getGroupPackageOptions, groupEnrollmentError, type GroupPackageOptions, type PrepareGroupEnrollmentPayload } from "@/app/lib/owner/group-enrollments";
 import { useClientPaymentRevision } from "@/app/lib/session-corrections";
-import { getClientDisplayName } from "../client-utils";
+
 import GroupPackageChoices, { type GroupPackageChoice } from "./GroupPackageChoices";
 
 export default function GroupEnrollmentDraft({ sessionId, sessionStartAt, locationId, disabled, onPrepare, onClose }: {
   sessionId: number; sessionStartAt: string; locationId: number | null; disabled: boolean;
   onPrepare: (payload: PrepareGroupEnrollmentPayload, names?: { clientName: string; packageName: string }) => Promise<void>; onClose: () => void;
 }) {
-  const [clients, setClients] = useState<Client[]>([]);
-  const [client, setClient] = useState<Client | null>(null);
+  const [clients, setClients] = useState<OwnerFilterOption[]>([]);
+  const [client, setClient] = useState<OwnerFilterOption | null>(null);
   const [search, setSearch] = useState("");
   const [choosingClient, setChoosingClient] = useState(true);
   const [visibleCount, setVisibleCount] = useState(6);
@@ -88,7 +88,7 @@ export default function GroupEnrollmentDraft({ sessionId, sessionStartAt, locati
   const selected = choice?.kind === "owned" ? displayOptions?.ownedPackages.find(pkg => pkg.clientPackageId === choice.id) : choice?.kind === "offer" ? displayOptions?.offers.find(pkg => pkg.packageId === choice.id) : undefined;
   const selectPackage = useCallback((next: GroupPackageChoice) => { setChoice(next); setActionError(""); }, []);
 
-  function chooseClient(item: Client) {
+  function chooseClient(item: OwnerFilterOption) {
     if (item.id !== clientId) { setClient(item); setChoice(null); setOptions(null); setLoadedOptionsKey(""); setOptionsError(""); }
     setChoosingClient(false); setActionError("");
   }
@@ -96,7 +96,7 @@ export default function GroupEnrollmentDraft({ sessionId, sessionStartAt, locati
     if (lock.current || disabled || !client || !selected || selected.canSelect !== true || !choice || !optionsCurrent || optionsLoading || choosingClient) return;
     lock.current = true; setSubmitting(true); setActionError("");
     try {
-      await onPrepare({ clientId: client.id, packageId: selected.packageId, ...(choice.kind === "owned" ? { clientPackageId: choice.id } : {}) }, { clientName: getClientDisplayName(client), packageName: selected.name || "Pakiet klienta" });
+      await onPrepare({ clientId: client.id, packageId: selected.packageId, ...(choice.kind === "owned" ? { clientPackageId: choice.id } : {}) }, { clientName: client.name, packageName: selected.name || "Pakiet klienta" });
     } catch (err) {
       if (alive.current) { setActionError(groupEnrollmentError(err)); setPackagesRetry(value => value + 1); }
     } finally { lock.current = false; if (alive.current) setSubmitting(false); }
@@ -107,17 +107,17 @@ export default function GroupEnrollmentDraft({ sessionId, sessionStartAt, locati
     {!hasLocation ? <p role="alert" className="text-sm text-error-light">Ustal lokalizację zajęć przed wyborem klienta.</p> : null}
     <fieldset disabled={formDisabled || !hasLocation} className="min-w-0 space-y-3">
       {choosingClient ? <div>
-        <TextField label="Klient" value={search} onChange={setSearch} icon={<Search size={15} />} placeholder="Imię, nazwisko lub e-mail" />
-        <div role="status" className="flex min-h-7 items-center text-xs text-on-surface-muted">{clientsPending || clientsLoading ? "Wyszukiwanie klientów…" : clientsError || (!clients.length ? query ? "Brak pasujących klientów." : "Brak klientów z dostępem grupowym w tej lokalizacji." : `${clients.length} klientów`)}</div>
+        <TextField label="Klient" value={search} onChange={setSearch} icon={<Search size={15} />} placeholder="Nazwisko, e-mail lub telefon" />
+        <div role="status" className="flex min-h-7 items-center text-xs text-on-surface-muted">{clientsPending || clientsLoading ? "Wyszukiwanie klientów…" : clientsError || (!clients.length ? query ? "Brak pasujących klientów." : "Brak klientów z dostępem grupowym w tej lokalizacji." : `${clients.length} klientów${clients.length >= 20 ? " · Doprecyzuj wyszukiwanie, aby znaleźć kolejne osoby." : ""}`)}</div>
         {clientsError ? <Button type="button" variant="secondary" size="sm" onClick={() => setClientsRetry(value => value + 1)}>Ponów wyszukiwanie</Button> : null}
         <ul aria-label="Wybierz klienta" aria-busy={clientsPending || clientsLoading} className="space-y-1">{clients.slice(0, visibleCount).map(item => <li key={item.id}>
           <button type="button" aria-pressed={item.id === clientId} disabled={clientsPending || clientsLoading} onClick={() => chooseClient(item)} className="flex min-h-10 w-full items-center gap-2 rounded-[var(--radius-md)] bg-surface-container px-3 py-2 text-left text-sm hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60">
-            <span title={getClientDisplayName(item)} className="min-w-0 flex-1 truncate font-semibold">{getClientDisplayName(item)}</span>{item.email ? <span className="hidden min-w-0 max-w-[45%] truncate text-xs text-on-surface-muted sm:block">{item.email}</span> : null}{item.id === clientId ? <Check size={15} aria-label="Wybrany" className="shrink-0 text-primary-light" /> : null}
+            <span title={item.name} className="min-w-0 flex-1 truncate font-semibold">{item.name}</span>{item.id === clientId ? <Check size={15} aria-label="Wybrany" className="shrink-0 text-primary-light" /> : null}
           </button>
         </li>)}</ul>
         {clients.length > visibleCount ? <Button type="button" variant="ghost" size="sm" disabled={clientsPending || clientsLoading} onClick={() => setVisibleCount(value => value + 6)}>Pokaż kolejnych klientów</Button> : null}
         {client ? <Button type="button" variant="ghost" size="sm" onClick={() => setChoosingClient(false)}>Zachowaj obecny wybór</Button> : null}
-      </div> : client ? <div className="flex min-w-0 items-center gap-3 rounded-[var(--radius-md)] bg-surface-container px-3 py-2"><Check size={15} className="shrink-0 text-primary-light" /><p className="min-w-0 flex-1 truncate text-sm font-semibold">{getClientDisplayName(client)}</p><Button type="button" variant="ghost" size="sm" onClick={() => setChoosingClient(true)}>Zmień klienta</Button></div> : null}
+      </div> : client ? <div className="flex min-w-0 items-center gap-3 rounded-[var(--radius-md)] bg-surface-container px-3 py-2"><Check size={15} className="shrink-0 text-primary-light" /><p className="min-w-0 flex-1 truncate text-sm font-semibold">{client.name}</p><Button type="button" variant="ghost" size="sm" onClick={() => setChoosingClient(true)}>Zmień klienta</Button></div> : null}
       {client && !choosingClient ? <div aria-busy={optionsLoading} className="min-h-7">
         <p role="status" className="min-h-5 text-xs text-on-surface-muted">{optionsLoading ? "Sprawdzanie pakietów…" : ""}</p>
         {optionsError ? <div role="alert" className="space-y-2"><p className="text-sm text-error-light">{optionsError}</p><Button type="button" variant="secondary" size="sm" onClick={() => setPackagesRetry(value => value + 1)}>Sprawdź pakiety ponownie</Button></div> : null}

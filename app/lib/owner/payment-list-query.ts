@@ -2,7 +2,7 @@ import type { PaymentsQuery } from "./billing";
 import type { PaymentFiltersValue } from "@/app/(app)/owner/payments/components/PaymentFilters";
 
 export function paymentListQuery(filters: PaymentFiltersValue, page: number, pageSize: number, locationId: number | null): PaymentsQuery {
-  const sorts: Record<string, PaymentsQuery["sort"]> = { newest: "paymentDateDesc", oldest: "paymentDate", amountDesc: "amountDesc", amountAsc: "amount" };
+  const sorts: Record<string, PaymentsQuery["sort"]> = { newest: "paymentDateDesc", oldest: "paymentDate", amountDesc: "amountDesc", amountAsc: "amount", clientAsc: "clientName", overpaymentDesc: "overpaymentDesc" };
   const sort = sorts[filters.sortBy];
   if (!sort) throw new Error("To sortowanie nie jest jeszcze dostępne. Wybierz sortowanie po dacie lub kwocie.");
   const search = filters.client.trim();
