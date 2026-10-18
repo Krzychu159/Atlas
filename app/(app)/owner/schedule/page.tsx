@@ -18,7 +18,9 @@ import { getLocations, type Location } from "@/app/lib/owner/locations";
 import { getOutlookStatus } from "@/app/lib/owner/outlook";
 import {
   createSession,
+  deleteSession,
   getSession,
+  syncSessionToOutlook,
   createSessionSeries,
   getOwnerSessions,
   updateSession,
@@ -30,7 +32,8 @@ import { DateNavigator, ViewSwitch } from "./components/ScheduleControls";
 import ScheduleFilters, { countScheduleFilters, ScheduleFiltersToggle } from "./components/ScheduleFilters";
 import { OutlookRequiredState } from "./components/ScheduleStates";
 import { DaySchedule, WeekSchedule } from "./components/ScheduleViews";
-import { completeConsultation, correctCompletedSession, isConsultationForm } from "@/app/(app)/owner/schedule/session-utils";
+import { completeConsultation, correctCompletedSession, correctionErrorMessage, isConsultationForm } from "@/app/(app)/owner/schedule/session-utils";
+import OutlookIssuesPanel from "./components/OutlookIssuesPanel";
 import { notifySessionCorrected, useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 import SessionEditorModal from "./components/SessionEditorModal";
 import {
@@ -87,6 +90,8 @@ export default function SchedulePage() {
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [pendingSessionId, setPendingSessionId] = useState<number | null>(null);
   const [isSavingSession, setIsSavingSession] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const requestedSessionHandled = useRef(false);
   const calendarRevision = useSessionCorrectionRevision();
   const [sessionRevision, setSessionRevision] = useState(0);
 
@@ -182,7 +187,52 @@ export default function SchedulePage() {
     setIsSessionModalOpen(true);
   }
 
-  async function openEditModal(session: OwnerSession) {
+  // Calendar issues in settings link here with ?sessionId=…
+  useEffect(() => {
+    if (!connected || requestedSessionHandled.current) return;
+    requestedSessionHandled.current = true;
+    const sessionId = Number(/[?&]sessionId=(\d+)/.exec(globalThis.location?.search ?? "")?.[1]);
+    if (!Number.isSafeInteger(sessionId) || sessionId <= 0) return;
+    window.history.replaceState(window.history.state, "", window.location.pathname);
+    void openEditModal({ id: sessionId });
+    // openEditModal only reads refs and setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected]);
+
+  async function handleDeleteSession() {
+    if (!selectedSession || isSavingSession) return;
+    setSessionError(null);
+    setIsSavingSession(true);
+    try {
+      await deleteSession(selectedSession.id);
+      showOwnerSuccess("Sesja została usunięta z grafiku.");
+      notifySessionCorrected();
+      setIsSessionModalOpen(false);
+      setSelectedSession(null);
+      await loadSessions();
+    } catch (err) {
+      setSessionError(userMessage(err instanceof Error ? err.message : null, "Nie udało się usunąć sesji. Spróbuj ponownie."));
+    } finally {
+      setIsSavingSession(false);
+    }
+  }
+
+  async function handleSyncSessionToOutlook() {
+    if (!selectedSession || isSavingSession) return;
+    setSessionError(null);
+    setIsSavingSession(true);
+    try {
+      await syncSessionToOutlook(selectedSession.id);
+      showOwnerSuccess("Sesja została wysłana do Outlooka.");
+    } catch (err) {
+      setSessionError(userMessage(err instanceof Error ? err.message : null, "Nie udało się wysłać sesji do Outlooka. Sprawdź połączenie z kalendarzem i spróbuj ponownie."));
+    } finally {
+      setIsSavingSession(false);
+    }
+  }
+
+  async function openEditModal(session: Pick<OwnerSession, "id">) {
+    setSessionError(null);
     detailRead.current?.abort();
     const controller = new AbortController();
     detailRead.current = controller;
@@ -202,11 +252,20 @@ export default function SchedulePage() {
   async function handleSaveSession(values: SessionFormValues, recurrence?: SessionRecurrence) {
     if (isSavingSession) return;
     if (selectedSession?.canEdit === false) { showOwnerError(new Error("Te zajęcia są dostępne tylko do podglądu."), "Te zajęcia są dostępne tylko do podglądu."); return; }
-    try {
-      setIsSavingSession(true);
-      if (selectedSession?.status === "Completed") {
-        await correctCompletedSession(selectedSession, values);
-        showOwnerSuccess("Korekta została zapisana.");
+    setSessionError(null);
+    if (selectedSession?.status === "Completed") {
+      let mode: Awaited<ReturnType<typeof correctCompletedSession>>;
+      try {
+        setIsSavingSession(true);
+        mode = await correctCompletedSession(selectedSession, values);
+      } catch (err) {
+        // Keep the entered correction so the owner can fix the cause and save again.
+        setSessionError(correctionErrorMessage(err));
+        setIsSavingSession(false);
+        return;
+      }
+      try {
+        showOwnerSuccess(mode === "not-held" ? "Sesja nie jest już rozliczona jako zrealizowana. Wejścia i salda klientów zostały przeliczone." : "Korekta została zapisana.");
         notifySessionCorrected();
         // A refresh failure must not turn a successful correction into a retry.
         try {
@@ -219,8 +278,13 @@ export default function SchedulePage() {
           showOwnerError(err, "Korekta zapisana, ale nie udało się odświeżyć szczegółów.");
         }
         await loadSessions();
-        return;
+      } finally {
+        setIsSavingSession(false);
       }
+      return;
+    }
+    try {
+      setIsSavingSession(true);
       const completingConsultation = Boolean(selectedSession) && isConsultationForm(values) && values.status === "Completed";
       // Save other edits with the current status, then complete through the dedicated endpoint.
       const payload = toSessionPayload(completingConsultation ? { ...values, status: selectedSession?.status || "" } : values, selectedSession);
@@ -378,6 +442,7 @@ export default function SchedulePage() {
           <OwnerReadState loading={false} error={resources.error} retry={resources.retry} label="Ładowanie danych grafiku..." />
           <OwnerReadState loading={false} error={sessionList.error} retry={sessionList.retry} label="Ładowanie sesji..." />
         </> : null}
+        {connected ? <OutlookIssuesPanel onOpenSession={id => void openEditModal({ id })} /> : null}
         {outlook.loading ? (
           <div className="card-shell p-6 text-on-surface-variant">
             Sprawdzanie połączenia z Microsoft Outlook...
@@ -428,8 +493,12 @@ export default function SchedulePage() {
         loadClientOptions={loadClientOptions}
         defaultTrainerId={defaultTrainerId}
         isSaving={isSavingSession}
+        saveError={sessionError}
+        onDelete={selectedSession && selectedSession.status !== "Completed" ? handleDeleteSession : undefined}
+        onSyncOutlook={selectedSession && selectedSession.status !== "Cancelled" ? handleSyncSessionToOutlook : undefined}
         onClose={() => {
           if (isSavingSession) return;
+          setSessionError(null);
           detailRead.current?.abort();
           setIsSessionModalOpen(false);
           setSelectedSession(null);

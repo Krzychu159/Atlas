@@ -18,8 +18,8 @@ type ScopeKind = OutlookReconcileScope["kind"];
 
 const scopeOptions: { value: ScopeKind; label: string; hint: string }[] = [
   { value: "mine", label: "Mój kalendarz", hint: "Najszybsza opcja. Odświeża tylko Twój kalendarz." },
-  { value: "trainer", label: "Wybrany trener", hint: "Odświeża kalendarz jednego trenera." },
-  { value: "all", label: "Wszyscy trenerzy", hint: "Odświeża kalendarze całego studia. Trwa najdłużej." },
+  { value: "trainer", label: "Kalendarz trenera…", hint: "Odświeża kalendarz jednego, wybranego trenera." },
+  { value: "all", label: "Wszyscy", hint: "Odświeża kalendarze całego studia. Trwa najdłużej." },
 ];
 
 const buttonLabels: Record<ScopeKind, string> = {
@@ -68,7 +68,7 @@ export default function OutlookRefreshPanel({
   const selectedTrainerId = Number(trainerId);
   const needsTrainer = activeScope === "trainer" && !(selectedTrainerId > 0);
   const needsConnection = activeScope === "mine" && !connected;
-  const label = canChooseScope ? buttonLabels[activeScope] : "Odśwież Outlook";
+  const label = canChooseScope ? buttonLabels[activeScope] : "Odśwież mój Outlook";
 
   function setRunningState(value: boolean) {
     setRunning(value);
@@ -92,7 +92,7 @@ export default function OutlookRefreshPanel({
       setResult(data);
       onCompleted(data);
       notifySessionCorrected();
-      if (data.errors?.length) showAppInfo("Kalendarz został odświeżony, ale części danych nie udało się zsynchronizować.");
+      if (data.errors?.length) showAppInfo("Kalendarz został odświeżony, ale części danych nie udało się zsynchronizować. Szczegóły znajdziesz poniżej.");
       else showAppSuccess(summarize(data), { id: "outlook-reconcile-success" });
     } catch (err) {
       if (isAbortError(err)) return;

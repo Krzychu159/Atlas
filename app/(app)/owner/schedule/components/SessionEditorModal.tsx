@@ -13,10 +13,13 @@ import { NativeDateInput } from "@/app/components/ui/native-date-input";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Plus,
+  RefreshCw,
   Save,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
+import { ConfirmDialog } from "@/app/components/ui/confirm-dialog";
 import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { getErrorMessage } from "@/app/lib/backend";
 import { Button } from "@/app/components/ui/button";
@@ -41,8 +44,9 @@ import {
   getSessionTitle,
   isConsultationForm,
 } from "../session-utils";
-import type { SessionEditorSession, SessionFormValues } from "../types";
+import type { ParticipantCorrection, SessionEditorSession, SessionFormValues } from "../types";
 import SessionCorrectionHistory from "./SessionCorrectionHistory";
+import { CorrectionParticipantRows, SessionCorrectionPanel } from "./SessionCorrectionPanel";
 import GroupEnrollmentsSection from "./GroupEnrollmentsSection";
 
 export default function SessionEditorModal({
@@ -60,6 +64,9 @@ export default function SessionEditorModal({
   allowRecurringSessions = false,
   allowCorrectionHistory = false,
   isSaving,
+  saveError,
+  onDelete,
+  onSyncOutlook,
   onClose,
   onSubmit,
   onGroupEnrollmentChanged,
@@ -78,20 +85,28 @@ export default function SessionEditorModal({
   allowRecurringSessions?: boolean;
   allowCorrectionHistory?: boolean;
   isSaving: boolean;
+  saveError?: string | null;
+  onDelete?: () => void;
+  onSyncOutlook?: () => void;
   onClose: () => void;
   onSubmit: (values: SessionFormValues, recurrence?: SessionRecurrence) => void;
   onGroupEnrollmentChanged?: () => Promise<void>;
 }) {
-  const [values, setValues] = useState<SessionFormValues>(() =>
-    getDefaultFormValues({
+  const ownerCorrection = !trainerAccess && session?.status === "Completed" && session.canEdit !== false;
+  const correctionAllowsParticipants = ownerCorrection && !isConsultationSession(session);
+  const getInitialValues = (): SessionFormValues => {
+    const initial = getDefaultFormValues({
       session,
       date: anchorDate,
       startAt: defaultStartAt,
       trainers,
       locations,
       defaultTrainerId,
-    }),
-  );
+    });
+    return ownerCorrection ? { ...initial, correctionMode: correctionAllowsParticipants ? "participants" : "details" } : initial;
+  };
+  const [values, setValues] = useState<SessionFormValues>(getInitialValues);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [countsAgainstPackage, setCountsAgainstPackage] = useState(true);
   const [groupEnrollmentBusy, setGroupEnrollmentBusy] = useState(false);
   const [sessionsCharged, setSessionsCharged] = useState("1");
@@ -140,6 +155,11 @@ export default function SessionEditorModal({
   if (!open) return null;
 
   const readOnly = session?.canEdit === false || (trainerAccess && session != null && session.canEdit !== true);
+  const correctionMode = ownerCorrection ? values.correctionMode ?? "details" : null;
+  // During a participants or "not held" correction the other session data stays as it was.
+  const detailsLocked = correctionMode === "participants" || correctionMode === "not-held";
+  const correctingParticipants = correctionMode === "participants";
+  const participantsLocked = correctionMode === "details" || correctionMode === "not-held";
   const ownerGroupSession = !trainerAccess && !consultationForm && session != null && (session.isGroupSession === true || isGroupTraining(session));
   const droppedParticipants = consultationForm && session != null && !isConsultationSession(session) ? session.participants?.length ?? 0 : 0;
   const billingType = values.actualSessionType ?? getSessionTrainingTypeValue(session || {});
@@ -243,8 +263,33 @@ export default function SessionEditorModal({
     }));
   }
 
+  // Switching the kind of correction drops edits that belong to another kind, so they are never mixed.
+  function changeCorrectionMode(mode: NonNullable<SessionFormValues["correctionMode"]>) {
+    setValues(current => ({
+      ...getInitialValues(),
+      correctionMode: mode,
+      correctionReason: current.correctionReason,
+      status: mode === "not-held" ? "Cancelled" : "Completed",
+    }));
+  }
+
+  function updateParticipantCorrection(clientId: string, correction: ParticipantCorrection) {
+    setValues(current => ({ ...current, participantsEdited: true, participantCorrections: { ...current.participantCorrections, [clientId]: correction } }));
+  }
+
+  function removeCorrectionParticipant(clientId: string) {
+    setValues(current => ({ ...current, participantsEdited: true, participantIds: current.participantIds.filter(id => id !== clientId) }));
+  }
+
+  function participantName(clientId: string) {
+    const participant = session?.participants?.find(item => String(item.clientId) === clientId);
+    const client = [...remoteClients, ...clients].find(item => String(item.id) === clientId);
+    return participant?.clientFullName || (client ? getClientDisplayName(client) : `Klient #${clientId}`);
+  }
+
   function toggleParticipant(clientId: string) {
-    if (isGroupForm || consultationForm) return;
+    if (participantsLocked) return;
+    if ((isGroupForm || consultationForm) && !correctingParticipants) return;
     setValues((current) => {
       const participantIds = current.participantIds.includes(clientId)
         ? current.participantIds.filter((id) => id !== clientId)
@@ -319,7 +364,19 @@ export default function SessionEditorModal({
             <span className="text-on-surface-variant">{session && isGroupTraining(session) ? groupSeatsLabel(session) : "Uczestników potwierdzisz po zapisaniu zajęć" + (values.publicCapacity ? " · limit " + values.publicCapacity : "")}</span>
             {session && isGroupTraining(session) && session.isFullyBooked ? <span className="text-on-surface-variant">Brak miejsc</span> : null}
           </div> : null}
-          <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly} className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+          {correctionMode ? <SessionCorrectionPanel
+            mode={correctionMode}
+            values={values}
+            allowParticipants={correctionAllowsParticipants}
+            billingType={billingType}
+            billingTypeOptions={billingTypeOptions}
+            disabled={isSaving || groupEnrollmentBusy}
+            onModeChange={changeCorrectionMode}
+            onStatusChange={status => updateValue("status", status)}
+            onReasonChange={value => updateValue("correctionReason", value)}
+            onBillingTypeChange={consultationForm ? null : value => updateValue("actualSessionType", value)}
+          /> : null}
+          <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly || detailsLocked} className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
             <Field label="Tytuł" className="md:col-span-2">
               <input
                 value={values.title}
@@ -381,26 +438,27 @@ export default function SessionEditorModal({
               />
             </Field>
 
-            <Field label="Status">
+            {ownerCorrection ? null : <Field label="Status">
               <CustomSelect
                 value={values.status}
                 options={trainerAccess ? statusOptions.filter(option => ["", "Planned", "Active", "Cancelled", session?.status, ...(consultationForm && session ? ["Completed"] : [])].includes(option.value)).map(option => option.value ? option : { ...option, label: "Wybierz status" }) : session?.status === "Completed" ? statusOptions.filter((option) => ["Completed", "Planned", "Cancelled"].includes(option.value)) : statusOptions}
                 onChange={(value) => updateValue("status", value)}
               />
-            </Field>
+            </Field>}
 
             <Field label="Rodzaj zajęć">
               <CustomSelect value={values.plannedSessionType} options={typeOptions} onChange={updateSessionType} />
             </Field>
           </fieldset>
           <div className="mt-4 space-y-3">
-            {consultationForm ? null : ownerGroupSession && session ? <GroupEnrollmentsSection key={session.id + ":" + session.locationId} session={session} canConfirm={!readOnly && !isSaving} onChanged={onGroupEnrollmentChanged} onBusyChange={setGroupEnrollmentBusy} /> : <SessionAccordion title="Uczestnicy" summary={values.participantIds.length + (readOnly ? " osób" : " wybranych")}>
+            {consultationForm ? null : ownerGroupSession && session && !correctingParticipants ? <GroupEnrollmentsSection key={session.id + ":" + session.locationId} session={session} canConfirm={!readOnly && !isSaving} onChanged={onGroupEnrollmentChanged} onBusyChange={setGroupEnrollmentBusy} /> : <SessionAccordion title="Uczestnicy" summary={values.participantIds.length + (readOnly || participantsLocked ? " osób" : " wybranych")}>
+              {correctingParticipants && session ? <div className="mb-3"><CorrectionParticipantRows session={session} values={values} disabled={isSaving || groupEnrollmentBusy} nameFor={participantName} onChange={updateParticipantCorrection} onRemove={removeCorrectionParticipant} /></div> : null}
               {isGroupForm && !session ? <p className="mb-3 text-sm text-on-surface-variant">Dodaj zajęcia, aby zapisać uczestników.</p> : null}
-              {!readOnly && !isGroupForm ? <fieldset disabled={isSaving || groupEnrollmentBusy} className="min-w-0 space-y-4">
+              {!readOnly && !isGroupForm && !participantsLocked ? <fieldset disabled={isSaving || groupEnrollmentBusy} className="min-w-0 space-y-4">
             <div className="space-y-3">
               {!trainerAccess && session?.status === "Completed" && (
                 <span className="mb-3 block text-xs text-on-surface-variant">
-                  Zmianę uczestników lub typu rozliczenia zapisz osobno od pozostałych danych sesji.
+                  Wybierz klienta z listy, aby dopisać go do zrealizowanej sesji.
                 </span>
               )}
               {trainerAccess && isGroupForm ? <span className="mb-3 block text-xs text-on-surface-variant">Możesz dodawać uczestników z listy swoich klientów.</span> : null}
@@ -509,7 +567,7 @@ export default function SessionEditorModal({
               {session && isGroupTraining(session) && readOnly ? <GroupSessionDetails key={session.id + ":" + session.updatedAt} session={session} trainerAccess={trainerAccess} participantsOnly showSummary={false} wrapParticipants={false} /> : session && isGroupTraining(session) ? <SessionAccordion title="Szczegóły zapisów" summary={session.bookedSeats != null ? session.bookedSeats + " zapisanych" : undefined}>
                 <GroupSessionDetails key={session.id + ":" + session.updatedAt} session={session} trainerAccess={trainerAccess} participantsOnly showSummary={false} wrapParticipants={false} />
               </SessionAccordion> : null}
-          {session && !isGroupTraining(session) && session.participants?.length ? (
+          {session && !isGroupTraining(session) && !correctingParticipants && session.participants?.length ? (
             <div className="mt-6 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
               <p className="text-label text-on-surface-muted">Uczestnicy</p>
               <div className="mt-3 grid max-h-[260px] gap-2 overflow-y-auto overscroll-contain md:grid-cols-2">
@@ -533,7 +591,7 @@ export default function SessionEditorModal({
           ) : null}
             </SessionAccordion>}
             {!readOnly || values.note.trim() ? <SessionAccordion title="Opis zajęć" summary={values.note.trim() ? "Uzupełniony" : undefined}>
-              <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly} className="min-w-0">
+              <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly || detailsLocked} className="min-w-0">
             <Field
               label={isGroupForm ? "Opis zajęć" : "Notatka"}
               className="md:col-span-2"
@@ -548,7 +606,7 @@ export default function SessionEditorModal({
               </fieldset>
             </SessionAccordion> : null}
             {isGroupForm && (!readOnly || values.eventRules.trim() || values.publicCapacity || values.isPubliclyBookable) ? <SessionAccordion title="Zasady uczestnictwa i rezerwacji">
-              <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly} className="grid min-w-0 gap-4 md:grid-cols-2">
+              <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly || detailsLocked} className="grid min-w-0 gap-4 md:grid-cols-2">
             {isGroupForm ? <>
               {!readOnly || values.publicCapacity ? <Field label={values.isPubliclyBookable ? "Limit uczestników" : "Limit uczestników (bez limitu: pozostaw puste)"}>
                 <input type="number" min="1" step="1" required={values.isPubliclyBookable} value={values.publicCapacity} onChange={event => updateValue("publicCapacity", event.target.value)} className="h-11 w-full rounded-[var(--radius-lg)] md:h-10 bg-surface-container-lowest px-4 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
@@ -564,8 +622,8 @@ export default function SessionEditorModal({
               </fieldset>
             </SessionAccordion> : null}
             {!readOnly || values.outlookCategories.trim() || (session?.status === "Completed" && (session.actualSessionType || session.plannedSessionType)) || values.isPubliclyBookable ? <SessionAccordion title="Ustawienia dodatkowe">
-              <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly} className="grid min-w-0 gap-4 md:grid-cols-2">
-            {session?.status === "Completed" && (
+              <fieldset disabled={isSaving || groupEnrollmentBusy || readOnly || detailsLocked} className="grid min-w-0 gap-4 md:grid-cols-2">
+            {session?.status === "Completed" && !ownerCorrection && (
               <>
                 {!readOnly ? <Field label="Powód korekty" className="md:col-span-2">
                   <textarea required value={values.correctionReason || ""} rows={2}
@@ -685,11 +743,16 @@ export default function SessionEditorModal({
 
               </fieldset>
             </SessionAccordion> : null}
-            {allowCorrectionHistory && !trainerAccess && session ? <SessionAccordion title="Historia korekt">{() => <SessionCorrectionHistory sessionId={session.id} />}</SessionAccordion> : null}
+            {allowCorrectionHistory && !trainerAccess && session ? <SessionAccordion title="Historia">{() => <SessionCorrectionHistory sessionId={session.id} />}</SessionAccordion> : null}
           </div>
         </div>
 
+        {saveError ? <p role="alert" className="border-t border-white/5 bg-error-container/20 px-5 py-3 text-sm text-error-light md:px-6">{saveError}</p> : null}
         <div className="flex flex-col-reverse gap-3 border-t border-white/5 bg-surface-container px-5 py-4 sm:flex-row sm:justify-end md:px-6">
+          {session && !readOnly && (onDelete || onSyncOutlook) ? <div className="flex flex-col-reverse gap-3 sm:mr-auto sm:flex-row">
+            {onDelete ? <Button type="button" variant="ghost" icon={<Trash2 size={16} />} disabled={isSaving || groupEnrollmentBusy} onClick={() => setConfirmDelete(true)} className="text-error-light">Usuń sesję</Button> : null}
+            {onSyncOutlook ? <Button type="button" variant="ghost" icon={<RefreshCw size={16} />} disabled={isSaving || groupEnrollmentBusy} onClick={onSyncOutlook}>Wyślij do Outlooka</Button> : null}
+          </div> : null}
           <Button type="button" variant="secondary" disabled={isSaving || groupEnrollmentBusy} onClick={onClose}>
             Zamknij
           </Button>
@@ -700,6 +763,10 @@ export default function SessionEditorModal({
           >
             {isSaving
               ? "Zapisywanie..."
+              : correctionMode === "participants"
+                ? "Zapisz korektę i przelicz wejścia"
+                : correctionMode === "not-held"
+                  ? values.status === "Planned" ? "Przywróć do zaplanowanych" : "Oznacz jako nieodbytą"
               : session
                 ? "Zapisz zmiany"
                 : repeat && allowRecurringSessions && !consultationForm
@@ -708,6 +775,19 @@ export default function SessionEditorModal({
           </Button>
         </div>
       </form>
+      {confirmDelete && session && onDelete ? (
+        <ConfirmDialog
+          title="Usunąć sesję z grafiku?"
+          description="Sesja zniknie z grafiku i z kalendarza Outlook."
+          confirmLabel="Usuń sesję"
+          busyLabel="Usuwanie…"
+          icon={<Trash2 size={20} />}
+          tone="danger"
+          busy={isSaving}
+          onConfirm={() => { setConfirmDelete(false); onDelete(); }}
+          onClose={() => setConfirmDelete(false)}
+        />
+      ) : null}
     </ModalOverlay>
   );
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backendCookieHeader, relayBackendSetCookies } from "@/app/lib/server/backend-cookies";
+import { escapeHtml, readOutlookCallbackError, type OutlookCallbackError } from "@/app/lib/calendar/outlook-callback";
 
 const BACKEND_URL = process.env.BACKEND_API_URL;
 
@@ -62,11 +63,14 @@ export async function GET(req: NextRequest) {
 
   const redirectTarget = providerError ? null : frontendRedirect(response, req.nextUrl.origin);
   let nextResponse: NextResponse;
+  const callbackError = redirectTarget || response.ok ? null : await readCallbackError(response);
 
   if (redirectTarget) {
     nextResponse = NextResponse.redirect(redirectTarget, 303);
     nextResponse.headers.set("Cache-Control", "no-store");
     nextResponse.headers.set("Referrer-Policy", "no-referrer");
+  } else if (callbackError) {
+    nextResponse = errorPage(callbackError, response.status >= 500 ? 502 : 400);
   } else {
     nextResponse = outcomePage(providerError
       ? "cancelled"
@@ -99,9 +103,28 @@ function frontendRedirect(response: Response, frontendOrigin: string) {
   }
 }
 
+// The backend describes a failed connection as { code, message, microsoftCode }.
+async function readCallbackError(response: Response) {
+  if (!(response.headers.get("content-type") || "").includes("json")) return null;
+  try {
+    return readOutlookCallbackError(await response.json());
+  } catch {
+    return null;
+  }
+}
+
+function errorPage(error: OutlookCallbackError, status: number) {
+  const detail = error.microsoftCode ? `<small>Kod Microsoft: ${escapeHtml(error.microsoftCode)}</small>` : "";
+  return htmlPage("Nie udało się połączyć konta Microsoft", escapeHtml(error.message), status, detail);
+}
+
 function outcomePage(outcome: CallbackOutcome) {
   const { status, title, description } = outcomes[outcome];
-  const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>ATLAS — ${title}</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;box-sizing:border-box;background:#121416;color:#e2e2e5;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:440px;padding:32px;border-radius:16px;background:#1a1c1e}h1{margin:0 0 12px;font-size:20px;line-height:1.3}p{margin:0 0 24px;color:#c3c5d9;line-height:1.6;font-size:14px}a{display:inline-block;padding:10px 16px;border-radius:8px;background:#0052ff;color:#fff;text-decoration:none;font-weight:600;font-size:14px}a:focus-visible{outline:2px solid #b7c4ff;outline-offset:2px}</style></head><body><main><h1>${title}</h1><p>${description}</p><a href="/">Wróć do ATLAS</a></main></body></html>`;
+  return htmlPage(title, description, status);
+}
+
+function htmlPage(title: string, description: string, status: number, detail = "") {
+  const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>ATLAS — ${title}</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;box-sizing:border-box;background:#121416;color:#e2e2e5;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:440px;padding:32px;border-radius:16px;background:#1a1c1e}h1{margin:0 0 12px;font-size:20px;line-height:1.3}p{margin:0 0 24px;color:#c3c5d9;line-height:1.6;font-size:14px}small{display:block;margin:-12px 0 24px;color:#8d90a2;font-size:12px}a{display:inline-block;padding:10px 16px;border-radius:8px;background:#0052ff;color:#fff;text-decoration:none;font-weight:600;font-size:14px}a:focus-visible{outline:2px solid #b7c4ff;outline-offset:2px}</style></head><body><main><h1>${title}</h1><p>${description}</p>${detail}<a href="/">Wróć do ATLAS</a></main></body></html>`;
 
   return new NextResponse(html, {
     status,

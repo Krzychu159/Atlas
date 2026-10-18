@@ -151,6 +151,14 @@ export function deleteSessionSeries(recurringGroupId: string) {
   return backendDelete<unknown>(`sessions/series/${encodeURIComponent(recurringGroupId)}`);
 }
 
+export function deleteSession(id: number) {
+  return backendDelete<unknown>(`sessions/${id}`);
+}
+
+export function syncSessionToOutlook(id: number) {
+  return backendPost<unknown>(`outlook/sync-session/${id}`);
+}
+
 export function getSession(id: number, signal?: AbortSignal) {
   return backendGet<OwnerSession>(`sessions/${id}`, undefined, signal);
 }
@@ -176,8 +184,8 @@ export type SessionCorrection = {
   createdAt: string;
 };
 
-export function getSessionCorrections(id: number) {
-  return backendGet<SessionCorrection[]>(`sessions/${id}/corrections`);
+export function getSessionCorrections(id: number, signal?: AbortSignal) {
+  return backendGet<SessionCorrection[]>(`sessions/${id}/corrections`, undefined, signal);
 }
 
 export function getClientSessions(clientId: number, signal?: AbortSignal) {

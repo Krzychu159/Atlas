@@ -33,6 +33,7 @@ import {
   type OutlookStatus,
 } from "@/app/lib/calendar/outlook";
 import OutlookRefreshPanel from "./OutlookRefreshPanel";
+import OutlookIssuesPanel from "../../schedule/components/OutlookIssuesPanel";
 
 function formatConnectedDate(value: string | null) {
   if (!value) return "Brak daty połączenia";
@@ -179,7 +180,7 @@ export default function OutlookIntegrationCard({
       authWindow.opener = null;
       startConnectPolling(authWindow);
       showAppInfo(
-        "Logowanie do Microsoft otworzyło się w nowym oknie. Zamkniemy je automatycznie po połączeniu.",
+        "Logowanie do Microsoft otworzyło się w nowym oknie. Wybierz konto, w którym prowadzisz kalendarz. Zamkniemy okno automatycznie po połączeniu.",
         { id: "outlook-connect-started" },
       );
     } catch (err) {
@@ -387,6 +388,12 @@ export default function OutlookIntegrationCard({
         </div>
       </div>
 
+      {!connected && !isLoading && !loadError ? (
+        <p className="mt-5 rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+          <span className="font-semibold text-on-surface">Wybierz konto, w którym prowadzisz kalendarz.</span>{" "}
+          Po kliknięciu „Połącz Microsoft” zaloguj się na konto z grafikiem treningów – jeśli masz kilka kont, wybierz właściwe na liście Microsoft.
+        </p>
+      ) : null}
       {loadError ? <p role="alert" className="mt-5 text-sm text-error-light">{loadError}</p> : null}
       <div className="mt-6 grid gap-3 md:grid-cols-3">
         <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4">
@@ -432,6 +439,8 @@ export default function OutlookIntegrationCard({
           onCompleted={handleReconcileCompleted}
         />
       ) : null}
+
+      {allowAdministration && !loadError ? <OutlookIssuesPanel embedded className="mt-6" /> : null}
 
       {allowAdministration && series.length > 0 && (
         <div className="mt-6 space-y-3">

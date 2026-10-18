@@ -25,6 +25,7 @@ import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 import { getTrainerClientsPage } from "@/app/lib/trainer/optimized";
 import type { Client } from "@/app/lib/owner/clients";
 import TrainerSessionDetailsModal from "./components/TrainerSessionDetailsModal";
+import OutlookRefreshButton from "@/app/components/schedule/OutlookRefreshButton";
 
 export default function TrainerSchedulePage() {
   const [view, setView] = useState<ScheduleView>("week");
@@ -275,7 +276,7 @@ export default function TrainerSchedulePage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div><p className="text-label text-primary-light">Plan</p><h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-tight tracking-tight">Moje zajęcia</h1><p className="mt-3 text-sm leading-6 text-on-surface-variant">Własne treningi i zajęcia grupowe. Wybierz zajęcia, aby zobaczyć uczestników i szczegóły.</p></div>
           <div className="flex flex-wrap items-center gap-3"><ViewSwitch value={view} onChange={setView} /><DateNavigator view={view} anchorDate={anchorDate} periodLabel={period.label} onDateChange={setAnchorDate} onMove={direction => setAnchorDate(date => addDays(date, (view === "week" ? 7 : 1) * direction))} />
-            <Button variant="secondary" icon={<RefreshCw size={16} />} disabled={isLoading || isSaving} onClick={() => void reloadSessions()}>Odśwież</Button><Button icon={<Plus size={16} />} disabled={!canCreate || isSaving} onClick={() => openCreate()}>Dodaj sesję</Button></div>
+            <Button variant="secondary" icon={<RefreshCw size={16} />} disabled={isLoading || isSaving} onClick={() => void reloadSessions()}>Odśwież</Button>{outlookStatus?.isConnected ? <OutlookRefreshButton disabled={isSaving} /> : null}<Button icon={<Plus size={16} />} disabled={!canCreate || isSaving} onClick={() => openCreate()}>Dodaj sesję</Button></div>
         </div>
         <div className="card-shell flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><CustomSelect label="Status zajęć" value={statusFilter} options={scheduleStatusFilterOptions} onChange={value => setStatusFilter(value as SessionStatusFilter)} /><p className="text-sm text-on-surface-muted">{!isLoading && !loadError ? visibleSessions.length + " zajęć w wybranym terminie" : ""}</p></div>
         {resourcesError ? <div role="alert" className="card-shell p-4 text-sm text-on-surface-variant">{resourcesError}<Button variant="secondary" className="mt-3" onClick={() => void reloadResources()}>Spróbuj ponownie</Button></div> : !isResourcesLoading && !locations.length ? <p className="card-shell p-4 text-sm text-on-surface-variant">Nie masz przypisanej lokalizacji. Ustal ją z właścicielem studia przed dodaniem zajęć.</p> : null}

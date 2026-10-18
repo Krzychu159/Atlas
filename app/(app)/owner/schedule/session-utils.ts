@@ -1,5 +1,5 @@
 import { CONSULTATION_SESSION_TYPE, groupSeatsLabel, isConsultationSession, isGroupTraining } from "@/app/lib/group-sessions";
-import { sessionTrainingType } from "@/app/lib/user-messages";
+import { sessionTrainingType, userMessage } from "@/app/lib/user-messages";
 import type { Location } from "@/app/lib/owner/locations";
 import type {
   SessionParticipantPayload,
@@ -9,7 +9,7 @@ import type { Trainer } from "@/app/lib/owner/trainers";
 import { completeSession, updateSession } from "@/app/lib/owner/sessions";
 
 import { toDateTimeLocalValue } from "./date-utils";
-import type { CalendarSession, SessionEditorSession, SessionFormValues, SessionStatusFilter } from "./types";
+import type { CalendarSession, CorrectionMode, ParticipantCorrection, SessionEditorSession, SessionFormValues, SessionStatusFilter } from "./types";
 
 export function generatePublicSessionSlug(title: string, startAt: string) {
   const name = title.toLowerCase().replace(/ł/g, "l").normalize("NFD")
@@ -317,44 +317,109 @@ export function completeConsultation(
   return complete(sessionId, { participants: [] });
 }
 
+export const PRESENT_ATTENDANCE = "Present";
+
+// Present and Absent are the attendance values the CRM sends; other stored values are kept as they are.
+export const attendanceCorrectionOptions = [
+  { value: PRESENT_ATTENDANCE, label: "Obecny" },
+  { value: "Absent", label: "Nieobecny" },
+];
+
+type CorrectionSession = Pick<SessionEditorSession, "participants">;
+
+export function getParticipantCorrection(clientId: string, session: CorrectionSession, values: Pick<SessionFormValues, "participantCorrections">): ParticipantCorrection {
+  const edited = values.participantCorrections?.[clientId];
+  if (edited) return edited;
+  const existing = session.participants?.find(participant => String(participant.clientId) === clientId);
+  return {
+    attendanceStatus: existing?.attendanceStatus || PRESENT_ATTENDANCE,
+    countsAgainstPackage: existing?.countsAgainstPackage ?? true,
+    sessionsCharged: String(existing?.sessionsCharged ?? 1),
+  };
+}
+
+// The backend takes an entry only from a present participant counted against a package.
+export function chargesPackageEntry(correction: Pick<ParticipantCorrection, "attendanceStatus" | "countsAgainstPackage">) {
+  return correction.attendanceStatus === PRESENT_ATTENDANCE && correction.countsAgainstPackage;
+}
+
+export function buildCorrectionParticipants(session: CorrectionSession, values: Pick<SessionFormValues, "participantIds" | "participantCorrections">) {
+  return values.participantIds.map(id => {
+    const correction = getParticipantCorrection(id, session, values);
+    const sessionsCharged = Number(correction.sessionsCharged);
+    if (!Number.isInteger(sessionsCharged) || sessionsCharged < 0 || sessionsCharged > 100) throw new Error("Liczba wejść musi być liczbą całkowitą od 0 do 100.");
+    if (values.participantCorrections?.[id] && chargesPackageEntry(correction) && sessionsCharged === 0) throw new Error("Obecny uczestnik rozliczany z pakietu musi mieć co najmniej 1 wejście.");
+    const existing = session.participants?.find(participant => String(participant.clientId) === id);
+    return {
+      clientId: Number(id),
+      attendanceStatus: correction.attendanceStatus,
+      countsAgainstPackage: correction.countsAgainstPackage,
+      sessionsCharged,
+      note: existing?.note ?? null,
+    };
+  });
+}
+
+export function correctionParticipantsChanged(session: CorrectionSession, values: Pick<SessionFormValues, "participantIds" | "participantCorrections">) {
+  const current = session.participants ?? [];
+  if (values.participantIds.length !== current.length || current.some(participant => !values.participantIds.includes(String(participant.clientId)))) return true;
+  return current.some(participant => {
+    const correction = getParticipantCorrection(String(participant.clientId), session, values);
+    return correction.attendanceStatus !== (participant.attendanceStatus || PRESENT_ATTENDANCE)
+      || correction.countsAgainstPackage !== participant.countsAgainstPackage
+      || Number(correction.sessionsCharged) !== participant.sessionsCharged;
+  });
+}
+
+// Without an explicit choice the mode follows what the owner changed.
+export function resolveCorrectionMode(session: SessionEditorSession, values: SessionFormValues): CorrectionMode {
+  if (values.correctionMode) return values.correctionMode;
+  if (values.status !== "Completed") return "not-held";
+  const actualSessionType = (values.actualSessionType ?? session.actualSessionType ?? session.plannedSessionType ?? "").trim();
+  const typeChanged = actualSessionType !== (session.actualSessionType || session.plannedSessionType || "");
+  return typeChanged || correctionParticipantsChanged(session, values) ? "participants" : "details";
+}
+
 export async function correctCompletedSession(session: SessionEditorSession, values: SessionFormValues, complete: (id: number, payload: Parameters<typeof completeSession>[1]) => Promise<unknown> = completeSession) {
   const correctionReason = values.correctionReason?.trim();
   if (!correctionReason) throw new Error("Podaj powód korekty.");
-  if (!["Completed", "Planned", "Cancelled"].includes(values.status)) {
-    throw new Error("Wybierz status: Zrealizowana, Zaplanowana lub Anulowana.");
-  }
+  if (correctionReason.length > 500) throw new Error("Powód korekty może mieć maksymalnie 500 znaków.");
   if (!session.participants && isConsultationSession(session)) session = { ...session, participants: [] };
   if (!session.participants) throw new Error("Odśwież szczegóły sesji przed korektą uczestników.");
-  const payload = toSessionPayload(values, session);
-  const participantsChanged = values.participantIds.length !== session.participants.length ||
-    session.participants.some((participant) => !values.participantIds.includes(String(participant.clientId)));
-  const actualSessionType = (values.actualSessionType ?? session.actualSessionType ?? session.plannedSessionType ?? "").trim();
-  const typeChanged = actualSessionType !== (session.actualSessionType || session.plannedSessionType || "");
-  if (values.status === "Completed" && (participantsChanged || typeChanged)) {
+  const mode = resolveCorrectionMode(session, values);
+
+  if (mode === "participants") {
     const initial = getDefaultFormValues({ session, date: new Date(session.startAt), trainers: [], locations: [] });
+    const payload = toSessionPayload({ ...values, status: "Completed", participantsEdited: false }, session);
     const initialPayload = toSessionPayload(initial, session);
     const metadataKeys = [...new Set([...Object.keys(payload), ...Object.keys(initialPayload)])]
       .filter((key) => key !== "participants") as (keyof SessionPayload)[];
     if (metadataKeys.some((key) => JSON.stringify(payload[key]) !== JSON.stringify(initialPayload[key]))) {
       throw new Error("Zapisz korektę uczestników lub typu rozliczenia osobno od zmian pozostałych danych sesji.");
     }
+    const actualSessionType = (values.actualSessionType ?? session.actualSessionType ?? session.plannedSessionType ?? "").trim();
     if (!actualSessionType) throw new Error("Podaj typ rozliczenia sesji.");
+    if (values.correctionMode && !correctionParticipantsChanged(session, values) && actualSessionType === (session.actualSessionType || session.plannedSessionType || "")) {
+      throw new Error("Nie wprowadzono zmian w uczestnikach, obecności ani typie rozliczenia.");
+    }
+    // The backend replaces the whole list: a client left out is removed and gets the entry back.
     await complete(session.id, {
       actualSessionType,
       correctionReason,
-      participants: values.participantIds.map((id) => {
-        const existing = session.participants!.find((participant) => participant.clientId === Number(id));
-        return {
-          ...getParticipantPayload(Number(id), session),
-          attendanceStatus: existing?.attendanceStatus || "Present",
-        };
-      }),
+      participants: isConsultationSession({ ...session, actualSessionType }) ? [] : buildCorrectionParticipants(session, values),
     });
-  } else {
-    // Completed metadata edits must never replace the billed participant list.
-    if (values.status === "Completed") delete payload.participants;
-    await updateSession(session.id, { ...payload, correctionReason });
+    return mode;
   }
+
+  if (mode === "not-held") {
+    if (values.status !== "Cancelled" && values.status !== "Planned") throw new Error("Wybierz, czy sesję anulować, czy przywrócić do zaplanowanych.");
+    if (correctionParticipantsChanged(session, values)) throw new Error("Zapisz zmianę uczestników osobno od zmiany statusu sesji.");
+  }
+  const payload = toSessionPayload(mode === "details" ? { ...values, status: "Completed" } : values, session);
+  // Corrections through the session form never replace the billed participant list.
+  delete payload.participants;
+  await updateSession(session.id, { ...payload, correctionReason });
+  return mode;
 }
 
 function getParticipantPayload(
@@ -371,4 +436,30 @@ function getParticipantPayload(
     sessionsCharged: existing?.sessionsCharged ?? 1,
     note: existing?.note ?? null,
   };
+}
+
+// changeType has no documented values, so only recognisable parts of the name are translated.
+export function correctionChangeLabel(changeType: string | null | undefined) {
+  const value = (changeType || "").toLowerCase();
+  const labels: [RegExp, string][] = [
+    [/cancel/, "Sesja oznaczona jako nieodbyta"],
+    [/restor|planned|reopen/, "Przywrócenie sesji do zaplanowanych"],
+    [/participant|attendance|attendee/, "Zmiana uczestników lub obecności"],
+    [/type|billing/, "Zmiana typu rozliczenia"],
+    [/trainer/, "Zmiana trenera"],
+    [/location/, "Zmiana lokalizacji"],
+    [/time|date|reschedul|term/, "Zmiana terminu"],
+  ];
+  return labels.find(([pattern]) => pattern.test(value))?.[1] ?? "Korekta sesji";
+}
+
+// Known reasons why the backend refuses a correction; the form keeps the entered data.
+export function correctionErrorMessage(error: unknown) {
+  const message = error && typeof error === "object" && typeof (error as { message?: unknown }).message === "string" ? (error as { message: string }).message : "";
+  const text = message.toLowerCase();
+  if (/settlement|rozliczeni/.test(text) && /paid|wypłac/.test(text)) return "Rozliczenie trenera za ten okres jest już wypłacone, więc tej sesji nie można przeliczyć. Sprawdź rozliczenie trenera, zanim poprawisz sesję.";
+  if (/(next|later|subsequent|newer|kolejn|następn).*(package|pakiet)|(package|pakiet).*(next|later|subsequent|newer|kolejn|następn)/.test(text)) return "Klient korzysta już z kolejnego pakietu, więc wejścia z tej sesji nie można przenieść. Skontaktuj się z klientem i rozlicz zmianę ręcznie.";
+  if (/(package|pakiet).*(closed|zamkni)|(closed|zamkni).*(package|pakiet)/.test(text)) return "Pakiet klienta jest zamknięty, więc nie można zmienić wejść z tej sesji.";
+  if (/archiv|archiw/.test(text)) return "Klient jest w archiwum. Przywróć go, aby zmienić jego udział w tej sesji.";
+  return userMessage(message, "Nie udało się zapisać korekty. Sprawdź dane i spróbuj ponownie.");
 }

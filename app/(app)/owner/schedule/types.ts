@@ -14,7 +14,17 @@ export type SessionStatusFilter =
   | "Completed"
   | "Cancelled";
 
+export type CorrectionMode = "participants" | "details" | "not-held";
+
+export type ParticipantCorrection = {
+  attendanceStatus: string;
+  countsAgainstPackage: boolean;
+  sessionsCharged: string;
+};
+
 export type SessionFormValues = {
+  correctionMode?: CorrectionMode;
+  participantCorrections?: Record<string, ParticipantCorrection>;
   newParticipantCountsAgainstPackage?: boolean;
   newParticipantSessionsCharged?: string;
   correctionReason?: string;
