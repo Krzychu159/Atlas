@@ -202,7 +202,8 @@ export default function SchedulePage() {
   }, [connected]);
 
   async function handleDeleteSession() {
-    if (!selectedSession || isSavingSession) return;
+    // A completed session is billed; it is corrected as "not held" instead of being deleted.
+    if (!selectedSession || isSavingSession || selectedSession.status === "Completed") return;
     setSessionError(null);
     setIsSavingSession(true);
     try {

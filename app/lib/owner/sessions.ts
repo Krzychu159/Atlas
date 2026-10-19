@@ -176,11 +176,12 @@ export type SessionCorrection = {
   id: number;
   sessionId: number | null;
   originalSessionId: number;
-  changeType: string;
-  reason: string;
+  changeType: string | null;
+  reason: string | null;
   beforeState: unknown;
   afterState: unknown;
   changedByUserId: number | null;
+  changedByFullName?: string | null;
   createdAt: string;
 };
 

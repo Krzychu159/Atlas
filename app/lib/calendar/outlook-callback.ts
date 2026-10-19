@@ -28,6 +28,8 @@ export function readOutlookCallbackError(payload: unknown): OutlookCallbackError
   const code = safeCode(raw.code);
   const message = text(raw.message);
   if (!code && !message) return null;
+  // Without a code (e.g. an expired login attempt) the caller shows its own outcome page unless the message is readable.
+  if (!code && !userMessage(message, "")) return null;
   const fallback = (code && Object.hasOwn(codeMessages, code) ? codeMessages[code] : null) ?? "Nie udało się połączyć konta Microsoft. Spróbuj ponownie z ustawień ATLAS.";
   return { code, message: userMessage(message, fallback), microsoftCode: safeCode(raw.microsoftCode) };
 }

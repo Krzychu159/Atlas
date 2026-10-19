@@ -340,6 +340,22 @@ test('payment notifications use the client named by their entity or profile link
   assert.equal(api.getNotificationPaymentId({ relatedEntityType: 'TrainerSettlementPayment', relatedEntityId: 3 }), null);
 });
 
+test('package payment reminders open the payments tab of the client they name', () => {
+  const api = load('app/lib/notifications.ts');
+  const due = { type: 'PackagePaymentRequired', category: 'payments', title: 'Pakiet wymaga opłacenia' };
+  assert.equal(api.getNotificationDestination({ ...due, actionUrl: '/owner/payments', relatedEntityType: 'Client', relatedEntityId: 13 }, 'owner'), '/owner/clients/13/payments');
+  assert.equal(api.getNotificationDestination({ ...due, actionUrl: '/owner/payments?clientId=13' }, 'owner'), '/owner/clients/13/payments');
+  assert.equal(api.getNotificationDestination({ ...due, actionUrl: '/owner/clients/13' }, 'owner'), '/owner/clients/13/payments');
+  assert.equal(api.getNotificationDestination({ ...due, actionUrl: '/clients/13/packages' }, 'owner'), '/owner/clients/13/payments');
+  assert.equal(api.getNotificationDestination({ ...due, actionUrl: '/owner/clients/13/payments' }, 'owner'), '/owner/clients/13/payments');
+  assert.equal(api.getNotificationDestination({ type: 'PackageUnpaid', actionUrl: '/owner/payments', relatedEntityType: 'Client', relatedEntityId: 13 }, 'owner'), '/owner/clients/13/payments');
+  // Without the client in the notification it stays on the general list rather than guessing.
+  assert.equal(api.getNotificationDestination({ ...due, actionUrl: '/owner/payments', relatedEntityType: 'ClientPackage', relatedEntityId: 40 }, 'owner'), '/owner/payments');
+  assert.equal(api.getNotificationDestination({ ...due, actionUrl: null, relatedEntityType: null, relatedEntityId: null }, 'owner'), '/owner/payments');
+  // A non-payment notification about a client still opens the profile.
+  assert.equal(api.getNotificationDestination({ type: 'PackageEndingSoon', actionUrl: '/owner/clients/13' }, 'owner'), '/owner/clients/13');
+});
+
 test('a payment known only by id is matched among pending payments of the right portal', async () => {
   const api = load('app/lib/notifications.ts');
   const calls = [];

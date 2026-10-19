@@ -166,7 +166,10 @@ export default function SessionEditorModal({
   const billingTypeOptions = sessionBillingTypeOptions.some(option => option.value === billingType)
     ? sessionBillingTypeOptions
     : [{ value: billingType, label: billingType ? userTrainingType(billingType, "Obecny typ rozliczenia") : "Wybierz typ rozliczenia" }, ...sessionBillingTypeOptions];
-  const typeOptions = sessionTypeOptions.some(option => option.value === values.plannedSessionType) ? sessionTypeOptions : [...sessionTypeOptions, { value: values.plannedSessionType, label: userTrainingType(values.plannedSessionType, "Obecny rodzaj zajęć") }];
+  // A trainer's series may contain only individual and semi sessions.
+  const trainerSeries = trainerAccess && allowRecurringSessions && !session && repeat;
+  const allTypeOptions = sessionTypeOptions.some(option => option.value === values.plannedSessionType) ? sessionTypeOptions : [...sessionTypeOptions, { value: values.plannedSessionType, label: userTrainingType(values.plannedSessionType, "Obecny rodzaj zajęć") }];
+  const typeOptions = trainerSeries ? allTypeOptions.filter(option => option.value !== "Group") : allTypeOptions;
   const trainerOptions = trainers.map((trainer) => ({
     value: String(trainer.id),
     label: trainer.fullName || `${trainer.firstName} ${trainer.lastName}`,
@@ -650,7 +653,7 @@ export default function SessionEditorModal({
               />
             </Field> : null}
 
-          {allowPublicSessions && isGroupForm && (!readOnly || values.isPubliclyBookable) && (
+          {allowPublicSessions && !trainerSeries && isGroupForm && (!readOnly || values.isPubliclyBookable) && (
             <div className="md:col-span-2">
               <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4 md:col-span-2">
                 <label className="flex cursor-pointer items-center justify-between gap-4">
@@ -689,8 +692,12 @@ export default function SessionEditorModal({
             <div className="rounded-[var(--radius-lg)] bg-surface-container-low p-4 md:col-span-2">
               <label className="flex cursor-pointer items-center justify-between gap-4 font-semibold">
                 Powtarzaj
-                <SessionToggle label="Powtarzaj zajęcia" checked={repeat} disabled={isSaving || groupEnrollmentBusy || readOnly} onChange={setRepeat} />
+                <SessionToggle label="Powtarzaj zajęcia" checked={repeat} disabled={isSaving || groupEnrollmentBusy || readOnly} onChange={checked => {
+                  setRepeat(checked);
+                  if (checked && trainerAccess) setValues(current => current.plannedSessionType === "Group" || current.isPubliclyBookable ? { ...current, plannedSessionType: "", isPubliclyBookable: false } : current);
+                }} />
               </label>
+              {trainerAccess ? <p className="mt-2 text-xs leading-5 text-on-surface-variant">Serie możesz tworzyć z treningów indywidualnych i semi. Zajęcia grupowe planuje właściciel studia. Seria zapisze się w Twoim kalendarzu Outlook.</p> : null}
               {repeat && (
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <Field label="Częstotliwość">

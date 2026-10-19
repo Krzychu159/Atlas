@@ -18,7 +18,7 @@ test("owner and trainer sort menus expose every sort the server supports", () =>
   const filters = load("app/(app)/owner/clients/components/OwnerClientFilters.tsx", { react: h.react });
   const tree = h.render(filters.default, { value: filters.defaultOwnerClientFilters, onChange() {} });
   const options = find(tree, node => node.props.label === "Sortuj").props.options;
-  assert.deepEqual(Array.from(options.filter(option => !option.disabled), option => option.value), ["package-usage", "newest", "name", "trainer", "balance-desc", "balance-asc"]);
+  assert.deepEqual(Array.from(options.filter(option => !option.disabled), option => option.value), ["package-usage", "newest", "name", "trainer", "amount-due-desc", "amount-due-asc"]);
   const payments = load("app/(app)/owner/payments/components/PaymentFilters.tsx");
   const render = serverPagination => payments.PaymentFilters({ serverPagination, value: payments.defaultPaymentFilters, advancedOpen: false, onChange() {}, onClear() {}, onAdvancedOpenChange() {} });
   const ownerOptions = find(render(true), node => node.props.label === "Sortuj").props.options;
@@ -26,10 +26,74 @@ test("owner and trainer sort menus expose every sort the server supports", () =>
   assert.ok(find(render(false), node => node.props.label === "Sortuj").props.options.every(option => !option.disabled));
 });
 
+test("amount-due filter counts as an advanced filter and is cleared with the rest", () => {
+  const h = hooks(), changes = [];
+  const filters = load("app/(app)/owner/clients/components/OwnerClientFilters.tsx", { react: h.react });
+  const render = value => h.render(filters.default, { value, onChange: next => changes.push(next) });
+  const idle = render(filters.defaultOwnerClientFilters);
+  assert.equal(idle.props.advancedActiveCount, 0); assert.equal(idle.props.canClear, false);
+  const select = find(idle.props.advanced, node => node.props.label === "Płatności");
+  assert.deepEqual(Array.from(select.props.options, option => option.value), ["all", "due"]);
+  select.props.onChange("due");
+  assert.equal(changes.at(-1).amountDueOnly, true);
+  const active = render({ ...filters.defaultOwnerClientFilters, amountDueOnly: true, packageFilter: "active-package" });
+  assert.equal(active.props.advancedActiveCount, 2); assert.equal(active.props.canClear, true);
+  assert.equal(find(active.props.advanced, node => node.props.label === "Płatności").props.value, "due");
+  active.props.onClear();
+  assert.equal(changes.at(-1).amountDueOnly, false);
+});
+
+function amountDueClientsFixture(search) {
+  const h = hooks(), queries = [], urls = [];
+  const reader = load("app/(app)/owner/components/use-owner-read.ts", { react: h.react, "@/app/lib/backend": { getErrorMessage: (_, fallback) => fallback } }, { setTimeout: h.window.setTimeout, clearTimeout: h.window.clearTimeout });
+  const defaults = { search: "", packageFilter: "all", trainerFilter: "all", amountDueOnly: false, sort: "newest" };
+  const Page = load("app/(app)/owner/clients/page.tsx", {
+    react: h.react,
+    "next/navigation": { useSearchParams: () => new URLSearchParams(search), useRouter: () => ({ replace() {} }) },
+    "../components/use-owner-read": reader,
+    "../components/list-url-state": { readPositiveInt: value => (value && /^\d+$/.test(value) ? Number(value) : null), listUrlKey: () => "", useListScrollRestoration() {}, useListUrlSync: params => urls.push(params) },
+    "@/app/lib/owner/location-filter": { useOwnerLocationFilter: () => ({ selectedLocationId: null }) },
+    "@/app/lib/owner/clients": { getOwnerClients: async query => { queries.push(query); return { items: [], page: query.page, pageSize: 25, totalCount: 0, totalPages: 0, summary: { withActivePackageCount: 0 } }; } },
+    "@/app/(app)/owner/clients/components/OwnerClientFilters": { default: () => null, defaultOwnerClientFilters: defaults },
+    "@/app/(app)/owner/clients/components/client-list-display": { pluralizeClients: count => String(count) },
+  }).default;
+  const root = Page().props.children;
+  const render = () => h.render(root.type, root.props);
+  const flush = async () => { render(); h.commit(); h.timers(); await settle(); return render(); };
+  return { h, defaults, render, flush, queries, urls };
+}
+
+test("amount-due filter is applied by the server, resets the page and is kept in the address", async () => {
+  const { h, defaults, render, flush, queries, urls } = amountDueClientsFixture("page=3");
+  await flush();
+  assert.equal(queries.at(-1).page, 3); assert.equal(queries.at(-1).hasAmountDue, undefined);
+  find(render(), node => node.props.value?.trainerFilter === "all").props.onChange({ ...defaults, amountDueOnly: true });
+  const tree = await flush();
+  assert.equal(queries.at(-1).page, 1); assert.equal(queries.at(-1).hasAmountDue, true);
+  assert.equal(urls.at(-1).due, "1"); assert.equal(urls.at(-1).page, null);
+  const empty = find(tree, node => node.props.title === "Nikt nie ma nic do zapłaty");
+  assert.ok(empty);
+  empty.props.action.props.onClick();
+  await flush();
+  assert.equal(queries.at(-1).hasAmountDue, undefined); assert.equal(urls.at(-1).due, null);
+  h.unmount();
+});
+
+test("amount-due filter and sort are restored from the address", async () => {
+  const { h, flush, queries } = amountDueClientsFixture("due=1&sort=amount-due-desc");
+  await flush();
+  assert.equal(queries.at(-1).hasAmountDue, true); assert.equal(queries.at(-1).sort, "amountDueDesc");
+  h.unmount();
+  const legacy = amountDueClientsFixture("due=yes&sort=balance-desc");
+  await legacy.flush();
+  assert.equal(legacy.queries.at(-1).hasAmountDue, undefined); assert.equal(legacy.queries.at(-1).sort, "createdDesc");
+  legacy.h.unmount();
+});
+
 function emptyClientsFixture(locationId = null, totalCount = 0) {
   const h = hooks();
   const reader = load("app/(app)/owner/components/use-owner-read.ts", { react: h.react, "@/app/lib/backend": { getErrorMessage: (_, fallback) => fallback } }, { setTimeout: h.window.setTimeout, clearTimeout: h.window.clearTimeout });
-  const defaults = { search: "", packageFilter: "all", trainerFilter: "all", sort: "newest" };
+  const defaults = { search: "", packageFilter: "all", trainerFilter: "all", amountDueOnly: false, sort: "newest" };
   const Page = load("app/(app)/owner/clients/page.tsx", {
     react: h.react,
     "next/navigation": { useSearchParams: () => new URLSearchParams(), useRouter: () => ({ replace() {} }) },

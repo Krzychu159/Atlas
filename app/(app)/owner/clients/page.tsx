@@ -28,9 +28,9 @@ import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { listUrlKey, readPositiveInt, useListScrollRestoration, useListUrlSync } from "../components/list-url-state";
 import type { ClientPackageFilter } from "./components/ClientFilters";
 
-const CLIENT_SORTS: Record<string, NonNullable<OwnerClientsQuery["sort"]>> = { newest: "createdDesc", name: "name", "package-usage": "packageUsageDesc", trainer: "trainer", "balance-desc": "balanceDesc", "balance-asc": "balance" };
+const CLIENT_SORTS: Record<string, NonNullable<OwnerClientsQuery["sort"]>> = { newest: "createdDesc", name: "name", "package-usage": "packageUsageDesc", trainer: "trainer", "amount-due-desc": "amountDueDesc", "amount-due-asc": "amountDue" };
 
-const CLIENT_URL_KEYS = ["q", "package", "trainer", "sort", "page"] as const;
+const CLIENT_URL_KEYS = ["q", "package", "trainer", "due", "sort", "page"] as const;
 const PACKAGE_FILTERS: readonly ClientPackageFilter[] = ["all", "active-package", "inactive-package"];
 
 function clientFiltersFromUrl(params: URLSearchParams): OwnerClientFiltersValue {
@@ -39,6 +39,7 @@ function clientFiltersFromUrl(params: URLSearchParams): OwnerClientFiltersValue 
     search: (params.get("q") ?? "").slice(0, 100),
     packageFilter: PACKAGE_FILTERS.find((value) => value === params.get("package")) ?? defaultOwnerClientFilters.packageFilter,
     trainerFilter: trainerId ? String(trainerId) : defaultOwnerClientFilters.trainerFilter,
+    amountDueOnly: params.get("due") === "1",
     // Restore only documented server sorts.
     sort: Object.hasOwn(CLIENT_SORTS, params.get("sort") ?? "") ? params.get("sort") as OwnerClientFiltersValue["sort"] : defaultOwnerClientFilters.sort,
   };
@@ -49,6 +50,7 @@ function clientFiltersToUrl(filters: OwnerClientFiltersValue, page: number) {
     q: filters.search.trim() || null,
     package: filters.packageFilter === defaultOwnerClientFilters.packageFilter ? null : filters.packageFilter,
     trainer: filters.trainerFilter === defaultOwnerClientFilters.trainerFilter ? null : filters.trainerFilter,
+    due: filters.amountDueOnly ? "1" : null,
     sort: filters.sort === defaultOwnerClientFilters.sort ? null : filters.sort,
     page: page > 1 ? String(page) : null,
   };
@@ -64,7 +66,7 @@ function ClientsContent() {
   const showInvitations = searchParams.get("invitations") === "true";
   const { selectedLocationId } = useOwnerLocationFilter();
   const [filters, setFilters] = useState<OwnerClientFiltersValue>(() => clientFiltersFromUrl(searchParams));
-  const { search, packageFilter, trainerFilter, sort } = filters;
+  const { search, packageFilter, trainerFilter, amountDueOnly, sort } = filters;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [pagination, setPagination] = useState(() => ({ page: readPositiveInt(searchParams.get("page")) ?? 1, locationId: selectedLocationId }));
   const page = pagination.locationId === selectedLocationId ? pagination.page : 1;
@@ -75,8 +77,9 @@ function ClientsContent() {
   const query = useMemo<OwnerClientsQuery>(() => ({ page, pageSize: 25, isArchived: false, search: search.trim() || undefined,
     trainerId: trainerFilter === "all" ? undefined : Number(trainerFilter), locationId: selectedLocationId,
     packageStatus: packageFilter === "active-package" ? "active" : packageFilter === "inactive-package" ? "none" : undefined,
+    hasAmountDue: amountDueOnly ? true : undefined,
     sort: CLIENT_SORTS[sort],
-  }), [page, search, trainerFilter, selectedLocationId, packageFilter, sort]);
+  }), [page, search, trainerFilter, selectedLocationId, packageFilter, amountDueOnly, sort]);
   const load = useCallback((signal: AbortSignal) => getOwnerClients(query, signal), [query]);
   const list = useOwnerRead(JSON.stringify(query), load, "Nie udało się pobrać klientów.", 0, 250, !unsupportedSort && !invalidSearch);
   const lastPage = list.data?.totalPages;
@@ -92,7 +95,7 @@ function ClientsContent() {
   const readError = unsupportedSort ? "To sortowanie nie jest jeszcze dostępne. Wybierz Najnowsi lub Alfabetycznie." : invalidSearch ? "Wpisz maksymalnie 100 znaków wyszukiwania." : list.error;
   const clients = list.data?.items ?? [];
   const filteredClients = clients;
-  const hasLocalFilters = Boolean(search.trim()) || packageFilter !== "all" || trainerFilter !== "all";
+  const hasLocalFilters = Boolean(search.trim()) || packageFilter !== "all" || trainerFilter !== "all" || amountDueOnly;
   const hasFilters = hasLocalFilters || selectedLocationId !== null;
   const isLoading = list.loading;
   const loadFailed = Boolean(readError);
@@ -136,6 +139,22 @@ function ClientsContent() {
           action={
             <Button size="sm" icon={<UserPlus size={15} />} onClick={() => setIsModalOpen(true)}>
               Dodaj klienta
+            </Button>
+          }
+        />
+      );
+    }
+
+    if (filteredClients.length === 0 && amountDueOnly && !search.trim() && packageFilter === "all" && trainerFilter === "all") {
+      return (
+        <ListState
+          variant="empty"
+          icon={<SearchX size={28} />}
+          title="Nikt nie ma nic do zapłaty"
+          message={selectedLocationId !== null ? "Wszyscy klienci w tej lokalizacji mają opłacone pakiety." : "Wszyscy klienci mają opłacone pakiety."}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => changeFilters({ ...filters, amountDueOnly: false })}>
+              Pokaż wszystkich klientów
             </Button>
           }
         />
@@ -225,7 +244,7 @@ function ClientsContent() {
 
         <ListSection
           title="Lista klientów"
-          description="Trener, pakiet, saldo i status klienta w jednym wierszu."
+          description="Trener, pakiet, kwota do zapłaty i status klienta w jednym wierszu."
           meta={countsReady ? pluralizeClients(list.data?.totalCount ?? 0) : null}
         >
           {!readError || list.data ? renderList() : null}

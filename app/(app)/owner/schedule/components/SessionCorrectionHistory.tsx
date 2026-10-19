@@ -5,7 +5,7 @@ import { Button } from "@/app/components/ui/button";
 import { getErrorMessage, isAbortError } from "@/app/lib/backend";
 import { getSessionCorrections, type SessionCorrection } from "@/app/lib/owner/sessions";
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
-import { correctionChangeLabel } from "../session-utils";
+import { correctionAuthor, correctionChangeLabel } from "../session-utils";
 
 export default function SessionCorrectionHistory({ sessionId }: { sessionId: number }) {
   const [history, setHistory] = useState<SessionCorrection[]>([]);
@@ -47,7 +47,7 @@ export default function SessionCorrectionHistory({ sessionId }: { sessionId: num
                 <time dateTime={item.createdAt} className="text-xs text-on-surface-muted">{new Date(item.createdAt).toLocaleString("pl-PL", { dateStyle: "medium", timeStyle: "short" })}</time>
               </div>
               {item.reason ? <p className="mt-2 whitespace-pre-wrap break-words text-on-surface">{item.reason}</p> : null}
-              <p className="mt-1 text-xs text-on-surface-muted">Zmienione przez: {item.changedByUserId == null ? "brak danych" : `użytkownik #${item.changedByUserId}`}</p>
+              <p className="mt-1 text-xs text-on-surface-muted">Zmienione przez: {correctionAuthor(item)}</p>
               <details className="mt-3">
                 <summary className="cursor-pointer text-xs font-semibold text-primary-light">Stan przed i po zmianie</summary>
                 <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2">

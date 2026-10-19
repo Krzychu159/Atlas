@@ -230,13 +230,15 @@ export function getNotificationPaymentId(notification: AppNotification) {
 }
 
 // Payment notifications open the client's payments tab whenever the notification itself names the client.
+// Any notification sent to the general payments list does the same when its entity is the client.
 function paymentClientDestination(notification: AppNotification, role: NotificationRole | null, destination: string | null) {
-  if (!role || role === "client" || getNotificationKind(notification) !== "payment") return destination;
-  const profile = destination?.match(/^\/(?:owner|trainer)\/clients\/([1-9]\d*)\/?([?#].*)?$/);
+  if (!role || role === "client") return destination;
+  const payment = getNotificationKind(notification) === "payment";
+  const profile = payment ? destination?.match(/^\/(?:owner|trainer)\/clients\/([1-9]\d*)\/?([?#].*)?$/) : null;
   if (profile) return `/${role}/clients/${profile[1]}/payments${profile[2] ?? ""}`;
   const clientId = notification.relatedEntityId;
   const knownClient = notification.relatedEntityType?.toLowerCase() === "client" && typeof clientId === "number" && Number.isSafeInteger(clientId) && clientId > 0;
-  if (knownClient && (!destination || isGeneralPaymentsDestination(destination, role))) return `/${role}/clients/${clientId}/payments`;
+  if (knownClient && ((payment && !destination) || isGeneralPaymentsDestination(destination, role))) return `/${role}/clients/${clientId}/payments`;
   return destination;
 }
 

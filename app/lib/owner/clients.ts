@@ -7,7 +7,7 @@ import {
 } from "../backend";
 import type { PagedResult } from "./billing";
 
-export type OwnerClientsQuery = { page: number; pageSize: number; search?: string; trainerId?: number; locationId?: number | null; isArchived?: boolean; status?: "New" | "Active" | "Inactive"; packageStatus?: "active" | "none"; sort?: "createdDesc" | "created" | "name" | "nameDesc" | "packageUsage" | "packageUsageDesc" | "balance" | "balanceDesc" | "trainer" | "trainerDesc" | "archivedAt" | "archivedAtDesc"; order?: "asc" | "desc" };
+export type OwnerClientsQuery = { page: number; pageSize: number; search?: string; trainerId?: number; locationId?: number | null; isArchived?: boolean; status?: "New" | "Active" | "Inactive"; packageStatus?: "active" | "none"; hasAmountDue?: boolean; sort?: "createdDesc" | "created" | "name" | "nameDesc" | "packageUsage" | "packageUsageDesc" | "balance" | "balanceDesc" | "trainer" | "trainerDesc" | "archivedAt" | "archivedAtDesc" | "amountDue" | "amountDueDesc"; order?: "asc" | "desc" };
 export type OwnerClientsPage = PagedResult<Client> & { summary?: { activeClientsCount?: number; withActivePackageCount?: number } | null };
 export async function getOwnerClients(query: OwnerClientsQuery, signal?: AbortSignal) {
   const result = await backendGet<OwnerClientsPage>("clients", query, signal);
@@ -77,6 +77,9 @@ export type Client = {
   billingBalance?: number | null;
   currency?: string | null;
   balanceCurrency?: string | null;
+  // Unpaid remainder of all client packages (sum of max(0, price - paid)); sent by GET /clients.
+  totalAmountDue?: number | null;
+  amountDueCurrency?: string | null;
   // Calendar day supplied by ClientDto; do not interpret it as a UTC instant.
   trainingStartDate: string | null;
   nextSessionAt: string | null;

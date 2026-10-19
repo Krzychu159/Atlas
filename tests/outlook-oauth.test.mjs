@@ -31,8 +31,12 @@ function backendResponse(status, { body = "", headers = {}, setCookies = [] } = 
   return new Response(status === 204 || (status >= 300 && status < 400) ? null : body, { status, headers: responseHeaders });
 }
 
+const groupSessions = load("app/lib/group-sessions.ts");
+const userMessages = load("app/lib/user-messages.ts", { "./group-sessions": groupSessions });
+const callbackErrors = load("app/lib/calendar/outlook-callback.ts", { "@/app/lib/user-messages": userMessages });
+
 function loadCallback(fetchImpl, env = { BACKEND_API_URL: "https://backend.test" }) {
-  return load("app/api/outlook/callback/route.ts", { "@/app/lib/server/backend-cookies": cookies }, {
+  return load("app/api/outlook/callback/route.ts", { "@/app/lib/server/backend-cookies": cookies, "@/app/lib/calendar/outlook-callback": callbackErrors }, {
     fetch: fetchImpl, process: { env },
   });
 }
@@ -219,4 +223,47 @@ test("route protection does not require a CRM session for the OAuth callback", a
   const response = await proxy.proxy(callbackRequest("?code=c&state=s"));
   assert.equal(response.headers.get("x-middleware-next"), "1");
   assert.ok(proxy.config.matcher.every(pattern => !pattern.startsWith("/api")));
+});
+
+function jsonError(status, body) {
+  return backendResponse(status, { body: JSON.stringify(body), headers: { "content-type": "application/json; charset=utf-8" } });
+}
+
+test("callback shows the backend message and Microsoft code for coded OAuth failures", async () => {
+  const calls = [];
+  const route = loadCallback(async (url) => {
+    calls.push(url);
+    return jsonError(400, {
+      message: "Konto Microsoft należy do organizacji, w której zgodę na dostęp aplikacji ATLAS musi zatwierdzić administrator Microsoft 365.",
+      code: "AdminConsentRequired", microsoftError: "consent_required", microsoftCode: "AADSTS90094", detail: "AADSTS90094: Admin consent",
+    });
+  });
+  const search = "?error=consent_required&error_description=AADSTS90094%3A+Admin+consent&state=s%3D1&session_state=abc";
+  const response = await route.GET(callbackRequest(search));
+  const html = await response.text();
+  assert.equal(calls[0], `https://backend.test/api/outlook/callback${search}`, "the full OAuth query string reaches the backend");
+  assert.equal(response.status, 400);
+  assert.match(html, /musi zatwierdzić administrator Microsoft 365/);
+  assert.ok(html.includes("<small>Kod Microsoft: AADSTS90094</small>"));
+  assert.doesNotMatch(html, /consent_required|Admin consent/, "raw Microsoft details stay hidden");
+});
+
+test("callback falls back to Polish copy for English or unsafe backend messages", async () => {
+  const english = loadCallback(async () => jsonError(400, { message: "Access denied by user", code: "AccessDenied", microsoftCode: "AADSTS65004" }));
+  const englishHtml = await (await english.GET(callbackRequest("?error=access_denied&state=s"))).text();
+  assert.match(englishHtml, /Nie udzielono dostępu do kalendarza/);
+  assert.doesNotMatch(englishHtml, /Access denied by user/);
+
+  const unsafe = loadCallback(async () => jsonError(400, { message: "<img src=x onerror=alert(1)> Konto nie jest obsługiwane", code: "AccountNotSupported", microsoftCode: "<b>x</b>" }));
+  const unsafeHtml = await (await unsafe.GET(callbackRequest("?code=c&state=s"))).text();
+  assert.doesNotMatch(unsafeHtml, /<img|onerror|<b>x/);
+  assert.match(unsafeHtml, /Połącz konto, w którym prowadzisz kalendarz/);
+
+  const expired = loadCallback(async () => jsonError(400, { message: "Invalid or expired OAuth state." }));
+  assert.match(await (await expired.GET(callbackRequest("?code=c&state=s"))).text(), /Nie udało się potwierdzić połączenia/, "an uncoded state failure keeps the expired-attempt page");
+
+  const outage = loadCallback(async () => jsonError(503, { message: "Usługa Microsoft jest chwilowo niedostępna. Spróbuj za kilka minut.", code: "MicrosoftUnavailable" }));
+  const outageResponse = await outage.GET(callbackRequest("?code=c&state=s"));
+  assert.equal(outageResponse.status, 502);
+  assert.match(await outageResponse.text(), /chwilowo niedostępna/);
 });

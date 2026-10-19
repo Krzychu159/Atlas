@@ -282,7 +282,7 @@ test("client list renders one responsive row per returned client and preserves s
       getClientPackageUsage: () => ({ percent: 0, label: "Brak", packageName: "Brak" }), hasActiveClientPackage: () => false, getPortalAccessLabel: () => "Brak konta",
     },
     "@/app/(app)/owner/clients/components/OwnerClientFilters": {
-      default: stub, defaultOwnerClientFilters: { search: "", packageFilter: "all", trainerFilter: "all", sort: "newest" },
+      default: stub, defaultOwnerClientFilters: { search: "", packageFilter: "all", trainerFilter: "all", amountDueOnly: false, sort: "newest" },
     },
     "@/app/(app)/owner/clients/components/client-list-display": { pluralizeClients: count => `${count} klientów` },
   }).default;

@@ -11,7 +11,7 @@ export default function OwnerClientList({ children }: { children: ReactNode }) {
         <span>Klient</span>
         <span>Trener</span>
         <span>Pakiet</span>
-        <span>Saldo</span>
+        <span>Do zapłaty</span>
         <span>Status</span>
         <span className="sr-only">Akcje</span>
       </div>

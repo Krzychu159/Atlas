@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { Trash2 } from "lucide-react";
 import SessionAccordion from "@/app/components/schedule/SessionAccordion";
 import GroupSessionDetails from "@/app/components/schedule/GroupSessionDetails";
 import { groupSeatsLabel, isConsultationSession, isGroupTraining } from "@/app/lib/group-sessions";
@@ -9,7 +11,14 @@ import { getSessionStatusLabel } from "@/app/(app)/owner/schedule/session-utils"
 import { sessionTrainingType, userTrainingType } from "@/app/lib/user-messages";
 import type { TrainerSessionDetails } from "@/app/lib/trainer/portal";
 
-export default function TrainerSessionDetailsModal({ session, onClose, onEdit }: { session: TrainerSessionDetails; onClose: () => void; onEdit?: () => void }) {
+export type TrainerSeriesActions = {
+  busy: "sync" | "delete" | null;
+  onRetrySync: () => Promise<void>;
+  onDeleteFuture: () => Promise<boolean>;
+};
+
+export default function TrainerSessionDetailsModal({ session, onClose, onEdit, series }: { session: TrainerSessionDetails; onClose: () => void; onEdit?: () => void; series?: TrainerSeriesActions }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const participants = session.participants;
   const consultation = isConsultationSession(session);
   return (
@@ -49,10 +58,29 @@ export default function TrainerSessionDetailsModal({ session, onClose, onEdit }:
             {session.isPubliclyBookable ? <ParticipantDetail label="Zapisy" value="Publiczne" /> : null}
             {session.locationLimit > 0 ? <ParticipantDetail label="Limit lokalizacji" value={numberLabel(session.locationLimit)} /> : null}
           </dl></SessionAccordion></div> : null}
+          {series ? <div className="mt-4 rounded-[var(--radius-lg)] bg-surface-container-low p-4">
+            <h3 className="font-semibold">Seria zajęć{session.recurrenceInstanceNumber ? ` · termin ${session.recurrenceInstanceNumber}` : ""}</h3>
+            <p className="mt-1 text-sm leading-6 text-on-surface-variant">Te zajęcia należą do serii zapisanej w Twoim kalendarzu Outlook.</p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <Button type="button" variant="secondary" size="sm" disabled={series.busy !== null} onClick={() => void series.onRetrySync()}>{series.busy === "sync" ? "Zapisywanie…" : "Ponów zapis serii w Outlooku"}</Button>
+              <Button type="button" variant="danger" size="sm" disabled={series.busy !== null} onClick={() => setConfirmDelete(true)}>Usuń przyszłe zajęcia z serii</Button>
+            </div>
+          </div> : null}
           <p className="mt-5 text-sm text-on-surface-muted">{session.canEdit === true ? "Możesz edytować te zajęcia." : "Te zajęcia są dostępne tylko do podglądu."}</p>
         </div>
         <ModalFooter>{session.canEdit === true && onEdit ? <Button onClick={onEdit}>Edytuj zajęcia</Button> : null}<Button variant="secondary" onClick={onClose}>Zamknij</Button></ModalFooter>
       </div>
+      {series && confirmDelete ? <ModalOverlay onClose={series.busy ? undefined : () => setConfirmDelete(false)}>
+        <div role="alertdialog" aria-modal="true" className="relative w-full max-w-[480px] overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient">
+          <div className="p-5 md:p-6">
+            <ModalHeader title="Usunąć przyszłe zajęcia z tej serii?" description="Zajęcia, które już się odbyły albo są rozliczone, zostaną bez zmian. Przyszłe terminy znikną też z Twojego kalendarza Outlook." icon={<Trash2 size={19} />} iconTone="danger" onClose={() => setConfirmDelete(false)} />
+          </div>
+          <ModalFooter>
+            <Button type="button" variant="secondary" disabled={series.busy !== null} onClick={() => setConfirmDelete(false)}>Wróć</Button>
+            <Button type="button" variant="danger" icon={<Trash2 size={16} />} disabled={series.busy !== null} onClick={async () => { if (await series.onDeleteFuture()) setConfirmDelete(false); }}>{series.busy === "delete" ? "Usuwanie…" : "Usuń przyszłe zajęcia"}</Button>
+          </ModalFooter>
+        </div>
+      </ModalOverlay> : null}
     </ModalOverlay>
   );
 }

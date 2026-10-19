@@ -49,3 +49,19 @@ test("a failed job, a lost job and a malformed job end with a clear message", as
   const malformed = outlook({ post: async () => ({ unexpected: true }), get: async () => null });
   await assert.rejects(malformed.lib.reconcileOutlook({ kind: "mine" }), /odczytać wyniku/);
 });
+
+test("a background job that finishes with partial errors returns them for the warning", async () => {
+  const partial = { ...result, errors: ["Nie udało się pobrać kalendarza trenera Jan."] };
+  const { lib } = outlook({ post: async () => ({ jobId: "p", state: "Queued", queuedAt: "2026-10-19T10:00:00Z" }), get: async () => ({ jobId: "p", state: "Completed", result: partial }) });
+  const data = await lib.reconcileOutlook({ kind: "all" });
+  assert.deepEqual(data.errors, ["Nie udało się pobrać kalendarza trenera Jan."]);
+});
+
+test("a completed job without a result and a cancelled wait never report success", async () => {
+  const empty = outlook({ post: async () => ({ jobId: "e", state: "Running" }), get: async () => ({ jobId: "e", state: "Completed", result: null }) });
+  await assert.rejects(empty.lib.reconcileOutlook({ kind: "mine" }), /nie udało się odczytać podsumowania/);
+  const controller = new AbortController();
+  controller.abort();
+  const aborted = outlook({ post: async () => ({ jobId: "a", state: "Running" }), get: async () => { throw new Error("must not poll"); } });
+  await assert.rejects(aborted.lib.reconcileOutlook({ kind: "mine" }, controller.signal), error => error.name === "AbortError");
+});

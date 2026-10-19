@@ -455,11 +455,27 @@ export function correctionChangeLabel(changeType: string | null | undefined) {
 
 // Known reasons why the backend refuses a correction; the form keeps the entered data.
 export function correctionErrorMessage(error: unknown) {
-  const message = error && typeof error === "object" && typeof (error as { message?: unknown }).message === "string" ? (error as { message: string }).message : "";
-  const text = message.toLowerCase();
+  const raw = error && typeof error === "object" ? error as { message?: unknown; status?: unknown; payload?: unknown } : {};
+  const payload = raw.payload && typeof raw.payload === "object" ? raw.payload as Record<string, unknown> : {};
+  const message = typeof raw.message === "string" ? raw.message : "";
+  if (raw.status === 403) return "Nie masz uprawnień, aby poprawić tę sesję.";
+  if (raw.status === 404) return "Ta sesja już nie istnieje albo została usunięta. Odśwież grafik.";
+  if (raw.status === 409) return "Sesja została w międzyczasie zmieniona. Zamknij okno, otwórz sesję ponownie i powtórz korektę.";
+  // A readable Polish message from the studio system is shown as it is.
+  const readable = userMessage(message, "");
+  if (readable) return readable;
+  const text = [payload.code, message, payload.detail, payload.title].filter(value => typeof value === "string").join(" ").toLowerCase();
   if (/settlement|rozliczeni/.test(text) && /paid|wypłac/.test(text)) return "Rozliczenie trenera za ten okres jest już wypłacone, więc tej sesji nie można przeliczyć. Sprawdź rozliczenie trenera, zanim poprawisz sesję.";
   if (/(next|later|subsequent|newer|kolejn|następn).*(package|pakiet)|(package|pakiet).*(next|later|subsequent|newer|kolejn|następn)/.test(text)) return "Klient korzysta już z kolejnego pakietu, więc wejścia z tej sesji nie można przenieść. Skontaktuj się z klientem i rozlicz zmianę ręcznie.";
   if (/(package|pakiet).*(closed|zamkni)|(closed|zamkni).*(package|pakiet)/.test(text)) return "Pakiet klienta jest zamknięty, więc nie można zmienić wejść z tej sesji.";
   if (/archiv|archiw/.test(text)) return "Klient jest w archiwum. Przywróć go, aby zmienić jego udział w tej sesji.";
-  return userMessage(message, "Nie udało się zapisać korekty. Sprawdź dane i spróbuj ponownie.");
+  if (/reason|powód/.test(text)) return "Podaj powód korekty (od 1 do 500 znaków).";
+  if (/attendance|obecno/.test(text)) return "Wybrany status obecności nie jest obsługiwany. Wybierz „Obecny” albo „Nieobecny”.";
+  return "Nie udało się zapisać korekty. Sprawdź dane i spróbuj ponownie.";
+}
+
+export function correctionAuthor(item: { changedByFullName?: string | null; changedByUserId: number | null }) {
+  const name = item.changedByFullName?.trim();
+  if (name) return name;
+  return item.changedByUserId == null ? "brak danych" : `użytkownik #${item.changedByUserId}`;
 }

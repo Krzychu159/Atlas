@@ -51,12 +51,16 @@ test("clients without a package and with several packages", () => {
   assert.equal(many.extraCount, 1);
 });
 
-test("balance never turns missing data into zero", () => {
-  assert.equal(display.clientBalance({ ...base }).tone, "missing");
-  assert.equal(display.clientBalance({ ...base }).label, "Brak danych");
-  assert.equal(display.clientBalance({ ...base, currentBalance: 150, currency: "PLN" }).tone, "positive");
-  assert.equal(display.clientBalance({ ...base, currentBalance: -50, currency: "PLN" }).tone, "neutral");
-  assert.equal(display.clientBalance({ ...base, currentBalance: 0, currency: "PLN" }).tone, "neutral");
+test("amount due comes only from totalAmountDue and never turns missing data into zero", () => {
+  const nbsp = value => value.replace(/\s/g, " ");
+  assert.deepEqual({ ...display.clientAmountDue({ ...base }) }, { label: "Brak danych", tone: "missing" });
+  assert.equal(display.clientAmountDue({ ...base, totalAmountDue: null, currentBalance: 300 }).tone, "missing");
+  const settled = display.clientAmountDue({ ...base, totalAmountDue: 0, amountDueCurrency: "PLN", currentBalance: 300 });
+  assert.equal(nbsp(settled.label), "0,00 zł"); assert.equal(settled.tone, "settled");
+  const due = display.clientAmountDue({ ...base, totalAmountDue: 12500.5, amountDueCurrency: "PLN" });
+  assert.equal(nbsp(due.label), "12 500,50 zł"); assert.equal(due.tone, "due");
+  assert.equal(nbsp(display.clientAmountDue({ ...base, totalAmountDue: 99 }).label), "99,00 zł");
+  assert.equal(display.clientAmountDue({ ...base, totalAmountDue: 10, amountDueCurrency: "EUR" }).label.includes("€"), true);
 });
 
 test("trainer and status labels follow the data", () => {

@@ -1,5 +1,5 @@
 import type { GroupSessionFields, GroupSessionSettings } from "../group-sessions";
-import { backendGet, backendPatch, backendPost, backendPut } from "../backend";
+import { backendDelete, backendGet, backendPatch, backendPost, backendPut } from "../backend";
 import type {
   Client,
   ClientListPackage,
@@ -360,6 +360,51 @@ export function getTrainerPortalSession(sessionId: number, signal?: AbortSignal)
 
 export function createTrainerPortalSession(payload: TrainerSessionPayload) {
   return backendPost<unknown>("trainer-portal/sessions", payload);
+}
+
+export type TrainerSessionRecurrence = {
+  frequency: "Daily" | "Weekly";
+  interval: number;
+  daysOfWeek: string[];
+  occurrencesCount: number | null;
+  endDate: string | null;
+};
+
+export type TrainerSessionSeriesResult = {
+  recurringGroupId: string;
+  frequency: TrainerSessionRecurrence["frequency"];
+  interval: number;
+  occurrencesCount: number;
+  outlookSeriesSynced: boolean;
+  outlookSyncWarning: string | null;
+  sessions: unknown[];
+};
+
+export type TrainerSessionSeriesSyncResult = {
+  recurringGroupId: string;
+  outlookSeriesSynced: boolean;
+  outlookSyncWarning: string | null;
+};
+
+export type TrainerSessionSeriesDeleteResult = {
+  recurringGroupId: string;
+  deletedSessionsCount: number;
+  keptSessionsCount: number;
+  outlookSeriesDeleted: boolean;
+};
+
+// The backend always assigns the series to the signed-in trainer.
+export function createTrainerPortalSessionSeries(session: TrainerSessionPayload, recurrence: TrainerSessionRecurrence) {
+  return backendPost<TrainerSessionSeriesResult>("trainer-portal/sessions/series", { session, recurrence });
+}
+
+export function syncTrainerPortalSessionSeriesOutlook(recurringGroupId: string) {
+  return backendPost<TrainerSessionSeriesSyncResult>(`trainer-portal/sessions/series/${encodeURIComponent(recurringGroupId)}/sync-outlook`);
+}
+
+// Removes only future, not completed and not charged sessions; past ones stay in the series.
+export function deleteTrainerPortalSessionSeries(recurringGroupId: string) {
+  return backendDelete<TrainerSessionSeriesDeleteResult>(`trainer-portal/sessions/series/${encodeURIComponent(recurringGroupId)}`);
 }
 
 export function updateTrainerPortalSession(

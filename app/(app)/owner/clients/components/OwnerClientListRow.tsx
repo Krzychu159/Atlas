@@ -1,14 +1,15 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, WalletCards } from "lucide-react";
 import type { Client } from "@/app/lib/owner/clients";
 import { getClientName } from "./client-display";
 import {
-  clientBalance,
+  clientAmountDue,
   clientPackageSummary,
   clientStatus,
   clientTrainerLabel,
   sessionDots,
+  type ClientAmountDueTone,
   type ClientPackageSummary,
   type ClientStatusTone,
 } from "./client-list-display";
@@ -24,7 +25,7 @@ export default function OwnerClientListRow({ client }: { client: Client }) {
   const fullName = getClientName(client);
   const status = clientStatus(client);
   const trainer = clientTrainerLabel(client);
-  const balance = clientBalance(client);
+  const amountDue = clientAmountDue(client);
   const pkg = clientPackageSummary(client);
 
   return (
@@ -54,7 +55,7 @@ export default function OwnerClientListRow({ client }: { client: Client }) {
           {trainer.label}
         </p>
         <PackageCell summary={pkg} />
-        <p className={`truncate text-sm font-semibold ${balanceTone[balance.tone]}`}>{balance.label}</p>
+        <p className={`truncate text-sm font-semibold tabular-nums ${amountDueTone[amountDue.tone]}`}>{amountDue.label}</p>
         <div className="min-w-0">
           <StatusBadge tone={status.tone} label={status.label} />
         </div>
@@ -81,8 +82,11 @@ export default function OwnerClientListRow({ client }: { client: Client }) {
             <PackageCell summary={pkg} />
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">Saldo</p>
-            <p className={`text-sm font-semibold ${balanceTone[balance.tone]}`}>{balance.label}</p>
+            <p className="flex items-center justify-end gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
+              <WalletCards size={12} className={amountDue.tone === "due" ? "text-error-light" : undefined} aria-hidden />
+              Do zapłaty
+            </p>
+            <p className={`text-sm font-semibold tabular-nums ${amountDueTone[amountDue.tone]}`}>{amountDue.label}</p>
           </div>
         </div>
       </div>
@@ -176,11 +180,11 @@ const statusBadge: Record<ClientStatusTone, string> = {
   unknown: "bg-surface-container-high text-on-surface-muted",
 };
 
-const balanceTone = {
-  positive: "text-tertiary-light",
-  neutral: "text-on-surface",
+const amountDueTone: Record<ClientAmountDueTone, string> = {
+  due: "text-error-light",
+  settled: "text-on-surface",
   missing: "text-on-surface-muted",
-} as const;
+};
 
 function StatusBadge({ tone, label }: { tone: ClientStatusTone; label: string }) {
   return (

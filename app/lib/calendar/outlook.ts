@@ -34,7 +34,10 @@ export type OutlookSeriesAttention = string | {
   outlookSyncWarning?: string | null;
 };
 
+// OutlookReconciliationResultDto
 export type OutlookReconcileResult = {
+  rangeStartAt?: string;
+  rangeEndAt?: string;
   integrationsProcessed: number;
   outlookEventsFound: number;
   importedOrUpdatedEvents: number;
@@ -53,11 +56,15 @@ export type OutlookReconcileScope =
 
 export type OutlookReconcileJobState = "Queued" | "Running" | "Completed" | "Failed";
 
+// OutlookReconcileJobStatusDto (202 from POST /outlook/reconcile, 200 from GET /outlook/reconcile/{jobId})
 export type OutlookReconcileJob = {
   jobId: string;
   state: OutlookReconcileJobState | string;
   message?: string | null;
   result?: OutlookReconcileResult | null;
+  queuedAt?: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
 };
 
 const RECONCILE_POLL_MS = 4000;

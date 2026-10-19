@@ -6,17 +6,21 @@ import { FilterSearchField, FilterToolbar } from "@/app/components/ui/list/Filte
 import { OwnerRemoteSelect } from "../../components/OwnerRemoteSelect";
 import type { ClientPackageFilter, ClientSort } from "./ClientFilters";
 
+export type OwnerClientSort = Exclude<ClientSort, "balance-desc" | "balance-asc"> | "amount-due-desc" | "amount-due-asc";
+
 export type OwnerClientFiltersValue = {
   search: string;
   packageFilter: ClientPackageFilter;
   trainerFilter: string;
-  sort: ClientSort;
+  amountDueOnly: boolean;
+  sort: OwnerClientSort;
 };
 
 export const defaultOwnerClientFilters: OwnerClientFiltersValue = {
   search: "",
   packageFilter: "all",
   trainerFilter: "all",
+  amountDueOnly: false,
   sort: "newest",
 };
 
@@ -32,6 +36,9 @@ export default function OwnerClientFilters({ value, locationId, onChange }: Owne
     key: Key,
     nextValue: OwnerClientFiltersValue[Key],
   ) => onChange({ ...value, [key]: nextValue });
+  const advancedActiveCount =
+    (value.packageFilter !== defaultOwnerClientFilters.packageFilter ? 1 : 0) +
+    (value.amountDueOnly ? 1 : 0);
 
   return (
     <FilterToolbar
@@ -45,20 +52,29 @@ export default function OwnerClientFilters({ value, locationId, onChange }: Owne
       gridClassName="md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_240px_240px_auto_auto]"
       advancedId="client-advanced-filters"
       advancedOpen={advancedOpen}
-      advancedActiveCount={value.packageFilter !== defaultOwnerClientFilters.packageFilter ? 1 : 0}
+      advancedActiveCount={advancedActiveCount}
       onAdvancedOpenChange={setAdvancedOpen}
       advanced={
-        <CustomSelect
-          label="Pakiet"
-          value={value.packageFilter}
-          onChange={(nextValue) => update("packageFilter", nextValue as ClientPackageFilter)}
-          options={packageOptions}
-        />
+        <>
+          <CustomSelect
+            label="Pakiet"
+            value={value.packageFilter}
+            onChange={(nextValue) => update("packageFilter", nextValue as ClientPackageFilter)}
+            options={packageOptions}
+          />
+          <CustomSelect
+            label="Płatności"
+            value={value.amountDueOnly ? "due" : "all"}
+            onChange={(nextValue) => update("amountDueOnly", nextValue === "due")}
+            options={amountDueOptions}
+          />
+        </>
       }
       canClear={
         value.search !== defaultOwnerClientFilters.search ||
         value.packageFilter !== defaultOwnerClientFilters.packageFilter ||
         value.trainerFilter !== defaultOwnerClientFilters.trainerFilter ||
+        value.amountDueOnly !== defaultOwnerClientFilters.amountDueOnly ||
         value.sort !== defaultOwnerClientFilters.sort
       }
       onClear={() => onChange(defaultOwnerClientFilters)}
@@ -67,7 +83,7 @@ export default function OwnerClientFilters({ value, locationId, onChange }: Owne
       <CustomSelect
         label="Sortuj"
         value={value.sort}
-        onChange={(nextValue) => update("sort", nextValue as ClientSort)}
+        onChange={(nextValue) => update("sort", nextValue as OwnerClientSort)}
         options={sortOptions}
       />
     </FilterToolbar>
@@ -80,11 +96,16 @@ const packageOptions = [
   { value: "inactive-package", label: "Bez aktywnego" },
 ];
 
+const amountDueOptions = [
+  { value: "all", label: "Wszyscy" },
+  { value: "due", label: "Z kwotą do zapłaty" },
+];
+
 const sortOptions = [
   { value: "package-usage", label: "Wykorzystanie pakietu" },
   { value: "newest", label: "Najnowsi" },
   { value: "name", label: "Alfabetycznie" },
   { value: "trainer", label: "Po trenerze" },
-  { value: "balance-desc", label: "Saldo malejąco" },
-  { value: "balance-asc", label: "Saldo rosnąco" },
+  { value: "amount-due-desc", label: "Do zapłaty: najwięcej" },
+  { value: "amount-due-asc", label: "Do zapłaty: najmniej" },
 ];

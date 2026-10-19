@@ -40,7 +40,7 @@ for (const summary of [undefined, null, {}, { withActivePackageCount: 0 }, { wit
       "../components/use-owner-read": reader,
       "@/app/lib/owner/location-filter": { useOwnerLocationFilter: () => ({ selectedLocationId: null }) },
       "@/app/lib/owner/clients": { getOwnerClients: async () => ({ items: [{ id: 1, fullName: "Anna" }], page: 1, pageSize: 25, totalCount: 1, totalPages: 1, summary }) },
-      "@/app/(app)/owner/clients/components/OwnerClientFilters": { default: () => null, defaultOwnerClientFilters: { search: "", packageFilter: "all", trainerFilter: "all", sort: "newest" } },
+      "@/app/(app)/owner/clients/components/OwnerClientFilters": { default: () => null, defaultOwnerClientFilters: { search: "", packageFilter: "all", trainerFilter: "all", amountDueOnly: false, sort: "newest" } },
       "@/app/(app)/owner/clients/components/client-list-display": { pluralizeClients: count => `${count} klientów` },
     }).default;
     const root = Page().props.children;

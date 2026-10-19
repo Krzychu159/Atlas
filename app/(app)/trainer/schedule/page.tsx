@@ -11,7 +11,10 @@ import { correctCompletedSession } from "@/app/(app)/owner/schedule/session-util
 import { correctTrainerSessionBilling } from "@/app/lib/trainer/portal";
 import { notifySessionCorrected } from "@/app/lib/session-corrections";
 import { trainerPaymentError } from "@/app/lib/trainer/payment-errors";
+import { trainerSeriesBlocker, trainerSeriesError } from "@/app/lib/trainer/session-series";
+import { userMessage } from "@/app/lib/user-messages";
 import { getOutlookStatus, type OutlookStatus } from "@/app/lib/calendar/outlook";
+import { createTrainerPortalSessionSeries, deleteTrainerPortalSessionSeries, syncTrainerPortalSessionSeriesOutlook, type TrainerSessionRecurrence } from "@/app/lib/trainer/portal";
 import { updateTrainerPortalSession, createTrainerPortalSession, getTrainerPortalMe, getTrainerPortalSession, getTrainerPortalSessions, type TrainerPortalMe, type TrainerSessionDetails, type TrainerSessionPayload } from "@/app/lib/trainer/portal";
 import { trainerPortalClientsToClients, trainerPortalMeToLocations, trainerPortalMeToTrainer, trainerPortalSessionsToCalendarSessions } from "@/app/lib/trainer/portal-mappers";
 import { DateNavigator, ViewSwitch } from "@/app/(app)/owner/schedule/components/ScheduleControls";
@@ -48,6 +51,8 @@ export default function TrainerSchedulePage() {
   const [createDate, setCreateDate] = useState(() => new Date());
   const [createStartAt, setCreateStartAt] = useState<Date | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [seriesSyncWarning, setSeriesSyncWarning] = useState<{ recurringGroupId: string; message: string } | null>(null);
+  const [seriesAction, setSeriesAction] = useState<"sync" | "delete" | null>(null);
   const loadRevision = useRef(0);
   const sessionController = useRef<AbortController | null>(null);
   const detailController = useRef<AbortController | null>(null);
@@ -164,9 +169,11 @@ export default function TrainerSchedulePage() {
     }).finally(() => { if (revision === detailRevision.current) setIsDetailLoading(false); });
   }, []);
   function openDetails(session: Pick<CalendarSession, "id">) { setIsDetailLoading(true); setSelectedSession(null); return fetchDetails(session); }
-  async function handleCreate(values: SessionFormValues) {
+  async function handleCreate(values: SessionFormValues, recurrence?: TrainerSessionRecurrence) {
     if (saving.current || !me?.trainerId || resourcesError) return;
     try {
+      const seriesBlocker = recurrence ? trainerSeriesBlocker(values) : null;
+      if (seriesBlocker) throw new Error(seriesBlocker);
       if (Number(values.trainerId) !== me.trainerId) throw new Error("Możesz dodawać tylko własne zajęcia.");
       if (!locations.some(location => location.id === Number(values.locationId))) throw new Error("Wybierz dostępną lokalizację.");
       const consultation = isConsultationForm(values);
@@ -192,14 +199,25 @@ export default function TrainerSchedulePage() {
       };
       saving.current = true;
       setIsSaving(true);
-      await createTrainerPortalSession(payload);
-      if (!mounted.current) return;
-      setIsCreateOpen(false);
-      showAppSuccess("Zajęcia zostały dodane.");
+      if (recurrence) {
+        const series = await createTrainerPortalSessionSeries(payload, recurrence);
+        if (!mounted.current) return;
+        setIsCreateOpen(false);
+        const count = Array.isArray(series.sessions) && series.sessions.length ? series.sessions.length : series.occurrencesCount;
+        if (series.outlookSeriesSynced === false || series.outlookSyncWarning) {
+          setSeriesSyncWarning({ recurringGroupId: series.recurringGroupId, message: userMessage(series.outlookSyncWarning, "Seria jest zapisana w ATLAS, ale nie w pełni pojawiła się w Outlooku.") });
+          showAppSuccess(`Dodano serię zajęć (${count}).`);
+        } else showAppSuccess(`Dodano serię zajęć (${count}). Seria jest też w Twoim kalendarzu Outlook.`);
+      } else {
+        await createTrainerPortalSession(payload);
+        if (!mounted.current) return;
+        setIsCreateOpen(false);
+        showAppSuccess("Zajęcia zostały dodane.");
+      }
       await reloadSessions();
     } catch (error) {
       if (!mounted.current) return;
-      const message = trainerPaymentError(error, "Nie udało się dodać zajęć. Sprawdź wpisane dane i dostępność miejsc.");
+      const message = (recurrence ? trainerSeriesError : trainerPaymentError)(error, "Nie udało się dodać zajęć. Sprawdź wpisane dane i dostępność miejsc.");
       showAppError(new Error(message), message);
       if (error instanceof ApiError) await reloadSessions();
     } finally { saving.current = false; setIsSaving(false); }
@@ -264,6 +282,46 @@ export default function TrainerSchedulePage() {
       }
     } finally { saving.current = false; setIsSaving(false); }
   }
+  async function retrySeriesSync(recurringGroupId: string) {
+    if (seriesAction) return;
+    setSeriesAction("sync");
+    try {
+      const result = await syncTrainerPortalSessionSeriesOutlook(recurringGroupId);
+      if (!mounted.current) return;
+      if (result.outlookSeriesSynced) {
+        setSeriesSyncWarning(current => current?.recurringGroupId === recurringGroupId ? null : current);
+        showAppSuccess("Seria jest zapisana w Twoim kalendarzu Outlook.");
+      } else {
+        const message = userMessage(result.outlookSyncWarning, "Nie udało się jeszcze zapisać serii w Outlooku. Spróbuj ponownie za chwilę.");
+        setSeriesSyncWarning({ recurringGroupId, message });
+        showAppError(new Error(message), message);
+      }
+    } catch (error) {
+      if (!mounted.current) return;
+      const message = trainerSeriesError(error, "Nie udało się zapisać serii w Outlooku. Spróbuj ponownie.");
+      showAppError(new Error(message), message);
+    } finally { if (mounted.current) setSeriesAction(null); }
+  }
+  async function removeFutureSeriesSessions(recurringGroupId: string) {
+    if (seriesAction) return false;
+    setSeriesAction("delete");
+    try {
+      const result = await deleteTrainerPortalSessionSeries(recurringGroupId);
+      if (!mounted.current) return true;
+      const kept = result.keptSessionsCount > 0 ? ` Bez zmian zostało ${result.keptSessionsCount}, bo już się odbyły lub są rozliczone.` : "";
+      showAppSuccess(`Usunięto przyszłe zajęcia z serii (${result.deletedSessionsCount}).${kept}`);
+      setSeriesSyncWarning(current => current?.recurringGroupId === recurringGroupId ? null : current);
+      detailRevision.current += 1; detailController.current?.abort(); setSelectedSession(null);
+      notifySessionCorrected();
+      await reloadSessions();
+      return true;
+    } catch (error) {
+      if (!mounted.current) return false;
+      const message = trainerSeriesError(error, "Nie udało się usunąć zajęć z serii. Spróbuj ponownie.");
+      showAppError(new Error(message), message);
+      return false;
+    } finally { if (mounted.current) setSeriesAction(null); }
+  }
   const canCreate = !isResourcesLoading && !resourcesError && Boolean(me?.trainerId) && locations.length > 0;
 
   useEffect(() => {
@@ -281,15 +339,16 @@ export default function TrainerSchedulePage() {
         <div className="card-shell flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><CustomSelect label="Status zajęć" value={statusFilter} options={scheduleStatusFilterOptions} onChange={value => setStatusFilter(value as SessionStatusFilter)} /><p className="text-sm text-on-surface-muted">{!isLoading && !loadError ? visibleSessions.length + " zajęć w wybranym terminie" : ""}</p></div>
         {resourcesError ? <div role="alert" className="card-shell p-4 text-sm text-on-surface-variant">{resourcesError}<Button variant="secondary" className="mt-3" onClick={() => void reloadResources()}>Spróbuj ponownie</Button></div> : !isResourcesLoading && !locations.length ? <p className="card-shell p-4 text-sm text-on-surface-variant">Nie masz przypisanej lokalizacji. Ustal ją z właścicielem studia przed dodaniem zajęć.</p> : null}
         {outlookError || outlookStatus?.isConnected === false ? <div className="card-shell p-4 text-sm text-on-surface-variant">{outlookError || "Połącz Outlook, aby korzystać z synchronizacji kalendarza."}<Link href="/trainer/settings" className="ml-2 font-semibold text-primary-light">Ustawienia połączenia</Link></div> : null}
+        {seriesSyncWarning ? <div role="status" className="card-shell flex flex-col gap-3 p-4 text-sm text-on-surface-variant sm:flex-row sm:items-center sm:justify-between"><p>{seriesSyncWarning.message}</p><Button variant="secondary" size="sm" disabled={seriesAction !== null} onClick={() => void retrySeriesSync(seriesSyncWarning.recurringGroupId)}>{seriesAction === "sync" ? "Zapisywanie…" : "Ponów zapis w Outlooku"}</Button></div> : null}
         {isDetailLoading ? <p role="status" className="text-sm text-on-surface-variant">Pobieranie szczegółów zajęć…</p> : null}
         {loadError && !isLoading ? <div role="alert" className="card-shell p-5 text-on-surface-variant">{loadError}<Button variant="secondary" className="mt-3" onClick={() => void reloadSessions()}>Spróbuj ponownie</Button></div> : <>
           {!isLoading && !visibleSessions.length ? <p className="card-shell p-5 text-sm text-on-surface-variant">Brak zajęć w wybranym terminie i dla wybranego statusu.</p> : null}
           {view === "week" ? <WeekSchedule days={weekDays} sessions={visibleSessions} isLoading={isLoading} onSelectSession={openDetails} onCreateSession={canCreate ? openCreate : undefined} /> : <DaySchedule date={anchorDate} sessions={visibleSessions} isLoading={isLoading} onSelectSession={openDetails} onCreateSession={canCreate ? openCreate : undefined} />}
         </>}
       </div>
-      {selectedSession && !isEditOpen ? <TrainerSessionDetailsModal session={selectedSession} onEdit={!isResourcesLoading && !resourcesError && selectedSession.trainerId === me?.trainerId ? () => { if (selectedSession.canEdit === true) setIsEditOpen(true); } : undefined} onClose={() => { detailRevision.current += 1; detailController.current?.abort(); setSelectedSession(null); }} /> : null}
+      {selectedSession && !isEditOpen ? <TrainerSessionDetailsModal session={selectedSession} onEdit={!isResourcesLoading && !resourcesError && selectedSession.trainerId === me?.trainerId ? () => { if (selectedSession.canEdit === true) setIsEditOpen(true); } : undefined} onClose={() => { detailRevision.current += 1; detailController.current?.abort(); setSelectedSession(null); }} series={selectedSession.recurringGroupId && selectedSession.trainerId === me?.trainerId ? { busy: seriesAction, onRetrySync: () => retrySeriesSync(selectedSession.recurringGroupId!), onDeleteFuture: () => removeFutureSeriesSessions(selectedSession.recurringGroupId!) } : undefined} /> : null}
       {isEditOpen && selectedSession ? <SessionEditorModal key={"edit-" + selectedSession.id + "-" + editorRevision} open session={selectedSession} anchorDate={new Date(selectedSession.startAt)} trainers={trainers} locations={locations} clients={clients} loadClientOptions={loadClientOptions} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsEditOpen(false); }} onSubmit={handleEdit} /> : null}
-      <SessionEditorModal key={isCreateOpen ? "new-" + toDateInputValue(createDate) : "closed"} open={isCreateOpen} session={null} anchorDate={createDate} defaultStartAt={createStartAt} trainers={trainers} locations={locations} clients={clients} loadClientOptions={loadClientOptions} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsCreateOpen(false); }} onSubmit={handleCreate} />
+      <SessionEditorModal key={isCreateOpen ? "new-" + toDateInputValue(createDate) : "closed"} open={isCreateOpen} session={null} anchorDate={createDate} defaultStartAt={createStartAt} trainers={trainers} locations={locations} clients={clients} loadClientOptions={loadClientOptions} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions allowRecurringSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsCreateOpen(false); }} onSubmit={handleCreate} />
     </>
   );
 }

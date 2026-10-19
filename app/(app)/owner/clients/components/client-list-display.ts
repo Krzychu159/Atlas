@@ -1,7 +1,5 @@
 import type { ClientListItem } from "@/app/lib/owner/clients";
 import {
-  formatClientBalance,
-  getClientBalance,
   getClientPackageUsage,
   hasActiveClientPackage,
 } from "./client-display";
@@ -77,12 +75,21 @@ export function clientTrainerLabel(client: Pick<ClientListItem, "trainerFullName
   return { label: "Nie przypisano", assigned: false };
 }
 
-export function clientBalance(client: ClientListItem) {
-  const value = getClientBalance(client, true);
-  return {
-    label: formatClientBalance(client, true),
-    tone: value === null ? "missing" : value > 0 ? "positive" : "neutral",
-  } as const;
+export type ClientAmountDueTone = "due" | "settled" | "missing";
+
+// Missing data stays "Brak danych"; it is never shown as 0,00 zł.
+export function clientAmountDue(client: Pick<ClientListItem, "totalAmountDue" | "amountDueCurrency">): { label: string; tone: ClientAmountDueTone } {
+  const value = client.totalAmountDue;
+  if (typeof value !== "number" || !Number.isFinite(value)) return { label: "Brak danych", tone: "missing" };
+  const currency = client.amountDueCurrency?.trim() || "PLN";
+  const digits = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  let label: string;
+  try {
+    label = new Intl.NumberFormat("pl-PL", { style: "currency", currency, ...digits }).format(value);
+  } catch {
+    label = `${new Intl.NumberFormat("pl-PL", digits).format(value)} ${currency}`;
+  }
+  return { label, tone: value > 0 ? "due" : "settled" };
 }
 
 // Masculine-personal noun: "2 klientów" (dwóch klientów), so only 1 is singular.
