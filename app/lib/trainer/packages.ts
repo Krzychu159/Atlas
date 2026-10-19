@@ -27,3 +27,7 @@ export type TrainerPackage = {
 export function getTrainerPackages(signal?: AbortSignal, filters?: { locationId?: number; isActive?: boolean }) {
   return backendGet<TrainerPackage[]>("Packages", filters, signal);
 }
+
+export function getTrainerPackage(id: number, signal?: AbortSignal) {
+  return backendGet<TrainerPackage>(`Packages/${id}`, undefined, signal);
+}

@@ -19,14 +19,13 @@ import OwnerClientFilters, {
   defaultOwnerClientFilters,
   type OwnerClientFiltersValue,
 } from "@/app/(app)/owner/clients/components/OwnerClientFilters";
-import OwnerClientList from "@/app/(app)/owner/clients/components/OwnerClientList";
-import OwnerClientListRow from "@/app/(app)/owner/clients/components/OwnerClientListRow";
-import { pluralizeClients } from "@/app/(app)/owner/clients/components/client-list-display";
+import ClientList from "@/app/components/clients/ClientList";
+import ClientListRow from "@/app/components/clients/ClientListRow";
+import { clientAmountDue, pluralizeClients, type ClientPackageFilter } from "@/app/components/clients/client-list-display";
 import { useOwnerRead } from "../components/use-owner-read";
 import { OwnerReadState } from "../components/OwnerReadState";
 import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { listUrlKey, readPositiveInt, useListScrollRestoration, useListUrlSync } from "../components/list-url-state";
-import type { ClientPackageFilter } from "./components/ClientFilters";
 
 const CLIENT_SORTS: Record<string, NonNullable<OwnerClientsQuery["sort"]>> = { newest: "createdDesc", name: "name", "package-usage": "packageUsageDesc", trainer: "trainer", "amount-due-desc": "amountDueDesc", "amount-due-asc": "amountDue" };
 
@@ -178,11 +177,11 @@ function ClientsContent() {
     }
 
     return (
-      <OwnerClientList>
+      <ClientList amountLabel="Do zapłaty">
         {filteredClients.map((client) => (
-          <OwnerClientListRow key={client.id} client={client} />
+          <ClientListRow key={client.id} client={client} detailsHref={`/owner/clients/${client.id}`} amountLabel="Do zapłaty" amount={clientAmountDue(client)} />
         ))}
-      </OwnerClientList>
+      </ClientList>
     );
   }
 

@@ -32,7 +32,6 @@ import {
 } from "@/app/lib/owner/billing";
 // import ClientMetricCards from "./components/ClientMetricCards";
 import { Banknote, CalendarRange, Dumbbell, FileCheck2, History, NotebookPen, Package } from "lucide-react";
-import type { ClientPackageBilling } from "@/app/lib/owner/billing";
 import CollapsibleSection from "@/app/components/ui/collapsible-section";
 import ClientNotesPanel from "./components/ClientNotesPanel";
 import ClientProfileHero from "./components/ClientProfileHero";
@@ -42,6 +41,7 @@ import EditClientModal from "./components/EditClientModal";
 import ArchiveClientModal from "./components/ArchiveClientModal";
 import InviteClientPortalModal from "./components/InviteClientPortalModal";
 import ClientPackagesSection, {
+  getActivePackagesMeta,
   getClientGroupLocationNames,
 } from "./components/ClientPackagesSection";
 import EndCooperationModal from "./components/EndCooperationModal";
@@ -503,15 +503,6 @@ function ClientDetails({ clientId }: { clientId: number }) {
       ) : null}
     </div>
   );
-}
-
-function getActivePackagesMeta(packages: ClientPackageBilling[] | null | undefined) {
-  if (!packages) return undefined;
-  const active = packages.filter((item) => item.isActive === true).length;
-  if (active === 1) return "1 aktywny";
-  const lastDigit = active % 10;
-  const lastTwoDigits = active % 100;
-  return lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 12 || lastTwoDigits > 14) ? `${active} aktywne` : `${active} aktywnych`;
 }
 
 function getTrainingPlanUrl(plan: ClientTrainingPlan | null) {

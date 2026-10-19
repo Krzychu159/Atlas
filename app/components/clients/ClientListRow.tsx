@@ -1,32 +1,44 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { ChevronRight, WalletCards } from "lucide-react";
-import type { Client } from "@/app/lib/owner/clients";
-import { getClientName } from "./client-display";
+import type { ClientListItem } from "@/app/lib/owner/clients";
+import { getClientName } from "@/app/(app)/owner/clients/components/client-display";
 import {
-  clientAmountDue,
   clientPackageSummary,
   clientStatus,
   clientTrainerLabel,
   sessionDots,
-  type ClientAmountDueTone,
+  type ClientAmount,
+  type ClientAmountTone,
   type ClientPackageSummary,
   type ClientStatusTone,
 } from "./client-list-display";
 
 // Shared by the header and every row, so columns always line up. Applied only where the element is a grid (xl+).
-export const ownerClientListGridStyle: CSSProperties = {
-  gridTemplateColumns:
-    "minmax(0,2fr) minmax(0,1.2fr) minmax(0,2fr) minmax(0,0.9fr) minmax(0,0.9fr) 40px",
+export function clientListGridStyle(showTrainer: boolean): CSSProperties {
+  return {
+    gridTemplateColumns: showTrainer
+      ? "minmax(0,2fr) minmax(0,1.2fr) minmax(0,2fr) minmax(0,0.9fr) minmax(0,0.9fr) 40px"
+      : "minmax(0,2.2fr) minmax(0,2.2fr) minmax(0,1fr) minmax(0,0.9fr) 40px",
+  };
+}
+
+type ClientListRowProps = {
+  client: ClientListItem;
+  detailsHref: string;
+  amountLabel: string;
+  amount: ClientAmount;
+  // The trainer's own list does not repeat the trainer in every row.
+  showTrainer?: boolean;
 };
 
-export default function OwnerClientListRow({ client }: { client: Client }) {
-  const profileHref = `/owner/clients/${client.id}`;
+export default function ClientListRow({ client, detailsHref, amountLabel, amount, showTrainer = true }: ClientListRowProps) {
+  const profileHref = detailsHref;
   const fullName = getClientName(client);
   const status = clientStatus(client);
   const trainer = clientTrainerLabel(client);
-  const amountDue = clientAmountDue(client);
   const pkg = clientPackageSummary(client);
+  const gridStyle = clientListGridStyle(showTrainer);
 
   return (
     <article
@@ -35,7 +47,7 @@ export default function OwnerClientListRow({ client }: { client: Client }) {
         statusAccent[status.tone],
       ].join(" ")}
     >
-      <div className="hidden items-center gap-3 xl:grid" style={ownerClientListGridStyle}>
+      <div className="hidden items-center gap-3 xl:grid" style={gridStyle}>
         <div className="flex min-w-0 items-center gap-3">
           <ClientAvatar client={client} fullName={fullName} />
           <div className="min-w-0">
@@ -51,11 +63,13 @@ export default function OwnerClientListRow({ client }: { client: Client }) {
             ) : null}
           </div>
         </div>
-        <p className={`truncate text-sm ${trainer.assigned ? "text-on-surface-variant" : "text-on-surface-muted"}`}>
-          {trainer.label}
-        </p>
+        {showTrainer ? (
+          <p className={`truncate text-sm ${trainer.assigned ? "text-on-surface-variant" : "text-on-surface-muted"}`}>
+            {trainer.label}
+          </p>
+        ) : null}
         <PackageCell summary={pkg} />
-        <p className={`truncate text-sm font-semibold tabular-nums ${amountDueTone[amountDue.tone]}`}>{amountDue.label}</p>
+        <p className={`truncate text-sm font-semibold tabular-nums ${amountTone[amount.tone]}`}>{amount.label}</p>
         <div className="min-w-0">
           <StatusBadge tone={status.tone} label={status.label} />
         </div>
@@ -69,9 +83,13 @@ export default function OwnerClientListRow({ client }: { client: Client }) {
             <Link href={profileHref} prefetch={false} className="block truncate text-sm font-semibold text-on-surface">
               {fullName}
             </Link>
-            <p className={`truncate text-xs ${trainer.assigned ? "text-on-surface-variant" : "text-on-surface-muted"}`}>
-              Trener: {trainer.label}
-            </p>
+            {showTrainer ? (
+              <p className={`truncate text-xs ${trainer.assigned ? "text-on-surface-variant" : "text-on-surface-muted"}`}>
+                Trener: {trainer.label}
+              </p>
+            ) : client.email ? (
+              <p className="truncate text-xs text-on-surface-muted">{client.email}</p>
+            ) : null}
           </div>
           <StatusBadge tone={status.tone} label={status.label} />
           <ProfileLink href={profileHref} fullName={fullName} touch />
@@ -83,10 +101,10 @@ export default function OwnerClientListRow({ client }: { client: Client }) {
           </div>
           <div className="shrink-0 text-right">
             <p className="flex items-center justify-end gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
-              <WalletCards size={12} className={amountDue.tone === "due" ? "text-error-light" : undefined} aria-hidden />
-              Do zapłaty
+              <WalletCards size={12} className={amount.tone === "due" ? "text-error-light" : undefined} aria-hidden />
+              {amountLabel}
             </p>
-            <p className={`text-sm font-semibold tabular-nums ${amountDueTone[amountDue.tone]}`}>{amountDue.label}</p>
+            <p className={`text-sm font-semibold tabular-nums ${amountTone[amount.tone]}`}>{amount.label}</p>
           </div>
         </div>
       </div>
@@ -180,7 +198,7 @@ const statusBadge: Record<ClientStatusTone, string> = {
   unknown: "bg-surface-container-high text-on-surface-muted",
 };
 
-const amountDueTone: Record<ClientAmountDueTone, string> = {
+const amountTone: Record<ClientAmountTone, string> = {
   due: "text-error-light",
   settled: "text-on-surface",
   missing: "text-on-surface-muted",
@@ -194,7 +212,7 @@ function StatusBadge({ tone, label }: { tone: ClientStatusTone; label: string })
   );
 }
 
-function ClientAvatar({ client, fullName }: { client: Client; fullName: string }) {
+function ClientAvatar({ client, fullName }: { client: ClientListItem; fullName: string }) {
   const initials = fullName
     .split(/\s+/)
     .map((part) => part[0])

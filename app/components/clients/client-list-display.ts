@@ -1,8 +1,11 @@
 import type { ClientListItem } from "@/app/lib/owner/clients";
 import {
+  getClientBalance,
   getClientPackageUsage,
   hasActiveClientPackage,
-} from "./client-display";
+} from "@/app/(app)/owner/clients/components/client-display";
+
+export type ClientPackageFilter = "all" | "active-package" | "inactive-package";
 
 export type ClientStatusTone = "active" | "suspended" | "new" | "inactive" | "unknown";
 
@@ -75,21 +78,31 @@ export function clientTrainerLabel(client: Pick<ClientListItem, "trainerFullName
   return { label: "Nie przypisano", assigned: false };
 }
 
-export type ClientAmountDueTone = "due" | "settled" | "missing";
+export type ClientAmountTone = "due" | "settled" | "missing";
+export type ClientAmount = { label: string; tone: ClientAmountTone };
 
 // Missing data stays "Brak danych"; it is never shown as 0,00 zł.
-export function clientAmountDue(client: Pick<ClientListItem, "totalAmountDue" | "amountDueCurrency">): { label: string; tone: ClientAmountDueTone } {
+export function clientAmountDue(client: Pick<ClientListItem, "totalAmountDue" | "amountDueCurrency">): ClientAmount {
   const value = client.totalAmountDue;
   if (typeof value !== "number" || !Number.isFinite(value)) return { label: "Brak danych", tone: "missing" };
-  const currency = client.amountDueCurrency?.trim() || "PLN";
+  return { label: formatAmount(value, client.amountDueCurrency), tone: value > 0 ? "due" : "settled" };
+}
+
+// The trainer's client list has no amount due, only the balance; it is shown without a debt/credit judgement.
+export function clientBalance(client: ClientListItem): ClientAmount {
+  const value = getClientBalance(client, true);
+  if (value === null || !Number.isFinite(value)) return { label: "Brak danych", tone: "missing" };
+  return { label: formatAmount(value, client.balanceCurrency || client.currency), tone: "settled" };
+}
+
+function formatAmount(value: number, currencyCode: string | null | undefined) {
+  const currency = currencyCode?.trim() || "PLN";
   const digits = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
-  let label: string;
   try {
-    label = new Intl.NumberFormat("pl-PL", { style: "currency", currency, ...digits }).format(value);
+    return new Intl.NumberFormat("pl-PL", { style: "currency", currency, ...digits }).format(value);
   } catch {
-    label = `${new Intl.NumberFormat("pl-PL", digits).format(value)} ${currency}`;
+    return `${new Intl.NumberFormat("pl-PL", digits).format(value)} ${currency}`;
   }
-  return { label, tone: value > 0 ? "due" : "settled" };
 }
 
 // Masculine-personal noun: "2 klientów" (dwóch klientów), so only 1 is singular.

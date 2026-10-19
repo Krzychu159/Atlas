@@ -1,32 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { PackageOpen, SearchX } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
-import { trainerPaymentError } from "@/app/lib/trainer/payment-errors";
-import { Wallet } from "lucide-react";
+import { ListSection } from "@/app/components/ui/list/ListSection";
+import { ListState } from "@/app/components/ui/list/ListState";
 import { showAppError } from "@/app/components/ui/app-toast";
-import {
-  getTrainerPackages,
-  type TrainerPackage,
-} from "@/app/lib/trainer/packages";
-import { filterPackages, type PackageModeFilter } from "@/app/lib/packageFilters";
-import PackageCard from "@/app/components/packages/PackageCard";
-import PackageFilters, {
-  type DurationFilter,
-  type PackageSort,
-  type ParticipantsFilter,
-  type SessionsFilter,
-} from "@/app/components/packages/PackageFilters";
+import PackageList from "@/app/components/packages/PackageList";
+import PackageListFilters, {
+  defaultPackageListFilters,
+  type PackageListFiltersValue,
+} from "@/app/components/packages/PackageListFilters";
+import { pluralizePackages } from "@/app/components/packages/package-list-display";
+import { filterPackages } from "@/app/lib/packageFilters";
+import { getTrainerPackages, type TrainerPackage } from "@/app/lib/trainer/packages";
+import { trainerPaymentError } from "@/app/lib/trainer/payment-errors";
 
 export default function TrainerPackagesPage() {
   const [packages, setPackages] = useState<TrainerPackage[]>([]);
-  const [search, setSearch] = useState("");
-  const [billingModeFilter, setBillingModeFilter] = useState<PackageModeFilter>("all");
-  const [participantsFilter, setParticipantsFilter] =
-    useState<ParticipantsFilter>("all");
-  const [sessionsFilter, setSessionsFilter] = useState<SessionsFilter>("all");
-  const [durationFilter, setDurationFilter] = useState<DurationFilter>("all");
-  const [sort, setSort] = useState<PackageSort>("newest");
+  const [filters, setFilters] = useState<PackageListFiltersValue>(defaultPackageListFilters);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -35,6 +27,7 @@ export default function TrainerPackagesPage() {
       setIsLoading(true);
       setLoadError(null);
       const data = await getTrainerPackages();
+      // The trainer sees only the offer currently available to clients.
       setPackages(data.filter((item) => item.isActive));
     } catch (err) {
       setLoadError(trainerPaymentError(err, "Nie udało się pobrać pakietów."));
@@ -48,68 +41,87 @@ export default function TrainerPackagesPage() {
   }
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadPackages();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
+    void Promise.resolve().then(() => loadPackages());
   }, []);
 
   const filteredPackages = useMemo(
-    () => filterPackages(packages, {
-      search, participantsFilter, sessionsFilter, durationFilter, sort, billingModeFilter,
-    }),
-    [packages, search, participantsFilter, sessionsFilter, durationFilter, sort, billingModeFilter],
+    () => filterPackages(packages, filters),
+    [packages, filters],
   );
+
+  function renderList() {
+    if (isLoading && packages.length === 0) {
+      return <ListState variant="loading" label="Ładowanie pakietów..." />;
+    }
+
+    if (loadError) {
+      return (
+        <ListState
+          variant="error"
+          icon={<PackageOpen size={28} />}
+          title="Nie udało się wczytać pakietów"
+          message={loadError}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => void loadPackages()} disabled={isLoading}>
+              Spróbuj ponownie
+            </Button>
+          }
+        />
+      );
+    }
+
+    if (packages.length === 0) {
+      return (
+        <ListState
+          variant="empty"
+          icon={<PackageOpen size={28} />}
+          title="Obecnie nie ma pakietów w ofercie"
+          message="Pakiety i usługi dodane przez studio pojawią się tutaj."
+        />
+      );
+    }
+
+    if (filteredPackages.length === 0) {
+      return (
+        <ListState
+          variant="empty"
+          icon={<SearchX size={28} />}
+          title="Brak pakietów spełniających wybrane kryteria"
+          message="Zmień lub wyczyść filtry, aby zobaczyć więcej wyników."
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setFilters(defaultPackageListFilters)}>
+              Wyczyść filtry
+            </Button>
+          }
+        />
+      );
+    }
+
+    return <PackageList packages={filteredPackages} getDetailsHref={(item) => `/trainer/packages/${item.id}`} />;
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-label text-primary-light">Pakiety</p>
-          <h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
-            Katalog pakietów
-          </h1>
-          <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
-            Katalog ofert dostępnych dla klientów studia.
-          </p>
-        </div>
+      <div className="max-w-[560px]">
+        <p className="text-label text-primary-light">Katalog pakietów</p>
+        <h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
+          Pakiety <span className="text-primary-light">i usługi</span>
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-on-surface-variant">
+          Pakiety treningowe i usługi okresowe dostępne dla klientów studia.
+        </p>
+      </div>
 
-        <div className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container-low text-primary-light">
-          <Wallet size={20} />
-        </div>
-      </section>
+      <PackageListFilters value={filters} onChange={setFilters} showActivityFilter={false} />
 
-      <PackageFilters billingModeFilter={billingModeFilter} onBillingModeFilterChange={value => { setBillingModeFilter(value); if (value === "PeriodBased") { setParticipantsFilter("all"); setSessionsFilter("all"); } }}
-        search={search}
-        participantsFilter={participantsFilter}
-        sessionsFilter={sessionsFilter}
-        durationFilter={durationFilter}
-        sort={sort}
-        onSearchChange={setSearch}
-        onParticipantsFilterChange={setParticipantsFilter}
-        onSessionsFilterChange={setSessionsFilter}
-        onDurationFilterChange={setDurationFilter}
-        onSortChange={setSort}
-      />
-
-      {isLoading ? (
-        <div className="card-shell p-5 text-on-surface-variant">
-          Ładowanie pakietów...
-        </div>
-      ) : loadError ? (
-        <div role="alert" className="card-shell p-5 text-on-surface-variant">{loadError}<Button variant="secondary" className="mt-3" onClick={() => void loadPackages()}>Spróbuj ponownie</Button></div>
-      ) : filteredPackages.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {filteredPackages.map((item) => (
-            <PackageCard key={item.id} item={item} detailsHref="" />
-          ))}
-        </div>
-      ) : (
-        <div className="card-shell p-8 text-center text-on-surface-variant">
-          {packages.length ? "Brak pakietów spełniających wybrane kryteria." : "Obecnie nie ma pakietów w ofercie."}
-        </div>
-      )}
+      <ListSection
+        title="Lista pakietów"
+        description="Rodzaj, limit, cena i status oferty w jednym wierszu."
+        meta={!isLoading && !loadError ? pluralizePackages(filteredPackages.length) : null}
+        busy={isLoading}
+      >
+        {renderList()}
+      </ListSection>
     </div>
   );
 }

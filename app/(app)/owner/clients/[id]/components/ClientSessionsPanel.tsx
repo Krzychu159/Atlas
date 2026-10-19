@@ -18,9 +18,11 @@ function getStatusStyles(status?: string | null) {
 export default function ClientSessionsPanel({
   sessions,
   totalCount,
+  embedded = false,
 }: {
   sessions: (Pick<OwnerSession, "id" | "title" | "startAt" | "trainerFullName" | "status"> & { participants?: OwnerSession["participants"] })[];
   totalCount?: number;
+  embedded?: boolean;
 }) {
   const visibleSessions = [...sessions]
     .sort(
@@ -30,15 +32,15 @@ export default function ClientSessionsPanel({
     .slice(0, 3);
 
   return (
-    <section className="card-shell p-5 md:p-6">
-      <div className="flex items-center justify-between gap-4">
+    <section className={embedded ? "min-w-0" : "card-shell p-5 md:p-6"}>
+      {embedded ? null : <div className="flex items-center justify-between gap-4">
         <p className="text-section-title">Sesje klienta</p>
         <p className="text-label text-on-surface-muted">
           {totalCount ?? sessions.length} przypisanych
         </p>
-      </div>
+      </div>}
 
-      <div className="mt-5 flex flex-col gap-3">
+      <div className={`${embedded ? "" : "mt-5 "}flex flex-col gap-3`}>
         {visibleSessions.length > 0 ? (
           visibleSessions.map((session) => (
             <div

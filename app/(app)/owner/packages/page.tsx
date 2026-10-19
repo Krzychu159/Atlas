@@ -22,12 +22,12 @@ import { filterPackages } from "@/app/lib/packageFilters";
 import { ApiError } from "@/app/lib/backend";
 import { periodPackageError } from "@/app/lib/period-packages";
 import AddPackageModal from "./components/AddPackageModal";
-import PackageList from "./components/PackageList";
+import PackageList from "@/app/components/packages/PackageList";
 import PackageListFilters, {
   defaultPackageListFilters,
   type PackageListFiltersValue,
-} from "./components/PackageListFilters";
-import { pluralizePackages } from "./package-list-display";
+} from "@/app/components/packages/PackageListFilters";
+import { pluralizePackages } from "@/app/components/packages/package-list-display";
 import { showOwnerError, showOwnerSuccess } from "../components/owner-toast";
 
 export default function PackagesPage() {
@@ -190,7 +190,7 @@ export default function PackagesPage() {
       );
     }
 
-    return <PackageList packages={filteredPackages} onDeleteRequest={setPackageToDelete} />;
+    return <PackageList packages={filteredPackages} getDetailsHref={(item) => `/owner/packages/${item.id}`} onDeleteRequest={setPackageToDelete} />;
   }
 
   return (

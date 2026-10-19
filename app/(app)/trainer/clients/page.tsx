@@ -1,47 +1,78 @@
 "use client";
-import { formatTrainingStartDate } from "@/app/lib/formatters/date";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import ClientFilters, {
-  type ClientPackageFilter,
-  type ClientSort,
-} from "@/app/(app)/owner/clients/components/ClientFilters";
-import ClientListRow from "@/app/(app)/owner/clients/components/ClientListRow";
-import {
-  formatClientBalance,
-  getClientName,
-  getClientPackageUsage,
-} from "@/app/(app)/owner/clients/components/client-display";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { SearchX, UsersRound } from "lucide-react";
+import { Button } from "@/app/components/ui/button";
+import { ListSection } from "@/app/components/ui/list/ListSection";
+import { ListState } from "@/app/components/ui/list/ListState";
+import ClientList from "@/app/components/clients/ClientList";
+import ClientListRow from "@/app/components/clients/ClientListRow";
+import { clientBalance, pluralizeClients, type ClientPackageFilter } from "@/app/components/clients/client-list-display";
+import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
+import { listUrlKey, readPositiveInt, useListScrollRestoration, useListUrlSync } from "@/app/(app)/owner/components/list-url-state";
 import type { ClientListItem } from "@/app/lib/owner/clients";
 import { isForbiddenError } from "@/app/lib/backend";
 import { getTrainerClientsPage, type TrainerClientsQuery } from "@/app/lib/trainer/optimized";
-import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { trainerPortalClientsToListItems } from "@/app/lib/trainer/portal-mappers";
+import TrainerClientFilters, {
+  defaultTrainerClientFilters,
+  type TrainerClientFiltersValue,
+  type TrainerClientSort,
+} from "./components/TrainerClientFilters";
 
 const PAGE_SIZE = 25;
-const serverSort: Record<ClientSort, TrainerClientsQuery["Sort"]> = {
-  newest: "createdDesc", name: "name", trainer: "name",
-  "balance-desc": "balanceDesc", "balance-asc": "balance", "package-usage": "packageUsageDesc",
+const SERVER_SORTS: Record<TrainerClientSort, NonNullable<TrainerClientsQuery["Sort"]>> = {
+  "package-usage": "packageUsageDesc",
+  newest: "createdDesc",
+  name: "name",
+  "balance-desc": "balanceDesc",
+  "balance-asc": "balance",
 };
+const CLIENT_URL_KEYS = ["q", "package", "sort", "page"] as const;
+const PACKAGE_FILTERS: readonly ClientPackageFilter[] = ["all", "active-package", "inactive-package"];
+
+function filtersFromUrl(params: URLSearchParams): TrainerClientFiltersValue {
+  const sort = params.get("sort") ?? "";
+  return {
+    search: (params.get("q") ?? "").slice(0, 100),
+    packageFilter: PACKAGE_FILTERS.find((value) => value === params.get("package")) ?? defaultTrainerClientFilters.packageFilter,
+    sort: Object.hasOwn(SERVER_SORTS, sort) ? sort as TrainerClientSort : defaultTrainerClientFilters.sort,
+  };
+}
+
+function filtersToUrl(filters: TrainerClientFiltersValue, page: number) {
+  return {
+    q: filters.search.trim() || null,
+    package: filters.packageFilter === defaultTrainerClientFilters.packageFilter ? null : filters.packageFilter,
+    sort: filters.sort === defaultTrainerClientFilters.sort ? null : filters.sort,
+    page: page > 1 ? String(page) : null,
+  };
+}
 
 export default function TrainerClientsPage() {
+  return <Suspense><TrainerClientsContent /></Suspense>;
+}
+
+function TrainerClientsContent() {
+  const searchParams = useSearchParams();
+  const [filters, setFilters] = useState<TrainerClientFiltersValue>(() => filtersFromUrl(searchParams));
+  const { search, packageFilter, sort } = filters;
+  const [page, setPage] = useState(() => readPositiveInt(searchParams.get("page")) ?? 1);
   const [clients, setClients] = useState<ClientListItem[]>([]);
-  const [search, setSearch] = useState("");
-  const [packageFilter, setPackageFilter] =
-    useState<ClientPackageFilter>("all");
-  const [sort, setSort] = useState<ClientSort>("package-usage");
-  const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [activeClientsCount, setActiveClientsCount] = useState<number | null>(null);
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState(() => search.trim());
   const [loadedKey, setLoadedKey] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const queryKey = JSON.stringify([search.trim(), packageFilter, sort, page, attempt]);
   const isLoading = loadedKey !== queryKey;
-  const filteredClients = isLoading ? [] : clients;
+  const hasFilters = Boolean(search.trim()) || packageFilter !== defaultTrainerClientFilters.packageFilter;
+  const urlParams = filtersToUrl(filters, page);
+  useListUrlSync(urlParams, CLIENT_URL_KEYS);
+  useListScrollRestoration(listUrlKey("trainer-clients", urlParams), !isLoading && !loadError);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -51,7 +82,7 @@ export default function TrainerClientsPage() {
   useEffect(() => {
     const controller = new AbortController();
     getTrainerClientsPage({ Page: 1, PageSize: 1, HasActivePackage: true }, controller.signal)
-      .then(data => { if (!controller.signal.aborted) setActiveClientsCount(data.totalCount); })
+      .then((data) => { if (!controller.signal.aborted) setActiveClientsCount(data.totalCount); })
       .catch(() => { /* Do not replace an unavailable count with zero. */ });
     return () => controller.abort();
   }, []);
@@ -59,167 +90,142 @@ export default function TrainerClientsPage() {
   useEffect(() => {
     if (search.trim() !== debouncedSearch) return;
     const controller = new AbortController();
-    getTrainerClientsPage({ Page: page, PageSize: PAGE_SIZE, Search: debouncedSearch || undefined,
+    getTrainerClientsPage({
+      Page: page,
+      PageSize: PAGE_SIZE,
+      Search: debouncedSearch || undefined,
       HasActivePackage: packageFilter === "all" ? undefined : packageFilter === "active-package",
-      Sort: serverSort[sort],
-    }, controller.signal).then(data => {
+      Sort: SERVER_SORTS[sort],
+    }, controller.signal).then((data) => {
       if (controller.signal.aborted) return;
       if (page > Math.max(1, data.totalPages)) { setPage(Math.max(1, data.totalPages)); return; }
       setClients(trainerPortalClientsToListItems(data.items || []));
-      setTotalCount(data.totalCount); setLoadError(null); setLoadedKey(queryKey);
-    }).catch(error => {
+      setTotalCount(data.totalCount);
+      setTotalPages(data.totalPages);
+      setLoadError(null);
+      setLoadedKey(queryKey);
+    }).catch((error) => {
       if (controller.signal.aborted) return;
-      setClients([]); setLoadedKey(queryKey);
-      setLoadError(isForbiddenError(error) ? "Nie masz uprawnień do przeglądania tej listy klientów." : "Nie udało się pobrać klientów. Spróbuj ponownie.");
+      setClients([]);
+      setLoadedKey(queryKey);
+      setLoadError(isForbiddenError(error) ? "Nie masz uprawnień do przeglądania tej listy klientów." : "Sprawdź połączenie i spróbuj ponownie.");
     });
     return () => controller.abort();
   }, [search, debouncedSearch, packageFilter, sort, page, queryKey]);
 
+  function changeFilters(next: TrainerClientFiltersValue) {
+    setFilters(next);
+    setPage(1);
+  }
+
+  function renderList() {
+    if (isLoading) {
+      return <ListState variant="loading" label="Ładowanie klientów..." />;
+    }
+
+    if (loadError) {
+      return (
+        <ListState
+          variant="error"
+          icon={<UsersRound size={28} />}
+          title="Nie udało się wczytać klientów"
+          message={loadError}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setAttempt((value) => value + 1)}>
+              Spróbuj ponownie
+            </Button>
+          }
+        />
+      );
+    }
+
+    if (clients.length === 0 && !hasFilters) {
+      return (
+        <ListState
+          variant="empty"
+          icon={<UsersRound size={28} />}
+          title="Nie masz jeszcze przypisanych klientów"
+          message="Klienci przypisani do Ciebie przez studio pojawią się tutaj."
+        />
+      );
+    }
+
+    if (clients.length === 0) {
+      return (
+        <ListState
+          variant="empty"
+          icon={<SearchX size={28} />}
+          title="Brak klientów spełniających wybrane kryteria"
+          message="Zmień lub wyczyść filtry, aby zobaczyć więcej wyników."
+          action={
+            <Button variant="secondary" size="sm" onClick={() => changeFilters(defaultTrainerClientFilters)}>
+              Wyczyść filtry
+            </Button>
+          }
+        />
+      );
+    }
+
+    return (
+      <ClientList amountLabel="Saldo" showTrainer={false}>
+        {clients.map((client) => (
+          <ClientListRow
+            key={client.id}
+            client={client}
+            detailsHref={`/trainer/clients/${client.id}`}
+            amountLabel="Saldo"
+            amount={clientBalance(client)}
+            showTrainer={false}
+          />
+        ))}
+      </ClientList>
+    );
+  }
+
+  const countsReady = !isLoading && !loadError;
+
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
-      <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
-              Klienci
-            </h1>
-            <span className="rounded-full bg-surface-container px-3 py-1 text-sm text-on-surface-variant">
-              {isLoading ? "Ładowanie..." : loadError ? "Niedostępne" : `${totalCount} znalezionych`}
-            </span>
-          </div>
-
-          <p className="mt-3 max-w-[760px] text-base text-on-surface-variant">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="max-w-[560px]">
+          <p className="text-label text-primary-light">Twoi klienci</p>
+          <h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
+            Klienci
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-on-surface-variant">
             Klienci przypisani do Ciebie — aktywni i nieaktywni.
           </p>
         </div>
 
-        <div className="rounded-[var(--radius-lg)] bg-surface-container px-4 py-3">
-          <p className="text-label text-on-surface-muted">Aktywny pakiet</p>
-          <p className="mt-2 text-2xl font-semibold leading-none text-on-surface">
-            {isLoading || loadError ? "—" : activeClientsCount === null ? "Brak danych" : activeClientsCount}
-          </p>
+        <div className="flex gap-3">
+          <div className="flex flex-1 items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3 sm:flex-none">
+            <p className="text-2xl font-semibold leading-none">
+              {countsReady ? totalCount : "–"}
+            </p>
+            <p className="text-sm text-on-surface-variant">{hasFilters ? "znalezionych" : "łącznie"}</p>
+          </div>
+          <div className="flex flex-1 items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3 sm:flex-none">
+            <p className="text-2xl font-semibold leading-none text-tertiary-light">
+              {activeClientsCount ?? "–"}
+            </p>
+            <p className="text-sm text-on-surface-variant">z aktywnym pakietem</p>
+          </div>
         </div>
-      </section>
+      </div>
 
-      <ClientFilters
-        showTrainerFilter={false}
-        searchPlaceholder="Szukaj po nazwisku lub e-mailu..."
-        searchMaxLength={100}
-        search={search}
-        packageFilter={packageFilter}
-        sort={sort}
-        onSearchChange={value => { setSearch(value); setPage(1); }}
-        onPackageFilterChange={value => { setPackageFilter(value); setPage(1); }}
-        onSortChange={value => { setSort(value); setPage(1); }}
-      />
+      <TrainerClientFilters value={filters} onChange={changeFilters} />
 
-      <section className="hidden flex-col gap-3 md:flex">
-        {isLoading ? (
-          <div className="card-shell p-5 text-on-surface-variant">
-            Ładowanie klientów...
-          </div>
-        ) : loadError ? (
-          <div role="alert" className="card-shell p-5 text-on-surface-variant">
-            {loadError}
-            <button type="button" className="ml-3 font-semibold text-primary-light" onClick={() => setAttempt(value => value + 1)}>Spróbuj ponownie</button>
-          </div>
-        ) : filteredClients.length > 0 ? (
-          filteredClients.map((client) => (
-            <ClientListRow
-              key={client.id}
-              client={client}
-              preserveMissingData
-              detailsHref={`/trainer/clients/${client.id}`}
-            />
-          ))
-        ) : (
-          <div className="card-shell p-8 text-center text-on-surface-variant">
-            {clients.length ? "Brak klientów dla wybranych filtrów." : "Nie masz jeszcze przypisanych klientów."}
-          </div>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-4 md:hidden">
-        {isLoading ? (
-          <div className="card-shell p-5 text-on-surface-variant">
-            Ładowanie klientów...
-          </div>
-        ) : loadError ? (
-          <div role="alert" className="card-shell p-5 text-on-surface-variant">
-            {loadError}
-            <button type="button" className="ml-3 font-semibold text-primary-light" onClick={() => setAttempt(value => value + 1)}>Spróbuj ponownie</button>
-          </div>
-        ) : filteredClients.length > 0 ? (
-          filteredClients.map((client) => {
-            const packageUsage = getClientPackageUsage(client, true);
-            const fullName = getClientName(client);
-
-            return (
-              <div key={client.id} className="card-shell p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-lg font-semibold">
-                      {fullName}
-                    </p>
-                    <p className="mt-2 truncate text-sm text-on-surface-variant">
-                      {client.email || "Brak adresu e-mail"}
-                    </p>
-                    <p className="mt-4 text-label text-primary-light">
-                      Trener: {client.trainerFullName || "Brak danych"}
-                    </p>
-                    <p className="mt-2 text-xs text-on-surface-muted">Rozpoczęcie treningów: {formatTrainingStartDate(client.trainingStartDate)}</p>
-                  </div>
-
-                  <Link
-                    href={`/trainer/clients/${client.id}`}
-                    prefetch={false}
-                    aria-label={`Przejdź do profilu klienta ${fullName}`}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container-high text-primary-light"
-                  >
-                    <ArrowRight size={18} />
-                  </Link>
-                </div>
-
-                <div className="mt-5 grid grid-cols-[1fr_auto] items-end gap-4">
-                  <div className="min-w-0">
-                    <p className="text-label text-on-surface-variant">
-                      Wykorzystanie pakietu
-                    </p>
-                    <div className="mt-2 flex items-center gap-3">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-container-lowest">
-                        {packageUsage.sortPercent !== null ? (
-                          <div
-                            className="h-full rounded-full bg-primary-gradient"
-                            style={{ width: `${packageUsage.percent}%` }}
-                          />
-                        ) : null}
-                      </div>
-                      <p className="text-sm font-semibold text-primary-light">
-                        {packageUsage.label}
-                      </p>
-                    </div>
-                    <p className="mt-2 truncate text-xs text-on-surface-muted">
-                      {packageUsage.packageName}
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="text-label text-on-surface-variant">Saldo</p>
-                    <p className="mt-1 text-sm font-semibold text-tertiary-light">
-                      {formatClientBalance(client, true)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        ) : (
-          <div className="card-shell p-8 text-center text-on-surface-variant">
-            {clients.length ? "Brak klientów dla wybranych filtrów." : "Nie masz jeszcze przypisanych klientów."}
-          </div>
-        )}
-      </section>
-      {!isLoading && !loadError && totalCount > 0 ? <PaymentPagination page={page} pageSize={PAGE_SIZE} totalItems={totalCount} onPageChange={setPage} itemLabel="klientów" ariaLabel="Paginacja klientów" /> : null}
+      <ListSection
+        title="Lista klientów"
+        description="Pakiet, saldo i status klienta w jednym wierszu."
+        meta={countsReady ? pluralizeClients(totalCount) : null}
+        busy={isLoading}
+      >
+        {renderList()}
+        {countsReady && totalPages > 1 ? (
+          <PaymentPagination page={page} pageSize={PAGE_SIZE} totalItems={totalCount} totalPages={totalPages} onPageChange={setPage} itemLabel="klientów" ariaLabel="Strony klientów" />
+        ) : null}
+      </ListSection>
     </div>
   );
 }

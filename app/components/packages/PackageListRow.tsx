@@ -9,7 +9,7 @@ import {
   packageListKind,
   packageLocationLabel,
   packageStatusLabel,
-} from "../package-list-display";
+} from "./package-list-display";
 
 // Shared by the header and every row, so columns always line up. Applied only where the element is a grid (lg+).
 export const packageListGridStyle: CSSProperties = {
@@ -18,11 +18,12 @@ export const packageListGridStyle: CSSProperties = {
 
 type PackageListRowProps = {
   item: Package;
-  onDeleteRequest: (item: Package) => void;
+  detailsHref: string;
+  // Without it the row is read-only (e.g. the trainer's catalog).
+  onDeleteRequest?: (item: Package) => void;
 };
 
-export default function PackageListRow({ item, onDeleteRequest }: PackageListRowProps) {
-  const detailsHref = `/owner/packages/${item.id}`;
+export default function PackageListRow({ item, detailsHref, onDeleteRequest }: PackageListRowProps) {
   const period = packageListKind(item) === "period";
   const kind = packageKindLabel(item);
   const limit = packageLimitLabel(item);
@@ -104,16 +105,18 @@ export default function PackageListRow({ item, onDeleteRequest }: PackageListRow
             href={detailsHref}
             className="inline-flex h-10 flex-1 items-center justify-center gap-1 rounded-[var(--radius-lg)] bg-surface-container px-3 text-xs font-semibold text-primary-light transition hover:bg-surface-container-high"
           >
-            Szczegóły i edycja <ChevronRight size={15} />
+            {onDeleteRequest ? "Szczegóły i edycja" : "Szczegóły"} <ChevronRight size={15} />
           </Link>
-          <button
-            type="button"
-            onClick={() => onDeleteRequest(item)}
-            aria-label={`Usuń pakiet ${item.name}`}
-            className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container text-on-surface-muted transition hover:bg-error-container/35 hover:text-error-light"
-          >
-            <Trash2 size={16} />
-          </button>
+          {onDeleteRequest ? (
+            <button
+              type="button"
+              onClick={() => onDeleteRequest(item)}
+              aria-label={`Usuń pakiet ${item.name}`}
+              className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container text-on-surface-muted transition hover:bg-error-container/35 hover:text-error-light"
+            >
+              <Trash2 size={16} />
+            </button>
+          ) : null}
         </div>
       </div>
     </article>
@@ -150,23 +153,27 @@ function RowActions({
 }: {
   item: Package;
   detailsHref: string;
-  onDeleteRequest: (item: Package) => void;
+  onDeleteRequest?: (item: Package) => void;
 }) {
+  const detailsLabel = onDeleteRequest ? "Szczegóły i edycja" : "Szczegóły";
+
   return (
     <div className="flex justify-end gap-1.5">
-      <button
-        type="button"
-        onClick={() => onDeleteRequest(item)}
-        aria-label={`Usuń pakiet ${item.name}`}
-        title="Usuń pakiet"
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-container text-on-surface-muted transition hover:bg-error-container/35 hover:text-error-light"
-      >
-        <Trash2 size={16} />
-      </button>
+      {onDeleteRequest ? (
+        <button
+          type="button"
+          onClick={() => onDeleteRequest(item)}
+          aria-label={`Usuń pakiet ${item.name}`}
+          title="Usuń pakiet"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-container text-on-surface-muted transition hover:bg-error-container/35 hover:text-error-light"
+        >
+          <Trash2 size={16} />
+        </button>
+      ) : null}
       <Link
         href={detailsHref}
-        aria-label={`Szczegóły i edycja pakietu ${item.name}`}
-        title="Szczegóły i edycja"
+        aria-label={`${detailsLabel} pakietu ${item.name}`}
+        title={detailsLabel}
         className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-container text-on-surface-muted transition hover:bg-surface-container-high hover:text-primary-light"
       >
         <ChevronRight size={17} />

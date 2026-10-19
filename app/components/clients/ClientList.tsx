@@ -1,17 +1,23 @@
 import type { ReactNode } from "react";
-import { ownerClientListGridStyle } from "./OwnerClientListRow";
+import { clientListGridStyle } from "./ClientListRow";
 
-export default function OwnerClientList({ children }: { children: ReactNode }) {
+type ClientListProps = {
+  amountLabel: string;
+  showTrainer?: boolean;
+  children: ReactNode;
+};
+
+export default function ClientList({ amountLabel, showTrainer = true, children }: ClientListProps) {
   return (
     <div className="bg-surface-container-lowest">
       <div
         className="hidden gap-3 bg-surface-container-low px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted xl:grid"
-        style={ownerClientListGridStyle}
+        style={clientListGridStyle(showTrainer)}
       >
         <span>Klient</span>
-        <span>Trener</span>
+        {showTrainer ? <span>Trener</span> : null}
         <span>Pakiet</span>
-        <span>Do zapłaty</span>
+        <span>{amountLabel}</span>
         <span>Status</span>
         <span className="sr-only">Akcje</span>
       </div>

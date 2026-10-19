@@ -41,9 +41,9 @@ test("package reads start in parallel and late old profiles cannot overwrite the
   assert.ok(calls.slice(0, 2).every(call => call.signal.aborted));
   calls[2].resolve({ id: 2, name: "Nowy" }); calls[3].resolve([{ id: 12 }]); await settle();
   calls[0].resolve({ id: 1, name: "Stary" }); calls[1].reject(new Error("old failure")); await settle();
-  const hero = find(render(2), element => element.props.item?.id === 2 && "clientsAvailable" in element.props);
+  const hero = find(render(2), element => element.props.item?.id === 2 && "clientStats" in element.props);
   assert.ok(hero);
-  assert.equal(hero.props.clients[0].id, 12);
+  assert.equal(hero.props.clientStats.clients[0].id, 12);
   assert.equal(errors.length, 0);
   h.unmount();
 });
@@ -58,15 +58,15 @@ test("package client failure is visible and retry does not pretend no clients ex
   const render = () => h.render(Page, { params: { id: "3" } });
   render(); h.commit(); await settle();
   const tree = render();
-  const initialItem = find(tree, element => "clientsAvailable" in element.props).props.item;
+  const initialItem = find(tree, element => "clientStats" in element.props).props.item;
   assert.ok(find(tree, element => element.props.role === "alert"));
-  assert.equal(find(tree, element => "clientsAvailable" in element.props).props.clientsAvailable, false);
+  assert.equal(find(tree, element => "clientStats" in element.props).props.clientStats.available, false);
   const retry = find(tree, element => element.props.children === "Spróbuj ponownie");
   fail = false; retry.props.onClick(); render(); h.commit(); await settle();
   assert.equal(calls, 2);
   assert.equal(packageCalls, 1);
-  assert.equal(find(render(), element => "clientsAvailable" in element.props).props.item, initialItem);
-  assert.equal(find(render(), element => "clientsAvailable" in element.props).props.clientsAvailable, true);
+  assert.equal(find(render(), element => "clientStats" in element.props).props.item, initialItem);
+  assert.equal(find(render(), element => "clientStats" in element.props).props.clientStats.available, true);
   h.unmount();
 });
 
@@ -161,7 +161,7 @@ test("disabled storage keeps the location filter and same-tab synchronization us
 });
 
 test("unavailable package clients display unknown counts and usage instead of zero", () => {
-  const Hero = load("app/(app)/owner/packages/[id]/components/PackageDetailsHero.tsx", {
+  const Hero = load("app/components/packages/PackageDetailsHero.tsx", {
     "@/app/lib/period-packages": { isPeriodPackage: () => false },
     "@/app/components/ui/profile-hero": {
       ProfileChip: ({ children }) => React.createElement("span", null, children),
@@ -170,7 +170,7 @@ test("unavailable package clients display unknown counts and usage instead of ze
     },
     "@/app/components/ui/tooltip": { Tooltip: ({ label, children }) => React.createElement("span", null, children, label) },
   }).default;
-  const markup = renderToStaticMarkup(React.createElement(Hero, { item: { id: 3, name: "Pakiet", price: 200, currency: "PLN", durationDays: 30, sessionsLimit: 10 }, clients: [], clientsAvailable: false }));
+  const markup = renderToStaticMarkup(React.createElement(Hero, { item: { id: 3, name: "Pakiet", price: 200, currency: "PLN", durationDays: 30, sessionsLimit: 10 }, backHref: "/owner/packages", clientStats: { clients: [], available: false } }));
   assert.ok(markup.includes("Brak danych o wykorzystaniu"));
   assert.ok(!markup.includes("0 wykorzystanych sesji"));
   assert.equal((markup.match(/—/g) || []).length, 2);

@@ -50,7 +50,7 @@ test("phone location picker shares the stored selection and marks a narrowed sco
 });
 
 test("package filters show no active marker and disabled clearing at defaults", () => {
-  const mod = load("app/(app)/owner/packages/components/PackageListFilters.tsx", {
+  const mod = load("app/components/packages/PackageListFilters.tsx", {
     react: { ...React, useState: initial => [initial, () => {}] },
     "@/app/components/ui/list/FilterToolbar": { FilterToolbar: () => null, FilterSearchField: () => null },
   });

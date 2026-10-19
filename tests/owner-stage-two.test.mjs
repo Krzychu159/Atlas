@@ -284,7 +284,7 @@ test("client list renders one responsive row per returned client and preserves s
     "@/app/(app)/owner/clients/components/OwnerClientFilters": {
       default: stub, defaultOwnerClientFilters: { search: "", packageFilter: "all", trainerFilter: "all", amountDueOnly: false, sort: "newest" },
     },
-    "@/app/(app)/owner/clients/components/client-list-display": { pluralizeClients: count => `${count} klientów` },
+    "@/app/components/clients/client-list-display": { pluralizeClients: count => `${count} klientów`, clientAmountDue: () => ({ label: "", tone: "settled" }) },
   }).default;
   const root = Page().props.children; const render = () => h.render(root.type, root.props);
   render(); h.commit(); h.timers(); await settle();

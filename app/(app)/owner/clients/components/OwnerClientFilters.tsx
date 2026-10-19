@@ -4,9 +4,9 @@ import { useState } from "react";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { FilterSearchField, FilterToolbar } from "@/app/components/ui/list/FilterToolbar";
 import { OwnerRemoteSelect } from "../../components/OwnerRemoteSelect";
-import type { ClientPackageFilter, ClientSort } from "./ClientFilters";
+import type { ClientPackageFilter } from "@/app/components/clients/client-list-display";
 
-export type OwnerClientSort = Exclude<ClientSort, "balance-desc" | "balance-asc"> | "amount-due-desc" | "amount-due-asc";
+export type OwnerClientSort = "newest" | "name" | "trainer" | "package-usage" | "amount-due-desc" | "amount-due-asc";
 
 export type OwnerClientFiltersValue = {
   search: string;

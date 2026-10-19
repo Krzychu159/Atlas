@@ -9,7 +9,7 @@ import {
   type Package,
   type PackageClient,
 } from "@/app/lib/owner/packages";
-import PackageDetailsHero from "./components/PackageDetailsHero";
+import PackageDetailsHero from "@/app/components/packages/PackageDetailsHero";
 import PackageEditModal from "./components/PackageEditModal";
 import PackageClientsList from "./components/PackageClientsList";
 import { isPeriodPackage } from "@/app/lib/period-packages";
@@ -112,7 +112,7 @@ export default function PackageDetailsPage({
 
       {!isLoading && item?.id === packageId ? (
         <>
-          <PackageDetailsHero item={item} clients={clients} clientsAvailable={!clientsError} onEdit={() => setIsEditOpen(true)} />
+          <PackageDetailsHero item={item} backHref="/owner/packages" clientStats={{ clients, available: !clientsError }} onEdit={() => setIsEditOpen(true)} />
 
           {clientsError ? <div role="alert" className="card-shell flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-on-surface-variant">{clientsError}</p>

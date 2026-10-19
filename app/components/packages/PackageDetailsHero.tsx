@@ -22,28 +22,29 @@ import {
   profilePrimaryActionClassName,
 } from "@/app/components/ui/profile-hero";
 
+type PackageClientStats = {
+  clients: PackageClient[];
+  available: boolean;
+};
+
 export default function PackageDetailsHero({
   item,
-  clients,
-  clientsAvailable = true,
+  backHref,
+  clientStats,
   onEdit,
 }: {
   item: Package;
-  clients: PackageClient[];
-  clientsAvailable?: boolean;
-  onEdit: () => void;
+  backHref: string;
+  // Omitted where the portal has no access to the package's client list.
+  clientStats?: PackageClientStats;
+  onEdit?: () => void;
 }) {
   const periodBased = isPeriodPackage(item);
-  const usedSessions = clients.every(client => client.activePackageId === item.id && typeof client.activePackageUsedSessions === "number" && Number.isFinite(client.activePackageUsedSessions))
-    ? clients.reduce((sum, client) => sum + client.activePackageUsedSessions!, 0)
-    : null;
-  const estimatedRevenue = clients.length * item.price;
-  const currency = item.currency || "PLN";
 
   return (
     <section className="card-shell p-4 md:p-6">
       <Link
-        href="/owner/packages"
+        href={backHref}
         className="inline-flex items-center gap-1.5 text-xs font-semibold text-on-surface-muted transition hover:text-primary-light"
       >
         <ArrowLeft size={14} />
@@ -76,12 +77,14 @@ export default function PackageDetailsHero({
         <div className="flex shrink-0 items-center gap-4 md:flex-col md:items-end md:gap-3">
           <div className="md:text-right">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">{periodBased ? "Cena usługi" : "Cena pakietu"}</p>
-            <p className="text-2xl font-semibold leading-tight text-primary-light">{formatMoney(item.price, currency)}</p>
+            <p className="text-2xl font-semibold leading-tight text-primary-light">{formatMoney(item.price, item.currency || "PLN")}</p>
           </div>
-          <button type="button" onClick={onEdit} className={`${profilePrimaryActionClassName} ml-auto md:ml-0`}>
-            <Pencil size={14} />
-            Edytuj
-          </button>
+          {onEdit ? (
+            <button type="button" onClick={onEdit} className={`${profilePrimaryActionClassName} ml-auto md:ml-0`}>
+              <Pencil size={14} />
+              Edytuj
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -104,28 +107,47 @@ export default function PackageDetailsHero({
             {item.isPubliclyAvailable ? "Włączone" : "Wyłączone"}
           </ProfileInfoStat>
         ) : null}
-        <ProfileInfoStat icon={<Users size={13} />} label="Klienci" muted={!clientsAvailable}>
-          {clientsAvailable ? clients.length : "—"}
-        </ProfileInfoStat>
-        <ProfileInfoStat icon={<TrendingUp size={13} />} label="Szacowana wartość" muted={!clientsAvailable}>
-          {clientsAvailable ? (
-            <Tooltip
-              align="start"
-              label={periodBased
-                ? "Liczba klientów × cena usługi."
-                : `Liczba klientów × cena pakietu. ${usedSessions === null ? "Brak danych o wykorzystaniu." : `Wykorzystane sesje: ${usedSessions}.`}`}
-            >
-              <span tabIndex={0} className="focus-visible:text-primary-light focus-visible:outline-none">
-                {formatMoney(estimatedRevenue, currency)}
-              </span>
-            </Tooltip>
-          ) : (
-            <Tooltip align="start" label="Brak danych o wykorzystaniu i liczbie klientów.">
-              <span tabIndex={0} className="focus-visible:text-primary-light focus-visible:outline-none">—</span>
-            </Tooltip>
-          )}
-        </ProfileInfoStat>
+        {clientStats ? <PackageClientStatsInfo item={item} periodBased={periodBased} {...clientStats} /> : null}
       </div>
     </section>
+  );
+}
+
+function PackageClientStatsInfo({
+  item,
+  periodBased,
+  clients,
+  available,
+}: PackageClientStats & { item: Package; periodBased: boolean }) {
+  const usedSessions = clients.every(client => client.activePackageId === item.id && typeof client.activePackageUsedSessions === "number" && Number.isFinite(client.activePackageUsedSessions))
+    ? clients.reduce((sum, client) => sum + client.activePackageUsedSessions!, 0)
+    : null;
+  const estimatedRevenue = clients.length * item.price;
+  const currency = item.currency || "PLN";
+
+  return (
+    <>
+      <ProfileInfoStat icon={<Users size={13} />} label="Klienci" muted={!available}>
+        {available ? clients.length : "—"}
+      </ProfileInfoStat>
+      <ProfileInfoStat icon={<TrendingUp size={13} />} label="Szacowana wartość" muted={!available}>
+        {available ? (
+          <Tooltip
+            align="start"
+            label={periodBased
+              ? "Liczba klientów × cena usługi."
+              : `Liczba klientów × cena pakietu. ${usedSessions === null ? "Brak danych o wykorzystaniu." : `Wykorzystane sesje: ${usedSessions}.`}`}
+          >
+            <span tabIndex={0} className="focus-visible:text-primary-light focus-visible:outline-none">
+              {formatMoney(estimatedRevenue, currency)}
+            </span>
+          </Tooltip>
+        ) : (
+          <Tooltip align="start" label="Brak danych o wykorzystaniu i liczbie klientów.">
+            <span tabIndex={0} className="focus-visible:text-primary-light focus-visible:outline-none">—</span>
+          </Tooltip>
+        )}
+      </ProfileInfoStat>
+    </>
   );
 }

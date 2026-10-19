@@ -55,7 +55,7 @@ function amountDueClientsFixture(search) {
     "@/app/lib/owner/location-filter": { useOwnerLocationFilter: () => ({ selectedLocationId: null }) },
     "@/app/lib/owner/clients": { getOwnerClients: async query => { queries.push(query); return { items: [], page: query.page, pageSize: 25, totalCount: 0, totalPages: 0, summary: { withActivePackageCount: 0 } }; } },
     "@/app/(app)/owner/clients/components/OwnerClientFilters": { default: () => null, defaultOwnerClientFilters: defaults },
-    "@/app/(app)/owner/clients/components/client-list-display": { pluralizeClients: count => String(count) },
+    "@/app/components/clients/client-list-display": { pluralizeClients: count => String(count), clientAmountDue: () => ({ label: "", tone: "settled" }) },
   }).default;
   const root = Page().props.children;
   const render = () => h.render(root.type, root.props);
@@ -101,7 +101,7 @@ function emptyClientsFixture(locationId = null, totalCount = 0) {
     "@/app/lib/owner/location-filter": { useOwnerLocationFilter: () => ({ selectedLocationId: locationId }) },
     "@/app/lib/owner/clients": { getOwnerClients: async () => ({ items: [], page: 1, pageSize: 25, totalCount, totalPages: totalCount ? 1 : 0, summary: { withActivePackageCount: 0 } }) },
     "@/app/(app)/owner/clients/components/OwnerClientFilters": { default: () => null, defaultOwnerClientFilters: defaults },
-    "@/app/(app)/owner/clients/components/client-list-display": { pluralizeClients: count => String(count) },
+    "@/app/components/clients/client-list-display": { pluralizeClients: count => String(count), clientAmountDue: () => ({ label: "", tone: "settled" }) },
   }).default;
   const root = Page().props.children;
   const render = () => h.render(root.type, root.props);

@@ -3,10 +3,11 @@ import PackageListRow, { packageListGridStyle } from "./PackageListRow";
 
 type PackageListProps = {
   packages: Package[];
-  onDeleteRequest: (item: Package) => void;
+  getDetailsHref: (item: Package) => string;
+  onDeleteRequest?: (item: Package) => void;
 };
 
-export default function PackageList({ packages, onDeleteRequest }: PackageListProps) {
+export default function PackageList({ packages, getDetailsHref, onDeleteRequest }: PackageListProps) {
   return (
     <div className="bg-surface-container-lowest">
       <div
@@ -23,7 +24,12 @@ export default function PackageList({ packages, onDeleteRequest }: PackageListPr
 
       <div className="flex flex-col gap-3 p-3 lg:block lg:p-0">
         {packages.map((item) => (
-          <PackageListRow key={item.id} item={item} onDeleteRequest={onDeleteRequest} />
+          <PackageListRow
+            key={item.id}
+            item={item}
+            detailsHref={getDetailsHref(item)}
+            onDeleteRequest={onDeleteRequest}
+          />
         ))}
       </div>
     </div>

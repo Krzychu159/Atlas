@@ -35,16 +35,18 @@ export const defaultPackageListFilters: PackageListFiltersValue = {
 type PackageListFiltersProps = {
   value: PackageListFiltersValue;
   onChange: (value: PackageListFiltersValue) => void;
+  // Hidden where the list already contains only active offers.
+  showActivityFilter?: boolean;
 };
 
-export default function PackageListFilters({ value, onChange }: PackageListFiltersProps) {
+export default function PackageListFilters({ value, onChange, showActivityFilter = true }: PackageListFiltersProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const periodOnly = value.billingModeFilter === "PeriodBased";
   const advancedActiveCount = [
     !periodOnly && value.participantsFilter !== "all",
     !periodOnly && value.sessionsFilter !== "all",
     value.durationFilter !== "all",
-    value.activityFilter !== "all",
+    showActivityFilter && value.activityFilter !== "all",
   ].filter(Boolean).length;
   // Sorting only reorders the list, so it does not count as an active filter.
   const narrowsList = advancedActiveCount > 0 || value.search.trim() !== "" || value.billingModeFilter !== "all";
@@ -72,12 +74,14 @@ export default function PackageListFilters({ value, onChange }: PackageListFilte
       onClear={() => onChange({ ...defaultPackageListFilters, sort: value.sort })}
       advanced={
         <>
-          <CustomSelect
-            label="Status"
-            value={value.activityFilter}
-            onChange={(nextValue) => update("activityFilter", nextValue as PackageActivityFilter)}
-            options={activityOptions}
-          />
+          {showActivityFilter ? (
+            <CustomSelect
+              label="Status"
+              value={value.activityFilter}
+              onChange={(nextValue) => update("activityFilter", nextValue as PackageActivityFilter)}
+              options={activityOptions}
+            />
+          ) : null}
           {!periodOnly ? (
             <CustomSelect
               label="Uczestnicy"

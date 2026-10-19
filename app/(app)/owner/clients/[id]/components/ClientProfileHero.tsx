@@ -38,7 +38,7 @@ import {
   getClientName,
   getPortalAccessLabel,
 } from "../../components/client-display";
-import { clientStatus } from "../../components/client-list-display";
+import { clientStatus } from "@/app/components/clients/client-list-display";
 
 function getInitials(client: Client) {
   return getClientName(client)

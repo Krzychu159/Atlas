@@ -19,7 +19,7 @@ function load(file, modules = {}) {
 const periodPackages = load("app/lib/period-packages.ts", { "./backend": {}, "./formatters/money": {} });
 const packageFilters = load("app/lib/packageFilters.ts", { "./period-packages": periodPackages });
 const packageValidity = load("app/lib/package-validity.ts");
-const display = load("app/(app)/owner/packages/package-list-display.ts", {
+const display = load("app/components/packages/package-list-display.ts", {
   "@/app/lib/packageFilters": packageFilters,
   "@/app/lib/package-validity": packageValidity,
   "@/app/lib/period-packages": periodPackages,

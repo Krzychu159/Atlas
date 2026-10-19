@@ -27,6 +27,15 @@ function getClientPackageKind(
   return kind === "individual" ? "main" : kind;
 }
 
+export function getActivePackagesMeta(packages: ClientPackageBilling[] | null | undefined) {
+  if (!packages) return undefined;
+  const active = packages.filter((item) => item.isActive === true).length;
+  if (active === 1) return "1 aktywny";
+  const lastDigit = active % 10;
+  const lastTwoDigits = active % 100;
+  return lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 12 || lastTwoDigits > 14) ? `${active} aktywne` : `${active} aktywnych`;
+}
+
 export function getClientGroupLocationNames(
   packages: ClientPackageBilling[] | null | undefined,
   mainLocationName?: string | null,

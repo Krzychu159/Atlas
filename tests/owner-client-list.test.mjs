@@ -18,7 +18,7 @@ function load(file, modules = {}) {
 
 const periodPackages = load("app/lib/period-packages.ts", { "./backend": {}, "./formatters/money": {} });
 const clientDisplay = load("app/(app)/owner/clients/components/client-display.ts", { "@/app/lib/period-packages": periodPackages });
-const display = load("app/(app)/owner/clients/components/client-list-display.ts", { "./client-display": clientDisplay });
+const display = load("app/components/clients/client-list-display.ts", { "@/app/(app)/owner/clients/components/client-display": clientDisplay });
 
 const pkg = (overrides) => ({ clientPackageId: 10, packageId: 1, name: "12 treningów", billingMode: "SessionBased", status: "Active", paymentStatus: "Paid", totalSessions: 12, usedSessions: 8, remainingSessions: 4, validUntil: null, periodStartsAt: null, locationId: 1, ...overrides });
 const base = { id: 1, firstName: "Anna", lastName: "Nowak", fullName: "Anna Nowak", trainerId: null, trainerFullName: "", status: "active" };
@@ -87,4 +87,12 @@ test("session dots are exact up to 20 sessions and proportional above", () => {
 test("missing period dates never produce a fake validity", () => {
   const summary = display.clientPackageSummary({ ...base, activePackages: [pkg({ billingMode: "PeriodBased", totalSessions: null, usedSessions: null, remainingSessions: null })] });
   assert.equal(summary.detail, "Okres ważności niedostępny");
+});
+
+test("trainer balance column never turns missing data into zero and never marks a balance as debt", () => {
+  assert.deepEqual({ ...display.clientBalance({ ...base }) }, { label: "Brak danych", tone: "missing" });
+  const negative = display.clientBalance({ ...base, currentBalance: -150, currency: "PLN" });
+  assert.equal(negative.label.replace(/\s/g, " "), "-150,00 zł");
+  assert.equal(negative.tone, "settled");
+  assert.equal(display.clientBalance({ ...base, currentBalance: 0 }).tone, "settled");
 });
