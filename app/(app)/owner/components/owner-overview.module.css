@@ -3,8 +3,9 @@
 .header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 4px 0 16px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
 .header h1 { font-family: var(--font-display); font-size: clamp(30px, 2.5vw, 36px); font-weight: 650; letter-spacing: -.045em; line-height: 1.1; }
 .header p { margin-top: 6px; color: var(--color-on-surface-variant); font-size: 14px; }
-.period { display: flex; flex-shrink: 0; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--color-surface-container-low); color: var(--color-on-surface-variant); }
-.period input { background: transparent; color: var(--color-on-surface); font: inherit; min-width: 0; width: 170px; border: 0; color-scheme: dark; }
+.period { display: flex; flex-shrink: 0; align-items: center; gap: 10px; width: 210px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--color-surface-container-low); color: var(--color-on-surface); font: inherit; text-align: left; cursor: pointer; }
+.period:hover { background: var(--color-surface-container); }
+.periodIcon { flex-shrink: 0; order: -1; color: var(--color-on-surface-variant); }
 .card { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--color-surface-container-low); }
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
 .kpi { padding: 18px 20px; min-height: 144px; display: flex; flex-direction: column; align-items: flex-start; }
@@ -91,7 +92,7 @@
   .header h1 { font-size: 26px; }
   .header p { font-size: 13px; margin-top: 4px; }
   .period { padding: 7px 10px; gap: 8px; }
-  .period input { width: 112px; font-size: 14px; }
+  .period { width: 172px; font-size: 14px; }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .alerts { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .kpi { min-height: 0; padding: 12px 12px 12px 14px; }
@@ -120,10 +121,7 @@
 
 .headerControls { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
 .scopeNote { display: flex; align-items: center; gap: 2px; margin-top: 4px; color: var(--color-on-surface-muted); font-size: 11px; }
-.period input { width: 155px; padding: 0; appearance: none; }
-.period input::-webkit-calendar-picker-indicator { display: none; }
-.period input::-webkit-inner-spin-button { display: none; }
-.period:focus-within { outline: 2px solid var(--color-primary-light); outline-offset: 3px; }
+.period:focus-visible { outline: 2px solid var(--color-primary-light); outline-offset: 3px; }
 .metricHeading { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; }
 .revenueHeading { display: flex; align-items: center; gap: 4px; }
 .info { position: relative; display: inline-flex; vertical-align: middle; flex-shrink: 0; text-transform: none; letter-spacing: normal; }
@@ -132,4 +130,4 @@
 .infoTooltip { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; width: min(280px, calc(100vw - 48px)); padding: 12px 14px; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--color-surface-container-high); color: var(--color-on-surface-variant); box-shadow: var(--shadow-soft); font-size: 12px; font-weight: 400; line-height: 1.6; text-align: left; }
 .infoTooltip[hidden] { display: none; }
 .scopeNote .infoTooltip, .revenueHeading .infoTooltip { right: auto; left: 0; }
-@media (max-width: 600px) { .header > div:first-child > p { display: none; } .period input { width: 136px; } .headerControls { align-items: flex-end; } .partial { justify-content: flex-end; } .scopeNote .infoTooltip { left: 0; right: auto; } .partial .infoTooltip { left: auto; right: 0; } .revenueHeading .infoTooltip { left: -110px; } .kpis > :nth-child(even) .infoTooltip { right: 0; left: auto; } .kpis > :nth-child(odd) .infoTooltip { left: -150px; right: auto; } }
+@media (max-width: 600px) { .header > div:first-child > p { display: none; } .period { width: 168px; } .headerControls { align-items: flex-end; } .partial { justify-content: flex-end; } .scopeNote .infoTooltip { left: 0; right: auto; } .partial .infoTooltip { left: auto; right: 0; } .revenueHeading .infoTooltip { left: -110px; } .kpis > :nth-child(even) .infoTooltip { right: 0; left: auto; } .kpis > :nth-child(odd) .infoTooltip { left: -150px; right: auto; } }

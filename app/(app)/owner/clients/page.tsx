@@ -21,7 +21,7 @@ import OwnerClientFilters, {
 } from "@/app/(app)/owner/clients/components/OwnerClientFilters";
 import ClientList from "@/app/components/clients/ClientList";
 import ClientListRow from "@/app/components/clients/ClientListRow";
-import { clientAmountDue, pluralizeClients, type ClientPackageFilter } from "@/app/components/clients/client-list-display";
+import { clientAmountDue, clientResultsLabel, pluralizeClients, type ClientPackageFilter } from "@/app/components/clients/client-list-display";
 import { useOwnerRead } from "../components/use-owner-read";
 import { OwnerReadState } from "../components/OwnerReadState";
 import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
@@ -98,9 +98,15 @@ function ClientsContent() {
   const hasFilters = hasLocalFilters || selectedLocationId !== null;
   const isLoading = list.loading;
   const loadFailed = Boolean(readError);
-  const packageCount = list.data?.summary?.withActivePackageCount;
+  // Header counters describe the whole client base in the selected location; with filters they need one unfiltered count read.
+  const totalsQuery = useMemo<OwnerClientsQuery>(() => ({ page: 1, pageSize: 1, isArchived: false, locationId: selectedLocationId }), [selectedLocationId]);
+  const loadTotals = useCallback((signal: AbortSignal) => getOwnerClients(totalsQuery, signal), [totalsQuery]);
+  const totals = useOwnerRead(`totals:${JSON.stringify(totalsQuery)}`, loadTotals, "Nie udało się pobrać liczby klientów.", 0, 250, hasLocalFilters && !unsupportedSort && !invalidSearch);
+  const overview = hasLocalFilters ? totals.data : list.data;
+  const allClientsCount = overview?.totalCount;
+  const packageCount = overview?.summary?.withActivePackageCount;
   const activeClientsCount = typeof packageCount === "number" && Number.isSafeInteger(packageCount) && packageCount >= 0 ? packageCount : undefined;
-  async function loadClients() { try { await list.reload(); } catch { /* Visible read error. */ } }
+  async function loadClients() { try { await Promise.all([list.reload(), hasLocalFilters ? totals.reload() : undefined]); } catch { /* Visible read error. */ } }
   function changeFilters(next: OwnerClientFiltersValue) { setFilters(next); setPage(1); }
 
   function renderList() {
@@ -186,6 +192,8 @@ function ClientsContent() {
   }
 
   const countsReady = list.data !== undefined && !loadFailed;
+  const overviewReady = hasLocalFilters ? totals.data !== undefined : countsReady;
+  const overviewPending = hasLocalFilters ? totals.loading : !countsReady;
 
   return (
     <>
@@ -205,13 +213,13 @@ function ClientsContent() {
             <div className="flex gap-3">
               <div className="flex flex-1 items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3 sm:flex-none">
                 <p className="text-2xl font-semibold leading-none">
-                  {countsReady ? list.data?.totalCount : "–"}
+                  {overviewReady ? allClientsCount : overviewPending ? "–" : "—"}
                 </p>
                 <p className="text-sm text-on-surface-variant">łącznie</p>
               </div>
               <div className="flex flex-1 items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3 sm:flex-none">
                 <p className="text-2xl font-semibold leading-none text-tertiary-light">
-                  {countsReady ? activeClientsCount ?? "—" : "–"}
+                  {overviewReady ? activeClientsCount ?? "—" : overviewPending ? "–" : "—"}
                 </p>
                 <p className="text-sm text-on-surface-variant">z aktywnym pakietem</p>
               </div>
@@ -239,12 +247,12 @@ function ClientsContent() {
 
         <OwnerClientFilters value={filters} locationId={selectedLocationId} onChange={changeFilters} />
         <OwnerReadState loading={false} error={readError} retry={list.retry} label="Ładowanie klientów..." />
-        {countsReady && activeClientsCount === undefined ? <p role="status" className="text-sm text-on-surface-muted">Podsumowanie klientów z aktywnym pakietem jest chwilowo niedostępne.</p> : null}
+        {overviewReady && activeClientsCount === undefined ? <p role="status" className="text-sm text-on-surface-muted">Podsumowanie klientów z aktywnym pakietem jest chwilowo niedostępne.</p> : null}
 
         <ListSection
           title="Lista klientów"
           description="Trener, pakiet, kwota do zapłaty i status klienta w jednym wierszu."
-          meta={countsReady ? pluralizeClients(list.data?.totalCount ?? 0) : null}
+          meta={countsReady ? hasLocalFilters ? clientResultsLabel(list.data?.totalCount ?? 0, allClientsCount) : pluralizeClients(list.data?.totalCount ?? 0) : null}
         >
           {!readError || list.data ? renderList() : null}
           {list.data && list.data.totalPages > 1 && !isLoading && !readError ? <PaymentPagination page={list.data.page} pageSize={list.data.pageSize} totalItems={list.data.totalCount} totalPages={list.data.totalPages} onPageChange={setPage} itemLabel="klientów" ariaLabel="Strony klientów" /> : null}

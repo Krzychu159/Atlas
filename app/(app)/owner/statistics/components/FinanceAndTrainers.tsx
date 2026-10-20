@@ -1,5 +1,6 @@
 import { Activity, BarChart3 } from "lucide-react";
 import { formatMoney } from "@/app/lib/formatters/money";
+import { countLabel } from "@/app/lib/formatters/plural";
 import type { AnalyticsBreakdown } from "@/app/lib/owner/analytics";
 import {
   getBreakdownAmount,
@@ -111,7 +112,7 @@ function TrainerProfitability({ items }: { items: AnalyticsBreakdown[] }) {
                       {getBreakdownLabel(item, `Trener ${index + 1}`)}
                     </p>
                     <p className="mt-1 text-xs text-on-surface-muted">
-                      {getBreakdownCount(item)} sesji · marża{" "}
+                      {countLabel(getBreakdownCount(item), "sesja", "sesje", "sesji")} · marża{" "}
                       {formatPercent(margin)}
                     </p>
                   </div>

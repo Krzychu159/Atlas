@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Clock3, ReceiptText, Wallet, CheckCircle2, FileCheck2, FileX2 } from "lucide-react";
 import DashboardStatCard from "@/app/(app)/owner/components/DashboardStatCard";
-import { NativeDateInput } from "@/app/components/ui/native-date-input";
+import { MonthPicker } from "@/app/components/ui/month-picker";
 import { getTrainerPortalSettlement, type TrainerPortalSettlement } from "@/app/lib/trainer/portal";
 import {
   formatSettlementDate, formatSettlementMoney, formatSettlementNumber,
@@ -26,8 +26,8 @@ export default function TrainerSettlementsPage() {
         <div className="flex w-full items-end gap-2 sm:w-auto">
           <button type="button" aria-label="Poprzedni miesiąc" onClick={() => setMonthValue((value) => moveTrainerMonth(value, -1))} disabled={monthValue === "0001-01"} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container text-primary-light disabled:opacity-50"><ChevronLeft size={18} /></button>
           <div className="min-w-0 flex-1 sm:w-56">
-            <label htmlFor="trainer-settlement-month" className="mb-2 block text-label text-on-surface-muted">Miesiąc i rok</label>
-            <NativeDateInput id="trainer-settlement-month" type="month" value={monthValue} min="0001-01" max="9999-12" onChange={(event) => { if (parseTrainerMonth(event.target.value)) setMonthValue(event.target.value); }} className="h-12 w-full rounded-[var(--radius-lg)] bg-surface-container px-4 pr-12 text-sm font-semibold" />
+            <span aria-hidden="true" className="mb-2 block text-label text-on-surface-muted">Miesiąc i rok</span>
+            <MonthPicker id="trainer-settlement-month" ariaLabel="Miesiąc i rok rozliczenia" value={monthValue} min="0001-01" max="9999-12" align="end" onChange={(value) => { if (parseTrainerMonth(value)) setMonthValue(value); }} className="flex h-12 w-full items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container px-4 text-left text-sm font-semibold text-on-surface transition hover:bg-surface-container-high focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--color-primary-light)]" />
           </div>
           <button type="button" aria-label="Następny miesiąc" onClick={() => setMonthValue((value) => moveTrainerMonth(value, 1))} disabled={monthValue === "9999-12"} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-surface-container text-primary-light disabled:opacity-50"><ChevronRight size={18} /></button>
         </div>

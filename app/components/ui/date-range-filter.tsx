@@ -29,7 +29,9 @@ export function DateRangeFilter({
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      const target = event.target as Element;
+      // Calendars of the date fields render in a portal; using them must not close the range.
+      if (!rootRef.current?.contains(target) && !target.closest?.("[data-atlas-picker]")) {
         setIsOpen(false);
       }
     }
@@ -240,15 +242,11 @@ function getPresetRange(preset: DateRangePreset): DateRangeValue {
   };
 }
 
+// Moves on to the "Do" field and opens its calendar (ATLAS calendar, or the system picker on touch).
 function openDatePicker(input: HTMLInputElement | null) {
   if (!input) return;
-
   input.focus();
-  try {
-    input.showPicker?.();
-  } catch {
-    // Sam fokus pozostaje bezpiecznym fallbackiem dla przeglądarek blokujących showPicker().
-  }
+  input.parentElement?.querySelector<HTMLButtonElement>('button[aria-haspopup="dialog"]')?.click();
 }
 
 function rangesEqual(first: DateRangeValue, second: DateRangeValue) {

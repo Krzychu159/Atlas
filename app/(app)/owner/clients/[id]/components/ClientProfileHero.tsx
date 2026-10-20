@@ -23,6 +23,7 @@ import { formatTrainingStartDate } from "@/app/lib/formatters/date";
 import { formatMoney } from "@/app/lib/formatters/money";
 import ClientRewardProgress from "@/app/components/clients/ClientRewardProgress";
 import { Tooltip } from "@/app/components/ui/tooltip";
+import { ProfileMoreMenu, type ProfileMoreMenuItem } from "@/app/components/ui/profile-more-menu";
 import {
   ProfileChip as Chip,
   ProfileIconAction as IconAction,
@@ -119,7 +120,11 @@ export default function ClientProfileHero({
   const locationLabel = groupLocationNames?.length
     ? `Lokalizacja główna · zajęcia grupowe: ${groupLocationNames.join(", ")}`
     : groupLocationNames ? "Lokalizacja główna" : "Lokalizacja";
-  const hasIconActions = Boolean(onFiles || onPortalAction || onArchive || onEndCooperation || onRefresh);
+  const hasIconActions = Boolean(onFiles || onPortalAction || onRefresh);
+  const moreActions: ProfileMoreMenuItem[] = [
+    ...(onEndCooperation ? [{ label: "Zakończ współpracę", icon: <UserRoundX size={15} />, onSelect: onEndCooperation, tone: "danger" as const }] : []),
+    ...(onArchive ? [{ label: "Archiwizuj klienta", icon: <Archive size={15} />, onSelect: onArchive, tone: "danger" as const }] : []),
+  ];
 
   return (
     <section className="card-shell p-4 md:p-6">
@@ -237,21 +242,9 @@ export default function ClientProfileHero({
                   <PortalActionIcon status={client.portalAccessStatus} />
                 </IconAction>
               ) : null}
-              {(onFiles || onPortalAction || onRefresh) && (onArchive || onEndCooperation) ? (
-                <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-white/10" />
-              ) : null}
-              {onArchive ? (
-                <IconAction label="Archiwizuj klienta" onClick={onArchive} tone="danger" align="end">
-                  <Archive size={15} />
-                </IconAction>
-              ) : null}
-              {onEndCooperation ? (
-                <IconAction label="Zakończ współpracę" onClick={onEndCooperation} tone="danger" align="end">
-                  <UserRoundX size={15} />
-                </IconAction>
-              ) : null}
             </ProfileIconActions>
           ) : null}
+          <ProfileMoreMenu items={moreActions} />
         </div>
       </div>
 

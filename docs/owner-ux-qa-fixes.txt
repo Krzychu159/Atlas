@@ -1,0 +1,404 @@
+ATLAS CRM — POPRAWKI UX/UI PANELU OWNERA PO AUDYCIE QA, 20.10.2026
+
+STAN I GRANICE PRACY
+Na wejściu: branch main, git status czysty poza nieśledzonym .claude/.
+Bez commitów, push, merge, stash i resetów. Bez zmian backendu, kontraktów API,
+obliczeń finansowych, statusów biznesowych i nowych zależności.
+Raport audytu z 20.10.2026 nie znajduje się w repozytorium (jest tylko
+docs/owner-ux-ui-audit.txt z 16.10.2026), więc punkty sprawdzono w kodzie.
+Enumy zweryfikowano w aktualnym Swaggerze backendu (GET /swagger/v1/swagger.json).
+
+UWAGA: w trakcie pracy w git status pojawiło się usunięcie trzech plików
+„PRACE ZALICZENIOWE/*.docx”. Nie były usuwane przez tę pracę i nie zostały
+przywrócone — proszę sprawdzić, czy to zamierzona zmiana.
+
+======================================================================
+1. WDROŻONE POPRAWKI
+======================================================================
+
+ETAP A
+
+A1. Walidacja kwoty wpłaty — WDROŻONE
+   PaymentEntryModal (wspólny dla profilu klienta Ownera/Trenera, zapisu
+   grupowego i portalu klienta) pokazuje komunikat przy polu:
+   - „Kwota musi być większa od 0.” dla -1, 0, 0,00;
+   - „Wpisz kwotę liczbą, maksymalnie z dwoma miejscami po przecinku…”
+     dla niepoprawnego formatu.
+   Puste pole pozostaje neutralne (przycisk nieaktywny jak dotąd).
+   TextField otrzymał opcjonalny prop error: aria-invalid, aria-describedby
+   wskazujące komunikat, czerwona ramka pola. Pola bez walidacji mają
+   niezmienioną strukturę. Dane formularza nie są czyszczone. Zasady
+   akceptacji kwoty i walidacja backendu bez zmian (ten sam wzorzec kwoty).
+
+A2. Kategorie powiadomień — WDROŻONE
+   Od szerokości md kategorie zawijają się do kolejnych wierszy, więc żadna
+   nie jest ukryta. Na telefonie zostało przewijanie poziome, ale pasek
+   przewijania jest widoczny (wcześniej scrollbarWidth: none ukrywał, że lista
+   jest dłuższa). Filtrowanie i liczniki bez zmian.
+
+A3. Kolejność powiadomień — SPRAWDZONE, BEZ ZMIAN
+   Frontend nie sortuje: wyświetla kolejność z GET /api/Notifications/page
+   i grupuje ją po dniach przy założeniu „od najnowszych” (komentarz w
+   notification-display.ts). Swagger nie dokumentuje parametru sortowania ani
+   priorytetu nieprzeczytanych. Wyjątek: powiadomienie otwarte z linku
+   (?id=) jest dopinane na górze, jeśli nie ma go na bieżącej stronie —
+   to zamierzone. Nie potwierdzono kolejności na żywych danych (patrz 4).
+
+A4. Kontrast etykiet — WDROŻONE
+   Pomiar: on-surface-muted #8a8f98 na surface-container-high #282a2c (tło
+   okna pakietu) = 4,43:1 — zgadza się z audytem. Nowy token
+   --color-on-surface-label #9ba0a8: 5,48:1 na #282a2c, 5,92:1 na #222426,
+   7,36:1 na #0c0e10. Zastosowany wyłącznie do:
+   - etykiet FormField (TextField, TextArea) i compactFieldLabelClassName
+     (etykiety pól w modalach, w tym CustomSelect),
+   - reguły [data-atlas-modal] .text-label.text-on-surface-muted (ręcznie
+     składane etykiety w modalach).
+   Paleta globalna, on-surface-muted dla tekstów pomocniczych oraz motywy
+   ATLAS/BSworkout (różnią się tylko kolorem primary) bez zmian.
+   W formularzu pakietu „Typ pakietu” i „Typ rozliczenia” mają teraz tę samą
+   etykietę co pozostałe pola okna.
+
+A5. Statystyki — wynik zerowy — WDROŻONE
+   Karta „Zysk operacyjny netto”: Wynik dodatni / Wynik zerowy (neutralny
+   kolor) / Wynik ujemny / Brak danych („—”, gdy nie udało się pobrać
+   przychodów lub kosztów; wcześniej wartości startowe 0 udawały wynik).
+   Kwota zaokrąglana do 0,00 zł jest wynikiem zerowym (bez „-0 zł”).
+   Sposób obliczenia bez zmian (patrz D2).
+
+A6. Liczebniki i kwoty — WDROŻONE CZĘŚCIOWO
+   Nowy helper app/lib/formatters/plural.ts (polishPlural, countLabel).
+   Poprawione miejsca w panelu Ownera:
+   - Statystyki, Rentowność trenerów: „1 sesji” → „1 sesja”, „3 sesje”;
+   - Statystyki, Rentowność sesji: „N sesji w zestawieniu”, „N uczestników”;
+   - Rozliczenie trenera, „Poza umową”: „1 sesji” → „1 sesja”.
+   „1 treningów” i „840.00 PLN”: w kodzie frontendu nie ma miejsca, które
+   składa takie teksty — kwoty idą przez formatMoney (Intl pl-PL, „840,00 zł”).
+   Najpewniej to treści generowane przez backend (tytuły/treści powiadomień,
+   opisy w dzienniku zmian) albo nazwy pakietów wpisane przez użytkownika.
+   Nie przepisywano tekstów backendu regexem po stronie frontendu (patrz 4, 6).
+
+A7. Lista klientów — liczniki — WDROŻONE
+   Bez filtrów: bez zmian, jedno zapytanie, kafelki i meta z odpowiedzi listy.
+   Z filtrami (wyszukiwanie, pakiet, trener, „do zapłaty”):
+   - kafelki „łącznie” i „z aktywnym pakietem” pokazują całą bazę w wybranej
+     lokalizacji (wcześniej pokazywały liczby po filtrach pod etykietą
+     „łącznie”),
+   - meta listy: „44 wyniki z 108 klientów”.
+   Liczby pochodzą wyłącznie z backendu: dodatkowy lekki odczyt
+   GET /api/clients?page=1&pageSize=1&isArchived=false[&locationId] daje
+   totalCount i summary.withActivePackageCount całej bazy (wg dokumentacji
+   summary liczone jest z całego przefiltrowanego zbioru przed paginacją).
+   Odczyt jest wykonywany tylko przy aktywnych filtrach, nie powtarza się
+   przy zmianie filtrów ani stron; przy błędzie kafelki pokazują „—”,
+   a meta same wyniki. Nic nie jest liczone z bieżącej strony.
+
+A8. Ładowanie lokalizacji — WDROŻONE
+   Wspólny helper owner/components/location-options.ts. Rozróżnione stany:
+   „Wczytywanie lokalizacji…”, „Nie udało się pobrać lokalizacji”,
+   „Brak aktywnych lokalizacji”, lista lokalizacji. Zastosowane w:
+   AddClientModal, InviteUserModal (zaproszenie klienta/trenera)
+   i EditTrainerModal (lista wielokrotnego wyboru pokazywała „Brak lokalizacji
+   do wyboru.” zarówno przy ładowaniu, jak i po cichym błędzie).
+   Formularze pakietów dostają lokalizacje z listy pakietów i mają opcję
+   „Bez przypisania” — nie dotyczy.
+
+ETAP B
+
+B9. Profil klienta — WDROŻONE BEZ DODATKOWYCH ZAPYTAŃ
+   - Sekcja „Pakiety” jest domyślnie rozwinięta (aktywny pakiet widoczny od
+     razu; starsze pakiety nadal w „Pokaż więcej”).
+   - Zwinięty nagłówek sekcji treningów pokazuje „Najbliższy: śr. 21.10, 18:00”
+     albo „Brak zaplanowanych”, obok łącznej liczby treningów.
+   Najbliższy trening jest wyliczany z już pobieranej 1. strony historii
+   (sortowanie desc). Pokazywany tylko wtedy, gdy jest to pewne: strona 1
+   sięga przeszłości albo jest jedyną stroną. Gdy klient ma ponad 25
+   przyszłych treningów albo oglądana jest dalsza strona — tylko liczba.
+   Pozostałe sekcje pozostały zwinięte; układ profilu bez przebudowy.
+
+B10. Dashboard „Warto sprawdzić” — NIE WDROŻONE (brak dokładnego filtra)
+   GET /api/clients obsługuje: Search, TrainerId, LocationId, IsArchived,
+   Status, PackageStatus (active|none), HasAmountDue, Sort. Nie ma filtrów
+   „bez treningu od N dni” ani „1 trening pozostały w pakiecie”, a alerty
+   z GET /api/owner/dashboard/attention zwracają tylko liczby. Każdy link
+   do listy pokazałby inną grupę niż licznik — zgodnie z poleceniem nie
+   dodano pozornego rozwiązania. Wymagania backendu w punkcie 6.
+
+B11. Akcje na profilu klienta — WDROŻONE
+   „Zakończ współpracę” i „Archiwizuj klienta” przeniesione z paska ikon do
+   podpisanego przycisku „Więcej” (nowy app/components/ui/profile-more-menu.tsx:
+   role=menu, aria-expanded, Escape/Tab zamyka i oddaje fokus, strzałki,
+   zamknięcie po kliknięciu obok). Na pasku zostały rutynowe: Dodaj wpłatę,
+   Edytuj, Pliki klienta, dostęp do portalu, Odśwież. Warunki widoczności,
+   handlery, okna potwierdzeń i uprawnienia bez zmian. Zakładka „Płatności”
+   i karta klienta u trenera nie przekazują tych akcji, więc menu się tam
+   nie pojawia (bez zmian).
+
+B12. Historia treningów — WDROŻONE W RAMACH STRONY
+   Sekcja nazywa się „Treningi”. Każda strona dzieli się na:
+   - „Nadchodzące” — przyszłe, nieanulowane, od najbliższego;
+   - „Historia treningów” — pozostałe, w kolejności z serwera
+     (w tym anulowane).
+   Puste grupy nie są pokazywane. Statusy, zapytanie (sessions/filter,
+   pageSize 25, order desc) i paginacja bez zmian. Pełny podział na dwie
+   niezależne listy wymaga potwierdzenia semantyki From/To (punkt 5).
+
+B13. Listy — WDROŻONE PUNKTOWO
+   - Pakiety (desktop): nazwa w 2 liniach zamiast ucinania do 1, pełna nazwa
+     w title; na mobile title dla line-clamp-2.
+   - Klienci (desktop): title z pełnym imieniem i nazwiskiem, e-mailem
+     i trenerem przy ucinanych komórkach.
+   Kolumn i informacji nie usuwano. Nagłówków i odstępów list nie zmieniano —
+   wspólne prymitywy (ListSection/ListState) są już spójne między Pakietami,
+   Klientami, Trenerami i Płatnościami; bez wizualnej weryfikacji na danych
+   nie było jednoznacznego, mierzalnego problemu do poprawy.
+
+ETAP C (tylko analiza, poza C15)
+
+C15. Pakiety — „Typ rozliczenia” — WDROŻONE (prezentacja)
+   Znaczenie potwierdzone w Swaggerze: SessionBillingType
+   1 = OneToOne, 2 = TwoToOne, 3 = ThreeToOne, 4 = FourToOne, 5 = Group;
+   zgodne z package-validity.ts i schedule/options.ts.
+   Pole liczbowe zastąpione listą: „Trening 1:1 — jeden klient”,
+   „Trening 2:1 — dwóch klientów”, „3:1”, „4:1” + opis „Liczba klientów
+   trenujących jednocześnie z jednym trenerem.” Wysyłane wartości bez zmian
+   (string → Number w packageFormPayload). Nieoczekiwana zapisana wartość
+   jest zachowana jako „Inny typ (N)”, a nie nadpisywana. Wartość 5 nadal
+   wybiera się przez „Typ pakietu: Grupowy”.
+
+======================================================================
+2. ZMIENIONE PLIKI
+======================================================================
+
+Nowe:
+- app/lib/formatters/plural.ts
+- app/(app)/owner/components/location-options.ts
+- app/components/ui/profile-more-menu.tsx
+- tests/owner-ux-qa-fixes.test.mjs
+- docs/owner-ux-qa-fixes.txt
+
+Zmienione:
+- app/globals.css — token --color-on-surface-label, reguła etykiet w modalach
+- app/components/ui/input.tsx — TextField error, styl aria-invalid
+- app/components/ui/field-density.tsx — kolor etykiety compact
+- app/components/payments/PaymentEntryModal.tsx — paymentAmountError
+- app/(app)/owner/components/NotificationFilters.tsx
+- app/(app)/owner/statistics/page.tsx, components/StatisticsOverview.tsx,
+  components/FinanceAndTrainers.tsx, components/SessionsProfitability.tsx
+- app/(app)/owner/trainers/[id]/settlements/page.tsx
+- app/(app)/owner/clients/page.tsx
+- app/components/clients/client-list-display.ts — clientResultsLabel
+- app/components/clients/ClientListRow.tsx
+- app/(app)/owner/clients/components/AddClientModal.tsx
+- app/(app)/owner/components/InviteUserModal.tsx
+- app/(app)/owner/trainers/components/EditTrainerModal.tsx
+- app/(app)/owner/packages/components/PackagePublicationFields.tsx
+- app/components/packages/PackageListRow.tsx
+- app/(app)/owner/clients/[id]/page.tsx
+- app/(app)/owner/clients/[id]/components/ClientSessionHistory.tsx
+- app/(app)/owner/clients/[id]/components/ClientProfileHero.tsx
+- app/lib/formatters/date.ts — formatSessionStart
+- tests/owner-frontend-fixes.test.mjs, tests/owner-client-list.test.mjs
+
+Poza panelem Ownera (współdzielone komponenty, zmiana działa też tam):
+PaymentEntryModal (portal klienta, trener), TextField/etykiety pól,
+ClientProfileHero (karta klienta u trenera — bez akcji archiwizacji, więc
+bez menu „Więcej”), ClientListRow, PackageListRow.
+
+======================================================================
+3. WYNIKI TESTÓW
+======================================================================
+
+- pnpm exec tsc --noEmit — OK, 0 błędów.
+- eslint zmienionych plików — 0 błędów, 2 ostrzeżenia istniejące wcześniej
+  (<img> w ClientProfileHero, nieużywane „secondary” w StatisticsOverview).
+- node --test tests/*.test.mjs — 288 testów: 287 OK, 0 błędów, 1 pominięty
+  (pominięty już wcześniej).
+  Nowe/zmienione testy: liczebniki; komunikat i powiązanie błędu kwoty;
+  wynik dodatni/zerowy/ujemny/brak danych przy niezmienionym wzorze; stany
+  lokalizacji; opcje typu rozliczenia z zachowaniem wartości; zawijanie
+  kategorii; menu „Więcej”; podział treningów na nadchodzące i historię;
+  wyznaczanie najbliższego treningu; licznik „wyniki z klientów” i jeden
+  niefiltrowany odczyt liczby klientów; format daty sesji.
+  Zaktualizowano atrapy client-list-display w dwóch istniejących testach
+  oraz test historii treningów (zmienione zachowanie).
+- git diff --check — OK (tylko ostrzeżenia autocrlf).
+- Pełny build nie był uruchamiany.
+- Weryfikacja wizualna (desktop/mobile): NIE WYKONANA. Serwer deweloperski
+  działa, ale panel wymaga zalogowania na konto Ownera produkcyjnego backendu,
+  a logowanie danymi użytkownika nie jest przeze mnie wykonywane.
+
+======================================================================
+4. PROBLEMY, KTÓRYCH NIE UDAŁO SIĘ ODTWORZYĆ
+======================================================================
+
+- „1 treningów”, „840.00 PLN” — brak źródła we frontendzie (patrz A6).
+  Do sprawdzenia na żywych danych: treść powiadomień, opisy dziennika zmian,
+  nazwy pakietów. Jeśli to backend — poprawka po stronie generowania tekstu.
+- Kolejność powiadomień — kod zakłada „od najnowszych”; bez danych nie
+  potwierdzono, czy backend sortuje po createdAt desc i czy nie promuje
+  nieprzeczytanych (wtedy grupowanie po dniach mieszałoby dni).
+- Grafik przy 1363 px — potwierdzone rachunkiem, nie wizualnie (C14).
+- Potencjalne duplikaty powiadomień Outlook — wymagają danych (D3).
+
+======================================================================
+5. PROPOZYCJE WYMAGAJĄCE DECYZJI
+======================================================================
+
+C14. Grafik — 7 dni przy 1363 px
+   Rachunek: kolumna dnia min. 160 px (rośnie przy nakładających się sesjach
+   do 4 × 96 px) + 56 px osi = min. 1176 px. Przy 1363 px okna zostaje
+   1363 − 280 (sidebar) − 64 (padding md:px-8) ≈ 1019 px — tydzień musi się
+   przewijać nawet bez nakładających się sesji.
+   Opcje (od najmniej inwazyjnej):
+   a) Zwijany sidebar do ikon (~72 px): zysk ~208 px → ~1227 px, 7 dni mieści
+      się przy dniach bez nakładania. Dotyka app-shell (wspólne dla portali).
+   b) Przełącznik zakresu „3 dni / tydzień” (ew. „robocze 6 dni”) w
+      ScheduleControls; zakres pobierania danych bez zmian (tydzień).
+   c) Widoczne sterowanie przewijaniem: przyciski ‹ › przy nagłówku dni
+      + cień krawędzi sygnalizujący dalsze dni.
+   Rekomendacja: a) + c); b) jako opcja dla mniejszych laptopów.
+   Nie zmniejszać MIN_DAY_WIDTH poniżej 160 px (traci się trener/lokalizacja).
+
+C16. Okno sesji — podwójne przewijanie
+   SessionEditorModal: treść ma overflow-y-auto, a w środku listy wyboru
+   uczestników mają max-h-[260px] overflow-y-auto (linie ~502 i ~576), u
+   trenera max-h-40. Stopka jest już poza obszarem przewijania (widoczna).
+   Propozycja: usunąć wewnętrzne max-h, nad listą pole „Szukaj klienta”
+   i licznik „Wybrano: N”, wybranych pokazywać na górze listy, resztę
+   w siatce 2-kolumnowej; jedno przewijanie treści + stała stopka.
+   Bez zmian w korektach zrealizowanych sesji, obecności i naliczaniu wejść.
+
+D. Hipotezy (tylko weryfikacja, bez zmian)
+   D1. Rentowność 100% przy sesjach poza umową — prawdopodobne z definicji:
+       profitMarginPercent liczy backend; dla sesji bez umowy
+       trainerCostAmount = 0, więc marża = 100%. DTO ma też
+       potentialTrainerCostAmount i uncoveredPotentialTrainerCostAmount.
+       Decyzja: pokazywać marżę z potencjalnym kosztem albo oznaczać
+       „poza umową — bez kosztu trenera”.
+   D2. „Zysk operacyjny netto” — front bierze
+       expenses.operatingProfitNetAmount, a gdy ten wynosi 0 — liczy
+       revenue.netAmount − expenses.netAmount. Ryzyko: prawdziwe 0 z backendu
+       zostaje zastąpione innym wynikiem, a zastępczy wzór nie odejmuje
+       kosztów trenerów. Swagger nie opisuje zakresu kosztów w
+       operatingProfitNetAmount. Decyzja biznesowa + doprecyzowanie
+       kontraktu; obliczenia nie były zmieniane.
+   D3. Duplikaty powiadomień Outlook — nie zweryfikowane bez danych; front
+       nie deduplikuje powiadomień i nie powinien (to dane backendu).
+   D4. Angielskie nazwy miesięcy — kod formatuje miesiące przez Intl pl-PL
+       (wykresy, dashboard). Źródłem są natywne pola <input type="month">
+       (dashboard, rozliczenia, rozliczenia trenera): Chrome wyświetla je
+       w języku przeglądarki, niezależnie od lang strony. Rozwiązanie
+       wymaga własnego wyboru miesiąca (np. lista miesięcy + rok) — decyzja.
+   D5. Aktywni klienci vs z aktywnym pakietem — dwie różne definicje:
+       activeClientsCount = Client.Status == "Active", withActivePackageCount
+       = co najmniej jeden aktywny, niezamknięty pakiet (dokumentacja
+       BACKEND_FOR_FRONTEND_OPTIMIZATION.md, pyt. 4). Dashboard pokazuje
+       „Aktywni klienci” z innego endpointu, lista — „z aktywnym pakietem”.
+       Decyzja: którą definicję nazywać „aktywnym” i czy ujednolicić etykiety.
+
+======================================================================
+6. PROBLEMY WYMAGAJĄCE BACKENDU
+======================================================================
+
+- Filtry listy klientów dla alertów „Warto sprawdzić”, liczone tą samą
+  definicją co /owner/dashboard/attention: np. inactiveDays=30 (bez treningu
+  od N dni, z obsługą klientów bez danych bazowych) i remainingSessions=1.
+  Dopiero wtedy przycisk „Zobacz klientów” pokaże dokładnie tę grupę.
+- Opcjonalnie: unfilteredTotalCount w summary GET /api/clients — usunie
+  dodatkowy odczyt licznika całej bazy przy filtrach.
+- Dokumentacja sortowania GET /api/Notifications/page (createdAt desc?).
+- Polskie liczebniki i formatowanie kwot w tekstach generowanych przez
+  backend (jeśli potwierdzi się źródło z punktu 4).
+- Semantyka From/To w GET /api/sessions/filter (startAt czy nakładanie)
+  — potrzebna do dwóch niezależnych list „Nadchodzące” i „Historia”.
+- Definicja operatingProfitNetAmount i marży dla sesji poza umową (D1, D2).
+
+======================================================================
+7. POZOSTAŁE RYZYKA
+======================================================================
+
+- Wspólne komponenty (TextField, PaymentEntryModal, etykiety pól) zmieniają
+  wygląd także w portalach Trenera i Klienta — zmiana jest wąska (kolor
+  etykiet, komunikat kwoty), ale niezweryfikowana wizualnie.
+- Menu „Więcej” na telefonie otwiera się od lewej krawędzi przycisku
+  (od sm — od prawej); do sprawdzenia przy zawijaniu przycisków w nagłówku.
+- Licznik całej bazy przy filtrach nie odświeża się po zmianach z innej
+  karty przeglądarki (odświeża się po dodaniu klienta w tym widoku).
+- „Najbliższy trening” opiera się na lokalnym zegarze i statusach
+  zawierających cancel/anul/odwoł (ta sama reguła co dotychczas w module).
+- Brak weryfikacji wizualnej desktop/mobile całego zakresu.
+
+======================================================================
+8. CO JESZCZE WARTO POPRAWIĆ PRZED ZAKOŃCZENIEM PRAC NAD PANELEM OWNERA
+======================================================================
+
+1. Weryfikacja wizualna tych poprawek na koncie Ownera (desktop 1363 px,
+   tablet, 375 px) w motywach ATLAS i BSworkout.
+2. Decyzje D2 i D5 — liczby finansowe i definicja „aktywnego klienta”
+   są najbardziej widoczne dla właściciela.
+3. Grafik: zwijany sidebar + sterowanie przewijaniem (C14).
+4. Okno sesji: jedno przewijanie listy uczestników (C16).
+5. Własny wybór miesiąca zamiast <input type="month"> (D4).
+6. Filtry backendu dla „Warto sprawdzić” i przycisk „Zobacz klientów” (B10).
+7. Pozostałe lokalne kopie odmiany liczebników (ok. 10 plików) można
+   stopniowo przenieść na app/lib/formatters/plural.ts — bez zmiany
+   zachowania, poza zakresem tego zadania.
+
+======================================================================
+9. DODATEK — POLSKIE POLA DATY, GODZINY I MIESIĄCA (decyzja z D4)
+======================================================================
+
+Decyzja: własne komponenty bez nowych zależności; na komputerze (mysz)
+okienko ATLAS po polsku, na telefonie/tablecie (dotyk, pointer: coarse)
+natywny wybierak systemu; godziny 24h, minuty w liście co 5, dowolna
+minuta wpisana lub zapisana (np. 08:07 z Outlooka) jest zachowana.
+
+Nowe pliki:
+- app/lib/formatters/date-input.ts — polski zapis, parsowanie wpisu
+  (21.10.2026, 21-10-2026, 21102026, 21.10.26; godziny 18:00, 1800, 18),
+  granice min/max, siatka miesiąca od poniedziałku.
+- app/lib/formatters/month.ts — „Październik 2026”, przesuwanie miesięcy.
+- app/components/ui/picker-popover.tsx — wspólny panel w portalu
+  (w otwartym modalu albo w body), pozycja fixed z odwracaniem w górę,
+  Escape/Tab zamykają tylko kalendarz, wykrywanie dotyku.
+- app/components/ui/date-picker-panel.tsx — siatka dni + kolumny godzin
+  i minut, „Dzisiaj”, „Wyczyść” (gdy pole nie jest wymagane), „Gotowe”.
+- app/components/ui/month-picker.tsx — wybór miesiąca (siatka 12 miesięcy,
+  rok ‹ ›, „Bieżący miesiąc”).
+
+NativeDateInput (wspólny dla Input/TextField/DateInput/DateRangeFilter):
+widoczne pole tekstowe po polsku + ukryte natywne pole, które dalej
+emituje te same zdarzenia onChange i ma ten sam format wartości —
+wywołania w formularzach nie zmieniły się. Wpis z klawiatury zatwierdza
+Enter lub wyjście z pola; niepoprawna data lub data spoza min/max nie jest
+wysyłana, pole jest oznaczone jako błędne z komunikatem (setCustomValidity,
+więc formularze z walidacją przeglądarki zablokują zapis). Zapis
+nie zmienionej chwili zachowuje sekundy (korekta daty wpłaty).
+
+Podmienione pola miesiąca: dashboard, rozliczenia zespołu, rozliczenie
+trenera (Owner), rozliczenia w portalu trenera.
+Surowe pola daty przepięte na wspólny komponent: import pakietu klienta,
+zarządzanie pakietem klienta. Filtr zakresu dat: kliknięcia w kalendarz
+nie zamykają filtra, po wyborze „Od” otwiera się kalendarz „Do”.
+Pozostałe pola (wpłaty, korekta daty wpłaty, okno sesji, grafik, umowy
+trenera, usługi okresowe, decyzja o ważności pakietu, publiczne zajęcia)
+dostały nowe zachowanie przez wspólne komponenty.
+
+Testy: tests/native-date-input.test.mjs przepisany (parsowanie, granice,
+kalendarz, miesiące, minuty, pole: polski tekst, onChange natywnego
+pola, mysz vs dotyk, blokady, zatwierdzanie i odrzucanie wpisu, Enter
+i Escape); tests/owner-dashboard.test.mjs dostosowany do MonthPicker.
+Całość: 298 testów, 297 OK, 1 pominięty (jak wcześniej). tsc i eslint OK.
+
+Weryfikacja w przeglądarce (strona /classes, bez logowania):
+- desktop: kalendarz po polsku, wybór dnia, wpis z klawiatury + Enter,
+  Alt+↓, strzałki, Enter — wartość i adres URL aktualizują się, fokus wraca;
+- mobile 375 px (emulacja dotyku): pole tylko do odczytu, ikona otwiera
+  natywny wybierak, zmiana z natywnego pola trafia do strony.
+NIE sprawdzone wizualnie (wymaga zalogowania): kolumny godzin w oknie
+sesji, wybór miesiąca na dashboardzie i w rozliczeniach, pola w modalach.
+
+Ryzyka: wpis z klawiatury zatwierdza się przy wyjściu z pola — formularz
+zapisywany przyciskiem bez <form> dostaje wartość po blur (React obsługuje
+to przed kliknięciem); na telefonie wymagane pole waliduje ukryte natywne
+pole (komunikat przeglądarki pojawi się przy nim).

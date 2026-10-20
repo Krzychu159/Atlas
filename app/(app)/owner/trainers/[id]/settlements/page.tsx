@@ -1,11 +1,12 @@
 "use client";
 
+import { polishPlural } from "@/app/lib/formatters/plural";
 import { userTrainingType } from "@/app/lib/user-messages";
 
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 import { useTrainerRatesRevision } from "@/app/lib/owner/trainer-rates-changes";
 
-import { NativeDateInput } from "@/app/components/ui/native-date-input";
+import { MonthPicker } from "@/app/components/ui/month-picker";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -354,17 +355,17 @@ export default function TrainerSettlementPage() {
             >
               <ChevronLeft size={17} />
             </button>
-            <label className="min-w-0 flex-1 sm:w-52 sm:flex-none">
-              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-on-surface-muted">Miesiąc</span>
-              <NativeDateInput
-                type="month"
+            <div className="min-w-0 flex-1 sm:w-52 sm:flex-none">
+              <span aria-hidden="true" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-on-surface-label">Miesiąc</span>
+              <MonthPicker
                 value={monthValue}
-                onChange={(event) => {
-                  if (parseTrainerMonth(event.target.value)) changeMonth(event.target.value);
+                ariaLabel="Miesiąc rozliczenia"
+                onChange={(value) => {
+                  if (parseTrainerMonth(value)) changeMonth(value);
                 }}
-                className="h-10 w-full rounded-[var(--radius-md)] bg-surface-container-low px-3 text-sm font-semibold"
+                className="flex h-10 w-full items-center gap-2 rounded-[var(--radius-md)] bg-surface-container-low px-3 text-left text-sm font-semibold text-on-surface transition hover:bg-surface-container-high focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--color-primary-light)]"
               />
-            </label>
+            </div>
             <button
               type="button"
               aria-label="Następny miesiąc"
@@ -429,7 +430,7 @@ export default function TrainerSettlementPage() {
               </ProfileInfoStat>
               <ProfileInfoStat icon={<FileX2 size={13} />} label="Poza umową" muted={!settlement.nonContractedTotalSessions}>
                 <span className="inline-flex items-center gap-1.5 text-lg">
-                  {formatSettlementNumber(settlement.nonContractedTotalSessions)} sesji · {formatSettlementNumber(settlement.nonContractedTotalHours)} h{settlement.nonContractedTotalAmount != null ? ` · ${formatSettlementMoney(settlement.nonContractedTotalAmount)}` : ""}
+                  {formatSettlementNumber(settlement.nonContractedTotalSessions)} {Number.isFinite(settlement.nonContractedTotalSessions) ? polishPlural(settlement.nonContractedTotalSessions, "sesja", "sesje", "sesji") : "sesji"} · {formatSettlementNumber(settlement.nonContractedTotalHours)} h{settlement.nonContractedTotalAmount != null ? ` · ${formatSettlementMoney(settlement.nonContractedTotalAmount)}` : ""}
                   <HintIcon label="Sesje bez umowy są pokazane osobno i nie są doliczane do kwoty rozliczenia ani wypłaty." />
                 </span>
               </ProfileInfoStat>

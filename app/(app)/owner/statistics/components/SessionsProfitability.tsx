@@ -1,6 +1,7 @@
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { formatMoney } from "@/app/lib/formatters/money";
+import { countLabel } from "@/app/lib/formatters/plural";
 import type { TrainerCostSession } from "@/app/lib/owner/analytics";
 import {
   getSessionDate,
@@ -32,7 +33,7 @@ export default function SessionsProfitability({
         <div>
           <h2 className="text-section-title">Rentowność sesji</h2>
           <p className="mt-1 text-xs text-on-surface-muted">
-            {totalCount} sesji w zestawieniu
+            {countLabel(totalCount, "sesja", "sesje", "sesji")} w zestawieniu
           </p>
         </div>
         {isLoading ? (
@@ -111,7 +112,7 @@ function SessionTable({ sessions }: { sessions: TrainerCostSession[] }) {
                 </p>
                 <p className="mt-1 text-xs text-on-surface-muted">
                   {session.packageName ||
-                    `${getSessionNumber(session, "participantsCount")} uczestników`}
+                    countLabel(getSessionNumber(session, "participantsCount"), "uczestnik", "uczestników", "uczestników")}
                 </p>
               </td>
               <td className="px-4 py-4 text-right text-sm font-semibold text-on-surface">

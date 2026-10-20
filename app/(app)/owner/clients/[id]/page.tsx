@@ -35,7 +35,10 @@ import { Banknote, CalendarRange, Dumbbell, FileCheck2, History, NotebookPen, Pa
 import CollapsibleSection from "@/app/components/ui/collapsible-section";
 import ClientNotesPanel from "./components/ClientNotesPanel";
 import ClientProfileHero from "./components/ClientProfileHero";
-import ClientSessionHistory from "./components/ClientSessionHistory";
+import ClientSessionHistory, { nearestUpcomingSession } from "./components/ClientSessionHistory";
+import { formatSessionStart } from "@/app/lib/formatters/date";
+import type { OwnerSession } from "@/app/lib/owner/sessions";
+import type { PagedResult } from "@/app/lib/owner/billing";
 import ClientLegalConsentsPanel from "./components/ClientLegalConsentsPanel";
 import EditClientModal from "./components/EditClientModal";
 import ArchiveClientModal from "./components/ArchiveClientModal";
@@ -404,7 +407,7 @@ function ClientDetails({ clientId }: { clientId: number }) {
           */}
           <div className="flex flex-col gap-2">
             {account.data !== undefined ? (
-              <CollapsibleSection title="Pakiety" icon={<Package size={15} />} meta={getActivePackagesMeta(billing?.packages)}>
+              <CollapsibleSection title="Pakiety" icon={<Package size={15} />} meta={getActivePackagesMeta(billing?.packages)} defaultOpen>
                 <ClientPackagesSection key={client.id} embedded packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} clientId={!client.isArchived ? client.id : undefined} onSaved={() => refreshCooperationData(client.id, true)} />
               </CollapsibleSection>
             ) : null}
@@ -414,7 +417,7 @@ function ClientDetails({ clientId }: { clientId: number }) {
 
             <OwnerReadState loading={history.loading} error={history.error} retry={history.retry} label="Ładowanie historii treningów...">
               {history.data !== undefined ? (
-                <CollapsibleSection title="Historia treningów" icon={<Dumbbell size={15} />} meta={history.data.totalCount}>
+                <CollapsibleSection title="Treningi" icon={<Dumbbell size={15} />} meta={sessionsMeta(history.data)}>
                   <ClientSessionHistory embedded clientId={client.id} sessions={sessions} pagination={{ ...history.data, onPageChange: setSessionPage }} />
                 </CollapsibleSection>
               ) : null}
@@ -503,6 +506,14 @@ function ClientDetails({ clientId }: { clientId: number }) {
       ) : null}
     </div>
   );
+}
+
+// The nearest planned session is visible on the collapsed header whenever the first page can tell it.
+function sessionsMeta(page: PagedResult<OwnerSession>) {
+  const nearest = nearestUpcomingSession(page);
+  if (nearest) return `Najbliższy: ${formatSessionStart(nearest.startAt)} · ${page.totalCount}`;
+  if (nearest === null) return `Brak zaplanowanych · ${page.totalCount}`;
+  return page.totalCount;
 }
 
 function getTrainingPlanUrl(plan: ClientTrainingPlan | null) {

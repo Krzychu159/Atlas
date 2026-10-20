@@ -5,7 +5,7 @@ import { isConsultationSession } from "@/app/lib/group-sessions";
 
 import { userStatus } from "@/app/lib/user-messages";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Clock3, Dumbbell, MapPin, UserRound } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
@@ -50,12 +50,18 @@ export default function ClientSessionHistory({
   );
 
   if (pagination) {
-    const visibleSessions = sessions.filter(session => !isConsultationSession(session));
+    const { upcoming, past } = splitSessionPage(sessions);
     return <section className={embedded ? "min-w-0" : "card-shell p-5 md:p-6"}>
-      {!embedded ? <h2 className="font-display text-[1.65rem] font-semibold leading-tight">Historia treningów</h2> : null}
-      <p className="mb-3 text-xs text-on-surface-muted">Treningi według daty, od najnowszych. Każda strona obejmuje wszystkie rodzaje treningów, także anulowane.</p>
-      <div className="flex flex-col gap-1.5">
-        {visibleSessions.length ? visibleSessions.map(session => <SessionRow key={session.id} clientId={clientId} session={session} />) : <p className="rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-2.5 text-xs text-on-surface-variant">Brak treningów na tej stronie.</p>}
+      {!embedded ? <h2 className="font-display text-[1.65rem] font-semibold leading-tight">Treningi</h2> : null}
+      <p className="mb-3 text-xs text-on-surface-muted">Treningi z tej strony, podzielone na nadchodzące i wcześniejsze. Lista obejmuje wszystkie rodzaje treningów, także anulowane.</p>
+      {!upcoming.length && !past.length ? <p className="rounded-[var(--radius-md)] bg-surface-container-lowest px-3 py-2.5 text-xs text-on-surface-variant">Brak treningów na tej stronie.</p> : null}
+      <div className="flex flex-col gap-4">
+        {upcoming.length ? <PageGroup title="Nadchodzące" count={upcoming.length}>
+          {upcoming.map(session => <SessionRow key={session.id} clientId={clientId} session={session} />)}
+        </PageGroup> : null}
+        {past.length ? <PageGroup title="Historia treningów" count={past.length}>
+          {past.map(session => <SessionRow key={session.id} clientId={clientId} session={session} />)}
+        </PageGroup> : null}
       </div>
       {pagination.totalPages > 1 ? <PaymentPagination page={pagination.page} pageSize={pagination.pageSize} totalItems={pagination.totalCount} totalPages={pagination.totalPages} onPageChange={pagination.onPageChange} itemLabel="treningów" ariaLabel="Strony historii treningów" /> : null}
     </section>;
@@ -127,6 +133,16 @@ export default function ClientSessionHistory({
       </div>
     </section>
   );
+}
+
+function PageGroup({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+  return <div>
+    <div className="flex items-center gap-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">{title}</h3>
+      <span className="rounded-full bg-surface-container-lowest px-2 py-0.5 text-[10px] font-semibold text-primary-light">{count}</span>
+    </div>
+    <div className="mt-2 flex flex-col gap-1.5">{children}</div>
+  </div>;
 }
 
 function SessionRow({
@@ -217,6 +233,34 @@ function MetaChip({
   );
 }
 
+function isCancelledSession(session: OwnerSession) {
+  const status = (session.status || "").toLowerCase();
+  return status.includes("cancel") || status.includes("anul") || status.includes("odwoł");
+}
+
+function isUpcomingSession(session: OwnerSession, now: number) {
+  return !isCancelledSession(session) && new Date(session.startAt).getTime() > now;
+}
+
+// One server page (newest first): upcoming sessions nearest first, the rest keeps the server order.
+export function splitSessionPage(sessions: OwnerSession[], now = Date.now()) {
+  const visible = sessions.filter(session => !isConsultationSession(session));
+  return {
+    upcoming: visible.filter(session => isUpcomingSession(session, now)).sort(byStartAscending),
+    past: visible.filter(session => !isUpcomingSession(session, now)),
+  };
+}
+
+// Needs the first page of the newest-first history. The nearest session is known only when that page
+// already reaches the past (or is the only page); otherwise it could sit on a later page. undefined = unknown.
+export function nearestUpcomingSession(page: { page: number; totalPages: number; items: OwnerSession[] | null }, now = Date.now()): OwnerSession | null | undefined {
+  const items = page.items ?? [];
+  if (page.page !== 1) return undefined;
+  const reachesPast = items.some(session => new Date(session.startAt).getTime() <= now);
+  if (!reachesPast && page.totalPages > 1) return undefined;
+  return splitSessionPage(items, now).upcoming[0] ?? null;
+}
+
 function groupClientSessions(sessions: OwnerSession[]) {
   const now = Date.now();
   const result: Record<SessionGroup, OwnerSession[]> = {
@@ -228,13 +272,7 @@ function groupClientSessions(sessions: OwnerSession[]) {
   sessions.forEach((session) => {
     // Consultations have no clients and never belong to a client's training history.
     if (isConsultationSession(session)) return;
-    const status = (session.status || "").toLowerCase();
-    const isCancelled =
-      status.includes("cancel") ||
-      status.includes("anul") ||
-      status.includes("odwoł");
-
-    if (isCancelled) {
+    if (isCancelledSession(session)) {
       result.cancelled.push(session);
     } else if (new Date(session.startAt).getTime() > now) {
       result.upcoming.push(session);

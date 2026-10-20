@@ -1,5 +1,6 @@
 "use client";
 
+import { NativeDateInput } from "@/app/components/ui/native-date-input";
 import { isSessionPackage } from "@/app/lib/period-packages";
 
 import { useEffect, useRef, useState } from "react";
@@ -107,8 +108,8 @@ export default function ImportClientPackageModal({ open, clientId, onClose, onSa
             <label className="text-sm">Wykorzystane wejścia<input className={inputClass} type="number" min="0" max={Math.max(Number(totalSessions) - 1, 0)} step="1" required value={usedSessions} onChange={(event) => setUsedSessions(event.target.value)} /></label>
             <label className="text-sm">Cena ({selected?.currency || "PLN"})<input className={inputClass} type="number" min="0" step="0.01" required value={totalPrice} onChange={(event) => setTotalPrice(event.target.value)} /></label>
             <label className="text-sm">Opłacono ({selected?.currency || "PLN"})<input className={inputClass} type="number" min="0" max={Number(totalPrice) || 0} step="0.01" required value={amountPaid} onChange={(event) => setAmountPaid(event.target.value)} /></label>
-            <label className="text-sm">Data zakupu<input className={inputClass} type="date" required value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} /></label>
-            <label className="text-sm">Ważny do — data i godzina<input className={inputClass} type="datetime-local" required value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label>
+            <label className="text-sm">Data zakupu<NativeDateInput className={inputClass} type="date" required value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} /></label>
+            <label className="text-sm">Ważny do — data i godzina<NativeDateInput className={inputClass} type="datetime-local" required value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label>
             <p className="text-xs text-on-surface-muted sm:col-span-2">Ważność kończy się dokładnie o wskazanej godzinie w Twojej lokalnej strefie czasowej.</p>
           </div>
           <label className="block text-sm">Powód wprowadzenia<textarea className={inputClass} required value={reason} onChange={(event) => setReason(event.target.value)} /></label>

@@ -20,6 +20,7 @@ import {
 } from "@/app/lib/owner/invitations";
 import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
+import { locationSelectOptions, type LocationLoadStatus } from "../../components/location-options";
 import { OwnerTrainerAssignmentSelect } from "../../components/OwnerTrainerAssignmentSelect";
 
 type AddClientMode = "record" | "invitation";
@@ -45,6 +46,7 @@ export default function AddClientModal({ open, onClose, onCreated, initialMode =
   const [mode, setMode] = useState<AddClientMode>("record");
   const [form, setForm] = useState(initialForm);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [locationsStatus, setLocationsStatus] = useState<LocationLoadStatus>("loading");
   const [isTrainerChecking, setIsTrainerChecking] = useState(false);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -74,6 +76,7 @@ export default function AddClientModal({ open, onClose, onCreated, initialMode =
         controller.signal.throwIfAborted();
         setMode(initialMode);
         setIsLoadingOptions(true);
+        setLocationsStatus("loading");
         return getLocations(controller.signal);
       })
       .then((locationsData) => {
@@ -87,11 +90,13 @@ export default function AddClientModal({ open, onClose, onCreated, initialMode =
           : String(availableLocations[0]?.id || "");
 
         setLocations(availableLocations);
+        setLocationsStatus("ready");
         setForm({ ...initialForm, locationId });
       })
       .catch((err) => {
         if (controller.signal.aborted) return;
         setLocations([]);
+        setLocationsStatus("error");
         showOwnerError(err, "Nie udało się pobrać lokalizacji.", {
           id: "owner-client-options-load-error",
         });
@@ -257,7 +262,7 @@ export default function AddClientModal({ open, onClose, onCreated, initialMode =
                 onChange={(value) => setForm((current) => ({ ...current, locationId: value, trainerId: "" }))}
                 icon={<MapPin size={17} />}
                 className="mt-2"
-                options={locationOptions.length ? locationOptions : [{ value: "", label: "Brak aktywnych lokalizacji" }]}
+                options={locationSelectOptions(locationsStatus, locationOptions)}
               />
             </div>
 

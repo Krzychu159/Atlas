@@ -236,8 +236,9 @@ function OwnerStatisticsPageContent({ locationId }: { locationId: number | null 
   }
 
   const monthlyData = combineMonthlyData(revenue.byMonth, expenses.byMonth);
-  const operatingProfit =
-    expenses.operatingProfitNetAmount || revenue.netAmount - expenses.netAmount;
+  const operatingProfit = failedSections.includes("przychody") || failedSections.includes("koszty")
+    ? null
+    : expenses.operatingProfitNetAmount || revenue.netAmount - expenses.netAmount;
   const hasFilters =
     JSON.stringify(filters) !== JSON.stringify(initialStatisticsFilters);
 

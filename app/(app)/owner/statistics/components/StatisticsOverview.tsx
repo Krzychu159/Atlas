@@ -19,9 +19,17 @@ type StatisticsOverviewProps = {
   revenue: RevenueStatistics;
   expenses: ExpenseStatistics;
   trainerCosts: TrainerCostStatistics;
-  operatingProfit: number;
+  /** null when revenue or expense data could not be loaded. */
+  operatingProfit: number | null;
   isLoading: boolean;
 };
+
+export function operatingResult(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return { meta: "Brak danych", tone: "neutral" } as const;
+  // Amounts are shown with two decimals, so anything that rounds to 0,00 zł is a zero result.
+  if (Math.abs(value) < 0.005) return { meta: "Wynik zerowy", tone: "neutral" } as const;
+  return value > 0 ? { meta: "Wynik dodatni", tone: "success" } as const : { meta: "Wynik ujemny", tone: "error" } as const;
+}
 
 // Sekcja: Podsumowanie przychodów, kosztów i trenerów
 export default function StatisticsOverview({
@@ -31,6 +39,7 @@ export default function StatisticsOverview({
   operatingProfit,
   isLoading,
 }: StatisticsOverviewProps) {
+  const result = operatingResult(operatingProfit);
   const cards = [
     {
       label: "Przychód netto",
@@ -48,10 +57,10 @@ export default function StatisticsOverview({
     },
     {
       label: "Zysk operacyjny netto",
-      value: formatMoney(operatingProfit),
-      meta: operatingProfit >= 0 ? "Wynik dodatni" : "Wynik ujemny",
+      value: operatingProfit === null ? "—" : formatMoney(Math.abs(operatingProfit) < 0.005 ? 0 : operatingProfit),
+      meta: result.meta,
       icon: <TrendingUp size={19} />,
-      tone: operatingProfit >= 0 ? "success" : "error",
+      tone: result.tone,
     },
     {
       label: "Prowizje operatorów",

@@ -63,6 +63,8 @@ button {
   --color-on-surface: #ffffff;
   --color-on-surface-variant: #c3c5d9;
   --color-on-surface-muted: #8a8f98;
+  /* Small form labels: at least 5.4:1 on every surface up to surface-container-high (muted is 4.43:1 there). */
+  --color-on-surface-label: #9ba0a8;
 
   /* Toasts */
   --color-success-toast-bg: #007633;
@@ -164,6 +166,7 @@ button {
   --color-on-surface: var(--color-on-surface);
   --color-on-surface-variant: var(--color-on-surface-variant);
   --color-on-surface-muted: var(--color-on-surface-muted);
+  --color-on-surface-label: var(--color-on-surface-label);
 
   --color-success-toast-bg: var(--color-success-toast-bg);
   --color-success-toast-text: var(--color-success-toast-text);
@@ -309,6 +312,10 @@ input[type="time"]::-webkit-date-and-time-value {
 [data-atlas-modal] .text-label {
   font-size: 11px;
   font-weight: 600;
+}
+
+[data-atlas-modal] .text-label.text-on-surface-muted {
+  color: var(--color-on-surface-label);
 }
 
 /* Prevent iOS from zooming the page when a form field gets focus. */

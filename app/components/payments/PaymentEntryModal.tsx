@@ -44,6 +44,18 @@ type PaymentEntryModalProps = {
   onSubmit: () => void;
 };
 
+const AMOUNT_PATTERN = /^\d+(?:[.,]\d{1,2})?$/;
+
+// Empty input stays neutral; the submit button is disabled until a valid amount is entered.
+export function paymentAmountError(amount: string): string | null {
+  const value = amount.trim();
+  if (!value) return null;
+  const parsed = Number(value.replace(",", "."));
+  if (/^[-−]/.test(value) || (Number.isFinite(parsed) && parsed <= 0)) return "Kwota musi być większa od 0.";
+  if (!AMOUNT_PATTERN.test(value) || !Number.isFinite(parsed)) return "Wpisz kwotę liczbą, maksymalnie z dwoma miejscami po przecinku, np. 120,50.";
+  return null;
+}
+
 export function PaymentEntryModal({
   open,
   eyebrow,
@@ -92,11 +104,13 @@ export function PaymentEntryModal({
   const selectPackageOptions = packageOptions.length
     ? [{ value: "", label: "Wybierz pakiet" }, ...packageOptions]
     : [{ value: "", label: "Brak pakietu do wyboru" }];
+  const amountError = paymentAmountError(amount);
   const canSubmit =
     packageOptions.length > 0 &&
     Boolean(selectedPackage) &&
     methodOptions.some((option) => option.value === method) &&
-    /^\d+(?:[.,]\d{1,2})?$/.test(amount.trim()) &&
+    !amountError &&
+    AMOUNT_PATTERN.test(amount.trim()) &&
     Number.isFinite(parsedAmount) &&
     parsedAmount > 0 &&
     (!onPaymentDateChange || Boolean(paymentDate)) &&
@@ -137,6 +151,7 @@ export function PaymentEntryModal({
               onChange={onAmountChange}
               inputMode="decimal"
               placeholder="0,00"
+              error={amountError}
             />
 
             <CustomSelect

@@ -14,8 +14,9 @@ export default function NotificationFilters({ category, setCategory, readFilter,
   categories: NotificationCategory[]; counts: UnreadCountResponse;
 }) {
   return (
-    <section className="card-shell flex min-w-0 flex-col gap-3 p-3 md:p-4 xl:flex-row xl:items-center xl:justify-between" aria-label="Filtry powiadomień">
-      <div role="group" aria-label="Kategoria powiadomień" className="-mx-1 flex min-w-0 gap-1.5 overflow-x-auto px-1 pb-0.5" style={{ scrollbarWidth: "none" }}>
+    <section className="card-shell flex min-w-0 flex-col gap-3 p-3 md:p-4 xl:flex-row xl:items-start xl:justify-between" aria-label="Filtry powiadomień">
+      {/* Phones scroll the chips sideways (thin visible scrollbar); wider screens wrap them so no category is hidden. */}
+      <div role="group" aria-label="Kategoria powiadomień" className="-mx-1 flex min-w-0 gap-1.5 overflow-x-auto px-1 pb-1.5 [scrollbar-width:thin] md:flex-1 md:flex-wrap md:overflow-visible md:pb-0">
         {[{ key: "", label: "Wszystkie" }, ...categories].map(item => {
           const active = category === item.key;
           const count = item.key ? counts.unreadByCategory[item.key] ?? 0 : counts.unreadCount;

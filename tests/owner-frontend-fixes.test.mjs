@@ -44,7 +44,7 @@ test("amount-due filter counts as an advanced filter and is cleared with the res
 });
 
 function amountDueClientsFixture(search) {
-  const h = hooks(), queries = [], urls = [];
+  const h = hooks(), queries = [], totalsQueries = [], urls = [];
   const reader = load("app/(app)/owner/components/use-owner-read.ts", { react: h.react, "@/app/lib/backend": { getErrorMessage: (_, fallback) => fallback } }, { setTimeout: h.window.setTimeout, clearTimeout: h.window.clearTimeout });
   const defaults = { search: "", packageFilter: "all", trainerFilter: "all", amountDueOnly: false, sort: "newest" };
   const Page = load("app/(app)/owner/clients/page.tsx", {
@@ -53,14 +53,14 @@ function amountDueClientsFixture(search) {
     "../components/use-owner-read": reader,
     "../components/list-url-state": { readPositiveInt: value => (value && /^\d+$/.test(value) ? Number(value) : null), listUrlKey: () => "", useListScrollRestoration() {}, useListUrlSync: params => urls.push(params) },
     "@/app/lib/owner/location-filter": { useOwnerLocationFilter: () => ({ selectedLocationId: null }) },
-    "@/app/lib/owner/clients": { getOwnerClients: async query => { queries.push(query); return { items: [], page: query.page, pageSize: 25, totalCount: 0, totalPages: 0, summary: { withActivePackageCount: 0 } }; } },
+    "@/app/lib/owner/clients": { getOwnerClients: async query => { (query.pageSize === 1 ? totalsQueries : queries).push(query); return query.pageSize === 1 ? { items: [], page: 1, pageSize: 1, totalCount: 108, totalPages: 108, summary: { withActivePackageCount: 40 } } : { items: [], page: query.page, pageSize: 25, totalCount: 0, totalPages: 0, summary: { withActivePackageCount: 0 } }; } },
     "@/app/(app)/owner/clients/components/OwnerClientFilters": { default: () => null, defaultOwnerClientFilters: defaults },
-    "@/app/components/clients/client-list-display": { pluralizeClients: count => String(count), clientAmountDue: () => ({ label: "", tone: "settled" }) },
+    "@/app/components/clients/client-list-display": { pluralizeClients: count => String(count), clientResultsLabel: (count, total) => `${count} of ${total}`, clientAmountDue: () => ({ label: "", tone: "settled" }) },
   }).default;
   const root = Page().props.children;
   const render = () => h.render(root.type, root.props);
   const flush = async () => { render(); h.commit(); h.timers(); await settle(); return render(); };
-  return { h, defaults, render, flush, queries, urls };
+  return { h, defaults, render, flush, queries, totalsQueries, urls };
 }
 
 test("amount-due filter is applied by the server, resets the page and is kept in the address", async () => {
@@ -77,6 +77,20 @@ test("amount-due filter is applied by the server, resets the page and is kept in
   await flush();
   assert.equal(queries.at(-1).hasAmountDue, undefined); assert.equal(urls.at(-1).due, null);
   h.unmount();
+});
+
+test("filtered client list counts results against the whole client base from one unfiltered count read", async () => {
+  const { h, flush, queries, totalsQueries } = amountDueClientsFixture("due=1");
+  const tree = await flush();
+  assert.equal(queries.at(-1).hasAmountDue, true);
+  assert.deepEqual(totalsQueries.map(query => ({ ...query })), [{ page: 1, pageSize: 1, isArchived: false, locationId: null }]);
+  assert.equal(find(tree, node => node.props.title === "Lista klientów").props.meta, "0 of 108");
+  assert.ok(find(tree, node => node.type === "p" && node.props.className?.includes("text-tertiary-light") && node.props.children === 40));
+  h.unmount();
+  const unfiltered = amountDueClientsFixture("");
+  await unfiltered.flush();
+  assert.equal(unfiltered.totalsQueries.length, 0, "without filters the list itself is the total");
+  unfiltered.h.unmount();
 });
 
 test("amount-due filter and sort are restored from the address", async () => {
@@ -101,7 +115,7 @@ function emptyClientsFixture(locationId = null, totalCount = 0) {
     "@/app/lib/owner/location-filter": { useOwnerLocationFilter: () => ({ selectedLocationId: locationId }) },
     "@/app/lib/owner/clients": { getOwnerClients: async () => ({ items: [], page: 1, pageSize: 25, totalCount, totalPages: totalCount ? 1 : 0, summary: { withActivePackageCount: 0 } }) },
     "@/app/(app)/owner/clients/components/OwnerClientFilters": { default: () => null, defaultOwnerClientFilters: defaults },
-    "@/app/components/clients/client-list-display": { pluralizeClients: count => String(count), clientAmountDue: () => ({ label: "", tone: "settled" }) },
+    "@/app/components/clients/client-list-display": { pluralizeClients: count => String(count), clientResultsLabel: (count, total) => `${count} of ${total}`, clientAmountDue: () => ({ label: "", tone: "settled" }) },
   }).default;
   const root = Page().props.children;
   const render = () => h.render(root.type, root.props);
@@ -134,15 +148,31 @@ test("empty page with nonzero total never claims that the client database is emp
   h.unmount();
 });
 
-test("paginated history preserves server order and does not show misleading empty groups", () => {
+test("paginated history separates upcoming sessions from history without misleading empty groups", () => {
   const h = hooks();
-  const Component = load("app/(app)/owner/clients/[id]/components/ClientSessionHistory.tsx", { react: h.react, "@/app/lib/group-sessions": { isConsultationSession: () => false } }).default;
-  const sessions = [{ id: 2, startAt: "2030-01-01", status: "Planned" }, { id: 1, startAt: "2020-01-01", status: "Completed" }];
-  const tree = h.render(Component, { clientId: 1, sessions, pagination: { page: 2, pageSize: 25, totalCount: 100, totalPages: 4, onPageChange() {} } });
+  const mod = load("app/(app)/owner/clients/[id]/components/ClientSessionHistory.tsx", { react: h.react, "@/app/lib/group-sessions": { isConsultationSession: () => false } });
+  const sessions = [{ id: 3, startAt: "2031-01-01", status: "Planned" }, { id: 2, startAt: "2030-01-01", status: "Planned" }, { id: 4, startAt: "2030-06-01", status: "Cancelled" }, { id: 1, startAt: "2020-01-01", status: "Completed" }, { id: 0, startAt: "2019-01-01", status: "Completed" }];
+  const tree = h.render(mod.default, { clientId: 1, sessions, pagination: { page: 2, pageSize: 25, totalCount: 100, totalPages: 4, onPageChange() {} } });
   assert.equal(find(tree, node => node.props.children === "Brak sesji w tej sekcji."), null);
-  const container = find(tree, node => node.props.className === "flex flex-col gap-1.5");
-  assert.deepEqual(Array.from(container.props.children, row => row.props.session.id), [2, 1]);
+  const group = title => find(tree, node => node.props.title === title);
+  assert.deepEqual(Array.from(group("Nadchodzące").props.children, row => row.props.session.id), [2, 3], "nearest upcoming first");
+  assert.deepEqual(Array.from(group("Historia treningów").props.children, row => row.props.session.id), [4, 1, 0], "history keeps the server order; cancelled sessions are not upcoming");
   assert.equal(find(tree, node => node.props.itemLabel === "treningów").props.totalItems, 100);
+  const onlyPast = h.render(mod.default, { clientId: 1, sessions: [sessions[3]], pagination: { page: 3, pageSize: 25, totalCount: 100, totalPages: 4, onPageChange() {} } });
+  assert.equal(find(onlyPast, node => node.props.title === "Nadchodzące"), null, "no empty upcoming group");
+});
+
+test("nearest planned session is reported only when the first page can prove it", () => {
+  const { nearestUpcomingSession } = load("app/(app)/owner/clients/[id]/components/ClientSessionHistory.tsx", { "@/app/lib/group-sessions": { isConsultationSession: () => false } });
+  const now = Date.parse("2026-10-20T12:00:00Z");
+  const planned = (id, startAt, status = "Planned") => ({ id, startAt, status });
+  const page = (items, extra = {}) => ({ page: 1, totalPages: 3, items, ...extra });
+  assert.equal(nearestUpcomingSession(page([planned(3, "2026-10-30T10:00:00Z"), planned(2, "2026-10-22T10:00:00Z"), planned(1, "2026-10-01T10:00:00Z", "Completed")]), now).id, 2);
+  assert.equal(nearestUpcomingSession(page([planned(3, "2026-10-30T10:00:00Z"), planned(2, "2026-10-22T10:00:00Z")]), now), undefined, "all future on a multi-page history: the nearest may be on a later page");
+  assert.equal(nearestUpcomingSession(page([planned(2, "2026-10-22T10:00:00Z")], { totalPages: 1 }), now).id, 2);
+  assert.equal(nearestUpcomingSession(page([planned(2, "2026-10-22T10:00:00Z", "Cancelled"), planned(1, "2026-10-01T10:00:00Z", "Completed")]), now), null);
+  assert.equal(nearestUpcomingSession(page([planned(1, "2026-10-01T10:00:00Z")], { page: 2 }), now), undefined);
+  assert.equal(nearestUpcomingSession(page(null, { totalPages: 0 }), now), null);
 });
 
 test("Active is matched exactly, and bad package validity cannot crash the group list", () => {

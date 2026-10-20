@@ -43,7 +43,8 @@ export default function PackageListRow({ item, detailsHref, onDeleteRequest }: P
           <div className="min-w-0">
             <Link
               href={detailsHref}
-              className="block truncate text-sm font-semibold text-on-surface transition hover:text-primary-light"
+              title={item.name}
+              className="line-clamp-2 break-words text-sm font-semibold leading-5 text-on-surface transition hover:text-primary-light"
             >
               {item.name}
             </Link>
@@ -77,7 +78,8 @@ export default function PackageListRow({ item, detailsHref, onDeleteRequest }: P
               </p>
               <Link
                 href={detailsHref}
-                className="mt-1 line-clamp-2 text-base font-semibold text-on-surface"
+                title={item.name}
+                className="mt-1 line-clamp-2 break-words text-base font-semibold text-on-surface"
               >
                 {item.name}
               </Link>

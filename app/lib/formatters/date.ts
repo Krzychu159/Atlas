@@ -91,3 +91,14 @@ export function dateInputToIsoDateTime(value?: string | null) {
 
   return normalized ? `${normalized}T00:00:00.000Z` : null;
 }
+
+// Short start of a planned session, e.g. "pon. 21.10, 18:00"; the year is added outside the current year.
+export function formatSessionStart(value?: string | null, now = new Date()) {
+  if (!value) return "Brak daty";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Brak daty";
+  const sameYear = date.getFullYear() === now.getFullYear();
+  const weekday = new Intl.DateTimeFormat("pl-PL", { weekday: "short" }).format(date);
+  const day = new Intl.DateTimeFormat("pl-PL", { day: "2-digit", month: "2-digit", ...(sameYear ? {} : { year: "numeric" }) }).format(date);
+  return `${weekday} ${day}, ${formatSessionTime(value)}`;
+}

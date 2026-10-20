@@ -1,5 +1,6 @@
 "use client";
 
+import { NativeDateInput } from "@/app/components/ui/native-date-input";
 import { useEffect, useRef, useState } from "react";
 import { useCurrentUser } from "@/app/components/current-user-provider";
 import { Button } from "@/app/components/ui/button";
@@ -278,8 +279,8 @@ export default function PackageManagementModal({ clientId, packageData, onClose,
         <fieldset disabled={busy} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {!periodBased ? <label className="text-sm">Wszystkie wejścia<input className={inputClass} type="number" disabled={!canChangeFields} min={current.usedSessions} step="1" required value={sessions} onChange={(event) => setSessions(event.target.value)} /></label> : null}
           <label className="text-sm">Kwota za pakiet ({current.currency || "PLN"})<input className={inputClass} type="number" disabled={!canChangePrice} min="0" step="0.01" required aria-describedby="package-price-hint" value={price} onChange={(event) => setPrice(event.target.value)} /><span id="package-price-hint" className="mt-1 block text-xs text-on-surface-muted">Należność klienta za ten pakiet po uwzględnieniu salda, a nie cena z katalogu.</span></label>
-          <label className="text-sm">Ważny do — data i godzina<input className={inputClass} type="datetime-local" disabled={!canChangeFields} required={Boolean(current.validUntil)} value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label>
-          <label className="text-sm">Termin płatności<input className={inputClass} type="date" disabled={!canChangeFields} required={Boolean(current.paymentDueDate)} value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
+          <label className="text-sm">Ważny do — data i godzina<NativeDateInput className={inputClass} type="datetime-local" disabled={!canChangeFields} required={Boolean(current.validUntil)} value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label>
+          <label className="text-sm">Termin płatności<NativeDateInput className={inputClass} type="date" disabled={!canChangeFields} required={Boolean(current.paymentDueDate)} value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
         </fieldset>
         <p className="text-xs text-on-surface-muted">Ważność kończy się o wskazanej godzinie w Twojej lokalnej strefie czasowej. Korekta nie usuwa wcześniej ustawionych dat.</p>
         {!canChangeFields && canChangePrice ? <p className="text-sm text-on-surface-muted">Możesz zmienić kwotę za pakiet. {periodBased ? "Daty pozostają" : "Liczba wejść i daty pozostają"} zablokowane.</p> : null}

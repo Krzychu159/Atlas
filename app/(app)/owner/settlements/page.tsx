@@ -3,7 +3,7 @@
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 import { useTrainerRatesRevision } from "@/app/lib/owner/trainer-rates-changes";
 
-import { NativeDateInput } from "@/app/components/ui/native-date-input";
+import { MonthPicker } from "@/app/components/ui/month-picker";
 import { Button } from "@/app/components/ui/button";
 import { FilterSearchField, FilterToolbar } from "@/app/components/ui/list/FilterToolbar";
 import { ListSection } from "@/app/components/ui/list/ListSection";
@@ -115,22 +115,19 @@ function OwnerSettlementsPageContent({ locationId }: { locationId: number | null
       {/* The month is the primary selector, so it stays visible on phones; the search sits behind "Filtry". */}
       <FilterToolbar
         search={
-          <label className="min-w-0">
-            <span className="text-label text-on-surface-muted max-md:sr-only">Miesiąc rozliczenia</span>
-            <div className="flex h-11 items-center rounded-[var(--radius-lg)] bg-surface-container-lowest px-3 transition focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-primary)_30%,transparent)] md:mt-2 md:h-12 md:px-4">
-              <NativeDateInput
-                type="month"
-                value={monthValue}
-                aria-label="Wybierz miesiąc rozliczenia"
-                onChange={(event) => {
-                  if (!event.target.value || event.target.value === monthValue) return;
-                  setMonthValue(event.target.value); setPage(1);
-                  updateUrlMonth(event.target.value);
-                }}
-                className="h-full w-full bg-transparent text-sm font-semibold text-on-surface outline-none"
-              />
-            </div>
-          </label>
+          <div className="min-w-0">
+            <span aria-hidden="true" className="text-label text-on-surface-muted max-md:sr-only">Miesiąc rozliczenia</span>
+            <MonthPicker
+              value={monthValue}
+              ariaLabel="Miesiąc rozliczenia"
+              onChange={(value) => {
+                if (!value || value === monthValue) return;
+                setMonthValue(value); setPage(1);
+                updateUrlMonth(value);
+              }}
+              className="flex h-11 w-full items-center gap-3 rounded-[var(--radius-lg)] bg-surface-container-lowest px-3 text-left text-sm font-semibold text-on-surface transition hover:bg-surface-container-low focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-primary)_30%,transparent)] md:mt-2 md:h-12 md:px-4"
+            />
+          </div>
         }
         gridClassName="md:grid-cols-[220px_minmax(0,1fr)_auto]"
         canClear={Boolean(search)}

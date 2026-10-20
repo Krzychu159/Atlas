@@ -17,6 +17,7 @@ import {
 } from "@/app/lib/owner/invitations";
 import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
+import { locationSelectOptions, type LocationLoadStatus } from "./location-options";
 import { OwnerTrainerAssignmentSelect } from "./OwnerTrainerAssignmentSelect";
 import InvitationsList from "./InvitationsList";
 import { showOwnerError, showOwnerSuccess } from "./owner-toast";
@@ -53,6 +54,7 @@ export default function InviteUserModal({
   const { selectedLocationId } = useOwnerLocationFilter();
   const [form, setForm] = useState(initialForm);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [locationsStatus, setLocationsStatus] = useState<LocationLoadStatus>("loading");
   const [isTrainerChecking, setIsTrainerChecking] = useState(false);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,6 +91,7 @@ export default function InviteUserModal({
       .then(() => {
         controller.signal.throwIfAborted();
         setIsLoadingOptions(true);
+        setLocationsStatus("loading");
 
         return getLocations(controller.signal);
       })
@@ -109,6 +112,7 @@ export default function InviteUserModal({
             : "";
 
         setLocations(availableLocations);
+        setLocationsStatus("ready");
         setForm({
           email: "",
           locationId: resolvedLocationId,
@@ -118,6 +122,7 @@ export default function InviteUserModal({
       .catch((err) => {
         if (controller.signal.aborted) return;
         setLocations([]);
+        setLocationsStatus("error");
         showOwnerError(err, "Nie udało się pobrać lokalizacji.", {
           id: `${toastScope}-invitation-options-load-error`,
         });
@@ -249,11 +254,7 @@ export default function InviteUserModal({
                 }
                 icon={<MapPin size={17} />}
                 className="mt-2"
-                options={
-                  locationOptions.length
-                    ? locationOptions
-                    : [{ value: "", label: "Brak aktywnych lokalizacji" }]
-                }
+                options={locationSelectOptions(locationsStatus, locationOptions)}
               />
             </div>
 

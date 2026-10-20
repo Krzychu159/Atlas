@@ -1,3 +1,4 @@
+import { countLabel } from "@/app/lib/formatters/plural";
 import type { ClientListItem } from "@/app/lib/owner/clients";
 import {
   getClientBalance,
@@ -108,4 +109,10 @@ function formatAmount(value: number, currencyCode: string | null | undefined) {
 // Masculine-personal noun: "2 klientów" (dwóch klientów), so only 1 is singular.
 export function pluralizeClients(count: number) {
   return count === 1 ? "1 klient" : `${count} klientów`;
+}
+
+// Filtered list meta, e.g. "44 wyniki z 108 klientów". Without a known total only the results are counted.
+export function clientResultsLabel(results: number, total?: number) {
+  const label = countLabel(results, "wynik", "wyniki", "wyników");
+  return total === undefined ? label : `${label} z ${total.toLocaleString("pl-PL")} ${total === 1 ? "klienta" : "klientów"}`;
 }

@@ -21,6 +21,7 @@ import {
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { deleteTrainerAvatar, uploadTrainerAvatar } from "@/app/lib/avatars";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
+import { locationListMessage, type LocationLoadStatus } from "../../components/location-options";
 import {
   getTrainerRates,
   getActiveTrainerHourlyRate,
@@ -90,6 +91,7 @@ export default function EditTrainerModal({
     [rates],
   );
   const [locations, setLocations] = useState<Location[]>([]);
+  const [locationsStatus, setLocationsStatus] = useState<LocationLoadStatus>("loading");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -107,9 +109,11 @@ export default function EditTrainerModal({
   useEffect(() => {
     if (!open) return;
 
+    let active = true;
     getLocations()
-      .then(setLocations)
-      .catch(() => setLocations([]));
+      .then((items) => { if (active) { setLocations(items); setLocationsStatus("ready"); } })
+      .catch(() => { if (active) { setLocations([]); setLocationsStatus("error"); } });
+    return () => { active = false; setLocationsStatus("loading"); };
   }, [open]);
 
   useEffect(() => {
@@ -311,6 +315,7 @@ export default function EditTrainerModal({
               label="Lokalizacje"
               values={locationIds}
               locations={locations}
+              status={locationsStatus}
               fallbackNames={trainer.locationNames}
               onChange={setLocationIds}
               className="md:col-span-2"
@@ -382,6 +387,7 @@ function LocationMultiSelect({
   label,
   values,
   locations,
+  status,
   fallbackNames,
   onChange,
   className,
@@ -389,6 +395,7 @@ function LocationMultiSelect({
   label: string;
   values: string[];
   locations: Location[];
+  status: LocationLoadStatus;
   fallbackNames?: string[] | null;
   onChange: (values: string[]) => void;
   className?: string;
@@ -498,8 +505,8 @@ function LocationMultiSelect({
               );
             })
           ) : (
-            <p className="px-3 py-2 text-sm text-on-surface-muted">
-              Brak lokalizacji do wyboru.
+            <p role="status" className="px-3 py-2 text-sm text-on-surface-muted">
+              {locationListMessage(status)}
             </p>
           )}
         </div>

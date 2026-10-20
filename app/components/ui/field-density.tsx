@@ -15,5 +15,5 @@ export function useFieldDensity() {
   return useContext(FieldDensityContext);
 }
 
-export const compactFieldLabelClassName = "text-[11px] font-semibold uppercase tracking-wider text-on-surface-muted";
+export const compactFieldLabelClassName = "text-[11px] font-semibold uppercase tracking-wider text-on-surface-label";
 export const compactControlHeightClassName = "h-11 md:h-10";

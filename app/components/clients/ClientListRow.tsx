@@ -54,17 +54,18 @@ export default function ClientListRow({ client, detailsHref, amountLabel, amount
             <Link
               href={profileHref}
               prefetch={false}
+              title={fullName}
               className="block truncate text-sm font-semibold text-on-surface transition hover:text-primary-light"
             >
               {fullName}
             </Link>
             {client.email ? (
-              <p className="truncate text-xs text-on-surface-muted">{client.email}</p>
+              <p className="truncate text-xs text-on-surface-muted" title={client.email}>{client.email}</p>
             ) : null}
           </div>
         </div>
         {showTrainer ? (
-          <p className={`truncate text-sm ${trainer.assigned ? "text-on-surface-variant" : "text-on-surface-muted"}`}>
+          <p className={`truncate text-sm ${trainer.assigned ? "text-on-surface-variant" : "text-on-surface-muted"}`} title={trainer.label}>
             {trainer.label}
           </p>
         ) : null}

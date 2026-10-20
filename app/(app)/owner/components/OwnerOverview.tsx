@@ -14,6 +14,7 @@ import { OWNER_LOCATION_ALL, useOwnerLocationFilter, useOwnerLocationOptions } f
 import { useDashboardResource } from "./use-dashboard-resource";
 import OverviewRevenueChart from "./OverviewRevenueChart";
 import OverviewInfo from "./OverviewInfo";
+import { MonthPicker } from "@/app/components/ui/month-picker";
 import styles from "./owner-overview.module.css";
 
 function Skeleton({ rows = 3 }: { rows?: number }) {
@@ -72,12 +73,8 @@ function Overview({ currentPeriod }: { currentPeriod: string }) {
     <header className={styles.header}>
       <div><h1>Przegląd</h1><p>Najważniejsze informacje o Twoim studiu</p><div className={styles.scopeNote}>{scopeLabel} <OverviewInfo label="Zakres danych przeglądu">{!displayScoped ? "Dane dotyczą całego studia. Wybierz lokalizację w górnym pasku, aby zobaczyć dane jednej lokalizacji." : `Dane dotyczą lokalizacji: ${scopeLabel}. Zmienisz ją w górnym pasku.`}</OverviewInfo></div></div>
       <div className={styles.headerControls}>
-      <label className={styles.period}><CalendarDays size={18} aria-hidden="true" /><span className={styles.srOnly}>Miesiąc przeglądu</span>
-        <input type="month" aria-label="Miesiąc przeglądu" min="2000-01" max={currentPeriod} value={period} required
-          onClick={event => { try { event.currentTarget.showPicker?.(); } catch { /* Native keyboard editing remains available. */ } }}
-          onInput={event => selectPeriod(event.currentTarget.value)}
-          onChange={event => selectPeriod(event.target.value)} />
-      </label>
+      <MonthPicker ariaLabel="Miesiąc przeglądu" min="2000-01" max={currentPeriod} value={period} onChange={selectPeriod} align="end" className={styles.period}
+        icon={<CalendarDays size={18} aria-hidden="true" className={styles.periodIcon} />} />
       {partial ? <div className={styles.partial}><span>Miesiąc w toku</span><OverviewInfo label="Informacje o niepełnym miesiącu">Dane za bieżący miesiąc są niepełne. Dane od początku miesiąca porównujemy z pełnym poprzednim miesiącem{stats ? ` (${dashboardMonth(stats.previousPeriod)})` : ""}. Średnia i zmiana przychodu r/r również uwzględniają niepełne dane.</OverviewInfo></div> : null}
       </div>
     </header>

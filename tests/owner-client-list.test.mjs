@@ -18,7 +18,8 @@ function load(file, modules = {}) {
 
 const periodPackages = load("app/lib/period-packages.ts", { "./backend": {}, "./formatters/money": {} });
 const clientDisplay = load("app/(app)/owner/clients/components/client-display.ts", { "@/app/lib/period-packages": periodPackages });
-const display = load("app/components/clients/client-list-display.ts", { "@/app/(app)/owner/clients/components/client-display": clientDisplay });
+const plural = load("app/lib/formatters/plural.ts");
+const display = load("app/components/clients/client-list-display.ts", { "@/app/(app)/owner/clients/components/client-display": clientDisplay, "@/app/lib/formatters/plural": plural });
 
 const pkg = (overrides) => ({ clientPackageId: 10, packageId: 1, name: "12 treningów", billingMode: "SessionBased", status: "Active", paymentStatus: "Paid", totalSessions: 12, usedSessions: 8, remainingSessions: 4, validUntil: null, periodStartsAt: null, locationId: 1, ...overrides });
 const base = { id: 1, firstName: "Anna", lastName: "Nowak", fullName: "Anna Nowak", trainerId: null, trainerFullName: "", status: "active" };
@@ -73,6 +74,10 @@ test("trainer and status labels follow the data", () => {
   assert.equal(display.clientStatus({ status: "Weird" }).label, "Status nieznany");
   assert.equal(display.pluralizeClients(1), "1 klient");
   assert.equal(display.pluralizeClients(4), "4 klientów");
+  assert.equal(display.clientResultsLabel(44, 108), "44 wyniki z 108 klientów");
+  assert.equal(display.clientResultsLabel(1, 1), "1 wynik z 1 klienta");
+  assert.equal(display.clientResultsLabel(12, 300), "12 wyników z 300 klientów");
+  assert.equal(display.clientResultsLabel(5), "5 wyników", "without a known total only results are counted");
 });
 
 test("session dots are exact up to 20 sessions and proportional above", () => {

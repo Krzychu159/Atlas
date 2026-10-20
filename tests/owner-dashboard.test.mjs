@@ -83,13 +83,15 @@ const chart = load("app/(app)/owner/components/OverviewRevenueChart.tsx", {
   "@/app/lib/owner/dashboard-overview": api, "@/app/lib/formatters/money": money, "./owner-overview.module.css": css,
 }).default;
 const info = load("app/(app)/owner/components/OverviewInfo.tsx", { "./owner-overview.module.css": css }).default;
+const MonthPickerStub = props => React.createElement("button", { type: "button", "aria-label": `${props.ariaLabel}: ${props.value}`, "data-min": props.min, "data-max": props.max }, props.icon, props.value);
+const monthPicker = { MonthPicker: MonthPickerStub };
 function overview(overrides = {}, role = "owner", resourceCalls = []) {
   const component = load("app/(app)/owner/components/OwnerOverview.tsx", {
     "@/app/components/current-user-provider": { useCurrentUser: () => ({ user: { role } }) },
     "@/app/lib/formatters/money": money, "@/app/lib/owner/dashboard-overview": api,
     "@/app/lib/session-corrections": { usePaymentDateCorrectionRevision: () => 0 },
     "@/app/lib/owner/location-filter": { OWNER_LOCATION_ALL: "all", useOwnerLocationFilter: () => ({ selectedLocationId: null }), useOwnerLocationOptions: () => ({ options: [], selectedLocationValue: "all" }) },
-    "./OverviewInfo": { default: info, __esModule: true }, "./OverviewRevenueChart": { default: chart, __esModule: true }, "./owner-overview.module.css": css,
+    "./OverviewInfo": { default: info, __esModule: true }, "./OverviewRevenueChart": { default: chart, __esModule: true }, "./owner-overview.module.css": css, "@/app/components/ui/month-picker": monthPicker,
     "next/link": { default: ({ href, children, ...props }) => React.createElement("a", { href, ...props }, children), __esModule: true },
     "./use-dashboard-resource": { useDashboardResource: (key, loader) => {
       const section = key.split(":")[0]; resourceCalls.push({ key, loader });
@@ -142,7 +144,7 @@ test("non-owner roles never render dashboard or start data loading", () => {
 });
 test("chart has Polish months, exact accessible values, range controls and month limits", () => {
   const html = overview();
-  assert.match(html, /min="2000-01"/); assert.match(html, /max="2026-10"/);
+  assert.match(html, /data-min="2000-01"/); assert.match(html, /data-max="2026-10"/);
   assert.match(html, /aria-pressed="false"[^>]*>6 miesięcy/);
   assert.match(html, /aria-pressed="true"[^>]*>12 miesięcy/);
   assert.match(html, /październik 2026: 8\s?600,00/);
@@ -251,7 +253,7 @@ test("month and 6/12 controls request selected periods while clients and alerts 
     "@/app/lib/formatters/money": money, "@/app/lib/owner/dashboard-overview": api,
     "@/app/lib/session-corrections": { usePaymentDateCorrectionRevision: () => 0 },
     "@/app/lib/owner/location-filter": { OWNER_LOCATION_ALL: "all", useOwnerLocationFilter: () => ({ selectedLocationId: null }), useOwnerLocationOptions: () => ({ options: [], selectedLocationValue: "all" }) },
-    "./OverviewInfo": { default: info, __esModule: true }, "./OverviewRevenueChart": { default: chart, __esModule: true }, "./owner-overview.module.css": css,
+    "./OverviewInfo": { default: info, __esModule: true }, "./OverviewRevenueChart": { default: chart, __esModule: true }, "./owner-overview.module.css": css, "@/app/components/ui/month-picker": monthPicker,
     "next/link": { default: () => null, __esModule: true },
     "./use-dashboard-resource": { useDashboardResource: (key, loader) => {
       requests.push({ key, loader }); return { data: fixtures[key.split(":")[0]], loading: false, retry() {} };
@@ -266,15 +268,12 @@ test("month and 6/12 controls request selected periods while clients and alerts 
     return find(node.props?.children, predicate);
   }
   let tree = render();
-  const input = find(tree, node => node.type === "input");
-  let opened = 0;
-  input.props.onClick({ currentTarget: { showPicker() { opened += 1; } } });
-  assert.equal(opened, 1);
-  assert.doesNotThrow(() => input.props.onClick({ currentTarget: { showPicker() { throw new Error("Not supported"); } } }));
-  assert.doesNotThrow(() => input.props.onClick({ currentTarget: {} }));
-  input.props.onInput({ currentTarget: { value: "2026-08" } });
+  const picker = () => find(tree, node => node.type === MonthPickerStub);
+  assert.equal(picker().props.ariaLabel, "Miesiąc przeglądu");
+  assert.equal(picker().props.min, "2000-01"); assert.equal(picker().props.max, "2026-10"); assert.equal(picker().props.value, "2026-10");
+  picker().props.onChange("2026-08");
   tree = render(); assert.equal(requests[0].key, "summary:all:2026-08:0");
-  find(tree, node => node.type === "input").props.onChange({ target: { value: "2026-09" } });
+  picker().props.onChange("2026-09");
   tree = render();
   assert.deepEqual(requests.map(request => request.key), ["summary:all:2026-09:0", "revenue:all:2026-09:12:0", "clients:all", "attention:all"]);
   find(tree, node => node.type === "button" && node.props.children?.[0] === 6).props.onClick();
@@ -285,7 +284,7 @@ test("month and 6/12 controls request selected periods while clients and alerts 
   find(tree, node => node.type === "button" && node.props.children?.[0] === 12).props.onClick();
   tree = render(); assert.equal(requests[1].key, "revenue:all:2026-09:12:0");
   for (const invalid of ["2026-11", "1999-12", ""]) {
-    find(tree, node => node.type === "input").props.onChange({ target: { value: invalid } });
+    picker().props.onChange(invalid);
     tree = render(); assert.equal(requests[0].key, "summary:all:2026-09:0");
   }
 });
@@ -302,7 +301,7 @@ test("compact KPI explanations live in accessible tooltips with one partial badg
   assert.match(visible, /\+2.*m\/m/);
   assert.match(visible, /aria-label="Brak podstawy do porównania">—/);
   assert.match(visible, /Wszystkie lokalizacje/);
-  assert.equal((visible.match(/class="lucide lucide-calendar-days"/g) ?? []).length, 1);
+  assert.equal((visible.match(/class="lucide lucide-calendar-days[^"]*"/g) ?? []).length, 1);
 });
 test("information tooltips open with focus and touch, dismiss with Escape and blur", () => {
   let open = false;
