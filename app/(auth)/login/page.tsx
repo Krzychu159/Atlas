@@ -293,35 +293,30 @@ export default function LoginPage() {
 
   return (
     <div
-      className="min-h-screen overflow-hidden bg-surface text-on-surface"
+      className="min-h-dvh overflow-hidden bg-surface text-on-surface"
       aria-busy={isSubmitting}
     >
-      <div className="relative min-h-screen">
+      <div className="relative min-h-dvh">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,82,255,0.14),transparent_30%)]" />
         <div className="pointer-events-none absolute bottom-0 left-0 h-[320px] w-[320px] bg-[radial-gradient(circle,rgba(0,118,51,0.12),transparent_60%)]" />
 
-        <div className="hidden min-h-screen flex-col lg:flex">
-          <header className="relative z-10 px-9 pt-8">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary shadow-soft">
-                  <Dumbbell size={18} className="text-on-primary" />
-                </div>
-
-                <div>
-                  <p className="text-[2rem] font-semibold leading-none tracking-tight">
-                    ATLAS
-                  </p>
-                </div>
+        <div className="hidden min-h-dvh flex-col lg:flex">
+          <header className="relative z-10 px-9 pt-7">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary shadow-soft">
+                <Dumbbell size={18} className="text-on-primary" />
               </div>
 
+              <p className="text-[1.75rem] font-semibold leading-none tracking-tight">
+                ATLAS
+              </p>
             </div>
           </header>
 
-          <main className="relative z-10 flex-1 px-9 pb-8 pt-10">
-            <div className="mx-auto max-w-[1180px]">
+          <main className="relative z-10 flex flex-1 items-center justify-center px-9 py-6">
+            <div className="w-full max-w-[1120px]">
               <div className="grid grid-cols-[1fr_0.92fr] overflow-hidden rounded-[32px] bg-surface-container shadow-[0_24px_80px_rgba(0,0,0,0.32)] outline outline-1 outline-white/[0.08]">
-                <section className="relative flex min-h-[690px] flex-col justify-between overflow-hidden p-12">
+                <section className="relative flex min-h-[560px] flex-col justify-between overflow-hidden p-10 xl:p-12 2xl:min-h-[640px]">
                   <div className="absolute inset-0">
                     <img
                       src="https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1600&auto=format&fit=crop"
@@ -333,7 +328,7 @@ export default function LoginPage() {
                   </div>
 
                   <div className="relative z-10 max-w-[470px]">
-                    <h1 className="mt-10 font-display text-[4.6rem] font-semibold leading-[0.92] tracking-[-0.04em]">
+                    <h1 className="mt-6 font-display text-[3.6rem] font-semibold leading-[0.92] tracking-[-0.04em] xl:text-[4.25rem]">
                       Jedna platforma.
                       <br />
                       <span className="text-primary-light">Nielimitowane</span>
@@ -341,7 +336,7 @@ export default function LoginPage() {
                       możliwości.
                     </h1>
 
-                    <p className="mt-10 max-w-[430px] text-[1.05rem] leading-9 text-white/80">
+                    <p className="mt-8 max-w-[430px] text-[1.05rem] leading-8 text-white/80">
                       Wszystko, czego potrzebujesz do organizacji treningów,
                       płatności i codziennej pracy — w jednym miejscu.
                     </p>
@@ -370,13 +365,13 @@ export default function LoginPage() {
                   </div>
                 </section>
 
-                <section className="flex flex-col justify-between bg-surface-container p-12">
+                <section className="flex flex-col justify-center bg-surface-container p-10 xl:p-12">
                   <div>
-                    <div className="mx-auto max-w-[460px]">
-                      <h2 className="text-[2.25rem] font-semibold leading-none tracking-tight">
+                    <div className="mx-auto max-w-[420px]">
+                      <h2 className="text-[2rem] font-semibold leading-none tracking-tight">
                         {authCopy.title}
                       </h2>
-                      <p className="mt-4 text-[1.05rem] leading-8 text-on-surface-variant">
+                      <p className="mt-3 text-base leading-7 text-on-surface-variant">
                         {authCopy.description}
                       </p>
 
@@ -393,25 +388,26 @@ export default function LoginPage() {
                       ) : null}
 
                       {mode === "login" ? (
-                      <form className="mt-12 space-y-7" onSubmit={handleSubmit}>
+                      <form className="mt-7 space-y-4 lg:mt-10 lg:space-y-5" onSubmit={handleSubmit}>
                         <div>
-                          <label className="mb-3 block text-label text-on-surface-variant">
+                          <label htmlFor="desktop-login-email" className="mb-2 block text-label text-on-surface-variant">
                             Adres e-mail
                           </label>
 
-                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                          <div className="flex h-12 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 transition-shadow lg:h-14 focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
                             <input
+                              id="desktop-login-email"
                               type="email"
                               placeholder="nazwa@studio.pl"
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
                               disabled={isSubmitting}
-                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                              className="h-full w-full min-w-0 bg-transparent text-base outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                               autoComplete="email"
                               required
                             />
                             <AtSign
-                              size={22}
+                              size={20}
                               className="shrink-0 text-on-surface-muted"
                             />
                           </div>
@@ -419,7 +415,7 @@ export default function LoginPage() {
 
                         <div>
                           <div className="mb-3 flex items-center justify-between gap-4">
-                            <label className="text-label text-on-surface-variant">
+                            <label htmlFor="desktop-login-password" className="text-label text-on-surface-variant">
                               Hasło
                             </label>
 
@@ -433,14 +429,15 @@ export default function LoginPage() {
                             </button>
                           </div>
 
-                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                          <div className="flex h-12 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 transition-shadow lg:h-14 focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
                             <input
+                              id="desktop-login-password"
                               type={showPassword ? "text" : "password"}
                               placeholder="••••••••"
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
                               disabled={isSubmitting}
-                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                              className="h-full w-full min-w-0 bg-transparent text-base outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                               autoComplete="current-password"
                               required
                             />
@@ -449,15 +446,15 @@ export default function LoginPage() {
                               type="button"
                               onClick={() => setShowPassword((prev) => !prev)}
                               disabled={isSubmitting}
-                              className="shrink-0 text-on-surface-muted disabled:pointer-events-none disabled:opacity-50"
+                              className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-on-surface-muted transition-colors hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-light/40 disabled:pointer-events-none disabled:opacity-50"
                               aria-label={
                                 showPassword ? "Ukryj hasło" : "Pokaż hasło"
                               }
                             >
                               {showPassword ? (
-                                <EyeOff size={22} />
+                                <EyeOff size={20} />
                               ) : (
-                                <Eye size={22} />
+                                <Eye size={20} />
                               )}
                             </button>
                           </div>
@@ -483,7 +480,7 @@ export default function LoginPage() {
                         <button
                           type="submit"
                           disabled={isSubmitting}
-                          className="flex h-[66px] w-full items-center justify-center gap-3 rounded-[24px] bg-primary-gradient text-[1.05rem] font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
+                          className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-primary-gradient text-base font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
                         >
                           {isSubmitting ? authCopy.pending : authCopy.submit}
                           <ArrowRight size={18} />
@@ -491,27 +488,28 @@ export default function LoginPage() {
                       </form>
                       ) : mode === "forgot" ? (
                       <form
-                        className="mt-12 space-y-7"
+                        className="mt-7 space-y-4 lg:mt-10 lg:space-y-5"
                         onSubmit={handleForgotSubmit}
                       >
                         <div>
-                          <label className="mb-3 block text-label text-on-surface-variant">
+                          <label htmlFor="desktop-forgot-email" className="mb-2 block text-label text-on-surface-variant">
                             Adres e-mail
                           </label>
 
-                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                          <div className="flex h-12 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 transition-shadow lg:h-14 focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
                             <input
+                              id="desktop-forgot-email"
                               type="email"
                               placeholder="nazwa@studio.pl"
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
                               disabled={isSubmitting}
-                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                              className="h-full w-full min-w-0 bg-transparent text-base outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                               autoComplete="email"
                               required
                             />
                             <AtSign
-                              size={22}
+                              size={20}
                               className="shrink-0 text-on-surface-muted"
                             />
                           </div>
@@ -524,7 +522,7 @@ export default function LoginPage() {
                         <button
                           type="submit"
                           disabled={isSubmitting}
-                          className="flex h-[66px] w-full items-center justify-center gap-3 rounded-[24px] bg-primary-gradient text-[1.05rem] font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
+                          className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-primary-gradient text-base font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
                         >
                           {isSubmitting ? authCopy.pending : authCopy.submit}
                           <MailCheck size={18} />
@@ -551,26 +549,27 @@ export default function LoginPage() {
                       </form>
                       ) : (
                       <form
-                        className="mt-12 space-y-7"
+                        className="mt-7 space-y-4 lg:mt-10 lg:space-y-5"
                         onSubmit={handleResetSubmit}
                       >
                         <div>
-                          <label className="mb-3 block text-label text-on-surface-variant">
+                          <label htmlFor="desktop-reset-token" className="mb-2 block text-label text-on-surface-variant">
                             Kod do zmiany hasła
                           </label>
 
-                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                          <div className="flex h-12 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 transition-shadow lg:h-14 focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
                             <KeyRound
-                              size={22}
+                              size={20}
                               className="shrink-0 text-on-surface-muted"
                             />
                             <input
+                              id="desktop-reset-token"
                               type="text"
                               placeholder="Wklej kod z linku do zmiany hasła"
                               value={resetToken}
                               onChange={(e) => setResetToken(e.target.value)}
                               disabled={isSubmitting}
-                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                              className="h-full w-full min-w-0 bg-transparent text-base outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                               autoComplete="one-time-code"
                               required
                             />
@@ -578,22 +577,23 @@ export default function LoginPage() {
                         </div>
 
                         <div>
-                          <label className="mb-3 block text-label text-on-surface-variant">
+                          <label htmlFor="desktop-reset-password" className="mb-2 block text-label text-on-surface-variant">
                             Nowe hasło
                           </label>
 
-                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                          <div className="flex h-12 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 transition-shadow lg:h-14 focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
                             <Lock
-                              size={22}
+                              size={20}
                               className="shrink-0 text-on-surface-muted"
                             />
                             <input
+                              id="desktop-reset-password"
                               type={showPassword ? "text" : "password"}
                               placeholder="Minimum 8 znaków"
                               value={newPassword}
                               onChange={(e) => setNewPassword(e.target.value)}
                               disabled={isSubmitting}
-                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                              className="h-full w-full min-w-0 bg-transparent text-base outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                               autoComplete="new-password"
                               required
                             />
@@ -601,31 +601,32 @@ export default function LoginPage() {
                               type="button"
                               onClick={() => setShowPassword((prev) => !prev)}
                               disabled={isSubmitting}
-                              className="shrink-0 text-on-surface-muted disabled:pointer-events-none disabled:opacity-50"
+                              className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-on-surface-muted transition-colors hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-light/40 disabled:pointer-events-none disabled:opacity-50"
                               aria-label={
                                 showPassword ? "Ukryj hasło" : "Pokaż hasło"
                               }
                             >
                               {showPassword ? (
-                                <EyeOff size={22} />
+                                <EyeOff size={20} />
                               ) : (
-                                <Eye size={22} />
+                                <Eye size={20} />
                               )}
                             </button>
                           </div>
                         </div>
 
                         <div>
-                          <label className="mb-3 block text-label text-on-surface-variant">
+                          <label htmlFor="desktop-reset-password-confirm" className="mb-2 block text-label text-on-surface-variant">
                             Powtórz hasło
                           </label>
 
-                          <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                          <div className="flex h-12 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 transition-shadow lg:h-14 focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
                             <Lock
-                              size={22}
+                              size={20}
                               className="shrink-0 text-on-surface-muted"
                             />
                             <input
+                              id="desktop-reset-password-confirm"
                               type={showPassword ? "text" : "password"}
                               placeholder="Powtórz nowe hasło"
                               value={confirmPassword}
@@ -633,7 +634,7 @@ export default function LoginPage() {
                                 setConfirmPassword(e.target.value)
                               }
                               disabled={isSubmitting}
-                              className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                              className="h-full w-full min-w-0 bg-transparent text-base outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                               autoComplete="new-password"
                               required
                             />
@@ -647,7 +648,7 @@ export default function LoginPage() {
                         <button
                           type="submit"
                           disabled={isSubmitting}
-                          className="flex h-[66px] w-full items-center justify-center gap-3 rounded-[24px] bg-primary-gradient text-[1.05rem] font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
+                          className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-primary-gradient text-base font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
                         >
                           {isSubmitting ? authCopy.pending : authCopy.submit}
                           <ArrowRight size={18} />
@@ -670,27 +671,27 @@ export default function LoginPage() {
             </div>
           </main>
 
-          <footer className="relative z-10 px-9 pb-8">
-            <div className="mx-auto flex max-w-[1180px] items-center justify-center gap-8 text-on-surface-muted">
+          <footer className="relative z-10 px-9 pb-6">
+            <div className="mx-auto flex max-w-[1120px] items-center justify-center gap-8 text-on-surface-muted">
               <span className="text-label">© 2026 Atlas </span>
             </div>
           </footer>
         </div>
 
-        <div className="flex min-h-screen flex-col px-6 pb-10 pt-8 lg:hidden">
-          <header className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary shadow-soft">
-              <Dumbbell size={18} className="text-on-primary" />
+        <div className="relative mx-auto flex min-h-dvh w-full max-w-[440px] flex-col px-5 pb-6 pt-6 sm:px-6 sm:pt-10 lg:hidden">
+          <header className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-soft">
+              <Dumbbell size={16} className="text-on-primary" />
             </div>
 
-            <p className="text-[2rem] font-semibold leading-none tracking-tight">
+            <p className="text-[1.5rem] font-semibold leading-none tracking-tight">
               ATLAS
             </p>
           </header>
 
-          <main className="flex flex-1 flex-col pt-10">
+          <main className="flex flex-1 flex-col pt-8 sm:justify-center sm:pt-6">
             <div>
-              <h1 className="font-display text-[4.2rem] font-semibold leading-[0.88] tracking-[-0.05em]">
+              <h1 className="font-display text-[clamp(2.25rem,11vw,3rem)] font-semibold leading-[0.9] tracking-[-0.04em]">
                 {mode === "forgot" ? (
                   <>
                     ODZYSKAJ
@@ -712,7 +713,7 @@ export default function LoginPage() {
                 )}
               </h1>
 
-              <p className="mt-5 text-[1.05rem] uppercase leading-8 tracking-[0.03em] text-on-surface-muted">
+              <p className="mt-3 text-[0.8rem] uppercase leading-6 tracking-[0.04em] text-on-surface-muted">
                 {authCopy.description}
               </p>
 
@@ -730,24 +731,25 @@ export default function LoginPage() {
             </div>
 
             {mode === "login" ? (
-            <form className="mt-12 space-y-7" onSubmit={handleSubmit}>
+            <form className="mt-7 space-y-4 lg:mt-10 lg:space-y-5" onSubmit={handleSubmit}>
               <div>
-                <label className="mb-3 block text-label text-on-surface-variant">
+                <label htmlFor="mobile-login-email" className="mb-2 block text-label text-on-surface-variant">
                   Adres e-mail
                 </label>
 
-                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                <div className="flex h-12 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 transition-shadow lg:h-14 focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
                   <AtSign
-                    size={22}
+                    size={20}
                     className="shrink-0 text-on-surface-muted"
                   />
                   <input
+                    id="mobile-login-email"
                     type="email"
-                    placeholder="nazwa@atlasops.com"
+                    placeholder="nazwa@studio.pl"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isSubmitting}
-                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                    className="h-full w-full min-w-0 bg-transparent text-base outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                     autoComplete="email"
                     required
                   />
@@ -755,19 +757,20 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="mb-3 block text-label text-on-surface-variant">
+                <label htmlFor="mobile-login-password" className="mb-2 block text-label text-on-surface-variant">
                   Hasło
                 </label>
 
-                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
-                  <Lock size={22} className="shrink-0 text-on-surface-muted" />
+                <div className="flex h-12 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 transition-shadow lg:h-14 focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                  <Lock size={20} className="shrink-0 text-on-surface-muted" />
                   <input
+                    id="mobile-login-password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isSubmitting}
-                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                    className="h-full w-full min-w-0 bg-transparent text-base outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                     autoComplete="current-password"
                     required
                   />
@@ -775,16 +778,16 @@ export default function LoginPage() {
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
                     disabled={isSubmitting}
-                    className="shrink-0 text-on-surface-muted disabled:pointer-events-none disabled:opacity-50"
+                    className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-on-surface-muted transition-colors hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-light/40 disabled:pointer-events-none disabled:opacity-50"
                     aria-label={showPassword ? "Ukryj hasło" : "Pokaż hasło"}
                   >
-                    {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-4">
-                <label className="flex cursor-pointer select-none items-center gap-4">
+              <div className="flex items-center justify-between gap-3">
+                <label className="flex min-h-11 cursor-pointer select-none items-center gap-3">
                   <input
                     type="checkbox"
                     checked={rememberMe}
@@ -792,7 +795,7 @@ export default function LoginPage() {
                     disabled={isSubmitting}
                     className="h-5 w-5 shrink-0 rounded border border-white/10 bg-surface-container-lowest disabled:cursor-not-allowed"
                   />
-                  <span className="text-[1rem] uppercase tracking-[0.04em] text-on-surface-variant">
+                  <span className="text-[0.8rem] uppercase tracking-[0.04em] text-on-surface-variant">
                     Zapamiętaj mnie
                   </span>
                 </label>
@@ -801,7 +804,7 @@ export default function LoginPage() {
                   type="button"
                   disabled={isSubmitting}
                   onClick={() => changeMode("forgot")}
-                  className="text-[1rem] font-medium uppercase tracking-[0.04em] text-primary-light disabled:pointer-events-none disabled:opacity-50"
+                  className="min-h-11 text-right text-[0.8rem] font-medium uppercase tracking-[0.04em] text-primary-light disabled:pointer-events-none disabled:opacity-50"
                 >
                   Zapomniałeś hasła?
                 </button>
@@ -812,31 +815,32 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex h-[74px] w-full items-center justify-center gap-4 rounded-[26px] bg-primary-gradient text-[1.15rem] font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
+                className="flex h-[52px] w-full items-center justify-center gap-3 rounded-2xl bg-primary-gradient text-base font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
               >
                 {isSubmitting ? authCopy.pending : authCopy.submit}
-                <ArrowRight size={22} />
+                <ArrowRight size={20} />
               </button>
             </form>
             ) : mode === "forgot" ? (
-            <form className="mt-12 space-y-7" onSubmit={handleForgotSubmit}>
+            <form className="mt-7 space-y-4 lg:mt-10 lg:space-y-5" onSubmit={handleForgotSubmit}>
               <div>
-                <label className="mb-3 block text-label text-on-surface-variant">
+                <label htmlFor="mobile-forgot-email" className="mb-2 block text-label text-on-surface-variant">
                   Adres e-mail
                 </label>
 
-                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                <div className="flex h-12 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 transition-shadow lg:h-14 focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
                   <AtSign
-                    size={22}
+                    size={20}
                     className="shrink-0 text-on-surface-muted"
                   />
                   <input
+                    id="mobile-forgot-email"
                     type="email"
                     placeholder="nazwa@studio.pl"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isSubmitting}
-                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                    className="h-full w-full min-w-0 bg-transparent text-base outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                     autoComplete="email"
                     required
                   />
@@ -848,10 +852,10 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex h-[74px] w-full items-center justify-center gap-4 rounded-[26px] bg-primary-gradient text-[1.15rem] font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
+                className="flex h-[52px] w-full items-center justify-center gap-3 rounded-2xl bg-primary-gradient text-base font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
               >
                 {isSubmitting ? authCopy.pending : authCopy.submit}
-                <MailCheck size={22} />
+                <MailCheck size={20} />
               </button>
 
               <div className="flex items-center justify-between gap-4">
@@ -859,7 +863,7 @@ export default function LoginPage() {
                   type="button"
                   disabled={isSubmitting}
                   onClick={() => changeMode("login")}
-                  className="text-sm font-semibold uppercase tracking-[0.04em] text-on-surface-variant transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+                  className="min-h-11 text-sm font-semibold uppercase tracking-[0.04em] text-on-surface-variant transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
                 >
                   Wróć
                 </button>
@@ -867,31 +871,32 @@ export default function LoginPage() {
                   type="button"
                   disabled={isSubmitting}
                   onClick={() => changeMode("reset")}
-                  className="text-sm font-semibold uppercase tracking-[0.04em] text-primary-light transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+                  className="min-h-11 text-sm font-semibold uppercase tracking-[0.04em] text-primary-light transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
                 >
                   Mam kod do zmiany hasła
                 </button>
               </div>
             </form>
             ) : (
-            <form className="mt-12 space-y-7" onSubmit={handleResetSubmit}>
+            <form className="mt-7 space-y-4 lg:mt-10 lg:space-y-5" onSubmit={handleResetSubmit}>
               <div>
-                <label className="mb-3 block text-label text-on-surface-variant">
+                <label htmlFor="mobile-reset-token" className="mb-2 block text-label text-on-surface-variant">
                   Kod do zmiany hasła
                 </label>
 
-                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                <div className="flex h-12 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 transition-shadow lg:h-14 focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
                   <KeyRound
-                    size={22}
+                    size={20}
                     className="shrink-0 text-on-surface-muted"
                   />
                   <input
+                    id="mobile-reset-token"
                     type="text"
                     placeholder="Wklej kod z linku do zmiany hasła"
                     value={resetToken}
                     onChange={(e) => setResetToken(e.target.value)}
                     disabled={isSubmitting}
-                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                    className="h-full w-full min-w-0 bg-transparent text-base outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                     autoComplete="one-time-code"
                     required
                   />
@@ -899,19 +904,20 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="mb-3 block text-label text-on-surface-variant">
+                <label htmlFor="mobile-reset-password" className="mb-2 block text-label text-on-surface-variant">
                   Nowe hasło
                 </label>
 
-                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
-                  <Lock size={22} className="shrink-0 text-on-surface-muted" />
+                <div className="flex h-12 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 transition-shadow lg:h-14 focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                  <Lock size={20} className="shrink-0 text-on-surface-muted" />
                   <input
+                    id="mobile-reset-password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Minimum 8 znaków"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     disabled={isSubmitting}
-                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                    className="h-full w-full min-w-0 bg-transparent text-base outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                     autoComplete="new-password"
                     required
                   />
@@ -919,28 +925,29 @@ export default function LoginPage() {
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
                     disabled={isSubmitting}
-                    className="shrink-0 text-on-surface-muted disabled:pointer-events-none disabled:opacity-50"
+                    className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-on-surface-muted transition-colors hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-light/40 disabled:pointer-events-none disabled:opacity-50"
                     aria-label={showPassword ? "Ukryj hasło" : "Pokaż hasło"}
                   >
-                    {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="mb-3 block text-label text-on-surface-variant">
+                <label htmlFor="mobile-reset-password-confirm" className="mb-2 block text-label text-on-surface-variant">
                   Powtórz hasło
                 </label>
 
-                <div className="flex h-16 items-center gap-4 rounded-[24px] bg-surface-container-lowest px-5 transition-shadow focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
-                  <Lock size={22} className="shrink-0 text-on-surface-muted" />
+                <div className="flex h-12 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 transition-shadow lg:h-14 focus-within:shadow-[0_0_0_2px_rgba(183,196,255,0.3)]">
+                  <Lock size={20} className="shrink-0 text-on-surface-muted" />
                   <input
+                    id="mobile-reset-password-confirm"
                     type={showPassword ? "text" : "password"}
                     placeholder="Powtórz nowe hasło"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     disabled={isSubmitting}
-                    className="w-full bg-transparent text-[1.05rem] outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
+                    className="h-full w-full min-w-0 bg-transparent text-base outline-none placeholder:text-on-surface-muted disabled:cursor-not-allowed"
                     autoComplete="new-password"
                     required
                   />
@@ -952,17 +959,17 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex h-[74px] w-full items-center justify-center gap-4 rounded-[26px] bg-primary-gradient text-[1.15rem] font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
+                className="flex h-[52px] w-full items-center justify-center gap-3 rounded-2xl bg-primary-gradient text-base font-semibold text-white shadow-ambient transition-transform hover:scale-[1.01] disabled:cursor-wait disabled:opacity-80 disabled:hover:scale-100"
               >
                 {isSubmitting ? authCopy.pending : authCopy.submit}
-                <ArrowRight size={22} />
+                <ArrowRight size={20} />
               </button>
 
               <button
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => changeMode("login")}
-                className="text-sm font-semibold uppercase tracking-[0.04em] text-on-surface-variant transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
+                className="min-h-11 text-sm font-semibold uppercase tracking-[0.04em] text-on-surface-variant transition-colors hover:text-on-surface disabled:pointer-events-none disabled:opacity-50"
               >
                 Wróć do logowania
               </button>
@@ -970,9 +977,9 @@ export default function LoginPage() {
             )}
           </main>
 
-          <footer className="pt-14 text-center">
+          <footer className="pt-8 text-center">
             <p className="text-label text-on-surface-muted">
-              © 2026 Atlas Kinetic Ops
+              © 2026 Atlas
             </p>
           </footer>
         </div>
