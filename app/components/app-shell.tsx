@@ -163,7 +163,7 @@ export function AppShell({ children, role, theme = "atlas" }: AppShellProps) {
           </div>
 
           <div className="shrink-0 pt-3">
-            <Link href={settingsHref} onClick={() => setMobileMenuOpen(false)} className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm text-on-surface-variant hover:bg-surface-container">
+            <Link href={settingsHref} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm text-on-surface-variant hover:bg-surface-container">
               <Settings size={20} /> Profil i ustawienia
             </Link>
             <Link href="/logout" prefetch={false} onClick={() => setMobileMenuOpen(false)} className="mb-2 flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm text-on-surface-variant hover:bg-surface-container">
@@ -239,11 +239,11 @@ export function AppShell({ children, role, theme = "atlas" }: AppShellProps) {
             {theme === "bsworkout" ? <BsworkoutLogo className="ml-auto h-6 w-16 min-w-12 shrink" /> : null}
             <div className="flex shrink-0 items-center gap-1">
               {role === "owner" ? <OwnerLocationIconPicker /> : null}
-              <Link href={`/${role}/notifications`} aria-label={unreadCount > 0 ? `Powiadomienia, nieprzeczytane: ${unreadCount}` : "Powiadomienia"} className="relative flex h-11 w-11 items-center justify-center rounded-full text-primary-light hover:bg-surface-container-high">
+              <Link href={`/${role}/notifications`} prefetch={false} aria-label={unreadCount > 0 ? `Powiadomienia, nieprzeczytane: ${unreadCount}` : "Powiadomienia"} className="relative flex h-11 w-11 items-center justify-center rounded-full text-primary-light hover:bg-surface-container-high">
                 <Bell size={21} />
                 {unreadCount > 0 && <span aria-hidden="true" className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-tertiary-light px-1 text-[0.625rem] font-bold text-on-tertiary">{unreadCount > 99 ? "99+" : unreadCount}</span>}
               </Link>
-              <Link href={settingsHref} aria-label="Profil i ustawienia" className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-container-high">
+              <Link href={settingsHref} prefetch={false} aria-label="Profil i ustawienia" className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-container-high">
                 <MobileUserAvatar user={user} />
               </Link>
             </div>

@@ -318,6 +318,7 @@ export function Header({ role, unreadNotificationCount, onUnreadCountChange }: H
             <>
               <Link
                 href={notificationsHref}
+                prefetch={false}
                 className="relative text-on-surface-variant hover:text-on-surface md:hidden"
               >
                 <Bell width={18} height={18} />
@@ -421,6 +422,7 @@ export function Header({ role, unreadNotificationCount, onUnreadCountChange }: H
 
                 <Link
                   href="/logout"
+                  prefetch={false}
                   className="mt-4 flex h-11 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low text-sm font-semibold text-on-surface transition hover:bg-surface-container-high"
                 >
                   <LogOut size={16} className="text-primary-light" />

@@ -101,14 +101,14 @@ function Overview({ currentPeriod }: { currentPeriod: string }) {
         </> : null}
       </section>
       <section className={`${styles.card} ${styles.clients}`} aria-labelledby="overview-clients" aria-busy={clients.loading}>
-        <div className={styles.cardHeader}><h2 id="overview-clients">Nowi klienci</h2><Link href="/owner/clients">Wszyscy klienci</Link></div>
+        <div className={styles.cardHeader}><h2 id="overview-clients">Nowi klienci</h2><Link href="/owner/clients" prefetch={false}>Wszyscy klienci</Link></div>
         {clients.loading ? <Skeleton rows={4} /> : clients.error ? <SectionError message={clients.error} retry={clients.retry} /> : clients.data?.length ? <ul className={styles.clientList}>{clients.data.slice(0, 4).map(client => <li key={client.id}>
-          <Link href={`/owner/clients/${client.id}`} className={styles.clientRow}>
+          <Link href={`/owner/clients/${client.id}`} prefetch={false} className={styles.clientRow}>
             <span className={styles.avatar} aria-hidden="true">{`${client.firstName.trim().charAt(0)}${client.lastName.trim().charAt(0)}`.toLocaleUpperCase("pl-PL") || "—"}</span>
             <span className={styles.clientName}>{client.fullName || `${client.firstName} ${client.lastName}`}</span>
             <span className={styles.clientDate}>{dashboardJoinedDate(client.joinedAt)}</span>
           </Link>
-        </li>)}</ul> : <div className={styles.empty}><Users size={28} aria-hidden="true" /><p>Nie ma jeszcze nowych klientów.</p><Link href="/owner/clients">Przejdź do klientów</Link></div>}
+        </li>)}</ul> : <div className={styles.empty}><Users size={28} aria-hidden="true" /><p>Nie ma jeszcze nowych klientów.</p><Link href="/owner/clients" prefetch={false}>Przejdź do klientów</Link></div>}
       </section>
     </div>
     <section aria-labelledby="overview-attention" aria-busy={attention.loading} className={styles.attention}>

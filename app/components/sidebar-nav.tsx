@@ -28,6 +28,9 @@ export function SidebarNav({ items, onNavigate }: SidebarNavProps) {
           <Link
             key={item.href}
             href={item.href}
+            // Without loading.tsx a dynamic route prefetch carries only the route tree,
+            // yet still hits the session check, so it costs more than it saves.
+            prefetch={false}
             onClick={onNavigate}
             aria-current={isActive ? "page" : undefined}
             className={[
