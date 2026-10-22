@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { getBackendSessionRevision } from "../backend";
 import { getLocations, type Location } from "./locations";
 
 export const OWNER_LOCATION_ALL = "all";
@@ -131,18 +132,22 @@ export function useOwnerLocationFilter() {
 export type OwnerLocationOption = { value: OwnerLocationFilterValue; label: string };
 export type OwnerLocationOptionsStatus = "loading" | "ready" | "error";
 
-let activeLocationsRequest: Promise<Location[]> | null = null;
+let activeLocations: { revision: number; request: Promise<Location[]> } | null = null;
 const subscribeNothing = () => () => {};
 
-// The desktop topbar and the mobile switcher share one request per page load.
+// The desktop topbar and the mobile switcher share one request per session;
+// logging out or switching accounts clears the session and forces a fresh list.
 function loadActiveLocations() {
-  activeLocationsRequest ??= getLocations()
+  const revision = getBackendSessionRevision();
+  if (activeLocations?.revision === revision) return activeLocations.request;
+  const request: Promise<Location[]> = getLocations()
     .then((locations) => locations.filter((location) => location.isActive))
     .catch((error: unknown) => {
-      activeLocationsRequest = null;
+      if (activeLocations?.request === request) activeLocations = null;
       throw error;
     });
-  return activeLocationsRequest;
+  activeLocations = { revision, request };
+  return request;
 }
 
 export function ownerLocationLabel(location: Pick<Location, "id" | "name" | "city">) {

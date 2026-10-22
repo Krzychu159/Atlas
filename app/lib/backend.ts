@@ -26,6 +26,11 @@ let sessionRevision = 0;
 type PendingGet = { controller: AbortController; promise: Promise<unknown>; subscribers: number; settled: boolean };
 const pendingGets = new Map<string, PendingGet>();
 
+// Changes whenever the session is cleared; module-level caches compare it to drop data of a previous account.
+export function getBackendSessionRevision() {
+  return sessionRevision;
+}
+
 // In-flight requests only: no resolved business data is cached globally.
 export function clearBackendRequests() {
   sessionRevision += 1;

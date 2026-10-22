@@ -36,6 +36,32 @@ test("a location missing from a successfully loaded list resets the scope", asyn
   assert.equal(storage["atlas-owner-location-id"], "all");
 });
 
+test("location list is shared within a session and reloaded after the session changes", async () => {
+  const lists = { 1: [{ id: 1, name: "Studio A", isActive: true }], 2: [{ id: 2, name: "Studio B", isActive: true }] };
+  let revision = 1, calls = 0, h = hooks();
+  const window = { localStorage: { getItem: () => null, setItem() {} }, addEventListener() {}, removeEventListener() {}, dispatchEvent() {} };
+  // One module instance across mounts, like a single browser tab; each mount gets fresh hook state.
+  const react = new Proxy({}, { get: (_target, key) => key === "useSyncExternalStore" ? (_subscribe, snapshot) => snapshot() : h.react[key] });
+  const api = load("app/lib/owner/location-filter.ts", {
+    react,
+    "../backend": { getBackendSessionRevision: () => revision },
+    "./locations": { getLocations: () => { calls += 1; return Promise.resolve(lists[revision]); } },
+  }, { window, CustomEvent: class {}, DOMException });
+  const mount = async () => {
+    h = hooks();
+    const screen = () => h.render(() => api.useOwnerLocationOptions(true));
+    screen(); h.commit(); await settle();
+    const labels = Array.from(screen().options, option => option.label); h.unmount();
+    return labels;
+  };
+  assert.deepEqual(await mount(), ["Wszystkie lokalizacje", "Studio A"]);
+  assert.deepEqual(await mount(), ["Wszystkie lokalizacje", "Studio A"]);
+  assert.equal(calls, 1);
+  revision = 2;
+  assert.deepEqual(await mount(), ["Wszystkie lokalizacje", "Studio B"]);
+  assert.equal(calls, 2);
+});
+
 test("phone location picker shares the stored selection and marks a narrowed scope", async () => {
   const { h, storage } = locationOptions("1", Promise.resolve([{ id: 1, name: "Kraków", isActive: true }]));
   const { OwnerLocationIconPicker } = load("app/components/owner-mobile-location.tsx", {
