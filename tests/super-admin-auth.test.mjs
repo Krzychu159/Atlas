@@ -59,14 +59,15 @@ test("roles[] is authoritative and legacy studio profiles keep their role", () =
 
 test("login restores only links belonging to the verified panel", () => {
   for (const role of ["owner", "trainer", "client", "super-admin"]) {
-    assert.equal(redirects.getLoginRedirectPath(role, null), `/${role}`);
+    const landing = role === "owner" ? "/owner/schedule" : `/${role}`;
+    assert.equal(redirects.getLoginRedirectPath(role, null), landing);
     assert.equal(redirects.getLoginRedirectPath(role, `/${role}?from=login`), `/${role}?from=login`);
     for (const unsafe of ["https://evil.test", "//evil.test", "/super-admin/../owner", "/super-admin/\\evil.test", "/login"]) {
-      assert.equal(redirects.getLoginRedirectPath(role, unsafe), `/${role}`);
+      assert.equal(redirects.getLoginRedirectPath(role, unsafe), landing);
     }
   }
   assert.equal(redirects.getLoginRedirectPath("super-admin", "/owner/settings"), "/super-admin");
-  assert.equal(redirects.getLoginRedirectPath("owner", "/super-admin/organizations"), "/owner");
+  assert.equal(redirects.getLoginRedirectPath("owner", "/super-admin/organizations"), "/owner/schedule");
   assert.equal(redirects.getLoginRedirectPath("super-admin", "/super-admin/organizations"), "/super-admin/organizations");
 });
 
@@ -206,7 +207,7 @@ test("login preserves organization context for each role and remains compatible 
       const user = (await response.json()).user;
       assert.equal(Object.hasOwn(user, "organizationId"), modern);
       if (modern) assert.equal(user.organizationId, context.organizationId);
-      assert.equal(redirects.getLoginRedirectPath(user.role, null), role === "SuperAdmin" ? "/super-admin" : `/${role.toLowerCase()}`);
+      assert.equal(redirects.getLoginRedirectPath(user.role, null), role === "SuperAdmin" ? "/super-admin" : role === "Owner" ? "/owner/schedule" : `/${role.toLowerCase()}`);
       assert.equal(response.cookies.get("organizationId"), undefined);
     }
   }
