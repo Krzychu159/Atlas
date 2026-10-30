@@ -89,7 +89,7 @@ function ClientDetails({ clientId }: { clientId: number }) {
   const renewal = useOwnerRead(String(clientId), loadSubscription, "Nie udało się pobrać danych o przedłużaniu pakietu.", revision);
   const account = useOwnerRead(String(clientId), loadBilling, "Nie udało się pobrać rozliczeń i pakietów klienta.", revision);
   const history = useOwnerRead(`${clientId}:${sessionPage}`, loadSessions, "Nie udało się pobrać historii treningów.", revision);
-  const plan = useOwnerRead<ClientTrainingPlan | null>(String(clientId), loadPlan, "Nie udało się pobrać folderu klienta.");
+  const plan = useOwnerRead<ClientTrainingPlan | null>(String(clientId), loadPlan, "Nie udało się pobrać planu treningowego.");
   const paymentList = useOwnerRead(String(clientId), loadPayments, "Nie udało się pobrać wpłat klienta.", revision);
   const consents = useOwnerRead(String(clientId), loadConsents, "Nie udało się pobrać zgód klienta.");
   const refundList = useOwnerRead(String(clientId), loadRefunds, "Nie udało się pobrać zwrotów klienta.", revision);
@@ -353,7 +353,7 @@ function ClientDetails({ clientId }: { clientId: number }) {
 
     if (!url) {
       pendingTab?.close();
-      showOwnerError(new Error("Najpierw dodaj link do folderu klienta."), "", {
+      showOwnerError(new Error("Najpierw dodaj link do planu treningowego."), "", {
         id: "owner-client-files-missing",
       });
       return;
@@ -397,7 +397,7 @@ function ClientDetails({ clientId }: { clientId: number }) {
           />
           <OwnerReadState loading={account.loading && account.data === undefined} error={account.error} retry={account.retry} label="Ładowanie rozliczeń i pakietów..." />
           <OwnerReadState loading={renewal.loading && renewal.data === undefined} error={renewal.error} retry={renewal.retry} label="Ładowanie danych o przedłużaniu pakietu..." />
-          <OwnerReadState loading={plan.loading && plan.data === undefined} error={plan.error} retry={plan.retry} label="Ładowanie folderu klienta..." />
+          <OwnerReadState loading={plan.loading && plan.data === undefined} error={plan.error} retry={plan.retry} label="Ładowanie planu treningowego..." />
           {/* Kafelki podsumowania tymczasowo ukryte w nowym układzie karty klienta.
           <ClientMetricCards preserveMissingData
             client={client}

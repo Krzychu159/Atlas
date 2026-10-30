@@ -151,14 +151,14 @@ export default function TrainerClientDetailsPage() {
     } catch (error) {
       pendingTab?.close();
       if (revision !== loadRevision.current || loadController.current?.signal.aborted) return;
-      const message = trainerPaymentError(error, "Nie udało się otworzyć plików klienta. Spróbuj ponownie.");
+      const message = trainerPaymentError(error, "Nie udało się otworzyć planu treningowego. Spróbuj ponownie.");
       showOwnerError(new Error(message), message);
       return;
     }
 
     if (!url) {
       pendingTab?.close();
-      showOwnerError(new Error("Najpierw dodaj link do folderu klienta."), "", {
+      showOwnerError(new Error("Najpierw dodaj link do planu treningowego."), "", {
         id: "trainer-client-files-missing",
       });
       return;

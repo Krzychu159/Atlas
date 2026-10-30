@@ -162,7 +162,7 @@ export default function EditClientModal({
     const controller = new AbortController();
     getTrainingPlanForEditModal(currentClientId, access, controller.signal)
       .then(plan => { if (active) { setTrainingPlan(plan); setTrainingPlanUrl(plan.url || plan.googleDriveFolderUrl || ""); setPlanReady(true); } })
-      .catch(error => { if (active) { setTrainingPlan(null); setTrainingPlanUrl(""); if (isNotFoundError(error)) setPlanReady(true); else setPlanError("Nie udało się pobrać linku do plików. Zamknij edycję i spróbuj ponownie."); } });
+      .catch(error => { if (active) { setTrainingPlan(null); setTrainingPlanUrl(""); if (isNotFoundError(error)) setPlanReady(true); else setPlanError("Nie udało się pobrać linku do planu treningowego. Zamknij edycję i spróbuj ponownie."); } });
     return () => { active = false; controller.abort(); };
   }, [access, currentClientId, open]);
 
@@ -556,13 +556,13 @@ export default function EditClientModal({
                 </div>
 
                 <p className="font-semibold text-on-surface">
-                  Pliki
+                  Plan treningowy
                 </p>
               </div>
 
-              {!planReady ? <p role="status" className="mb-3 text-sm text-on-surface-variant">{planError || "Pobieramy link do plików…"}</p> : null}
+              {!planReady ? <p role="status" className="mb-3 text-sm text-on-surface-variant">{planError || "Pobieramy link do planu treningowego…"}</p> : null}
               <OwnerTextField
-                label="Link do folderu"
+                label="Link do planu treningowego"
                 disabled={!planReady || isSaving}
                 value={trainingPlanUrl}
                 onChange={setTrainingPlanUrl}

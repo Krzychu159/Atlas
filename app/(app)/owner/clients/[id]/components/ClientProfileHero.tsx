@@ -229,7 +229,7 @@ export default function ClientProfileHero({
                 </IconAction>
               ) : null}
               {onFiles ? (
-                <IconAction label="Pliki klienta" onClick={onFiles}>
+                <IconAction label="Plan treningowy" onClick={onFiles}>
                   <Files size={15} />
                 </IconAction>
               ) : null}

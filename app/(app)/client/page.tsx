@@ -208,7 +208,7 @@ export default function ClientDashboardPage() {
             onClick={openTrainingPlan}
             icon={<FileText size={16} />}
           >
-            Pliki
+            Plan treningowy
           </Button>
         </div>
       </section>
@@ -541,7 +541,7 @@ function MobileDashboard({
             icon={<FileText size={15} />}
             onClick={onOpenTrainingPlan}
           >
-            Pliki
+            Plan treningowy
           </Button>
         </div>
         <div className="mt-4 flex flex-col gap-3">
