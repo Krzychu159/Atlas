@@ -39,7 +39,6 @@ const methodOptions = [
   { value: "1", label: "Blik" },
   { value: "2", label: "Przelew" },
   { value: "3", label: "Gotówka" },
-  { value: "4", label: "Płatność online" },
 ];
 
 const CLIENT_PAYMENTS_PER_PAGE = 6;
