@@ -10,7 +10,7 @@ import GroupSessionDetails from "@/app/components/schedule/GroupSessionDetails";
 import BookingThresholdField from "@/app/components/schedule/BookingThresholdField";
 import { NativeDateInput } from "@/app/components/ui/native-date-input";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   Plus,
   RefreshCw,
@@ -599,11 +599,11 @@ export default function SessionEditorModal({
               label={isGroupForm ? "Opis zajęć" : "Notatka"}
               className="md:col-span-2"
             >
-              <textarea
+              <AutoGrowTextarea
                 value={values.note}
-                onChange={(event) => updateValue("note", event.target.value)}
+                onChange={(note) => updateValue("note", note)}
                 rows={4}
-                className="w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3 text-sm outline-none"
+                className="w-full resize-none overflow-hidden rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3 text-sm outline-none"
               />
             </Field>
               </fieldset>
@@ -815,6 +815,38 @@ function Field({
       </span>
       {children}
     </label>
+  );
+}
+
+function AutoGrowTextarea({
+  value,
+  onChange,
+  rows,
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  rows: number;
+  className?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    element.style.height = "auto";
+    element.style.height = `${element.scrollHeight}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      rows={rows}
+      className={className}
+    />
   );
 }
 
