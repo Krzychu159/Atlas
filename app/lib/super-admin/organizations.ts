@@ -10,7 +10,7 @@ export type Organization = {
   status?: "Draft" | "Active" | "LegacyActive";
   revision?: number;
   crmAccessEnabled?: boolean;
-  accessMode?: "SetupOnly" | "FullCrm" | "Unavailable";
+  accessMode?: "SetupOnly" | "CoreCrm" | "FullCrm" | "Unavailable";
 };
 
 export type OrganizationPage = {
@@ -45,7 +45,7 @@ export function parseOrganization(value: unknown): Organization {
   if (("status" in source && source.status !== "Draft" && source.status !== "Active" && source.status !== "LegacyActive") ||
       ("revision" in source && (!Number.isSafeInteger(source.revision) || (source.revision as number) < 0)) ||
       ("crmAccessEnabled" in source && typeof source.crmAccessEnabled !== "boolean") ||
-      ("accessMode" in source && !["SetupOnly", "FullCrm", "Unavailable"].includes(String(source.accessMode)))) {
+      ("accessMode" in source && !["SetupOnly", "CoreCrm", "FullCrm", "Unavailable"].includes(String(source.accessMode)))) {
     throw new Error("Nie udało się odczytać danych organizacji. Spróbuj ponownie później.");
   }
   return {
