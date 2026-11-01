@@ -238,6 +238,19 @@ export type TrainerPortalClientDetails = {
   locationName: string | null;
 };
 
+// The backend assigns the client to the signed-in trainer, so trainerId is never sent.
+export type CreateTrainerClientPayload = {
+  firstName: string;
+  lastName: string;
+  locationId: number;
+  email?: string | null;
+  phoneNumber?: string | null;
+  goal?: string | null;
+  notes?: string | null;
+  trainingStartDate?: string | null;
+  nextSessionAt?: string | null;
+};
+
 export type UpdateTrainerClientPayload = {
   trainerId?: number | null;
   firstName?: string | null;
@@ -338,6 +351,10 @@ export function getTrainerPortalClient(clientId: number, signal?: AbortSignal) {
   return backendGet<TrainerPortalClientDetails>(
     `trainer-portal/clients/${clientId}`, undefined, signal,
   );
+}
+
+export function createTrainerPortalClient(payload: CreateTrainerClientPayload) {
+  return backendPost<TrainerPortalClientDetails>("trainer-portal/clients", payload);
 }
 
 export function updateTrainerPortalClient(

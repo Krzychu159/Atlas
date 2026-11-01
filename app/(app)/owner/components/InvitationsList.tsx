@@ -17,11 +17,14 @@ export default function InvitationsList({
   isLoading,
   onCancel,
   onResend,
+  stackOnMobile = false,
 }: {
   invitations: Invitation[];
   isLoading: boolean;
   onCancel: (id: number) => Promise<void>;
   onResend?: (id: number) => Promise<void>;
+  /** Stacks the row on phones, so resending stays available there. */
+  stackOnMobile?: boolean;
 }) {
   return (
     <div className="mt-8">
@@ -48,7 +51,7 @@ export default function InvitationsList({
         {invitations.map((invitation) => (
           <div
             key={invitation.id}
-            className="rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-4 flex items-center justify-between gap-4"
+            className={["rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-4 flex justify-between gap-4", stackOnMobile ? "flex-col sm:flex-row sm:items-center" : "items-center"].join(" ")}
           >
             <div className="flex items-center gap-3 min-w-0">
               <Mail size={17} className="text-on-surface-muted shrink-0" />
@@ -67,7 +70,7 @@ export default function InvitationsList({
               {onResend ? (
                 <button
                   onClick={() => onResend(invitation.id)}
-                  className="hidden sm:flex h-9 px-3 rounded-full bg-surface-container-high text-primary-light text-[11px] font-semibold uppercase tracking-[0.05em] items-center gap-2"
+                  className={[stackOnMobile ? "flex" : "hidden sm:flex", "h-9 px-3 rounded-full bg-surface-container-high text-primary-light text-[11px] font-semibold uppercase tracking-[0.05em] items-center gap-2"].join(" ")}
                 >
                   <RotateCcw size={13} />
                   Ponów

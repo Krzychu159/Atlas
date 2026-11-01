@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { SearchX, UsersRound } from "lucide-react";
+import { SearchX, UserPlus, UsersRound } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { ListSection } from "@/app/components/ui/list/ListSection";
 import { ListState } from "@/app/components/ui/list/ListState";
@@ -15,6 +15,7 @@ import type { ClientListItem } from "@/app/lib/owner/clients";
 import { isForbiddenError } from "@/app/lib/backend";
 import { getTrainerClientsPage, type TrainerClientsQuery } from "@/app/lib/trainer/optimized";
 import { trainerPortalClientsToListItems } from "@/app/lib/trainer/portal-mappers";
+import AddTrainerClientModal from "./components/AddTrainerClientModal";
 import TrainerClientFilters, {
   defaultTrainerClientFilters,
   type TrainerClientFiltersValue,
@@ -67,6 +68,7 @@ function TrainerClientsContent() {
   const [loadedKey, setLoadedKey] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [isAddOpen, setIsAddOpen] = useState(false);
   const queryKey = JSON.stringify([search.trim(), packageFilter, sort, page, attempt]);
   const isLoading = loadedKey !== queryKey;
   const hasFilters = Boolean(search.trim()) || packageFilter !== defaultTrainerClientFilters.packageFilter;
@@ -118,6 +120,12 @@ function TrainerClientsContent() {
     setPage(1);
   }
 
+  // Shows the newest clients first, so the new one is visible regardless of earlier filters.
+  function handleClientCreated() {
+    changeFilters({ ...defaultTrainerClientFilters, sort: "newest" });
+    setAttempt((value) => value + 1);
+  }
+
   function renderList() {
     if (isLoading) {
       return <ListState variant="loading" label="Ładowanie klientów..." />;
@@ -145,7 +153,12 @@ function TrainerClientsContent() {
           variant="empty"
           icon={<UsersRound size={28} />}
           title="Nie masz jeszcze przypisanych klientów"
-          message="Klienci przypisani do Ciebie przez studio pojawią się tutaj."
+          message="Dodaj pierwszego klienta. Klienci przypisani do Ciebie przez studio też pojawią się tutaj."
+          action={
+            <Button size="sm" icon={<UserPlus size={15} />} onClick={() => setIsAddOpen(true)}>
+              Dodaj klienta
+            </Button>
+          }
         />
       );
     }
@@ -197,19 +210,24 @@ function TrainerClientsContent() {
           </p>
         </div>
 
-        <div className="flex gap-3">
-          <div className="flex flex-1 items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3 sm:flex-none">
-            <p className="text-2xl font-semibold leading-none">
-              {countsReady ? totalCount : "–"}
-            </p>
-            <p className="text-sm text-on-surface-variant">{hasFilters ? "znalezionych" : "łącznie"}</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+          <div className="flex gap-3">
+            <div className="flex flex-1 items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3 sm:flex-none">
+              <p className="text-2xl font-semibold leading-none">
+                {countsReady ? totalCount : "–"}
+              </p>
+              <p className="text-sm text-on-surface-variant">{hasFilters ? "znalezionych" : "łącznie"}</p>
+            </div>
+            <div className="flex flex-1 items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3 sm:flex-none">
+              <p className="text-2xl font-semibold leading-none text-tertiary-light">
+                {activeClientsCount ?? "–"}
+              </p>
+              <p className="text-sm text-on-surface-variant">z aktywnym pakietem</p>
+            </div>
           </div>
-          <div className="flex flex-1 items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container px-4 py-3 sm:flex-none">
-            <p className="text-2xl font-semibold leading-none text-tertiary-light">
-              {activeClientsCount ?? "–"}
-            </p>
-            <p className="text-sm text-on-surface-variant">z aktywnym pakietem</p>
-          </div>
+          <Button icon={<UserPlus size={16} />} onClick={() => setIsAddOpen(true)}>
+            Dodaj klienta
+          </Button>
         </div>
       </div>
 
@@ -226,6 +244,8 @@ function TrainerClientsContent() {
           <PaymentPagination page={page} pageSize={PAGE_SIZE} totalItems={totalCount} totalPages={totalPages} onPageChange={setPage} itemLabel="klientów" ariaLabel="Strony klientów" />
         ) : null}
       </ListSection>
+
+      {isAddOpen ? <AddTrainerClientModal onClose={() => setIsAddOpen(false)} onCreated={handleClientCreated} /> : null}
     </div>
   );
 }

@@ -33,6 +33,8 @@ import {
 } from "@/app/lib/trainer/portal";
 import { safeExternalUrl } from "@/app/lib/safe-url";
 import { trainerPortalClientToClient } from "@/app/lib/trainer/portal-mappers";
+import { canInviteClient } from "@/app/lib/trainer/invitations";
+import TrainerInviteClientModal from "../components/TrainerInviteClientModal";
 
 export default function TrainerClientDetailsPage() {
   const loadRevision = useRef(0);
@@ -57,6 +59,7 @@ export default function TrainerClientDetailsPage() {
   const [billingError, setBillingError] = useState<string | null>(null);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
 
   async function loadClientDetails() {
     const revision = ++loadRevision.current;
@@ -203,6 +206,7 @@ export default function TrainerClientDetailsPage() {
             paymentsHref={`/trainer/clients/${client.id}/payments`}
             onEdit={() => void handleOpenEdit()}
             onFiles={handleOpenTrainingPlan}
+            onPortalAction={canInviteClient(client.portalAccessStatus) ? () => setIsInviteOpen(true) : undefined}
           />
 
           {sectionLoading.billing ? <p role="status" className="card-shell p-4 text-sm text-on-surface-variant">Ładowanie pakietów i rozliczeń...</p> : null}
@@ -266,6 +270,14 @@ export default function TrainerClientDetailsPage() {
             }
             onTrainingPlanSaved={setTrainingPlan}
           />
+
+          {isInviteOpen ? (
+            <TrainerInviteClientModal
+              client={client}
+              onClose={() => setIsInviteOpen(false)}
+              onChanged={() => { setIsInviteOpen(false); void loadClientDetails(); }}
+            />
+          ) : null}
         </>
       ) : null}
     </div>
