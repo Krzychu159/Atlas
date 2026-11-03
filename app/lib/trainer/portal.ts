@@ -8,7 +8,7 @@ import type {
   SubscriptionUsage,
   UpdateClientTrainingPlanPayload,
 } from "../owner/clients";
-import type { ClientBillingSummary, ClientPayment, CreateClientPaymentPayload, UpdatePaymentDatePayload } from "../owner/billing";
+import type { ClientBillingSummary, ClientPayment, CreateClientPackagePayload, CreateClientPaymentPayload, UpdatePaymentDatePayload } from "../owner/billing";
 import type { OutlookSessionColors } from "../calendar/outlook-colors";
 import type { completeSession } from "../owner/sessions";
 
@@ -454,6 +454,14 @@ export function updateTrainerPortalMe(
   payload: UpdateTrainerPortalProfilePayload,
 ) {
   return backendPatch<TrainerPortalMe>("trainer-portal/me", payload);
+}
+
+export function createTrainerPortalClientPackage(clientId: number, payload: CreateClientPackagePayload) {
+  return backendPost<{ id: number } | void>(`trainer-portal/clients/${clientId}/packages`, payload);
+}
+
+export function activateTrainerPortalClientPackage(clientId: number, clientPackageId: number) {
+  return backendPost<void>(`trainer-portal/clients/${clientId}/packages/${clientPackageId}/activate`);
 }
 
 export function getTrainerPortalClientSubscription(clientId: number, signal?: AbortSignal) {

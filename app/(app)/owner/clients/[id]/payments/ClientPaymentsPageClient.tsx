@@ -68,8 +68,10 @@ import {
   showOwnerSuccess,
 } from "@/app/(app)/owner/components/owner-toast";
 import {
+  activateTrainerPortalClientPackage,
   cancelTrainerPortalClientSubscription,
   confirmTrainerPortalPayment,
+  createTrainerPortalClientPackage,
   createTrainerPortalClientPayment,
   getTrainerPortalClient,
   getTrainerPortalClientBilling,
@@ -346,7 +348,7 @@ export default function ClientPaymentsPageClient({
   }
 
   async function handleAssignPackage() {
-    if (!clientId || !selectedPackageId || basePath !== "/owner" || mutationLock.current || isLoading) return;
+    if (!clientId || !selectedPackageId || mutationLock.current || isLoading || (basePath === "/trainer" && catalogError)) return;
 
     const selectedPackage = packages.find(
       (item) => item.id === Number(selectedPackageId),
@@ -370,7 +372,7 @@ export default function ClientPaymentsPageClient({
 
       validUntil.setDate(validUntil.getDate() + selectedPackage.durationDays);
 
-      await createClientPackage({
+      const packagePayload = {
         clientId,
         packageId: selectedPackage.id,
         name: selectedPackage.name,
@@ -380,9 +382,13 @@ export default function ClientPaymentsPageClient({
         purchaseDate: purchaseDate.toISOString(),
         validUntil: validUntil.toISOString(),
         paymentDueDate: null,
-      });
+      };
+      if (basePath === "/trainer") await createTrainerPortalClientPackage(clientId, packagePayload);
+      else await createClientPackage(packagePayload);
 
-      const refreshedBilling = await getClientBilling(clientId);
+      const refreshedBilling = basePath === "/trainer"
+        ? await getTrainerPortalClientBilling(clientId)
+        : await getClientBilling(clientId);
       const createdPackage = (refreshedBilling.packages || [])
         .filter(
           (item) =>
@@ -392,7 +398,8 @@ export default function ClientPaymentsPageClient({
         .sort((first, second) => second.clientPackageId - first.clientPackageId)[0];
 
       if (createdPackage && !createdPackage.isActive) {
-        await activateClientPackage(clientId, createdPackage.clientPackageId);
+        if (basePath === "/trainer") await activateTrainerPortalClientPackage(clientId, createdPackage.clientPackageId);
+        else await activateClientPackage(clientId, createdPackage.clientPackageId);
       }
 
       await loadClientPayments(clientId);
@@ -400,7 +407,7 @@ export default function ClientPaymentsPageClient({
         id: "owner-client-package-set",
       });
     } catch (err) {
-      showOwnerError(err, "Nie udało się ustawić pakietu klienta.", {
+      showOwnerError(basePath === "/trainer" ? new Error(trainerPaymentError(err, "Nie udało się ustawić pakietu klienta.")) : err, "Nie udało się ustawić pakietu klienta.", {
         id: "owner-client-package-error",
       });
     } finally {
@@ -823,7 +830,7 @@ export default function ClientPaymentsPageClient({
             packageOptions={packageOptions}
             nextPackageOptions={nextPackageOptions}
             clientLocationName={client?.locationName || "lokalizacji klienta"}
-            canAssignPackage={basePath === "/owner"}
+            canAssignPackage={basePath === "/owner" || !catalogError}
             canSetNextPackage={basePath === "/owner" || !catalogError}
             isSaving={isSaving || processingPaymentId !== null}
             onPackageChange={setSelectedPackageId}
@@ -886,7 +893,7 @@ export default function ClientPaymentsPageClient({
 
           {clientId ? (
             <CollapsibleSection title="Usługi okresowe" icon={<CalendarRange size={15} />}>
-              <ClientPeriodPackagesSection key={`period:${basePath}:${clientId}`} embedded clientId={clientId} portal={basePath === "/trainer" ? "trainer" : "owner"} packages={billing.packages} canManage={basePath === "/owner" && !client?.isArchived} onSaved={() => loadClientPayments(clientId, true)} onPayment={item => {
+              <ClientPeriodPackagesSection key={`period:${basePath}:${clientId}`} embedded clientId={clientId} portal={basePath === "/trainer" ? "trainer" : "owner"} packages={billing.packages} canManage={!client?.isArchived} onSaved={() => loadClientPayments(clientId, true)} onPayment={item => {
                 if (mutationLock.current || isSaving || processingPaymentId !== null) return;
                 setPaymentPackageId(String(item.clientPackageId)); setPaymentAmount(String(Math.max(item.amountDue, 0))); setPaymentDate(localToday()); setPaymentNote(""); setIsPaymentModalOpen(true);
               }} />
@@ -1072,7 +1079,7 @@ function SubscriptionPanel({
     return (
       <section className="card-shell p-4 md:p-5">
         <PanelTitle icon={<PackagePlus size={15} />} title={canAssignPackage ? "Ustaw pakiet klienta" : "Brak aktywnego pakietu"}>
-          {canAssignPackage ? `Pakiety dostępne w lokalizacji ${clientLocationName}.` : "Klient nie ma obecnie aktywnego pakietu indywidualnego. Pakiet może ustawić właściciel studia."}
+          {canAssignPackage ? `Pakiety dostępne w lokalizacji ${clientLocationName}.` : "Klient nie ma obecnie aktywnego pakietu indywidualnego."}
         </PanelTitle>
 
         {canAssignPackage ? (

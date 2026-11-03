@@ -11,6 +11,8 @@ import { createClientPackage, getClientPeriodPackages, getPackageClosureLabel, g
 import { canChangePeriodRenewal, calendarDateIsValid, formatPeriodAmount, isPeriodPackage, periodPackageError, periodRangeLabel, periodStatusLabel, warsawCalendarDate } from "@/app/lib/period-packages";
 import { dateInputToIsoDateTime } from "@/app/lib/formatters/date";
 import { useClientPaymentRevision } from "@/app/lib/session-corrections";
+import { getTrainerPackages } from "@/app/lib/trainer/packages";
+import { createTrainerPortalClientPackage } from "@/app/lib/trainer/portal";
 import PackageManagementModal from "./PackageManagementModal";
 
 export default function ClientPeriodPackagesSection({ clientId, canManage = false, packages, onSaved, onPayment, portal = "owner", embedded = false }: {
@@ -38,6 +40,7 @@ export default function ClientPeriodPackagesSection({ clientId, canManage = fals
   const [renewal, setRenewal] = useState<{ item: ClientPackageBilling; enabled: boolean } | null>(null);
   const lock = useRef(false);
   const paymentRevision = useClientPaymentRevision(clientId);
+  const canAssign = canManage && portal !== "client";
 
   const load = useCallback(async (signal?: AbortSignal) => {
     if (portal !== "owner") return;
@@ -62,19 +65,21 @@ export default function ClientPeriodPackagesSection({ clientId, canManage = fals
   }, [load, revision, paymentRevision]);
 
   useEffect(() => {
-    if (!assignOpen || !canManage || portal !== "owner") return;
+    if (!assignOpen || !canAssign) return;
     const controller = new AbortController();
     void Promise.resolve().then(async () => {
       if (controller.signal.aborted) return;
       setOffersLoading(true); setOffersError(""); setOffers([]);
       try {
-        const result = await getPackages({ isActive: true }, controller.signal);
+        const result: Package[] = portal === "trainer"
+          ? await getTrainerPackages(controller.signal, { isActive: true })
+          : await getPackages({ isActive: true }, controller.signal);
         if (!controller.signal.aborted) setOffers(result.filter(item => item.isActive && isPeriodPackage(item)));
       } catch (err) { if (!controller.signal.aborted) setOffersError(periodPackageError(err)); }
       finally { if (!controller.signal.aborted) setOffersLoading(false); }
     });
     return () => controller.abort();
-  }, [assignOpen, canManage, portal, revision]);
+  }, [assignOpen, canAssign, portal, revision]);
 
   async function refreshAfterSave() {
     setRevision(value => value + 1);
@@ -82,7 +87,7 @@ export default function ClientPeriodPackagesSection({ clientId, canManage = fals
   }
 
   async function assign() {
-    if (lock.current || !canManage || portal !== "owner") return;
+    if (lock.current || !canAssign) return;
     const offer = offers.find(item => item.id === Number(offerId));
     if (!offer || !offer.isActive || !isPeriodPackage(offer)) { setError("Wybierz dostępną ofertę usługi okresowej."); return; }
     if (!calendarDateIsValid(startsOn)) { setError("Wybierz poprawną datę rozpoczęcia."); return; }
@@ -90,7 +95,9 @@ export default function ClientPeriodPackagesSection({ clientId, canManage = fals
     lock.current = true; setBusy(true); setError(""); setNotice("");
     let committed = false;
     try {
-      await createClientPackage({ clientId, packageId: offer.id, startsOn, autoRenew, ...(dueDate ? { paymentDueDate: dateInputToIsoDateTime(dueDate)! } : {}) });
+      const payload = { clientId, packageId: offer.id, startsOn, autoRenew, ...(dueDate ? { paymentDueDate: dateInputToIsoDateTime(dueDate)! } : {}) };
+      if (portal === "trainer") await createTrainerPortalClientPackage(clientId, payload);
+      else await createClientPackage(payload);
       committed = true; setAssignOpen(false); setPage(1);
       setNotice("Usługa została przypisana klientowi. Sprawdź jej okres i rozliczenie poniżej.");
       await refreshAfterSave();
@@ -131,7 +138,7 @@ export default function ClientPeriodPackagesSection({ clientId, canManage = fals
   const catchUp = renewal?.enabled && renewalStart && today && renewalStart < today;
 
   return <section className={embedded ? "min-w-0" : "card-shell min-w-0 p-5 md:p-6"} aria-label="Usługi okresowe">
-    <div className={`flex flex-wrap items-center gap-3 ${embedded ? "justify-end" : "justify-between"}`}>{embedded ? null : <h2 className="text-section-title">Usługi okresowe</h2>}<div className="flex flex-wrap gap-2">{portal === "owner" ? <Button type="button" size="sm" variant="secondary" disabled={busy || loading} onClick={() => setRevision(value => value + 1)}>Odśwież</Button> : null}{canManage && portal === "owner" ? <Button type="button" size="sm" disabled={busy} onClick={() => { setOfferId(""); setStartsOn(warsawCalendarDate(new Date()) || ""); setAutoRenew(false); setDueDate(""); setError(""); setAssignOpen(true); }}>Przypisz usługę</Button> : null}</div></div>
+    <div className={`flex flex-wrap items-center gap-3 ${embedded ? "justify-end" : "justify-between"}`}>{embedded ? null : <h2 className="text-section-title">Usługi okresowe</h2>}<div className="flex flex-wrap gap-2">{portal === "owner" ? <Button type="button" size="sm" variant="secondary" disabled={busy || loading} onClick={() => setRevision(value => value + 1)}>Odśwież</Button> : null}{canAssign ? <Button type="button" size="sm" disabled={busy} onClick={() => { setOfferId(""); setStartsOn(warsawCalendarDate(new Date()) || ""); setAutoRenew(false); setDueDate(""); setError(""); setAssignOpen(true); }}>Przypisz usługę</Button> : null}</div></div>
     {error ? <p role="alert" className="mt-4 text-sm text-error-light">{error}</p> : null}
     {loadError ? <p role="alert" className="mt-4 text-sm text-error-light">{loadError}</p> : null}
     {notice ? <p role="status" className="mt-4 text-sm text-tertiary-light">{notice}</p> : null}
