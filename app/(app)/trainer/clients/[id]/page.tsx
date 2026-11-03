@@ -3,8 +3,9 @@
 import { useSessionCorrectionRevision, usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
-import { CalendarRange, Dumbbell, NotebookPen, Package } from "lucide-react";
+import { CalendarRange, Dumbbell, NotebookPen, Package, PackagePlus } from "lucide-react";
 import ClientPackagesSection, {
   getActivePackagesMeta,
   getClientGroupLocationNames,
@@ -17,6 +18,7 @@ import EditClientModal from "@/app/(app)/owner/clients/[id]/components/EditClien
 import { showOwnerError } from "@/app/(app)/owner/components/owner-toast";
 import CollapsibleSection from "@/app/components/ui/collapsible-section";
 import { Button } from "@/app/components/ui/button";
+import { profilePrimaryActionClassName } from "@/app/components/ui/profile-hero";
 import {
   type Client,
   type ClientTrainingPlan,
@@ -215,6 +217,19 @@ export default function TrainerClientDetailsPage() {
               <p className="text-sm text-on-surface-variant">{billingError}</p>
               <Button variant="secondary" onClick={() => void loadClientDetails()}>Spróbuj ponownie</Button>
             </div>
+          ) : null}
+
+          {billing && !billing.activeClientPackageId && !billing.packages?.some((item) => item.isActive) ? (
+            <section className="card-shell flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-on-surface">Klient nie ma aktywnego pakietu</h2>
+                <p className="text-xs text-on-surface-muted">Ustaw pakiet, aby zacząć pracę z tym klientem.</p>
+              </div>
+              <Link href={`/trainer/clients/${client.id}/payments`} className={profilePrimaryActionClassName}>
+                <PackagePlus size={15} />
+                Ustaw pakiet
+              </Link>
+            </section>
           ) : null}
 
           <div className="flex flex-col gap-2">
