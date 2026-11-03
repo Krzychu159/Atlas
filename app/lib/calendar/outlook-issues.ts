@@ -59,7 +59,8 @@ export function normalizeOutlookIssues(value: unknown): OutlookIssue[] {
       externalCalendarEventId,
       sessionId: readNumber(raw.sessionId),
       title: readText(raw.subject),
-      message: readText(raw.message),
+      // Kept verbatim: ignoring an issue only works with the exact text from the list.
+      message: typeof raw.message === "string" ? raw.message : null,
       startAt: readText(raw.startAt),
       locationName: readText(raw.locationName),
       calendarOwnerFullName: readText(raw.calendarOwnerFullName),
@@ -114,8 +115,13 @@ export async function getOutlookIssues(signal?: AbortSignal) {
   return normalizeOutlookIssues(await backendGet<unknown>("outlook/issues", undefined, signal));
 }
 
-export function ignoreOutlookIssue(externalCalendarEventId: number, message: string | null) {
+export function ignoreOutlookIssue({ externalCalendarEventId, message }: Pick<OutlookIssue, "externalCalendarEventId" | "message">) {
   return backendPost<unknown>("outlook/issues/ignore", { externalCalendarEventId, message });
+}
+
+// The backend answers 204 even when nothing matched, so only a fresh list confirms the result.
+export function isOutlookIssueListed(issues: OutlookIssue[], { externalCalendarEventId, message }: Pick<OutlookIssue, "externalCalendarEventId" | "message">) {
+  return issues.some(issue => issue.externalCalendarEventId === externalCalendarEventId && issue.message === message);
 }
 
 // The backend settles package entries for the converted session itself.

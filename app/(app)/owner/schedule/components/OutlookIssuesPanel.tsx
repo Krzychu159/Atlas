@@ -11,6 +11,7 @@ import {
   convertImportedEventToSession,
   getOutlookIssues,
   ignoreOutlookIssue,
+  isOutlookIssueListed,
   outlookIssueAction,
   outlookIssueCopy,
   splitOutlookIssues,
@@ -44,7 +45,6 @@ export default function OutlookIssuesPanel({ id, onOpenSession, onCountChange, e
   const revision = useSessionCorrectionRevision();
   const issues = useOwnerRead("outlook-issues", getOutlookIssues, "Nie udało się pobrać zmian z kalendarza do sprawdzenia.", revision);
   const [pending, setPending] = useState<PendingAction | null>(null);
-  const [ignoreNote, setIgnoreNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const lock = useRef(false);
@@ -57,7 +57,6 @@ export default function OutlookIssuesPanel({ id, onOpenSession, onCountChange, e
     if (busy) return;
     setPending(null);
     setActionError(null);
-    setIgnoreNote("");
   }
 
   async function confirmAction() {
@@ -70,11 +69,16 @@ export default function OutlookIssuesPanel({ id, onOpenSession, onCountChange, e
         await convertImportedEventToSession(pending.issue.externalCalendarEventId);
         showAppSuccess("Wydarzenie jest teraz sesją w grafiku, a wejścia zostały rozliczone.");
       } else {
-        await ignoreOutlookIssue(pending.issue.externalCalendarEventId, ignoreNote.trim() || null);
+        await ignoreOutlookIssue(pending.issue);
+        // A failed refresh is reported by the list itself; the ignore request has already succeeded.
+        const fresh = await issues.reload().catch(() => undefined);
+        if (fresh && isOutlookIssueListed(fresh, pending.issue)) {
+          setActionError("Nie udało się pominąć zgłoszenia. Spróbuj ponownie.");
+          return;
+        }
         showAppSuccess("Zgłoszenie zostało pominięte.");
       }
       setPending(null);
-      setIgnoreNote("");
       notifySessionCorrected();
     } catch (error) {
       setActionError(getErrorMessage(error, pending.kind === "convert" ? "Nie udało się zamienić wydarzenia na sesję. Spróbuj ponownie." : "Nie udało się pominąć zgłoszenia. Spróbuj ponownie."));
@@ -178,12 +182,7 @@ export default function OutlookIssuesPanel({ id, onOpenSession, onCountChange, e
           onConfirm={() => void confirmAction()}
           onClose={closeDialog}
         >
-          <label className="block text-sm text-on-surface-variant">
-            Notatka (opcjonalnie)
-            <textarea value={ignoreNote} maxLength={500} rows={2} disabled={busy} onChange={event => setIgnoreNote(event.target.value)}
-              placeholder="Np. wydarzenie prywatne, nie dotyczy treningu"
-              className="mt-2 w-full resize-none rounded-[var(--radius-lg)] bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/30" />
-          </label>
+          {pending.issue.title || pending.issue.startAt ? <p className="text-sm text-on-surface">{[pending.issue.title, formatIssueDate(pending.issue.startAt)].filter(Boolean).join(" · ")}</p> : null}
         </ConfirmDialog>
       ) : null}
     </section>

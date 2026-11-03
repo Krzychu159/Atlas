@@ -61,12 +61,31 @@ test("issues are split by requiresDecision and a missing flag still needs a deci
 
 test("ignoring and converting calendar issues send the documented requests", async () => {
   const { lib, calls } = issuesLib();
-  await lib.ignoreOutlookIssue(14, "Prywatne");
+  await lib.ignoreOutlookIssue({ externalCalendarEventId: 14, message: "Do weryfikacji w CRM" });
   await lib.convertImportedEventToSession(14);
   assert.deepEqual(plain(calls), [
-    ["post", "outlook/issues/ignore", { externalCalendarEventId: 14, message: "Prywatne" }],
+    ["post", "outlook/issues/ignore", { externalCalendarEventId: 14, message: "Do weryfikacji w CRM" }],
     ["post", "outlook/imported-events/14/convert-to-session", {}],
   ]);
+});
+
+test("ignoring sends the message exactly as the list returned it", async () => {
+  const { lib, calls } = issuesLib();
+  const message = "  Do weryfikacji w CRM: sesję usunięto w Outlooku. ";
+  const [issue] = lib.normalizeOutlookIssues([issueDto({ externalCalendarEventId: 14, message })]);
+  await lib.ignoreOutlookIssue(issue);
+  assert.deepEqual(plain(calls[0][2]), { externalCalendarEventId: 14, message });
+});
+
+test("only a fresh list with the same event and message means the issue is still open", () => {
+  const { lib } = issuesLib();
+  const ignored = { externalCalendarEventId: 14, message: "Usunięto: Anna" };
+  const fresh = lib.normalizeOutlookIssues([
+    issueDto({ externalCalendarEventId: 14, message: "Usunięto: Ola" }),
+    issueDto({ externalCalendarEventId: 15, message: "Usunięto: Anna" }),
+  ]);
+  assert.equal(lib.isOutlookIssueListed(fresh, ignored), false, "another issue of the same event stays independent");
+  assert.equal(lib.isOutlookIssueListed([...fresh, ...lib.normalizeOutlookIssues([issueDto({ externalCalendarEventId: 14, message: "Usunięto: Anna" })])], ignored), true);
 });
 
 test("a failed Microsoft connection shows the backend message and the Microsoft code", () => {
