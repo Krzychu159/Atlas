@@ -8,20 +8,29 @@ import { PaymentEntryModal } from "@/app/components/payments/PaymentEntryModal";
 import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { PaymentsList } from "@/app/components/payments/PaymentsList";
 import { Button } from "@/app/components/ui/button";
+import { RetryNotice } from "@/app/components/ui/retry-notice";
 import {
   showAppError,
   showAppInfo,
   showAppSuccess,
 } from "@/app/components/ui/app-toast";
 import { isNotFoundLikeError } from "@/app/lib/backend";
+import { formatCalendarDate } from "@/app/lib/formatters/date";
 import { formatMoney } from "@/app/lib/formatters/money";
 import { getPackagePaymentStatusLabel } from "@/app/lib/owner/billing";
+import {
+  canPayPackageOnline,
+  getClientAmountDue,
+  getClientBillingCurrency,
+  getUnpaidPackages,
+} from "@/app/lib/client/billing-summary";
 import ClientPackagesSection from "@/app/(app)/owner/clients/[id]/components/ClientPackagesSection";
 import ClientPeriodPackagesSection from "@/app/(app)/owner/clients/[id]/components/ClientPeriodPackagesSection";
 import {
   createClientPortalPayment,
   getClientPortalBilling,
   type ClientBillingSummary,
+  type ClientPackageBilling,
   type ClientPayment,
   type PaymentMethod,
 } from "@/app/lib/client/portal";
@@ -52,8 +61,9 @@ export default function ClientPaymentsPage() {
   const paymentDateRevision = usePaymentDateCorrectionRevision();
   const [billing, setBilling] = useState<ClientBillingSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isTpayLoading, setIsTpayLoading] = useState(false);
+  const [tpayPackageId, setTpayPackageId] = useState<number | null>(null);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("2");
   const [note, setNote] = useState("");
@@ -64,20 +74,9 @@ export default function ClientPaymentsPage() {
   async function loadBilling() {
     try {
       setIsLoading(true);
+      setLoadFailed(false);
       const data = await getClientPortalBilling();
       setBilling(data);
-      setSelectedPackageId((current) => {
-        if (current) return current;
-        return data.activeClientPackageId
-          ? String(data.activeClientPackageId)
-          : String(data.packages?.[0]?.clientPackageId || "");
-      });
-      setAmount((current) => {
-        if (current) return current;
-        return data.activePackageAmountDue > 0
-          ? String(data.activePackageAmountDue)
-          : "";
-      });
     } catch (err) {
       if (isNotFoundLikeError(err)) {
         setBilling(null);
@@ -86,6 +85,7 @@ export default function ClientPaymentsPage() {
         return;
       }
 
+      setLoadFailed(true);
       showAppError(err, "Nie udało się pobrać płatności.", {
         id: "client-payments-load-error",
       });
@@ -117,6 +117,55 @@ export default function ClientPaymentsPage() {
     currency: item.currency,
   }));
   const numericAmount = Number(amount.replace(",", "."));
+  const amountDue = getClientAmountDue(billing);
+  const currency = getClientBillingCurrency(billing) || "PLN";
+  const hasBillingData = Boolean(billing);
+  const isBillingPending = !hasBillingData && (isLoading || loadFailed);
+  const paymentActions = (
+    <PaymentActions
+      billing={billing}
+      isLoading={isLoading}
+      loadFailed={loadFailed}
+      isSubmitting={isSubmitting}
+      tpayPackageId={tpayPackageId}
+      onPayOnline={handleTpayCheckout}
+      onReport={openPaymentModal}
+      onRetry={() => void loadBilling()}
+    />
+  );
+
+  function dueAmountValue(item?: ClientPackageBilling) {
+    return item && item.amountDue > 0 ? String(item.amountDue) : "";
+  }
+
+  function openPaymentModal(item?: ClientPackageBilling) {
+    if (isSubmitting) return;
+    const target =
+      item ||
+      packages.find(
+        (candidate) =>
+          candidate.clientPackageId === billing?.activeClientPackageId,
+      ) ||
+      packages[0];
+
+    if (String(target?.clientPackageId ?? "") !== selectedPackageId) setNote("");
+    setSelectedPackageId(String(target?.clientPackageId ?? ""));
+    setAmount(dueAmountValue(target));
+    setIsPaymentModalOpen(true);
+  }
+
+  function handlePackageChange(value: string) {
+    const findPackage = (id: string) =>
+      packages.find((item) => String(item.clientPackageId) === id);
+    const previousDue = dueAmountValue(findPackage(selectedPackageId));
+
+    // An amount typed by the client is kept; only the prefilled one follows the package.
+    if (!amount.trim() || amount === previousDue) {
+      setAmount(dueAmountValue(findPackage(value)));
+    }
+    setSelectedPackageId(value);
+    setCheckoutTerms(null);
+  }
 
   async function handleSubmit() {
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
@@ -154,30 +203,9 @@ export default function ClientPaymentsPage() {
     }
   }
 
-  async function handleTpayCheckout(selectedPackageId: string) {
-    const clientPackageId = Number(selectedPackageId);
-
-    if (!Number.isInteger(clientPackageId) || clientPackageId <= 0) {
-      showAppError(
-        new Error("Wybierz pakiet do opłacenia."),
-        "Wybierz pakiet do opłacenia.",
-        { id: "client-payment-tpay-no-package" },
-      );
-      return;
-    }
-
-    const selectedPackage = packages.find(
-      (clientPackage) => clientPackage.clientPackageId === clientPackageId,
-    );
-
-    if (!selectedPackage) {
-      showAppError(
-        new Error("Nie znaleziono wybranego pakietu klienta."),
-        "Nie znaleziono wybranego pakietu klienta.",
-        { id: "client-payment-tpay-package-not-found" },
-      );
-      return;
-    }
+  async function handleTpayCheckout(selectedPackage: ClientPackageBilling) {
+    if (tpayPackageId !== null) return;
+    const clientPackageId = selectedPackage.clientPackageId;
 
     if (selectedPackage.locationId === null) {
       showAppError(
@@ -191,7 +219,7 @@ export default function ClientPaymentsPage() {
     }
 
     try {
-      setIsTpayLoading(true);
+      setTpayPackageId(clientPackageId);
 
       const legalRequirements = await getLegalRequirements(
         selectedPackage.locationId,
@@ -268,7 +296,7 @@ export default function ClientPaymentsPage() {
         },
       );
     } finally {
-      setIsTpayLoading(false);
+      setTpayPackageId(null);
     }
   }
 
@@ -276,12 +304,8 @@ export default function ClientPaymentsPage() {
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
       <MobilePayments
         billing={billing}
-        packagesLength={packages.length}
         isLoading={isLoading}
-        isSubmitting={isSubmitting}
-        isTpayLoading={isTpayLoading}
-        onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
-        onTpayCheckout={() => handleTpayCheckout(selectedPackageId)}
+        actions={paymentActions}
       />
 
       <div className="hidden flex-col gap-5 md:flex">
@@ -300,31 +324,30 @@ export default function ClientPaymentsPage() {
           <SummaryCard
             icon={<CreditCard size={20} />}
             label="Łącznie do zapłaty"
-            value={typeof billing?.totalAmountDue === "number" ? formatMoney(billing.totalAmountDue, getCurrency(billing)) : "Niedostępne"}
+            value={formatAmountDue(billing)}
             note="Wszystkie pakiety"
             loading={isLoading}
             accent={
-              (billing?.totalAmountDue ?? 0) > 0 ? "warning" : "success"
+              amountDue === null ? "primary" : amountDue > 0 ? "warning" : "success"
             }
           />
           <SummaryCard
             icon={<Dumbbell size={20} />}
             label="Bieżący pakiet indywidualny"
-            value={billing?.activeClientPackageId ? billing.activePackageName || "Brak nazwy" : "Brak pakietu"}
-            note={getPackagePaymentStatusLabel(billing?.activePackagePaymentStatus)}
+            value={!billing ? "Niedostępne" : billing.activeClientPackageId ? billing.activePackageName || "Brak nazwy" : "Brak pakietu"}
+            note={billing ? getPackagePaymentStatusLabel(billing.activePackagePaymentStatus) : ""}
             loading={isLoading}
           />
           <SummaryCard
             icon={<Wallet size={20} />}
             label="Saldo do wykorzystania"
-            value={formatMoney(
-              billing?.currentBalance ?? 0,
-              getCurrency(billing),
-            )}
+            value={billing ? formatMoney(billing.currentBalance, currency) : "Niedostępne"}
             note={
-              (billing?.currentBalance ?? 0) > 0
-                ? "Zostanie odjęte od kolejnego pakietu"
-                : "Brak nadpłaty"
+              !billing
+                ? ""
+                : billing.currentBalance > 0
+                  ? "Zostanie odjęte od kolejnego pakietu"
+                  : "Brak nadpłaty"
             }
             loading={isLoading}
             accent={(billing?.currentBalance ?? 0) > 0 ? "success" : "primary"}
@@ -332,59 +355,13 @@ export default function ClientPaymentsPage() {
           <SummaryCard
             icon={<CalendarDays size={20} />}
             label="Zapłacono"
-            value={formatMoney(
-              billing?.activePackageAmountPaid ?? 0,
-              getCurrency(billing),
-            )}
-            note={`Cena pakietu: ${formatMoney(
-              billing?.activePackageTotalPrice ?? 0,
-              getCurrency(billing),
-            )}`}
+            value={billing ? formatMoney(billing.activePackageAmountPaid, currency) : "Niedostępne"}
+            note={billing ? `Cena pakietu: ${formatMoney(billing.activePackageTotalPrice, currency)}` : ""}
             loading={isLoading}
           />
         </section>
 
-        <section className="grid gap-4">
-          <div className="card-shell flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between md:p-6">
-            <div>
-              <p className="text-label text-on-surface-muted">Nowa wpłata</p>
-              <h2 className="mt-3 font-display text-[1.85rem] font-semibold leading-none">
-                Zgłoś płatność
-              </h2>
-              <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
-                Wybierz pakiet, wpisz kwotę i metodę. Wpłata trafi do
-                potwierdzenia w studiu.
-              </p>
-              {!packages.length && !isLoading ? (
-                <p className="mt-3 text-sm font-semibold text-warning-light">
-                  Nie masz aktywnego pakietu do opłacenia.
-                </p>
-              ) : null}
-            </div>
-
-            <div className="flex flex-col gap-3 md:flex-row">
-              <Button
-                variant="outline"
-                size="lg"
-                disabled={isSubmitting || !packages.length}
-                onClick={() => setIsPaymentModalOpen(true)}
-                className="w-full md:w-auto"
-              >
-                Zgłoś wpłatę
-              </Button>
-              <Button
-                size="lg"
-                disabled={isTpayLoading || !packages.length}
-                onClick={() => handleTpayCheckout(selectedPackageId)}
-                className="w-full md:w-auto"
-              >
-                {isTpayLoading
-                  ? "Przygotowywanie płatności..."
-                  : "Zapłać wygodnie online"}
-              </Button>
-            </div>
-          </div>
-        </section>
+        {paymentActions}
       </div>
 
       {checkoutTerms && !checkoutTerms.requirements.isAccepted ? (
@@ -411,12 +388,9 @@ export default function ClientPaymentsPage() {
         </section>
       ) : null}
 
-      <ClientPackagesSection audience="client" packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} />
-      {billing && !isLoading ? <ClientPeriodPackagesSection clientId={billing.clientId} portal="client" packages={billing.packages} onPayment={item => {
-        if (isSubmitting) return;
-        setSelectedPackageId(String(item.clientPackageId)); setAmount(String(Math.max(item.amountDue, 0))); setNote(""); setIsPaymentModalOpen(true);
-      }} /> : null}
-      <ClientPaymentHistory payments={payments} isLoading={isLoading} />
+      {isBillingPending ? null : <ClientPackagesSection audience="client" packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} />}
+      {billing && !isLoading ? <ClientPeriodPackagesSection clientId={billing.clientId} portal="client" packages={billing.packages} onPayment={openPaymentModal} /> : null}
+      {!hasBillingData && loadFailed ? null : <ClientPaymentHistory payments={payments} isLoading={isLoading} />}
 
       <PaymentEntryModal
         open={isPaymentModalOpen}
@@ -434,10 +408,7 @@ export default function ClientPaymentsPage() {
         submittingLabel="Zgłaszanie..."
         emptyPackagesMessage="Nie masz aktywnego pakietu do opłacenia. Skontaktuj się z trenerem lub obsługą studia."
         onAmountChange={setAmount}
-        onPackageChange={(value) => {
-          setSelectedPackageId(value);
-          setCheckoutTerms(null);
-        }}
+        onPackageChange={handlePackageChange}
         onMethodChange={setMethod}
         onNoteChange={setNote}
         onClose={() => setIsPaymentModalOpen(false)}
@@ -447,25 +418,150 @@ export default function ClientPaymentsPage() {
   );
 }
 
-function MobilePayments({
+function PaymentActions({
   billing,
-  packagesLength,
   isLoading,
+  loadFailed,
   isSubmitting,
-  isTpayLoading,
-  onOpenPaymentModal,
-  onTpayCheckout,
+  tpayPackageId,
+  onPayOnline,
+  onReport,
+  onRetry,
 }: {
   billing: ClientBillingSummary | null;
-  packagesLength: number;
   isLoading: boolean;
+  loadFailed: boolean;
   isSubmitting: boolean;
-  isTpayLoading: boolean;
-  onOpenPaymentModal: () => void;
-  onTpayCheckout: () => void;
+  tpayPackageId: number | null;
+  onPayOnline: (item: ClientPackageBilling) => void;
+  onReport: (item?: ClientPackageBilling) => void;
+  onRetry: () => void;
 }) {
-  const currency = getCurrency(billing);
-  const due = billing?.activePackageAmountDue ?? 0;
+  if (!billing && isLoading) {
+    return <div className="card-shell h-40 animate-pulse" />;
+  }
+
+  if (!billing && loadFailed) {
+    return (
+      <RetryNotice
+        text="Nie udało się pobrać płatności, dlatego nie możemy pokazać kwot do zapłaty."
+        onRetry={onRetry}
+      />
+    );
+  }
+
+  const packagesCount = billing?.packages?.length ?? 0;
+  const unpaidPackages = getUnpaidPackages(billing);
+  const amountDue = getClientAmountDue(billing);
+
+  if (unpaidPackages.length) {
+    return (
+      <section className="card-shell p-5 md:p-6">
+        <p className="text-label text-warning-light">Do opłacenia</p>
+        <h2 className="mt-2 font-display text-[1.55rem] font-semibold leading-none md:text-[1.85rem]">
+          {unpaidPackages.length === 1 ? "Opłać pakiet" : "Opłać pakiety"}
+        </h2>
+
+        <div className="mt-5 flex flex-col gap-3">
+          {unpaidPackages.map((item) => (
+            <div
+              key={item.clientPackageId}
+              className="flex min-w-0 flex-col gap-4 rounded-[var(--radius-lg)] bg-surface-container-lowest p-4 lg:flex-row lg:items-center lg:justify-between"
+            >
+              <div className="min-w-0">
+                <p className="break-words text-sm font-semibold">
+                  {item.packageName || "Pakiet"}
+                </p>
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  Do zapłaty: {formatMoney(item.amountDue, item.currency)}
+                  {item.paymentDueDate
+                    ? ` · Termin: ${formatCalendarDate(item.paymentDueDate)}`
+                    : ""}
+                </p>
+              </div>
+
+              <div className="flex shrink-0 flex-col-reverse gap-2 sm:flex-row">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  disabled={isSubmitting}
+                  onClick={() => onReport(item)}
+                  className="w-full sm:w-auto"
+                >
+                  Zgłoś wpłatę
+                </Button>
+                {canPayPackageOnline(item) ? (
+                  <Button
+                    size="lg"
+                    disabled={tpayPackageId !== null}
+                    onClick={() => onPayOnline(item)}
+                    className="w-full sm:w-auto"
+                  >
+                    {tpayPackageId === item.clientPackageId
+                      ? "Przygotowywanie płatności..."
+                      : `Zapłać ${formatMoney(item.amountDue, item.currency)}`}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-4 text-sm leading-6 text-on-surface-variant">
+          Płatność przelewem lub gotówką zgłoś jako wpłatę. Studio potwierdzi ją
+          po sprawdzeniu.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="card-shell flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between md:p-6">
+      <div>
+        <h2 className="font-display text-[1.55rem] font-semibold leading-none md:text-[1.85rem]">
+          {!packagesCount
+            ? "Brak pakietu do opłacenia"
+            : amountDue === null
+              ? "Płatności"
+              : amountDue > 0
+                ? "Masz należność do wyjaśnienia"
+                : "Wszystko opłacone"}
+        </h2>
+        <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
+          {!packagesCount
+            ? "Skontaktuj się z trenerem lub obsługą studia, żeby przypisać pakiet."
+            : amountDue !== null && amountDue > 0
+              ? "Skontaktuj się ze studiem, żeby sprawdzić tę kwotę."
+              : "Jeśli zapłata została wykonana poza aplikacją, możesz ją zgłosić do potwierdzenia."}
+        </p>
+      </div>
+
+      {packagesCount ? (
+        <Button
+          variant="outline"
+          size="lg"
+          disabled={isSubmitting}
+          onClick={() => onReport()}
+          className="w-full shrink-0 md:w-auto"
+        >
+          Zgłoś wpłatę
+        </Button>
+      ) : null}
+    </section>
+  );
+}
+
+function MobilePayments({
+  billing,
+  isLoading,
+  actions,
+}: {
+  billing: ClientBillingSummary | null;
+  isLoading: boolean;
+  actions: React.ReactNode;
+}) {
+  const currency = getClientBillingCurrency(billing) || "PLN";
+  const due = getClientAmountDue(billing);
 
   return (
     <div className="flex flex-col gap-4 md:hidden">
@@ -488,15 +584,19 @@ function MobilePayments({
             ) : (
               <p
                 className={[
-                  "mt-4 text-[2.25rem] font-semibold leading-none",
-                  due > 0 ? "text-warning-light" : "text-tertiary-light",
+                  "mt-4 font-semibold leading-none",
+                  due === null
+                    ? "text-[1.55rem] text-on-surface-variant"
+                    : due > 0
+                      ? "text-[2.25rem] text-warning-light"
+                      : "text-[2.25rem] text-tertiary-light",
                 ].join(" ")}
               >
-                {formatMoney(due, currency)}
+                {formatAmountDue(billing)}
               </p>
             )}
             <p className="mt-3 text-sm leading-6 text-on-surface-variant">
-              {billing?.activePackageName || "Aktywny pakiet"}
+              Wszystkie pakiety
             </p>
           </div>
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
@@ -507,47 +607,16 @@ function MobilePayments({
         <div className="mt-5 grid grid-cols-2 gap-3">
           <MobilePaymentStat
             label="Zapłacono"
-            value={formatMoney(billing?.activePackageAmountPaid ?? 0, currency)}
+            value={billing ? formatMoney(billing.activePackageAmountPaid, currency) : "—"}
           />
           <MobilePaymentStat
             label="Saldo"
-            value={formatMoney(billing?.currentBalance ?? 0, currency)}
+            value={billing ? formatMoney(billing.currentBalance, currency) : "—"}
           />
         </div>
       </section>
 
-      <section className="card-shell p-5">
-        <p className="text-label text-on-surface-muted">Nowa wpłata</p>
-        <h2 className="mt-2 font-display text-[1.55rem] font-semibold leading-none">
-          Zgłoś płatność
-        </h2>
-
-        {!packagesLength && !isLoading ? (
-          <div className="mt-5 rounded-[var(--radius-lg)] border border-dashed border-white/10 bg-surface-container-lowest p-4 text-sm leading-6 text-on-surface-variant">
-            Nie masz jeszcze aktywnego pakietu do opłacenia. Skontaktuj się z
-            trenerem lub obsługą studia, żeby przypisać pakiet.
-          </div>
-        ) : null}
-
-        <Button
-          size="lg"
-          disabled={isSubmitting || !packagesLength}
-          onClick={onOpenPaymentModal}
-          className="mt-5 w-full"
-        >
-          Zgłoś wpłatę
-        </Button>
-        <Button
-          size="lg"
-          disabled={isTpayLoading || !packagesLength}
-          onClick={onTpayCheckout}
-          className="mt-3 w-full"
-        >
-          {isTpayLoading
-            ? "Przygotowywanie płatności..."
-            : "Zapłać wygodnie online"}
-        </Button>
-      </section>
+      {actions}
     </div>
   );
 }
@@ -674,10 +743,10 @@ function getTime(value?: string | null) {
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 }
 
-function getCurrency(billing?: ClientBillingSummary | null) {
-  const activePackage = billing?.packages?.find(
-    (item) => item.clientPackageId === billing.activeClientPackageId,
-  );
+function formatAmountDue(billing: ClientBillingSummary | null) {
+  const amountDue = getClientAmountDue(billing);
 
-  return activePackage?.currency || billing?.payments?.[0]?.currency || "PLN";
+  return amountDue === null
+    ? "Niedostępne"
+    : formatMoney(amountDue, getClientBillingCurrency(billing) || "PLN");
 }

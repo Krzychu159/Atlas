@@ -144,7 +144,7 @@ export function PaymentEntryModal({
           ) : null}
 
           {unresolved ? <p role="status" className="mb-4 text-sm text-on-surface-variant">Sprawdzamy wynik poprzedniej próby. Zachowaj dane wpłaty i kliknij „Sprawdź i ponów”.</p> : null}
-          <fieldset disabled={isSubmitting || unresolved} className="grid min-w-0 gap-4">
+          <fieldset disabled={isSubmitting || unresolved} className="grid min-w-0 grid-cols-1 gap-4">
             <TextField
               label="Kwota"
               value={amount}

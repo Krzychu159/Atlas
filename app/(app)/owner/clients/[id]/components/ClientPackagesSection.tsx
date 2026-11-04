@@ -102,6 +102,7 @@ export default function ClientPackagesSection({
         key={item.clientPackageId}
         packageData={item}
         highlighted={item.clientPackageId === highlightedId}
+        expandableDetails={audience === "client"}
         onManage={canManage ? () => setManagedPackage(item) : undefined}
         onExpiry={canManage ? () => setExpiryPackage(item) : undefined}
       />
@@ -165,11 +166,13 @@ function ClientPackageCard({
   onManage,
   onExpiry,
   highlighted = false,
+  expandableDetails = false,
 }: {
   packageData: ClientPackageBilling;
   onManage?: () => void;
   onExpiry?: () => void;
   highlighted?: boolean;
+  expandableDetails?: boolean;
 }) {
   const packageKind = getClientPackageKind(packageData);
   const isGroup = packageKind === "group";
@@ -188,6 +191,16 @@ function ClientPackageCard({
   ];
   if (packageData.activatedAt) details.push(["Aktywacja", formatPackageDate(packageData.activatedAt)]);
   if (originLabel) details.push(["Pochodzenie", originLabel]);
+  const detailsList = (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+      {details.map(([label, value]) => (
+        <Fragment key={label}>
+          <dt className="text-on-surface-muted">{label}</dt>
+          <dd>{value}</dd>
+        </Fragment>
+      ))}
+    </dl>
+  );
 
   return (
     <article className={`min-w-0 rounded-[var(--radius-lg)] bg-surface-container-lowest p-3 ${highlighted ? "ring-2 ring-primary-light" : ""}`}>
@@ -212,20 +225,13 @@ function ClientPackageCard({
           <span className="rounded-full bg-tertiary-container/45 px-2 py-0.5 text-[10px] font-semibold text-tertiary-light">
             {getPackageStatusLabel(packageData)}
           </span>
-          <InfoTooltip
-            align="end"
-            srLabel={`Szczegóły pakietu: ${details.map(([label, value]) => `${label}: ${value}`).join(", ")}`}
-            label={
-              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-                {details.map(([label, value]) => (
-                  <Fragment key={label}>
-                    <dt className="text-on-surface-muted">{label}</dt>
-                    <dd>{value}</dd>
-                  </Fragment>
-                ))}
-              </dl>
-            }
-          />
+          {expandableDetails ? null : (
+            <InfoTooltip
+              align="end"
+              srLabel={`Szczegóły pakietu: ${details.map(([label, value]) => `${label}: ${value}`).join(", ")}`}
+              label={detailsList}
+            />
+          )}
         </div>
       </div>
 
@@ -235,6 +241,13 @@ function ClientPackageCard({
         <CardStat label="Zapłacono" value={formatMoney(packageData.amountPaid, currency)} />
         <CardStat label="Do zapłaty" value={formatMoney(packageData.amountDue, currency)} accent />
       </dl>
+
+      {expandableDetails ? (
+        <details className="mt-2 text-xs">
+          <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-on-surface-variant">Szczegóły pakietu</summary>
+          <div className="pb-1">{detailsList}</div>
+        </details>
+      ) : null}
 
       {closureLabel || packageData.closureReason || packageData.closedAt || packageData.refundAmount > 0 || packageData.refundReference ? (
         <dl className="mt-3 grid grid-cols-1 gap-1.5 border-t border-white/5 pt-2 text-xs sm:grid-cols-2">

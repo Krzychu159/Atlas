@@ -25,8 +25,8 @@ export function Tooltip({
       <span
         aria-hidden="true"
         className={[
-          "pointer-events-none absolute top-full z-30 mt-2 w-max max-w-72 rounded-[var(--radius-md)] bg-surface-container-high px-3 py-2 text-left text-xs font-medium leading-5 text-on-surface opacity-0 shadow-soft ring-1 ring-white/5 transition-opacity duration-150",
-          "group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100",
+          "pointer-events-none absolute top-full z-30 mt-2 hidden w-max max-w-[min(18rem,calc(100vw-2rem))] rounded-[var(--radius-md)] bg-surface-container-high px-3 py-2 text-left text-xs font-medium leading-5 text-on-surface shadow-soft ring-1 ring-white/5",
+          "group-hover/tooltip:block group-focus-within/tooltip:block",
           alignClasses[align],
         ].join(" ")}
       >

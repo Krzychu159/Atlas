@@ -14,6 +14,20 @@ export function formatDateTime(value?: string | null) {
   }).format(date);
 }
 
+export function formatCalendarDate(value?: string | null) {
+  if (!value) return "Brak daty";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("pl-PL", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
 // trainingStartDate represents a calendar day, even when serialized as DateTime.
 export function parseTrainingStartDate(value?: string | null) {
   const match = value?.trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:T|$)/);

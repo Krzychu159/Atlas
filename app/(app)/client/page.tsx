@@ -23,8 +23,14 @@ import {
 import { Button, ButtonLink } from "@/app/components/ui/button";
 import { showAppError, showAppInfo } from "@/app/components/ui/app-toast";
 import { isNotFoundLikeError } from "@/app/lib/backend";
-import { formatDateTime, formatSessionTime } from "@/app/lib/formatters/date";
+import { RetryNotice } from "@/app/components/ui/retry-notice";
+import { formatCalendarDate, formatSessionTime } from "@/app/lib/formatters/date";
 import { formatMoney } from "@/app/lib/formatters/money";
+import {
+  getClientAmountDue,
+  getClientBillingCurrency,
+  getNearestPaymentDueDate,
+} from "@/app/lib/client/billing-summary";
 import {
   getClientPortalBilling,
   getClientPortalDashboard,
@@ -52,6 +58,8 @@ export default function ClientDashboardPage() {
     null,
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [dashboardFailed, setDashboardFailed] = useState(false);
+  const [billingFailed, setBillingFailed] = useState(false);
 
   async function loadDashboard() {
     try {
@@ -80,6 +88,14 @@ export default function ClientDashboardPage() {
       if (trainingPlanData.status === "fulfilled") {
         setTrainingPlan(trainingPlanData.value);
       }
+      setDashboardFailed(
+        dashboardData.status === "rejected" &&
+          !isNotFoundLikeError(dashboardData.reason),
+      );
+      setBillingFailed(
+        billingData.status === "rejected" &&
+          !isNotFoundLikeError(billingData.reason),
+      );
 
       const firstError = [
         dashboardData,
@@ -131,20 +147,37 @@ export default function ClientDashboardPage() {
   const firstName =
     dashboard?.greetingName ||
     me?.firstName ||
-    getFirstName(me?.fullName) ||
-    "Kliencie";
+    getFirstName(me?.fullName);
+  const greeting = firstName ? `Cześć, ${firstName}` : "Cześć";
+  const trainerFallback = isLoading
+    ? "—"
+    : dashboardFailed
+      ? "Niedostępne"
+      : "Nie przypisano";
   const usedSessions = mainPackage?.usedSessions ?? 0;
   const totalSessions = mainPackage?.totalSessions ?? 0;
   const remainingSessions = mainPackage?.remainingSessions ?? 0;
   const progress = totalSessions
     ? Math.min(100, Math.round((usedSessions / totalSessions) * 100))
     : 0;
-  const amountDue =
-    mainPackage?.amountDue ?? 0;
+  const amountDue = billingFailed ? null : getClientAmountDue(billing);
+  const nearestDueDate = getNearestPaymentDueDate(billing);
   const currency =
-    mainPackage?.currency ||
+    getClientBillingCurrency(billing) ||
     payment?.currency ||
     "PLN";
+  const amountDueLabel =
+    amountDue === null ? "Niedostępne" : formatMoney(amountDue, currency);
+  const amountDueNote =
+    amountDue === null
+      ? "Brak danych o płatnościach"
+      : amountDue === 0
+        ? "Wszystko opłacone"
+        : nearestDueDate
+          ? `Termin: ${formatCalendarDate(nearestDueDate)}`
+          : "Wszystkie pakiety";
+  const amountDueTone =
+    amountDue === null ? "neutral" : amountDue > 0 ? "warning" : "success";
 
   function openTrainingPlan() {
     const url =
@@ -162,23 +195,33 @@ export default function ClientDashboardPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
+      {!isLoading && (dashboardFailed || billingFailed) ? (
+        <RetryNotice
+          text="Nie udało się pobrać części informacji, dlatego niektóre dane mogą być niedostępne."
+          onRetry={() => void loadDashboard()}
+        />
+      ) : null}
+
       <MobileDashboard
-        firstName={firstName}
+        greeting={greeting}
         greetingMessage={dashboard?.greetingMessage}
         nextSession={nextSession}
         trainerName={
           nextSession?.trainerFullName ||
           trainer?.fullName ||
           me?.trainerFullName ||
-          "Nie przypisano"
+          trainerFallback
         }
         mainPackage={mainPackage}
         groupPackages={groupPackages}
-        amountDue={amountDue}
-        currency={currency}
+        amountDueLabel={amountDueLabel}
+        amountDueNote={amountDue === null || amountDue > 0 ? amountDueNote : undefined}
+        amountDueTone={amountDueTone}
         remainingSessions={remainingSessions}
         upcomingSessions={upcomingSessions}
         isLoading={isLoading}
+        dashboardFailed={dashboardFailed}
+        billingFailed={billingFailed}
         onOpenTrainingPlan={openTrainingPlan}
       />
 
@@ -187,7 +230,7 @@ export default function ClientDashboardPage() {
         <div>
           <p className="text-label text-primary-light">Panel klienta</p>
           <h1 className="mt-2 font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">
-            Cześć, {firstName}
+            {greeting}
           </h1>
           <p className="mt-3 max-w-[720px] text-sm leading-6 text-on-surface-variant">
             {dashboard?.greetingMessage ||
@@ -244,6 +287,12 @@ export default function ClientDashboardPage() {
                     </SessionMeta>
                   </div>
                 </div>
+              ) : dashboardFailed ? (
+                <div className="mt-10 max-w-[540px]">
+                  <h2 className="font-display text-[2rem] font-semibold leading-[1.1] tracking-tight">
+                    Nie udało się pobrać treningu
+                  </h2>
+                </div>
               ) : (
                 <div className="mt-10 max-w-[540px]">
                   <h2 className="font-display text-[2rem] font-semibold leading-[1.1] tracking-tight">
@@ -264,13 +313,15 @@ export default function ClientDashboardPage() {
                     nextSession?.trainerFullName ||
                     trainer?.fullName ||
                     me?.trainerFullName ||
-                    "Nie przypisano"
+                    trainerFallback
                   }
                 />
-                <InfoPill
-                  label="Status"
-                  value={getSessionStatusLabel(nextSession?.status)}
-                />
+                {nextSession ? (
+                  <InfoPill
+                    label="Status"
+                    value={getSessionStatusLabel(nextSession.status)}
+                  />
+                ) : null}
               </div>
               <ButtonLink href="/client/schedule" icon={<ArrowRight size={16} />}>
                 Plan tygodnia
@@ -284,10 +335,10 @@ export default function ClientDashboardPage() {
             <div>
               <p className="text-label text-on-surface-muted">Twój trener</p>
               <h2 className="mt-4 font-display text-[1.75rem] font-semibold leading-none">
-                {trainer?.fullName || me?.trainerFullName || "Brak trenera"}
+                {trainer?.fullName || me?.trainerFullName || trainerFallback}
               </h2>
               <p className="mt-3 text-sm leading-6 text-on-surface-variant">
-                {trainer?.specialization || trainer?.bio || "Kontakt do trenera pojawi się po przypisaniu opiekuna."}
+                {trainer?.specialization || trainer?.bio || (isLoading || dashboardFailed ? null : "Kontakt do trenera pojawi się po przypisaniu opiekuna.")}
               </p>
             </div>
             <Avatar
@@ -301,41 +352,47 @@ export default function ClientDashboardPage() {
             <ContactTile
               icon={<Phone size={16} />}
               label="Telefon"
-              value={trainer?.phone || "Brak numeru"}
+              value={trainer?.phone || (isLoading ? "—" : dashboardFailed ? "Niedostępne" : "Brak numeru")}
             />
             <ContactTile
               icon={<UserRound size={16} />}
               label="E-mail"
-              value={trainer?.email || "Brak e-maila"}
+              value={trainer?.email || (isLoading ? "—" : dashboardFailed ? "Niedostępne" : "Brak e-maila")}
             />
           </div>
         </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <ClientPackageCard packageData={mainPackage} />
-        <GroupPackagesCard packages={groupPackages} />
+        <ClientPackageCard packageData={mainPackage} isLoading={isLoading} failed={billingFailed} />
+        <GroupPackagesCard packages={groupPackages} isLoading={isLoading} failed={billingFailed} />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
         <MetricCard
           icon={<CreditCard size={20} />}
           label="Do zapłaty"
-          value={formatMoney(amountDue, currency)}
-          note={mainPackage?.paymentDueDate ? `Termin: ${formatDateTime(mainPackage.paymentDueDate)}` : "Saldo z głównego pakietu"}
-          accent={amountDue > 0 ? "warning" : "success"}
+          value={amountDueLabel}
+          note={amountDueNote}
+          accent={amountDueTone === "neutral" ? "primary" : amountDueTone}
+          isLoading={isLoading}
         />
         <MetricCard
           icon={<CheckCircle2 size={20} />}
           label="Pozostałe treningi"
-          value={String(remainingSessions)}
+          value={billingFailed ? "Niedostępne" : String(remainingSessions)}
           note={
-            !mainPackage
+            billingFailed
+              ? "Brak danych o pakiecie"
+              : !mainPackage
               ? "Brak aktywnego pakietu"
-              : subscription?.autoRenewEnabled
+              : !subscription
+              ? "Aktywny pakiet"
+              : subscription.autoRenewEnabled
               ? "Automatyczne przedłużanie aktywne"
               : "Automatyczne przedłużanie wyłączone"
           }
+          isLoading={isLoading}
         />
       </section>
 
@@ -345,7 +402,7 @@ export default function ClientDashboardPage() {
             <div>
               <p className="text-label text-on-surface-muted">Wykorzystanie pakietu</p>
               <h2 className="mt-3 font-display text-[1.85rem] font-semibold leading-tight">
-                {usedSessions} z {totalSessions || 0} treningów
+                {isLoading ? "—" : billingFailed ? "Niedostępne" : `${usedSessions} z ${totalSessions || 0} treningów`}
               </h2>
             </div>
             <span className="rounded-full bg-primary/15 px-3 py-1.5 text-sm font-semibold text-primary-light">
@@ -381,12 +438,14 @@ export default function ClientDashboardPage() {
           </div>
 
           <div className="mt-5 flex flex-col gap-3">
-            {upcomingSessions.length ? (
+            {isLoading ? (
+              <SkeletonBlock className="h-20 w-full" />
+            ) : upcomingSessions.length ? (
               upcomingSessions.map((session) => (
                 <SessionRow key={session.id} session={session} />
               ))
             ) : (
-              <EmptyState text="Nie masz zaplanowanych sesji w najbliższym czasie." />
+              <EmptyState text={dashboardFailed ? "Nie udało się pobrać terminów." : "Nie masz zaplanowanych sesji w najbliższym czasie."} />
             )}
           </div>
         </div>
@@ -406,13 +465,15 @@ export default function ClientDashboardPage() {
         </div>
 
         <div className="mt-5 grid gap-3 md:grid-cols-3">
-          {recentSessions.length ? (
+          {isLoading ? (
+            <SkeletonBlock className="h-24 w-full md:col-span-3" />
+          ) : recentSessions.length ? (
             recentSessions.map((session) => (
               <RecentSessionCard key={session.id} session={session} />
             ))
           ) : (
             <div className="md:col-span-3">
-              <EmptyState text="Historia treningów pojawi się po pierwszych zrealizowanych sesjach." />
+              <EmptyState text={dashboardFailed ? "Nie udało się pobrać historii treningów." : "Historia treningów pojawi się po pierwszych zrealizowanych sesjach."} />
             </div>
           )}
         </div>
@@ -423,30 +484,36 @@ export default function ClientDashboardPage() {
 }
 
 function MobileDashboard({
-  firstName,
+  greeting,
   greetingMessage,
   nextSession,
   trainerName,
   mainPackage,
   groupPackages,
-  amountDue,
-  currency,
+  amountDueLabel,
+  amountDueNote,
+  amountDueTone,
   remainingSessions,
   upcomingSessions,
   isLoading,
+  dashboardFailed,
+  billingFailed,
   onOpenTrainingPlan,
 }: {
-  firstName: string;
+  greeting: string;
   greetingMessage?: string | null;
   nextSession?: ClientPortalSession | null;
   trainerName: string;
   mainPackage: PackageDisplayData | null;
   groupPackages: ClientPackageBilling[];
-  amountDue: number;
-  currency: string;
+  amountDueLabel: string;
+  amountDueNote?: string;
+  amountDueTone: "success" | "warning" | "neutral";
   remainingSessions: number;
   upcomingSessions: ClientPortalSession[];
   isLoading: boolean;
+  dashboardFailed: boolean;
+  billingFailed: boolean;
   onOpenTrainingPlan: () => void;
 }) {
   return (
@@ -454,7 +521,7 @@ function MobileDashboard({
       <section>
         <p className="text-label text-primary-light">Panel klienta</p>
         <h1 className="mt-2 font-display text-[1.6rem] md:text-[2.15rem] font-semibold leading-[0.95] tracking-tight">
-          Cześć, {firstName}
+          {greeting}
         </h1>
         <p className="mt-3 text-sm leading-6 text-on-surface-variant">
           {greetingMessage || "Najważniejsze informacje o treningach i płatnościach."}
@@ -489,7 +556,9 @@ function MobileDashboard({
               </>
             ) : (
               <p className="mt-5 text-sm leading-6 text-on-surface-variant">
-                Nie masz zaplanowanego treningu. Ustal termin z trenerem.
+                {dashboardFailed
+                  ? "Nie udało się pobrać treningu."
+                  : "Nie masz zaplanowanego treningu. Ustal termin z trenerem."}
               </p>
             )}
           </div>
@@ -498,12 +567,14 @@ function MobileDashboard({
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3">
+        <div className={`mt-5 grid gap-3 ${nextSession ? "grid-cols-2" : "grid-cols-1"}`}>
           <MobileInfoTile label="Trener" value={trainerName} />
-          <MobileInfoTile
-            label="Status"
-            value={getSessionStatusLabel(nextSession?.status)}
-          />
+          {nextSession ? (
+            <MobileInfoTile
+              label="Status"
+              value={getSessionStatusLabel(nextSession.status)}
+            />
+          ) : null}
         </div>
 
         <ButtonLink
@@ -518,18 +589,22 @@ function MobileDashboard({
       <section className="grid grid-cols-2 gap-3">
         <MobileMetric
           label="Do zapłaty"
-          value={formatMoney(amountDue, currency)}
-          tone={amountDue > 0 ? "warning" : "success"}
+          value={amountDueLabel}
+          note={amountDueNote}
+          tone={amountDueTone}
+          isLoading={isLoading}
         />
         <MobileMetric
           label="Pozostało"
-          value={`${remainingSessions}`}
-          note="treningów"
+          value={billingFailed ? "Niedostępne" : `${remainingSessions}`}
+          note={billingFailed ? undefined : "treningów"}
+          tone={billingFailed ? "neutral" : "primary"}
+          isLoading={isLoading}
         />
       </section>
 
-      <ClientPackageCard packageData={mainPackage} compact />
-      <GroupPackagesCard packages={groupPackages} compact />
+      <ClientPackageCard packageData={mainPackage} isLoading={isLoading} failed={billingFailed} compact />
+      <GroupPackagesCard packages={groupPackages} isLoading={isLoading} failed={billingFailed} compact />
 
       <section className="card-shell p-5">
         <div className="flex items-center justify-between gap-4">
@@ -545,12 +620,14 @@ function MobileDashboard({
           </Button>
         </div>
         <div className="mt-4 flex flex-col gap-3">
-          {upcomingSessions.length ? (
+          {isLoading ? (
+            <SkeletonBlock className="h-20 w-full" />
+          ) : upcomingSessions.length ? (
             upcomingSessions.slice(0, 2).map((session) => (
               <SessionRow key={session.id} session={session} />
             ))
           ) : (
-            <EmptyState text="Brak zaplanowanych sesji." />
+            <EmptyState text={dashboardFailed ? "Nie udało się pobrać terminów." : "Brak zaplanowanych sesji."} />
           )}
         </div>
       </section>
@@ -572,9 +649,13 @@ type PackageDisplayData = {
 
 function ClientPackageCard({
   packageData,
+  isLoading,
+  failed,
   compact = false,
 }: {
   packageData: PackageDisplayData | null;
+  isLoading: boolean;
+  failed: boolean;
   compact?: boolean;
 }) {
   const totalSessions = packageData?.totalSessions ?? 0;
@@ -589,7 +670,7 @@ function ClientPackageCard({
         <div className="min-w-0">
           <p className="text-label text-on-surface-muted">Aktualny pakiet</p>
           <h2 className="mt-3 text-[1.35rem] font-semibold leading-tight">
-            {packageData?.packageName || "Brak aktywnego pakietu"}
+            {isLoading ? "—" : failed ? "Nie udało się pobrać pakietu" : packageData?.packageName || "Brak aktywnego pakietu"}
           </h2>
         </div>
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary-light">
@@ -597,7 +678,9 @@ function ClientPackageCard({
         </div>
       </div>
 
-      {packageData ? (
+      {isLoading ? (
+        <SkeletonBlock className="mt-5 h-12 w-full" />
+      ) : failed ? null : packageData ? (
         <>
           <div className="mt-5 flex items-center justify-between gap-3 text-sm text-on-surface-variant">
             <span>{usedSessions}/{totalSessions} wykorzystanych</span>
@@ -623,9 +706,13 @@ function ClientPackageCard({
 
 function GroupPackagesCard({
   packages,
+  isLoading,
+  failed,
   compact = false,
 }: {
   packages: ClientPackageBilling[];
+  isLoading: boolean;
+  failed: boolean;
   compact?: boolean;
 }) {
   return (
@@ -634,7 +721,11 @@ function GroupPackagesCard({
         <div>
           <p className="text-label text-on-surface-muted">Zajęcia grupowe</p>
           <h2 className="mt-3 text-[1.35rem] font-semibold leading-tight">
-            {packages.length
+            {isLoading
+              ? "—"
+              : failed
+              ? "Nie udało się pobrać zajęć grupowych"
+              : packages.length
               ? packages.length === 1
                 ? "1 aktywna wejściówka"
                 : `${packages.length} aktywne pakiety`
@@ -646,7 +737,9 @@ function GroupPackagesCard({
         </div>
       </div>
 
-      {packages.length ? (
+      {isLoading ? (
+        <SkeletonBlock className="mt-5 h-12 w-full" />
+      ) : failed ? null : packages.length ? (
         <div className="mt-5 flex flex-col gap-2">
           {packages.map((item) => (
             <div key={item.clientPackageId} className="flex items-center justify-between gap-4 rounded-[var(--radius-lg)] bg-surface-container-lowest px-4 py-3">
@@ -684,28 +777,38 @@ function MobileMetric({
   value,
   note,
   tone = "primary",
+  isLoading = false,
 }: {
   label: string;
   value: string;
   note?: string;
-  tone?: "primary" | "success" | "warning";
+  tone?: "primary" | "success" | "warning" | "neutral";
+  isLoading?: boolean;
 }) {
   const toneClass =
     tone === "success"
       ? "text-tertiary-light"
       : tone === "warning"
         ? "text-warning-light"
-        : "text-primary-light";
+        : tone === "neutral"
+          ? "text-on-surface-variant"
+          : "text-primary-light";
 
   return (
-    <div className="card-shell min-h-[126px] p-4">
+    <div className="card-shell min-h-[126px] min-w-0 p-4">
       <p className="text-label text-on-surface-muted">{label}</p>
-      <p className={`mt-5 text-[1.65rem] font-semibold leading-none ${toneClass}`}>
-        {value}
-      </p>
-      {note ? (
-        <p className="mt-2 text-sm text-on-surface-variant">{note}</p>
-      ) : null}
+      {isLoading ? (
+        <SkeletonBlock className="mt-5 h-7 w-full" />
+      ) : (
+        <>
+          <p className={`mt-5 break-words font-semibold leading-none ${tone === "neutral" ? "text-base" : "text-[1.65rem]"} ${toneClass}`}>
+            {value}
+          </p>
+          {note ? (
+            <p className="mt-2 text-sm text-on-surface-variant">{note}</p>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
@@ -742,12 +845,14 @@ function MetricCard({
   value,
   note,
   accent = "primary",
+  isLoading = false,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   note: string;
   accent?: "primary" | "success" | "warning";
+  isLoading?: boolean;
 }) {
   const accentClass =
     accent === "success"
@@ -762,10 +867,16 @@ function MetricCard({
         {icon}
       </div>
       <p className="mt-5 text-label text-on-surface-muted">{label}</p>
-      <p className="mt-3 line-clamp-2 text-[1.55rem] font-semibold leading-tight">
-        {value}
-      </p>
-      <p className="mt-3 text-sm leading-6 text-on-surface-variant">{note}</p>
+      {isLoading ? (
+        <SkeletonBlock className="mt-3 h-14 w-full" />
+      ) : (
+        <>
+          <p className="mt-3 line-clamp-2 text-[1.55rem] font-semibold leading-tight">
+            {value}
+          </p>
+          <p className="mt-3 text-sm leading-6 text-on-surface-variant">{note}</p>
+        </>
+      )}
     </div>
   );
 }
