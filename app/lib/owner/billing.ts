@@ -51,6 +51,7 @@ export type ClientPayment = {
   note: string | null;
   rejectionReason: string | null;
   reversalReason: string | null;
+  receiptRequired?: boolean;
   receiptStatus: string | null;
   receiptNumber: string | null;
   receiptIssuedAt: string | null;

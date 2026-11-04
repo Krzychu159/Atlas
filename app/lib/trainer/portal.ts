@@ -535,6 +535,23 @@ export function rejectTrainerPortalPayment(paymentId: number, reason?: string) {
   );
 }
 
+export function getTrainerPortalPendingReceipts(signal?: AbortSignal) {
+  return backendGet<ClientPayment[]>("trainer-portal/receipts/pending", undefined, signal);
+}
+
+export function issueTrainerPortalPaymentReceipt(paymentId: number) {
+  return backendPost<ClientPayment>(
+    `trainer-portal/payments/${paymentId}/receipt/issue`,
+    { receiptNumber: null },
+  );
+}
+
+export function cancelTrainerPortalPaymentReceipt(paymentId: number) {
+  return backendPost<ClientPayment>(
+    `trainer-portal/payments/${paymentId}/receipt/cancel`,
+  );
+}
+
 export function getTrainerPortalClientTrainingPlan(clientId: number, signal?: AbortSignal) {
   return backendGet<ClientTrainingPlan>(
     `trainer-portal/clients/${clientId}/training-plan`, undefined, signal,

@@ -42,6 +42,7 @@ type PaymentsListProps<TPayment extends PaymentDisplaySource> = {
   canConfirm?: (payment: TPayment) => boolean;
   onReject?: (payment: TPayment) => void;
   onIssueReceipt?: (payment: TPayment) => void;
+  canIssueReceipt?: (payment: TPayment) => boolean;
   onCancelReceipt?: (payment: TPayment) => void;
   onReverse?: (payment: TPayment) => void;
 };
@@ -59,6 +60,7 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
   canConfirm,
   onReject,
   onIssueReceipt,
+  canIssueReceipt,
   onCancelReceipt,
   onReverse,
 }: PaymentsListProps<TPayment>) {
@@ -123,7 +125,7 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
             onConfirm={onConfirm && (!canConfirm || canConfirm(payment)) ? () => onConfirm(payment) : undefined}
             onReject={onReject ? () => onReject(payment) : undefined}
             onIssueReceipt={
-              onIssueReceipt ? () => onIssueReceipt(payment) : undefined
+              onIssueReceipt && (!canIssueReceipt || canIssueReceipt(payment)) ? () => onIssueReceipt(payment) : undefined
             }
             onCancelReceipt={
               onCancelReceipt ? () => onCancelReceipt(payment) : undefined
@@ -152,6 +154,16 @@ function PaymentPackageContext({ payment }: { payment: PaymentDisplaySource }) {
     <p className="mt-1 text-xs text-on-surface-muted max-xl:line-clamp-2 xl:truncate" title={text}>
       {text}
     </p>
+  );
+}
+
+function PaymentReceiptInfo({ payment }: { payment: PaymentDisplaySource }) {
+  const label = payment.receiptNumber ? `Paragon nr ${payment.receiptNumber}` : "Paragon wystawiony";
+  return (
+    <div className="mt-1.5 min-w-0 text-[10px] text-tertiary-light">
+      <p className="truncate" title={label}>{label}</p>
+      {payment.receiptIssuedAt ? <p className="truncate">{formatDateTime(payment.receiptIssuedAt)}</p> : null}
+    </div>
   );
 }
 
@@ -227,11 +239,7 @@ function PaymentListRow(props: PaymentListRowProps) {
         </div>
         <div className="min-w-0">
           <PaymentStatusBadge payment={payment} />
-          {receiptIssued ? (
-            <p className="mt-1.5 truncate text-[10px] text-tertiary-light">
-              Paragon wystawiony
-            </p>
-          ) : null}
+          {receiptIssued ? <PaymentReceiptInfo payment={payment} /> : null}
         </div>
         <PaymentMethod method={payment.method} />
         {props.showActions ? <RowActions {...props} /> : null}
@@ -272,6 +280,8 @@ function PaymentListRow(props: PaymentListRowProps) {
             </span>
           ) : null}
         </div>
+
+        {receiptIssued ? <PaymentReceiptInfo payment={payment} /> : null}
 
         {payment.rejectionReason || payment.reversalReason ? (
           <p className="mt-3 rounded-[var(--radius-md)] bg-error-container/25 px-3 py-2 text-xs text-error-light">
@@ -369,7 +379,7 @@ function RowActions(props: PaymentListRowProps) {
   const receiptIssued = isPaymentReceiptIssued(props.payment);
 
   return (
-    <div className="flex flex-wrap justify-end gap-1.5">
+    <div className="flex justify-end gap-1.5">
       {props.onCorrectDate ? <IconAction label="Zmień datę wpłaty" onClick={props.onCorrectDate} disabled={props.processing}><CalendarClock size={16} /></IconAction> : null}
       {pending && (props.onConfirm || props.onReject) ? (
         <>
@@ -500,7 +510,7 @@ function formatPaymentDate(value?: string | null) {
 
 function getGridClass(showClient: boolean, showActions: boolean) {
   if (showClient && showActions) {
-    return "grid-cols-[110px_minmax(110px,0.75fr)_minmax(150px,1.1fr)_minmax(130px,0.75fr)_120px_90px_110px]";
+    return "grid-cols-[110px_minmax(130px,0.9fr)_minmax(150px,1fr)_minmax(130px,0.7fr)_120px_90px_162px]";
   }
 
   if (showClient) {
@@ -508,7 +518,7 @@ function getGridClass(showClient: boolean, showActions: boolean) {
   }
 
   if (showActions) {
-    return "grid-cols-[120px_minmax(190px,1.2fr)_minmax(150px,0.8fr)_120px_100px_110px]";
+    return "grid-cols-[120px_minmax(190px,1.2fr)_minmax(150px,0.8fr)_120px_100px_162px]";
   }
 
   return "grid-cols-[120px_minmax(220px,1.3fr)_minmax(160px,0.8fr)_120px_110px]";

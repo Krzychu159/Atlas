@@ -20,6 +20,14 @@ type PaymentActionConfirmModalProps = {
   onConfirm: () => void;
 };
 
+export const trainerIssueReceiptCopy = {
+  title: "Paragon wybity na kasie?",
+  description:
+    "Potwierdź, jeśli paragon za tę wpłatę został już wybity na kasie. Właściciel studia zobaczy to przy wpłacie.",
+  confirmLabel: "Tak, paragon wybity",
+  icon: "receipt" as const,
+};
+
 export function PaymentActionConfirmModal({
   payment,
   title,

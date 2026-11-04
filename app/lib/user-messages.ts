@@ -6,6 +6,10 @@ const knownMessages: Record<string, string> = {
   "invalid credentials": "Nieprawidłowy e-mail lub hasło. Sprawdź dane i spróbuj ponownie.",
   "invalid email or password": "Nieprawidłowy e-mail lub hasło. Sprawdź dane i spróbuj ponownie.",
   "email is not verified": "Potwierdź adres e-mail, aby kontynuować. Otwórz link z wiadomości od studia.",
+  "only confirmed payments can receive a receipt": "Paragon można oznaczyć dopiero po potwierdzeniu wpłaty.",
+  "receipt has already been issued for this payment": "Paragon za tę wpłatę jest już oznaczony jako wystawiony.",
+  "only issued receipts can be cancelled": "Ta wpłata nie ma wystawionego paragonu, więc nie ma czego cofać.",
+  "trainer does not have access to this client": "Ten klient nie jest przypisany do Ciebie.",
 };
 
 // Formats display text only. Keep the original error and payload for existing error handling.

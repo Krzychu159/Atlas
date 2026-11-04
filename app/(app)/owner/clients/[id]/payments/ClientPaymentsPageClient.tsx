@@ -24,7 +24,7 @@ import { Tooltip } from "@/app/components/ui/tooltip";
 import {
   profilePrimaryActionClassName,
 } from "@/app/components/ui/profile-hero";
-import { PaymentActionConfirmModal } from "@/app/components/payments/PaymentActionConfirmModal";
+import { PaymentActionConfirmModal, trainerIssueReceiptCopy } from "@/app/components/payments/PaymentActionConfirmModal";
 import { PaymentEntryModal } from "@/app/components/payments/PaymentEntryModal";
 import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { PaymentsList } from "@/app/components/payments/PaymentsList";
@@ -63,6 +63,7 @@ import {
   type PaymentMethod,
 } from "@/app/lib/owner/billing";
 import { getPackages, type Package } from "@/app/lib/owner/packages";
+import { ApiError } from "@/app/lib/backend";
 import {
   showOwnerError,
   showOwnerSuccess,
@@ -70,6 +71,7 @@ import {
 import {
   activateTrainerPortalClientPackage,
   cancelTrainerPortalClientSubscription,
+  cancelTrainerPortalPaymentReceipt,
   confirmTrainerPortalPayment,
   createTrainerPortalClientPackage,
   createTrainerPortalClientPayment,
@@ -77,6 +79,7 @@ import {
   getTrainerPortalClientBilling,
   getTrainerPortalClientSubscription,
   getTrainerPortalClientSubscriptionUsage,
+  issueTrainerPortalPaymentReceipt,
   resumeTrainerPortalClientSubscription,
   setTrainerPortalClientNextPackage,
 } from "@/app/lib/trainer/portal";
@@ -650,8 +653,41 @@ export default function ClientPaymentsPageClient({
     }
   }
 
+  // The row is updated in place, so marking several receipts does not reset the history page.
+  async function runTrainerReceiptAction(
+    payment: ClientPayment,
+    request: (paymentId: number) => Promise<ClientPayment>,
+    successMessage: string,
+    fallback: string,
+  ) {
+    if (!clientId || mutationLock.current || isLoading) return;
+
+    mutationLock.current = true;
+    try {
+      setProcessingPaymentId(payment.id);
+      const updated = await request(payment.id);
+      if (!mounted.current) return;
+      setClientPayments((current) => current.map((item) => item.id === updated.id ? { ...item, ...updated } : item));
+      showOwnerSuccess(successMessage, {
+        id: `trainer-client-payment-receipt-${payment.id}`,
+      });
+    } catch (err) {
+      showOwnerError(new Error(trainerPaymentError(err, fallback)), fallback, {
+        id: `trainer-client-payment-receipt-error-${payment.id}`,
+      });
+      if (err instanceof ApiError && [400, 403, 404, 409].includes(err.status)) void refreshTrainerBilling(clientId);
+    } finally {
+      mutationLock.current = false;
+      setProcessingPaymentId(null);
+    }
+  }
+
   async function handleIssueReceipt(payment: ClientPayment) {
-    if (!clientId || basePath !== "/owner") return;
+    if (!clientId) return;
+    if (basePath === "/trainer") {
+      await runTrainerReceiptAction(payment, issueTrainerPortalPaymentReceipt, "Paragon został oznaczony jako wystawiony.", "Nie udało się oznaczyć paragonu.");
+      return;
+    }
 
     try {
       setProcessingPaymentId(payment.id);
@@ -670,7 +706,11 @@ export default function ClientPaymentsPageClient({
   }
 
   async function handleCancelReceipt(payment: ClientPayment) {
-    if (!clientId || basePath !== "/owner") return;
+    if (!clientId) return;
+    if (basePath === "/trainer") {
+      await runTrainerReceiptAction(payment, cancelTrainerPortalPaymentReceipt, "Oznaczenie paragonu zostało cofnięte.", "Nie udało się cofnąć oznaczenia paragonu.");
+      return;
+    }
 
     try {
       setProcessingPaymentId(payment.id);
@@ -855,12 +895,13 @@ export default function ClientPaymentsPageClient({
               onConfirm={(payment) =>
                 setPaymentAction({ type: "confirm", payment })
               }
-              onIssueReceipt={basePath === "/owner" ? (payment) =>
+              onIssueReceipt={(payment) =>
                 setPaymentAction({ type: "issueReceipt", payment })
-              : undefined}
-              onCancelReceipt={basePath === "/owner" ? (payment) =>
+              }
+              canIssueReceipt={basePath === "/trainer" ? (payment) => payment.receiptRequired === true : undefined}
+              onCancelReceipt={(payment) =>
                 setPaymentAction({ type: "cancelReceipt", payment })
-              : undefined}
+              }
               onReverse={basePath === "/owner" ? (payment) => {
                 setPaymentToReverse(payment);
                 setReversalReason("");
@@ -945,7 +986,7 @@ export default function ClientPaymentsPageClient({
         <PaymentActionConfirmModal
           payment={paymentAction.payment}
           processing={processingPaymentId === paymentAction.payment.id}
-          {...getPaymentActionModalCopy(paymentAction.type)}
+          {...getPaymentActionModalCopy(paymentAction.type, basePath)}
           onClose={() => { if (!mutationLock.current) setPaymentAction(null); }}
           onConfirm={async () => {
             if (paymentAction.type === "confirm") {
@@ -986,7 +1027,20 @@ export default function ClientPaymentsPageClient({
   );
 }
 
-function getPaymentActionModalCopy(type: PaymentAction) {
+function getPaymentActionModalCopy(type: PaymentAction, basePath: "/owner" | "/trainer") {
+  if (type === "issueReceipt" && basePath === "/trainer") return trainerIssueReceiptCopy;
+
+  if (type === "cancelReceipt" && basePath === "/trainer") {
+    return {
+      title: "Cofnąć oznaczenie paragonu?",
+      description:
+        "Użyj tego, jeśli paragon został oznaczony przez pomyłkę. Wpłata znów będzie czekać na paragon.",
+      confirmLabel: "Cofnij oznaczenie",
+      tone: "danger" as const,
+      icon: "receipt" as const,
+    };
+  }
+
   if (type === "issueReceipt") {
     return {
       title: "Wystawić paragon?",
