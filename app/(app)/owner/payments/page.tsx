@@ -38,15 +38,19 @@ import {
   rejectTrainerPortalPayment,
 } from "@/app/lib/trainer/portal";
 import {
-  defaultPaymentFilters,
+  getDefaultPaymentFilters,
   PaymentFilters,
   type PaymentFiltersValue,
+  type TrainerFilterOption,
 } from "./components/PaymentFilters";
 import { listUrlKey, readOption, readPositiveInt, useListScrollRestoration, useListUrlSync } from "../components/list-url-state";
+import { parseMonthValue } from "@/app/lib/formatters/month";
+import { getTrainers } from "@/app/lib/owner/trainers";
 
 type PaymentAction = "confirm" | "issueReceipt" | "cancelReceipt";
 
-const PAYMENTS_PER_PAGE = 8;
+// Compact rows fit a whole working view on one page.
+const PAYMENTS_PER_PAGE = 25;
 
 export default function OwnerPaymentsPage() {
   const { selectedLocationId } = useOwnerLocationFilter();
@@ -63,24 +67,36 @@ export default function OwnerPaymentsPage() {
   );
 }
 
-const PAYMENT_URL_KEYS = ["q", "clientId", "status", "source", "overpayment", "from", "to", "min", "max", "sort", "page"] as const;
+const PAYMENT_URL_KEYS = ["q", "clientId", "month", "trainer", "status", "source", "overpayment", "from", "to", "min", "max", "sort", "page"] as const;
+// "month=all" keeps the list without any date limit; no month parameter means the current month.
+const ALL_MONTHS = "all";
 const SERVER_PAYMENT_SORTS = ["newest", "oldest", "amountDesc", "amountAsc", "clientAsc", "overpaymentDesc"] as const;
 const DATE_PARAM = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 const AMOUNT_PARAM = /^[0-9]{1,9}([.,][0-9]{1,2})?$/;
 
 function paymentFiltersFromUrl(params: URLSearchParams): PaymentFiltersValue {
+  const defaults = getDefaultPaymentFilters();
   const clientId = readPositiveInt(params.get("clientId"));
+  const trainerId = readPositiveInt(params.get("trainer"));
   const text = (name: string, pattern: RegExp) => {
     const value = params.get(name) ?? "";
     return pattern.test(value) ? value : "";
   };
+  const dateFrom = text("from", DATE_PARAM);
+  const dateTo = text("to", DATE_PARAM);
+  const monthParam = params.get("month");
+  const month = dateFrom || dateTo || monthParam === ALL_MONTHS
+    ? ""
+    : monthParam && parseMonthValue(monthParam) && monthParam <= defaults.month ? monthParam : defaults.month;
   return {
     client: clientId ? String(clientId) : (params.get("q") ?? "").slice(0, 100),
-    status: readOption(params.get("status"), ["all", "1", "2", "3", "4", "5"], defaultPaymentFilters.status),
-    source: readOption(params.get("source"), ["all", "1", "2", "3"], defaultPaymentFilters.source),
-    overpayment: readOption(params.get("overpayment"), ["all", "yes", "no"], defaultPaymentFilters.overpayment),
-    dateFrom: text("from", DATE_PARAM),
-    dateTo: text("to", DATE_PARAM),
+    month,
+    trainerId: trainerId ? String(trainerId) : "all",
+    status: readOption(params.get("status"), ["all", "1", "2", "3", "4", "5"], defaults.status),
+    source: readOption(params.get("source"), ["all", "1", "2", "3"], defaults.source),
+    overpayment: readOption(params.get("overpayment"), ["all", "yes", "no"], defaults.overpayment),
+    dateFrom: month ? "" : dateFrom,
+    dateTo: month ? "" : dateTo,
     amountMin: text("min", AMOUNT_PARAM),
     amountMax: text("max", AMOUNT_PARAM),
     sortBy: readOption(params.get("sort"), SERVER_PAYMENT_SORTS, "newest"),
@@ -90,10 +106,14 @@ function paymentFiltersFromUrl(params: URLSearchParams): PaymentFiltersValue {
 function paymentFiltersToUrl(filters: PaymentFiltersValue, page: number) {
   const client = filters.client.trim();
   const clientId = parseClientIdFilter(client);
-  const changed = (key: keyof PaymentFiltersValue) => filters[key] !== defaultPaymentFilters[key] ? filters[key].trim() || null : null;
+  const defaults = getDefaultPaymentFilters();
+  const changed = (key: keyof PaymentFiltersValue) => filters[key] !== defaults[key] ? filters[key].trim() || null : null;
+  const anyDate = filters.dateFrom || filters.dateTo;
   return {
     q: clientId ? null : client || null,
     clientId: clientId ? String(clientId) : null,
+    month: filters.month ? changed("month") : anyDate ? null : ALL_MONTHS,
+    trainer: changed("trainerId"),
     status: changed("status"),
     source: changed("source"),
     overpayment: changed("overpayment"),
@@ -153,12 +173,22 @@ function OwnerPaymentsPageContent({
   const urlParams = paymentFiltersToUrl(filters, page);
   useListUrlSync(urlParams, PAYMENT_URL_KEYS, owner);
   useListScrollRestoration(listUrlKey("payments", urlParams), owner && Boolean(list.data) && !list.loading);
+  const readTrainers = useCallback((signal: AbortSignal) => getTrainers(signal), []);
+  const trainers = useOwnerRead("payment-trainers", readTrainers, "Nie udało się pobrać listy trenerów.", 0, 0, owner);
+  const trainerOptions = useMemo<TrainerFilterOption[] | undefined>(() => {
+    if (!owner) return undefined;
+    return (trainers.data ?? [])
+      .filter((trainer) => Number.isInteger(trainer.id) && trainer.id > 0)
+      .map((trainer) => ({ value: String(trainer.id), label: trainer.fullName?.trim() || `${trainer.firstName ?? ""} ${trainer.lastName ?? ""}`.trim() || `Trener #${trainer.id}` }))
+      .sort((first, second) => first.label.localeCompare(second.label, "pl"));
+  }, [owner, trainers.data]);
 
   function buildBackendPaymentQuery() {
     const clientId = parseClientIdFilter(filters.client);
 
     return {
       clientId,
+      month: filters.month || null,
       status:
         filters.status === "all"
           ? null
@@ -169,10 +199,10 @@ function OwnerPaymentsPageContent({
           : (Number(filters.source) as ClientPaymentSource),
       hasOverpayment:
         filters.overpayment === "all" ? null : filters.overpayment === "yes",
-      from: filters.dateFrom
+      from: filters.dateFrom && !filters.month
         ? new Date(`${filters.dateFrom}T00:00:00`).toISOString()
         : null,
-      to: filters.dateTo
+      to: filters.dateTo && !filters.month
         ? new Date(`${filters.dateTo}T23:59:59`).toISOString()
         : null,
       amountMin: parseMoneyFilter(filters.amountMin),
@@ -197,7 +227,7 @@ function OwnerPaymentsPageContent({
     return () => window.clearTimeout(timer);
     // Legacy trainer screen retains its existing contract.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [owner, paymentDateRevision, filters.amountMax, filters.amountMin, filters.client, filters.dateFrom, filters.dateTo, filters.overpayment, filters.source, filters.status]);
+  }, [owner, paymentDateRevision, filters.amountMax, filters.amountMin, filters.client, filters.month, filters.dateFrom, filters.dateTo, filters.overpayment, filters.source, filters.status]);
 
   async function handleConfirm(payment: ClientPayment) {
     if (!isPendingPayment(payment)) {
@@ -349,7 +379,7 @@ function OwnerPaymentsPageContent({
   );
 
   function clearFilters() {
-    setFilters(defaultPaymentFilters);
+    setFilters(getDefaultPaymentFilters());
     setPage(1);
   }
 
@@ -387,6 +417,7 @@ function OwnerPaymentsPageContent({
       <PaymentFilters
         serverPagination={owner}
         value={filters}
+        trainerOptions={trainerOptions}
         advancedOpen={advancedFiltersOpen}
         onAdvancedOpenChange={setAdvancedFiltersOpen}
         onChange={handleFiltersChange}
@@ -404,6 +435,7 @@ function OwnerPaymentsPageContent({
       >
         <OwnerReadState loading={false} error={readError} retry={list.retry} label="Ładowanie płatności..." />
         {!readError || list.data ? <PaymentsList
+          density="compact"
           dateCorrectionPortal={basePath === "/trainer" ? "trainer" : "owner"}
           payments={visiblePayments}
           isLoading={loading}

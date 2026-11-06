@@ -1,4 +1,5 @@
 import type { PaymentsQuery } from "./billing";
+import { parseMonthValue } from "../formatters/month";
 import type { PaymentFiltersValue } from "@/app/(app)/owner/payments/components/PaymentFilters";
 
 export function paymentListQuery(filters: PaymentFiltersValue, page: number, pageSize: number, locationId: number | null): PaymentsQuery {
@@ -16,11 +17,20 @@ export function paymentListQuery(filters: PaymentFiltersValue, page: number, pag
   const amountMin = amount(filters.amountMin), amountMax = amount(filters.amountMax);
   if (amountMin !== undefined && amountMax !== undefined && amountMin > amountMax) throw new Error("Kwota od nie może być większa niż kwota do.");
   if (filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo) throw new Error("Data od nie może być późniejsza niż data do.");
-  return { page, pageSize, locationId, locationMatch: "effective", sort,
+  if (filters.month && !parseMonthValue(filters.month)) throw new Error("Wybierz poprawny miesiąc.");
+  const trainerId = filters.trainerId === "all" ? undefined : Number(filters.trainerId);
+  if (trainerId !== undefined && !(Number.isInteger(trainerId) && trainerId > 0)) throw new Error("Wybierz trenera z listy.");
+  // A month and a custom date range exclude each other.
+  const range = filters.month
+    ? { month: filters.month }
+    : {
+        from: filters.dateFrom ? new Date(`${filters.dateFrom}T00:00:00`).toISOString() : undefined,
+        to: filters.dateTo ? new Date(`${filters.dateTo}T23:59:59.999`).toISOString() : undefined,
+      };
+  return { page, pageSize, locationId, locationMatch: "effective", sort, trainerId, ...range,
     ...(/^\d+$/.test(search) && Number(search) > 0 ? { clientId: Number(search) } : { search: search || undefined }),
     status: filters.status === "all" ? undefined : Number(filters.status) as PaymentsQuery["status"],
     source: filters.source === "all" ? undefined : Number(filters.source) as PaymentsQuery["source"],
     hasOverpayment: filters.overpayment === "all" ? undefined : filters.overpayment === "yes",
-    from: filters.dateFrom ? new Date(`${filters.dateFrom}T00:00:00`).toISOString() : undefined,
-    to: filters.dateTo ? new Date(`${filters.dateTo}T23:59:59.999`).toISOString() : undefined, amountMin, amountMax };
+    amountMin, amountMax };
 }

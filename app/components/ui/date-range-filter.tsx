@@ -12,6 +12,8 @@ export type DateRangeValue = {
 
 type DateRangeFilterProps = {
   label?: string;
+  /** Text shown while no date is chosen. */
+  emptyLabel?: string;
   value: DateRangeValue;
   onChange: (value: DateRangeValue) => void;
   className?: string;
@@ -19,6 +21,7 @@ type DateRangeFilterProps = {
 
 export function DateRangeFilter({
   label = "Zakres dat",
+  emptyLabel = "Dowolny zakres",
   value,
   onChange,
   className,
@@ -86,7 +89,7 @@ export function DateRangeFilter({
             {label}
           </span>
           <span className="block truncate text-sm font-semibold text-on-surface">
-            {getRangeLabel(value)}
+            {getRangeLabel(value, emptyLabel)}
           </span>
         </span>
         <ChevronDown
@@ -270,7 +273,7 @@ function serializeDate(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function getRangeLabel(value: DateRangeValue) {
+function getRangeLabel(value: DateRangeValue, emptyLabel: string) {
   if (value.from && value.to) {
     return `${formatDate(value.from)} - ${formatDate(value.to)}`;
   }
@@ -283,7 +286,7 @@ function getRangeLabel(value: DateRangeValue) {
     return `Do ${formatDate(value.to)}`;
   }
 
-  return "Dowolny zakres";
+  return emptyLabel;
 }
 
 function formatDate(value: string) {

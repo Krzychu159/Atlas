@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import PaymentDateCorrectionModal from "./PaymentDateCorrectionModal";
 import { canCorrectPaymentDate } from "@/app/lib/payments/date-correction";
 import {
@@ -12,9 +12,11 @@ import {
   CircleX,
   CreditCard,
   LoaderCircle,
+  MoreHorizontal,
   ReceiptText,
   RotateCcw,
 } from "lucide-react";
+import { PickerPanel, usePickerPopover } from "@/app/components/ui/picker-popover";
 import { PaymentStatusBadge } from "@/app/components/payments/PaymentDisplay";
 import { Button } from "@/app/components/ui/button";
 import { formatDateTime } from "@/app/lib/formatters/date";
@@ -34,6 +36,8 @@ type PaymentsListProps<TPayment extends PaymentDisplaySource> = {
   isLoading: boolean;
   processingId: number | null;
   dateCorrectionPortal?: "owner" | "trainer";
+  /** "compact": one line per payment on desktop, rarely used actions behind "⋯". */
+  density?: "comfortable" | "compact";
   showClient?: boolean;
   getDetailsHref?: (payment: TPayment) => string | undefined;
   emptyTitle?: string;
@@ -52,6 +56,7 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
   isLoading,
   processingId,
   dateCorrectionPortal,
+  density = "comfortable",
   showClient = true,
   getDetailsHref,
   emptyTitle = "Brak płatności",
@@ -96,12 +101,13 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
     onCancelReceipt ||
     onReverse,
   );
-  const gridClass = getGridClass(showClient, hasActions);
+  const compact = density === "compact";
+  const gridClass = compact ? getCompactGridClass(showClient, hasActions) : getGridClass(showClient, hasActions);
 
   return (
     <><div className="bg-surface-container-lowest">
       <div
-        className={`hidden gap-3 bg-surface-container-low px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted xl:grid ${gridClass}`}
+        className={`hidden gap-3 bg-surface-container-low text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted xl:grid ${compact ? "px-4 py-2.5" : "px-5 py-3"} ${gridClass}`}
       >
         <span>Data</span>
         {showClient ? <span>Klient</span> : null}
@@ -112,11 +118,12 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
         {hasActions ? <span className="text-right">Akcje</span> : null}
       </div>
 
-      <div className="flex flex-col gap-3 p-3 xl:block xl:p-0">
+      <div className={`flex flex-col p-3 xl:block xl:p-0 ${compact ? "gap-2" : "gap-3"}`}>
         {payments.map((payment) => (
           <PaymentListRow
             key={payment.id}
             payment={payment}
+            compact={compact}
             processing={processingId !== null || datePayment !== null}
             showClient={showClient}
             showActions={hasActions}
@@ -140,7 +147,7 @@ export function PaymentsList<TPayment extends PaymentDisplaySource>({
 }
 
 // The current package state comes from the backend and is labelled separately from this payment's own status.
-function PaymentPackageContext({ payment }: { payment: PaymentDisplaySource }) {
+function paymentPackageContextText(payment: PaymentDisplaySource) {
   const due = payment.packageAmountDue;
   const packageNow = typeof due === "number" && Number.isFinite(due) && due > 0
     ? `Pakiet teraz: ${payment.packagePaymentStatus === "Overdue" ? "zaległość" : "do zapłaty"} ${formatMoney(due, payment.currency)}`
@@ -148,8 +155,12 @@ function PaymentPackageContext({ payment }: { payment: PaymentDisplaySource }) {
   const location = payment.effectiveLocationName
     ? `${payment.effectiveLocationName}${payment.effectiveLocationSource === "ClientHome" ? " (lokalizacja klienta)" : ""}`
     : null;
-  if (!packageNow && !location) return null;
-  const text = [packageNow, location].filter(Boolean).join(" · ");
+  return [packageNow, location].filter(Boolean).join(" · ") || null;
+}
+
+function PaymentPackageContext({ payment }: { payment: PaymentDisplaySource }) {
+  const text = paymentPackageContextText(payment);
+  if (!text) return null;
   return (
     <p className="mt-1 text-xs text-on-surface-muted max-xl:line-clamp-2 xl:truncate" title={text}>
       {text}
@@ -169,6 +180,7 @@ function PaymentReceiptInfo({ payment }: { payment: PaymentDisplaySource }) {
 
 type PaymentListRowProps = {
   payment: PaymentDisplaySource;
+  compact?: boolean;
   processing: boolean;
   showClient: boolean;
   showActions: boolean;
@@ -198,11 +210,12 @@ function PaymentListRow(props: PaymentListRowProps) {
   return (
     <article
       className={[
-        "relative overflow-hidden rounded-[var(--radius-lg)] bg-surface-container-low p-4 before:absolute before:inset-y-0 before:left-0 before:w-0.5 xl:rounded-none xl:bg-surface-container-lowest xl:px-5 xl:py-4 xl:before:hidden xl:odd:bg-surface-container-low/55",
+        "relative overflow-hidden rounded-[var(--radius-lg)] bg-surface-container-low before:absolute before:inset-y-0 before:left-0 before:w-0.5 xl:rounded-none xl:bg-surface-container-lowest xl:before:hidden xl:odd:bg-surface-container-low/55",
+        props.compact ? "p-3 xl:px-4 xl:py-2 xl:hover:bg-surface-container-low" : "p-4 xl:px-5 xl:py-4",
         accentClass,
       ].join(" ")}
     >
-      <div className={`hidden items-center gap-3 xl:grid ${props.gridClass}`}>
+      {props.compact ? <CompactDesktopRow {...props} /> : <div className={`hidden items-center gap-3 xl:grid ${props.gridClass}`}>
         <p className="text-xs leading-5 text-on-surface-variant">
           {formatPaymentDate(payment.paymentDate)}
         </p>
@@ -243,7 +256,7 @@ function PaymentListRow(props: PaymentListRowProps) {
         </div>
         <PaymentMethod method={payment.method} />
         {props.showActions ? <RowActions {...props} /> : null}
-      </div>
+      </div>}
 
       <div className="xl:hidden">
         <div className="flex items-start justify-between gap-4">
@@ -252,7 +265,7 @@ function PaymentListRow(props: PaymentListRowProps) {
               {formatPaymentDate(payment.paymentDate)}
             </p>
             {props.showClient ? (
-              <p className="mt-2 truncate text-base font-semibold text-on-surface">
+              <p className={`${props.compact ? "mt-1" : "mt-2"} truncate text-base font-semibold text-on-surface`}>
                 {payment.clientName || `Klient #${payment.clientId}`}
               </p>
             ) : null}
@@ -271,7 +284,7 @@ function PaymentListRow(props: PaymentListRowProps) {
           </div>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3 text-xs text-on-surface-muted">
+        <div className={`${props.compact ? "mt-2" : "mt-3"} flex items-center justify-between gap-3 text-xs text-on-surface-muted`}>
           <PaymentMethod method={payment.method} />
           {hasPaymentOverpayment(payment) ? (
             <span className="text-tertiary-light">
@@ -290,7 +303,7 @@ function PaymentListRow(props: PaymentListRowProps) {
         ) : null}
 
         {props.showActions ? (
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className={`${props.compact ? "mt-3" : "mt-4"} flex flex-wrap gap-2`}>
             {props.onCorrectDate ? <Button type="button" size="sm" variant="secondary" icon={<CalendarClock size={15} />} disabled={props.processing} onClick={props.onCorrectDate}>Zmień datę wpłaty</Button> : null}
             {pending && (props.onConfirm || props.onReject) ? (
               <>
@@ -369,6 +382,139 @@ function PaymentListRow(props: PaymentListRowProps) {
         ) : null}
       </div>
     </article>
+  );
+}
+
+function CompactDesktopRow(props: PaymentListRowProps) {
+  const { payment } = props;
+  const receiptIssued = isPaymentReceiptIssued(payment);
+  const overpayment = hasPaymentOverpayment(payment);
+  const packageDetails = [payment.packageName || "Bez przypisanego pakietu", paymentPackageContextText(payment), payment.note].filter(Boolean).join(" · ");
+  const receiptLabel = receiptIssued
+    ? [payment.receiptNumber ? `Paragon nr ${payment.receiptNumber}` : "Paragon wystawiony", payment.receiptIssuedAt ? formatDateTime(payment.receiptIssuedAt) : null].filter(Boolean).join(", ")
+    : null;
+
+  return (
+    <div className={`hidden min-h-10 items-center gap-3 xl:grid ${props.gridClass}`}>
+      <p className="text-xs tabular-nums text-on-surface-variant">{formatPaymentDate(payment.paymentDate)}</p>
+      {props.showClient ? (
+        <p className="truncate text-sm font-semibold text-on-surface" title={payment.clientName || undefined}>
+          {payment.clientName || `Klient #${payment.clientId}`}
+        </p>
+      ) : null}
+      <p className="truncate text-sm text-on-surface-variant" title={packageDetails}>
+        {payment.packageName || "Bez przypisanego pakietu"}
+      </p>
+      <p className="flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
+        <span className="text-sm font-semibold tabular-nums text-on-surface">{formatMoney(payment.amount, payment.currency)}</span>
+        {overpayment ? (
+          <span className="truncate text-xs text-tertiary-light" title={`Nadpłata ${formatMoney(payment.balanceCreditAmount, payment.currency)} trafiła na saldo klienta`}>
+            +{formatMoney(payment.balanceCreditAmount, payment.currency)}
+          </span>
+        ) : null}
+      </p>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <PaymentStatusBadge payment={payment} />
+        {receiptLabel ? (
+          <span className="shrink-0 text-tertiary-light" title={receiptLabel}>
+            <ReceiptText size={14} aria-hidden="true" />
+            <span className="sr-only">{receiptLabel}</span>
+          </span>
+        ) : null}
+      </div>
+      <PaymentMethod method={payment.method} />
+      {props.showActions ? <CompactRowActions {...props} /> : null}
+    </div>
+  );
+}
+
+// The most common next step stays visible; everything else waits behind "⋯".
+function CompactRowActions(props: PaymentListRowProps) {
+  const pending = isPaymentPending(props.payment);
+  const confirmed = isPaymentConfirmed(props.payment);
+  const reversed = isPaymentReversed(props.payment);
+  const receiptIssued = isPaymentReceiptIssued(props.payment);
+  const settled = confirmed && !reversed;
+  const primary = pending && props.onConfirm
+    ? { label: "Potwierdź wpłatę", icon: <Check size={15} />, onSelect: props.onConfirm, tone: "success" as const }
+    : settled && !receiptIssued && props.onIssueReceipt
+      ? { label: "Wystaw paragon", icon: <ReceiptText size={15} />, onSelect: props.onIssueReceipt, tone: "neutral" as const }
+      : null;
+  const menuItems: RowMenuItem[] = [
+    ...(pending && props.onReject ? [{ label: "Odrzuć wpłatę", icon: <CircleX size={15} />, onSelect: props.onReject, tone: "danger" as const }] : []),
+    ...(settled && receiptIssued && props.onCancelReceipt ? [{ label: "Cofnij paragon", icon: <CircleX size={15} />, onSelect: props.onCancelReceipt }] : []),
+    ...(props.onCorrectDate ? [{ label: "Zmień datę wpłaty", icon: <CalendarClock size={15} />, onSelect: props.onCorrectDate }] : []),
+    ...(settled && props.onReverse ? [{ label: "Cofnij wpłatę", icon: <RotateCcw size={15} />, onSelect: props.onReverse, tone: "danger" as const }] : []),
+  ];
+
+  return (
+    <div className="flex justify-end gap-1">
+      {primary ? (
+        <IconAction label={primary.label} onClick={primary.onSelect} disabled={props.processing} tone={primary.tone} size="sm">
+          {primary.icon}
+        </IconAction>
+      ) : null}
+      {props.detailsHref ? (
+        <Link
+          href={props.detailsHref}
+          aria-label="Zobacz szczegóły płatności"
+          title="Szczegóły"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container text-on-surface-muted transition hover:bg-surface-container-high hover:text-primary-light"
+        >
+          <ChevronRight size={16} />
+        </Link>
+      ) : null}
+      <RowMoreMenu items={menuItems} disabled={props.processing} />
+    </div>
+  );
+}
+
+type RowMenuItem = { label: string; icon: ReactNode; onSelect: () => void; tone?: "default" | "danger" };
+
+// Rendered in a portal so the list's rounded, clipped container never cuts the menu off.
+function RowMoreMenu({ items, disabled }: { items: RowMenuItem[]; disabled: boolean }) {
+  const { open, host, show, close, rootRef, triggerRef } = usePickerPopover();
+  const menuId = useId();
+  if (!items.length) return <span aria-hidden="true" className="h-8 w-8" />;
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label="Więcej akcji"
+        title="Więcej akcji"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        disabled={disabled}
+        onClick={() => (open ? close() : show())}
+        className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container text-on-surface-muted transition hover:bg-surface-container-high hover:text-on-surface disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <MoreHorizontal size={16} />
+      </button>
+      {host ? (
+        <PickerPanel host={host} anchorRef={rootRef} id={menuId} label="Więcej akcji" align="end" onClose={close} className="min-w-[210px] p-1.5!">
+          {items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              autoFocus={item === items[0]}
+              onClick={() => { close(false); item.onSelect(); }}
+              className={[
+                "flex min-h-9 w-full items-center gap-2.5 rounded-[var(--radius-md)] px-3 text-left text-sm font-semibold transition focus-visible:outline-none",
+                item.tone === "danger"
+                  ? "text-error-light hover:bg-error-container/25 focus-visible:bg-error-container/25"
+                  : "text-on-surface hover:bg-white/5 focus-visible:bg-white/5",
+              ].join(" ")}
+            >
+              <span className="shrink-0">{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </PickerPanel>
+      ) : null}
+    </div>
   );
 }
 
@@ -454,12 +600,14 @@ function IconAction({
   onClick,
   disabled,
   tone = "neutral",
+  size = "md",
   children,
 }: {
   label: string;
   onClick: () => void;
   disabled: boolean;
   tone?: "neutral" | "success" | "danger";
+  size?: "sm" | "md";
   children: React.ReactNode;
 }) {
   const toneClass = {
@@ -478,7 +626,7 @@ function IconAction({
       title={label}
       onClick={onClick}
       disabled={disabled}
-      className={`flex h-9 w-9 items-center justify-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-40 ${toneClass}`}
+      className={`flex items-center justify-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-40 ${size === "sm" ? "h-8 w-8" : "h-9 w-9"} ${toneClass}`}
     >
       {children}
     </button>
@@ -506,6 +654,14 @@ function formatPaymentDate(value?: string | null) {
   if (!value) return "Brak daty";
 
   return formatDateTime(value).replace(", 00:00", "");
+}
+
+// Full class names only: Tailwind generates classes it can read literally in the source.
+function getCompactGridClass(showClient: boolean, showActions: boolean) {
+  if (showClient && showActions) return "grid-cols-[96px_minmax(140px,1fr)_minmax(150px,1.2fr)_minmax(150px,0.8fr)_150px_96px_112px]";
+  if (showClient) return "grid-cols-[96px_minmax(140px,1fr)_minmax(150px,1.2fr)_minmax(150px,0.8fr)_150px_96px]";
+  if (showActions) return "grid-cols-[96px_minmax(200px,1.4fr)_minmax(150px,0.8fr)_150px_96px_112px]";
+  return "grid-cols-[96px_minmax(200px,1.4fr)_minmax(150px,0.8fr)_150px_96px]";
 }
 
 function getGridClass(showClient: boolean, showActions: boolean) {

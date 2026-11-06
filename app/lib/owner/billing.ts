@@ -170,10 +170,14 @@ export type PaymentsQuery = {
   sort?: "paymentDateDesc" | "paymentDate" | "amountDesc" | "amount" | "clientName" | "clientNameDesc" | "overpayment" | "overpaymentDesc";
   order?: "asc" | "desc";
   clientId?: number | null;
+  /** Trainer assigned to the client. */
+  trainerId?: number | null;
   status?: ClientPaymentStatus | null;
   source?: ClientPaymentSource | null;
   from?: string | null;
   to?: string | null;
+  /** Calendar month of the payment date in Polish time ("YYYY-MM"); the backend rejects it together with from/to. */
+  month?: string | null;
   amountMin?: number | null;
   amountMax?: number | null;
   hasOverpayment?: boolean | null;
@@ -521,10 +525,12 @@ function toPaymentsQuery(query?: PaymentsQuery) {
     Sort: query?.sort,
     Order: query?.order,
     ClientId: query?.clientId,
+    TrainerId: query?.trainerId,
     Status: query?.status,
     Source: query?.source,
     From: query?.from,
     To: query?.to,
+    Month: query?.month,
     AmountMin: query?.amountMin,
     AmountMax: query?.amountMax,
     HasOverpayment: query?.hasOverpayment,

@@ -21,6 +21,13 @@ export function shiftMonthValue(value: string, delta: number) {
   return toMonthValue(year, (index % 12) + 1);
 }
 
+// The studio's calendar month right now, independent of the browser's time zone.
+export function currentPolishMonthValue(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit" }).formatToParts(now);
+  const part = (type: "year" | "month") => Number(parts.find((item) => item.type === type)?.value);
+  return toMonthValue(part("year"), part("month"));
+}
+
 // Zero-padded "YYYY-MM" strings compare correctly as text.
 export function isMonthInRange(value: string, min?: string, max?: string) {
   return Boolean(parseMonthValue(value)) && (!min || value >= min) && (!max || value <= max);
