@@ -2,7 +2,7 @@ import type { CalendarSession } from "./types";
 
 const MINUTE = 60_000;
 const DEFAULT_START_HOUR = 7;
-const DEFAULT_END_HOUR = 21;
+const DEFAULT_END_HOUR = 24;
 
 export type PositionedSession<TSession extends CalendarSession> = {
   session: TSession;
