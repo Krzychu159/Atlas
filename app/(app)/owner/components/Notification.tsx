@@ -83,6 +83,8 @@ export default function NotificationItem({
   const element = useRef<HTMLElement>(null);
   const category = notificationCategoryLabel(item.category);
   const unread = !item.isRead;
+  // The reason a session was not settled names the client, package and dates; keep it readable.
+  const fullReason = item.type === "SessionNotSettled";
   useEffect(() => {
     if (expanded) element.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [expanded]);
@@ -149,7 +151,7 @@ export default function NotificationItem({
             <time dateTime={item.createdAt} className="shrink-0 text-[11px] tabular-nums text-on-surface-muted">{time}</time>
           </span>
           {!expanded && item.message ? (
-            <span className={`mt-0.5 block break-words text-xs leading-5 text-on-surface-muted ${compact ? "line-clamp-2" : "line-clamp-1 md:line-clamp-2"}`}>{item.message}</span>
+            <span className={`mt-0.5 block break-words text-xs leading-5 text-on-surface-muted ${fullReason ? "line-clamp-4" : compact ? "line-clamp-2" : "line-clamp-1 md:line-clamp-2"}`}>{item.message}</span>
           ) : null}
           {category || (!compact && !expanded) ? (
             <span className="mt-1.5 flex items-center gap-2 text-[11px] text-on-surface-muted">

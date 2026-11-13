@@ -22,7 +22,9 @@ import { DaySchedule, WeekSchedule } from "@/app/(app)/owner/schedule/components
 import SessionEditorModal from "@/app/(app)/owner/schedule/components/SessionEditorModal";
 import { scheduleStatusFilterOptions } from "@/app/(app)/owner/schedule/options";
 import { addDays, getPeriod, startOfWeek, toDateInputValue } from "@/app/(app)/owner/schedule/date-utils";
-import { completeConsultation, isConsultationForm, matchesStatusFilter, sortSessions, toSessionPayload } from "@/app/(app)/owner/schedule/session-utils";
+import { completeConsultation, isConsultationForm, matchesStatusFilter, sessionSettlementAlert, sortSessions, toSessionPayload } from "@/app/(app)/owner/schedule/session-utils";
+import type { SessionSettlementAlertProps } from "@/app/(app)/owner/schedule/components/SessionSettlementAlert";
+import { notifyNotificationsChanged } from "@/app/lib/notifications";
 import type { CalendarSession, ScheduleView, SessionFormValues, SessionStatusFilter } from "@/app/(app)/owner/schedule/types";
 import { useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 import { getTrainerClientsPage } from "@/app/lib/trainer/optimized";
@@ -47,6 +49,7 @@ export default function TrainerSchedulePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedSession, setSelectedSession] = useState<TrainerSessionDetails | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editSettlementError, setEditSettlementError] = useState<SessionSettlementAlertProps | null>(null);
   const [editorRevision, setEditorRevision] = useState(0);
   const [createDate, setCreateDate] = useState(() => new Date());
   const [createStartAt, setCreateStartAt] = useState<Date | null>(null);
@@ -225,6 +228,8 @@ export default function TrainerSchedulePage() {
   async function handleEdit(values: SessionFormValues) {
     const session = selectedSession;
     if (saving.current || !session || session.canEdit !== true || session.trainerId !== me?.trainerId) return;
+    const completing = session.status !== "Completed" && values.status === "Completed";
+    setEditSettlementError(null);
     try {
       if (Number(values.trainerId) !== session.trainerId) throw new Error("Możesz edytować tylko własne zajęcia.");
       if (Number(values.locationId) !== session.locationId && !locations.some(location => location.id === Number(values.locationId))) throw new Error("Wybierz dostępną lokalizację.");
@@ -259,6 +264,7 @@ export default function TrainerSchedulePage() {
         await completeConsultation(session.id, correctTrainerSessionBilling);
         notifySessionCorrected();
       }
+      if (completing) notifyNotificationsChanged();
       if (!mounted.current) return;
       setIsEditOpen(false);
       showAppSuccess(completingConsultation ? "Konsultacja została zakończona." : "Zmiany w zajęciach zostały zapisane.");
@@ -266,7 +272,10 @@ export default function TrainerSchedulePage() {
       await openDetails({ id: session.id });
     } catch (error) {
       if (!mounted.current) return;
-      showAppError(new Error(trainerPaymentError(error, "Nie udało się zapisać zmian w zajęciach.")), "Nie udało się zapisać zmian w zajęciach.");
+      // The reason stays in the edit window; the trainer cannot change packages, so there is no package link.
+      const settlement = sessionSettlementAlert(error, { completing, participantIds: values.participantIds, ownerAccess: false, title: completing ? undefined : "Nie można przeliczyć zajęć" });
+      if (settlement) setEditSettlementError(settlement);
+      else showAppError(new Error(trainerPaymentError(error, "Nie udało się zapisać zmian w zajęciach.")), "Nie udało się zapisać zmian w zajęciach.");
       if (error instanceof ApiError) {
         await reloadSessions();
         if (!mounted.current) return;
@@ -347,7 +356,7 @@ export default function TrainerSchedulePage() {
         </>}
       </div>
       {selectedSession && !isEditOpen ? <TrainerSessionDetailsModal session={selectedSession} onEdit={!isResourcesLoading && !resourcesError && selectedSession.trainerId === me?.trainerId ? () => { if (selectedSession.canEdit === true) setIsEditOpen(true); } : undefined} onClose={() => { detailRevision.current += 1; detailController.current?.abort(); setSelectedSession(null); }} series={selectedSession.recurringGroupId && selectedSession.trainerId === me?.trainerId ? { busy: seriesAction, onRetrySync: () => retrySeriesSync(selectedSession.recurringGroupId!), onDeleteFuture: () => removeFutureSeriesSessions(selectedSession.recurringGroupId!) } : undefined} /> : null}
-      {isEditOpen && selectedSession ? <SessionEditorModal key={"edit-" + selectedSession.id + "-" + editorRevision} open session={selectedSession} anchorDate={new Date(selectedSession.startAt)} trainers={trainers} locations={locations} clients={clients} loadClientOptions={loadClientOptions} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsEditOpen(false); }} onSubmit={handleEdit} /> : null}
+      {isEditOpen && selectedSession ? <SessionEditorModal key={"edit-" + selectedSession.id + "-" + editorRevision} open session={selectedSession} anchorDate={new Date(selectedSession.startAt)} trainers={trainers} locations={locations} clients={clients} loadClientOptions={loadClientOptions} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions isSaving={isSaving} settlementError={editSettlementError} onClose={() => { if (!saving.current) { setIsEditOpen(false); setEditSettlementError(null); } }} onSubmit={handleEdit} /> : null}
       <SessionEditorModal key={isCreateOpen ? "new-" + toDateInputValue(createDate) : "closed"} open={isCreateOpen} session={null} anchorDate={createDate} defaultStartAt={createStartAt} trainers={trainers} locations={locations} clients={clients} loadClientOptions={loadClientOptions} defaultTrainerId={me?.trainerId} trainerAccess allowPublicSessions allowRecurringSessions isSaving={isSaving} onClose={() => { if (!saving.current) setIsCreateOpen(false); }} onSubmit={handleCreate} />
     </>
   );

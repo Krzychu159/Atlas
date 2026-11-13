@@ -7,6 +7,8 @@ import type {
 } from "@/app/lib/owner/sessions";
 import type { Trainer } from "@/app/lib/owner/trainers";
 import { completeSession, updateSession } from "@/app/lib/owner/sessions";
+import { getSessionSettlementError, isPackageSettlementError } from "@/app/lib/session-settlement";
+import type { SessionSettlementAlertProps } from "./components/SessionSettlementAlert";
 
 import { toDateTimeLocalValue } from "./date-utils";
 import type { CalendarSession, CorrectionMode, ParticipantCorrection, SessionEditorSession, SessionFormValues, SessionStatusFilter } from "./types";
@@ -472,6 +474,24 @@ export function correctionErrorMessage(error: unknown) {
   if (/reason|powód/.test(text)) return "Podaj powód korekty (od 1 do 500 znaków).";
   if (/attendance|obecno/.test(text)) return "Wybrany status obecności nie jest obsługiwany. Wybierz „Obecny” albo „Nieobecny”.";
   return "Nie udało się zapisać korekty. Sprawdź dane i spróbuj ponownie.";
+}
+
+// Why completing (or re-settling) a session failed. Owners get a link to the client's packages
+// when one client is involved; with several participants the reason names the client.
+export function sessionSettlementAlert(
+  error: unknown,
+  { completing, participantIds, ownerAccess, title }: { completing: boolean; participantIds: string[]; ownerAccess: boolean; title?: string },
+): SessionSettlementAlertProps | null {
+  const settlement = getSessionSettlementError(error, completing);
+  if (!settlement) return null;
+  const clientId = participantIds.length === 1 && /^[1-9]\d*$/.test(participantIds[0]) ? participantIds[0] : null;
+  const packageIssue = isPackageSettlementError(settlement);
+  const action = ownerAccess && clientId && packageIssue
+    ? { href: `/owner/clients/${clientId}`, label: "Przejdź do pakietów klienta" }
+    : null;
+  // Trainers cannot change client packages; the owner fixes them.
+  const message = !ownerAccess && packageIssue ? `${settlement.message} Jeśli nie możesz tego zmienić, poproś właściciela studia.` : settlement.message;
+  return { title, message, action };
 }
 
 export function correctionAuthor(item: { changedByFullName?: string | null; changedByUserId: number | null }) {

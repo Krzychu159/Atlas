@@ -48,6 +48,7 @@ import type { ParticipantCorrection, SessionEditorSession, SessionFormValues } f
 import SessionCorrectionHistory from "./SessionCorrectionHistory";
 import { CorrectionParticipantRows, SessionCorrectionPanel } from "./SessionCorrectionPanel";
 import GroupEnrollmentsSection from "./GroupEnrollmentsSection";
+import SessionSettlementAlert, { type SessionSettlementAlertProps } from "./SessionSettlementAlert";
 
 export default function SessionEditorModal({
   open,
@@ -65,6 +66,7 @@ export default function SessionEditorModal({
   allowCorrectionHistory = false,
   isSaving,
   saveError,
+  settlementError,
   onDelete,
   onSyncOutlook,
   onClose,
@@ -86,6 +88,7 @@ export default function SessionEditorModal({
   allowCorrectionHistory?: boolean;
   isSaving: boolean;
   saveError?: string | null;
+  settlementError?: SessionSettlementAlertProps | null;
   onDelete?: () => void;
   onSyncOutlook?: () => void;
   onClose: () => void;
@@ -754,7 +757,7 @@ export default function SessionEditorModal({
           </div>
         </div>
 
-        {saveError ? <p role="alert" className="border-t border-white/5 bg-error-container/20 px-5 py-3 text-sm text-error-light md:px-6">{saveError}</p> : null}
+        {settlementError ? <SessionSettlementAlert {...settlementError} /> : saveError ? <p role="alert" className="border-t border-white/5 bg-error-container/20 px-5 py-3 text-sm text-error-light md:px-6">{saveError}</p> : null}
         <div className="flex flex-col-reverse gap-3 border-t border-white/5 bg-surface-container px-5 py-4 sm:flex-row sm:justify-end md:px-6">
           {session && !readOnly && (onDelete || onSyncOutlook) ? <div className="flex flex-col-reverse gap-3 sm:mr-auto sm:flex-row">
             {onDelete ? <Button type="button" variant="ghost" icon={<Trash2 size={16} />} disabled={isSaving || groupEnrollmentBusy} onClick={() => setConfirmDelete(true)} className="text-error-light">Usuń sesję</Button> : null}

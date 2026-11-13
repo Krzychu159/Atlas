@@ -155,7 +155,10 @@ function matchNotificationUrl(notification: AppNotification, role: NotificationR
     if (role === "client") return `/client/${client[2] ? "payments" : "settings"}${suffix}`;
     return `/${role}/clients/${client[1]}${client[2] ? "/payments" : ""}${suffix}`;
   }
-  if (/^\/(sessions|schedule|group-classes)(?:\/[1-9]\d*)?$/.test(domainPath)) return `/${role}/schedule${suffix}`;
+  // A session link (e.g. /sessions/1534/workspace) opens that session in the schedule.
+  const session = domainPath.match(/^\/sessions\/([1-9]\d*)(?:\/workspace)?$/);
+  if (session && role !== "client") return `/${role}/schedule?sessionId=${session[1]}`;
+  if (/^\/(sessions|schedule|group-classes)(?:\/[1-9]\d*(?:\/workspace)?)?$/.test(domainPath)) return `/${role}/schedule${suffix}`;
   if (/^\/(payments|billing)(?:\/[1-9]\d*)?$/.test(domainPath)) return `/${role}/payments${suffix}`;
   if (/^\/(client-packages|subscriptions)(?:\/[1-9]\d*)?$/.test(domainPath)) return `/${role}/payments${suffix}`;
   if (/^\/packages(?:\/[1-9]\d*)?$/.test(domainPath)) {
@@ -184,7 +187,7 @@ export function getNotificationDestination(notification: AppNotification, reques
   const validId = typeof id === "number" && Number.isSafeInteger(id) && id > 0;
   const kind = /settlement/i.test(`${entity} ${notification.type ?? ""}`) ? "settlement" : getNotificationKind(notification);
   if (kind === "invitation") return invitationDestination(notification, role);
-  if (kind === "session") return `/${role}/schedule`;
+  if (kind === "session") return entity === "session" && validId && role !== "client" ? `/${role}/schedule?sessionId=${id}` : `/${role}/schedule`;
   if (entity === "client" && validId) {
     if (role === "client") return ["payment", "package", "subscription"].includes(kind) ? "/client/payments" : "/client/settings";
     return `/${role}/clients/${id}${["payment", "package", "subscription"].includes(kind) ? "/payments" : ""}`;

@@ -4,6 +4,7 @@ import { ApiError } from "@/app/lib/backend";
 import { userMessage } from "@/app/lib/user-messages";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { CircleAlert, Plus, RefreshCw } from "lucide-react";
 import { useOwnerRead } from "../components/use-owner-read";
 import { OwnerReadState } from "../components/OwnerReadState";
@@ -32,7 +33,9 @@ import { DateNavigator, ViewSwitch } from "./components/ScheduleControls";
 import ScheduleFilters, { countScheduleFilters, ScheduleFiltersToggle } from "./components/ScheduleFilters";
 import { OutlookRequiredState } from "./components/ScheduleStates";
 import { DaySchedule, WeekSchedule } from "./components/ScheduleViews";
-import { completeConsultation, correctCompletedSession, correctionErrorMessage, isConsultationForm } from "@/app/(app)/owner/schedule/session-utils";
+import { completeConsultation, correctCompletedSession, correctionErrorMessage, isConsultationForm, sessionSettlementAlert } from "@/app/(app)/owner/schedule/session-utils";
+import type { SessionSettlementAlertProps } from "./components/SessionSettlementAlert";
+import { notifyNotificationsChanged } from "@/app/lib/notifications";
 import OutlookIssuesPanel from "./components/OutlookIssuesPanel";
 import { notifySessionCorrected, useSessionCorrectionRevision } from "@/app/lib/session-corrections";
 import SessionEditorModal from "./components/SessionEditorModal";
@@ -91,9 +94,9 @@ export default function SchedulePage() {
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [pendingSessionId, setPendingSessionId] = useState<number | null>(null);
   const [isSavingSession, setIsSavingSession] = useState(false);
-  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | SessionSettlementAlertProps | null>(null);
   const [issueCount, setIssueCount] = useState<number | null>(null);
-  const requestedSessionHandled = useRef(false);
+  const requestedSessionHandled = useRef<string | null>(null);
   const calendarRevision = useSessionCorrectionRevision();
   const [sessionRevision, setSessionRevision] = useState(0);
 
@@ -189,17 +192,18 @@ export default function SchedulePage() {
     setIsSessionModalOpen(true);
   }
 
-  // Calendar issues in settings link here with ?sessionId=…
+  // Calendar issues in settings and session notifications link here with ?sessionId=…,
+  // also while the schedule is already open.
+  const requestedSessionParam = useSearchParams().get("sessionId");
   useEffect(() => {
-    if (!connected || requestedSessionHandled.current) return;
-    requestedSessionHandled.current = true;
-    const sessionId = Number(/[?&]sessionId=(\d+)/.exec(globalThis.location?.search ?? "")?.[1]);
-    if (!Number.isSafeInteger(sessionId) || sessionId <= 0) return;
+    if (!requestedSessionParam) { requestedSessionHandled.current = null; return; }
+    if (!connected || requestedSessionHandled.current === requestedSessionParam) return;
+    requestedSessionHandled.current = requestedSessionParam;
+    const sessionId = Number(requestedSessionParam);
     window.history.replaceState(window.history.state, "", window.location.pathname);
+    if (!/^\d+$/.test(requestedSessionParam) || !Number.isSafeInteger(sessionId) || sessionId <= 0) return;
     void openEditModal({ id: sessionId });
-    // openEditModal only reads refs and setters.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected]);
+  }, [connected, requestedSessionParam]);
 
   async function handleDeleteSession() {
     // A completed session is billed; it is corrected as "not held" instead of being deleted.
@@ -263,13 +267,14 @@ export default function SchedulePage() {
         mode = await correctCompletedSession(selectedSession, values);
       } catch (err) {
         // Keep the entered correction so the owner can fix the cause and save again.
-        setSessionError(correctionErrorMessage(err));
+        setSessionError(sessionSettlementAlert(err, { completing: false, participantIds: values.participantIds, ownerAccess: true, title: "Nie można przeliczyć sesji" }) ?? correctionErrorMessage(err));
         setIsSavingSession(false);
         return;
       }
       try {
         showOwnerSuccess(mode === "not-held" ? "Sesja nie jest już rozliczona jako zrealizowana. Wejścia i salda klientów zostały przeliczone." : "Korekta została zapisana.");
         notifySessionCorrected();
+        notifyNotificationsChanged();
         // A refresh failure must not turn a successful correction into a retry.
         try {
           const refreshed = await getSession(selectedSession.id);
@@ -286,9 +291,10 @@ export default function SchedulePage() {
       }
       return;
     }
+    const completing = Boolean(selectedSession) && values.status === "Completed";
     try {
       setIsSavingSession(true);
-      const completingConsultation = Boolean(selectedSession) && isConsultationForm(values) && values.status === "Completed";
+      const completingConsultation = completing && isConsultationForm(values);
       // Save other edits with the current status, then complete through the dedicated endpoint.
       const payload = toSessionPayload(completingConsultation ? { ...values, status: selectedSession?.status || "" } : values, selectedSession);
 
@@ -296,9 +302,11 @@ export default function SchedulePage() {
         await updateSession(selectedSession.id, payload);
         await completeConsultation(selectedSession.id);
         notifySessionCorrected();
+        notifyNotificationsChanged();
         showOwnerSuccess("Konsultacja została zakończona.", { id: "owner-session-updated" });
       } else if (selectedSession) {
         await updateSession(selectedSession.id, payload);
+        if (completing) notifyNotificationsChanged();
         showOwnerSuccess("Sesja została zaktualizowana.", {
           id: "owner-session-updated",
         });
@@ -324,7 +332,10 @@ export default function SchedulePage() {
       setIsSessionModalOpen(false);
       setSelectedSession(null);
     } catch (err) {
-      showOwnerError(err, "Nie udało się zapisać sesji.", {
+      // The reason stays in the session window until the owner fixes the package and saves again.
+      const settlement = sessionSettlementAlert(err, { completing, participantIds: values.participantIds, ownerAccess: true });
+      if (settlement) setSessionError(settlement);
+      else showOwnerError(err, "Nie udało się zapisać sesji.", {
         id: "owner-session-save-error",
       });
       if (err instanceof ApiError) {
@@ -498,7 +509,8 @@ export default function SchedulePage() {
         loadClientOptions={loadClientOptions}
         defaultTrainerId={defaultTrainerId}
         isSaving={isSavingSession}
-        saveError={sessionError}
+        saveError={typeof sessionError === "string" ? sessionError : null}
+        settlementError={sessionError && typeof sessionError === "object" ? sessionError : null}
         onDelete={selectedSession && selectedSession.status !== "Completed" ? handleDeleteSession : undefined}
         onSyncOutlook={selectedSession && selectedSession.status !== "Cancelled" ? handleSyncSessionToOutlook : undefined}
         onClose={() => {

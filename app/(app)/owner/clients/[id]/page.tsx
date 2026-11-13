@@ -3,6 +3,7 @@
 import { safeExternalUrl } from "@/app/lib/safe-url";
 
 import { useSessionCorrectionRevision, usePaymentDateCorrectionRevision } from "@/app/lib/session-corrections";
+import { notifyNotificationsChanged } from "@/app/lib/notifications";
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -316,6 +317,13 @@ function ClientDetails({ clientId }: { clientId: number }) {
     }
   }
 
+  // An extended or newly assigned package can settle a session the worker could not settle,
+  // so the "session not settled" notifications and the unread count are fetched again.
+  async function refreshAfterPackageChange(id: number) {
+    notifyNotificationsChanged();
+    await refreshCooperationData(id, true);
+  }
+
   async function refreshRefundData(id: number) {
     await refreshCooperationData(id);
   }
@@ -408,11 +416,11 @@ function ClientDetails({ clientId }: { clientId: number }) {
           <div className="flex flex-col gap-2">
             {account.data !== undefined ? (
               <CollapsibleSection title="Pakiety" icon={<Package size={15} />} meta={getActivePackagesMeta(billing?.packages)} defaultOpen>
-                <ClientPackagesSection key={client.id} embedded packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} clientId={!client.isArchived ? client.id : undefined} onSaved={() => refreshCooperationData(client.id, true)} />
+                <ClientPackagesSection key={client.id} embedded packages={billing?.packages} activeClientPackageId={billing?.activeClientPackageId} clientId={!client.isArchived ? client.id : undefined} onSaved={() => refreshAfterPackageChange(client.id)} />
               </CollapsibleSection>
             ) : null}
             <CollapsibleSection title="Usługi okresowe" icon={<CalendarRange size={15} />}>
-              <ClientPeriodPackagesSection key={`period:${client.id}`} embedded clientId={client.id} canManage={!client.isArchived} onSaved={() => refreshCooperationData(client.id, true)} />
+              <ClientPeriodPackagesSection key={`period:${client.id}`} embedded clientId={client.id} canManage={!client.isArchived} onSaved={() => refreshAfterPackageChange(client.id)} />
             </CollapsibleSection>
 
             <OwnerReadState loading={history.loading} error={history.error} retry={history.retry} label="Ładowanie historii treningów...">
