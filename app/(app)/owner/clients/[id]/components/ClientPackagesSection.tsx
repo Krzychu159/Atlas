@@ -5,7 +5,7 @@ import { Dumbbell, Info, MapPin, UsersRound } from "lucide-react";
 import { useCurrentUser } from "@/app/components/current-user-provider";
 import { Button } from "@/app/components/ui/button";
 import { Tooltip } from "@/app/components/ui/tooltip";
-import { getPackageClosureLabel, getPackageOriginLabel, getPackagePaymentStatusLabel, type ClientPackageBilling } from "@/app/lib/owner/billing";
+import { getConsumedSessions, getPackageClosureLabel, getPackageOriginLabel, getPackagePaymentStatusLabel, type ClientPackageBilling } from "@/app/lib/owner/billing";
 import { formatMoney as formatKnownMoney } from "@/app/lib/formatters/money";
 import { userTrainingType } from "@/app/lib/user-messages";
 import PackageManagementModal from "./PackageManagementModal";
@@ -236,7 +236,7 @@ function ClientPackageCard({
       </div>
 
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
-        <CardStat label="Wejścia" value={`${packageData.usedSessions ?? "—"}/${packageData.totalSessions ?? "—"}`} />
+        <CardStat label="Wejścia" value={`${getConsumedSessions(packageData) ?? "—"}/${packageData.totalSessions ?? "—"}`} />
         <CardStat label="Ważność" value={formatPackageInstant(packageData.validUntil)} />
         <CardStat label="Zapłacono" value={formatMoney(packageData.amountPaid, currency)} />
         <CardStat label="Do zapłaty" value={formatMoney(packageData.amountDue, currency)} accent />

@@ -315,6 +315,7 @@ export type PackageManagementPreview = {
   canEdit: boolean;
   canCorrect: boolean;
   canCorrectPrice?: boolean;
+  canCorrectSessions?: boolean;
   amountPaid?: number;
   totalPrice?: number;
   canClose: boolean;
@@ -396,6 +397,13 @@ export function getPackagePaymentStatusLabel(value: unknown): string {
     PartiallyPaid: "Częściowo opłacony", PendingConfirmation: "Oczekuje na potwierdzenie wpłaty",
   };
   return typeof value === "string" && Object.hasOwn(labels, value) ? labels[value] : "Stan płatności niedostępny";
+}
+
+// usedSessions may include planned trainings; remainingSessions reflects only settled ones.
+export function getConsumedSessions(item: Pick<ClientPackageBilling, "totalSessions" | "usedSessions" | "remainingSessions">, remaining = item.remainingSessions) {
+  const { totalSessions } = item;
+  if (Number.isSafeInteger(totalSessions) && Number.isSafeInteger(remaining) && remaining >= 0 && remaining <= totalSessions) return totalSessions - remaining;
+  return item.usedSessions;
 }
 
 export function getClientPackageManagementPreview(clientId: number, clientPackageId: number) {

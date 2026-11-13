@@ -14,7 +14,7 @@ import { userMessage } from "@/app/lib/user-messages";
 import { calendarDateIsValid, isPeriodPackage, isSessionPackage, periodPackageError, periodRangeLabel, periodStatusLabel } from "@/app/lib/period-packages";
 import {
   closeClientPackage, correctClientPackage, deleteClientPackage, getClientBilling,
-  getClientPackageManagementPreview, getPackageBlockerLabel, getPackageClosureLabel,
+  getClientPackageManagementPreview, getConsumedSessions, getPackageBlockerLabel, getPackageClosureLabel,
   getPackagePaymentStatusLabel, type ClientPackageBilling, type CloseClientPackagePayload,
   type CorrectClientPackagePayload, type CorrectClientPackageResult, type PackageManagementPreview,
 } from "@/app/lib/owner/billing";
@@ -132,12 +132,13 @@ export default function PackageManagementModal({ clientId, packageData, onClose,
     if (mode === "correct") {
       if (!reason.trim()) { setError("Podaj powód zmiany."); return; }
       if (reason.trim().length > reasonMaxLength) { setError(`Powód może mieć maksymalnie ${reasonMaxLength} znaków.`); return; }
-      const editFields = preview.canEdit === true || preview.canCorrect === true;
+      const editFields = canChangeDates(preview);
       const sessionsChanged = Number(sessions) !== draftBase.totalSessions;
       const priceChanged = Number(price) !== draftBase.totalPrice;
       const validityChanged = validUntil !== packageInstantToLocalInput(draftBase.validUntil);
       const dueChanged = dueDate !== toDateInputValue(draftBase.paymentDueDate);
-      if ((sessionsChanged || validityChanged || dueChanged) && !editFields) { setError("Zmiana liczby wejść i dat jest teraz zablokowana. Formularz został zachowany."); return; }
+      if (sessionsChanged && !canChangeSessions(preview)) { setError("Zmiana liczby wejść jest teraz zablokowana. Formularz został zachowany."); return; }
+      if ((validityChanged || dueChanged) && !editFields) { setError("Zmiana dat jest teraz zablokowana. Formularz został zachowany."); return; }
       if (priceChanged && preview.canCorrectPrice !== true) { setError("Zmiana ceny jest teraz zablokowana. Formularz został zachowany."); return; }
       if (sessionsChanged) {
         if (!sessions.trim() || !Number.isSafeInteger(Number(sessions)) || Number(sessions) < Math.max(current.usedSessions, 0)) { setError("Liczba wejść nie może być niższa od liczby wykorzystanych wejść."); return; }
@@ -185,9 +186,8 @@ export default function PackageManagementModal({ clientId, packageData, onClose,
       }
       setPreview(latest);
       if (mode === "correct") {
-        const editFields = latest.canEdit === true || latest.canCorrect === true;
-        const otherFieldsChanged = correction.totalSessions !== undefined || correction.validUntil !== undefined || correction.paymentDueDate !== undefined;
-        if ((otherFieldsChanged && !editFields) || (correction.totalPrice !== undefined && latest.canCorrectPrice !== true)) {
+        const datesChanged = correction.validUntil !== undefined || correction.paymentDueDate !== undefined;
+        if ((datesChanged && !canChangeDates(latest)) || (correction.totalSessions !== undefined && !canChangeSessions(latest)) || (correction.totalPrice !== undefined && latest.canCorrectPrice !== true)) {
           setChanged(true); setError("Dostępne działania zmieniły się. Formularz został zachowany. Sprawdź aktualne uprawnienia przed ponownym zatwierdzeniem."); return;
         }
       }
@@ -233,8 +233,11 @@ export default function PackageManagementModal({ clientId, packageData, onClose,
     finally { saving.current = false; setBusy(false); }
   }
 
-  const canChangeFields = preview?.canEdit === true || preview?.canCorrect === true;
+  const canChangeFields = preview ? canChangeDates(preview) : false;
+  const canChangeSessionCount = preview ? canChangeSessions(preview) : false;
   const canChangePrice = preview?.canCorrectPrice === true;
+  const visibleBlockers = (preview?.blockers || []).filter(blocker => blocker !== "UnfinishedSessions" || !canChangeFields);
+  const lockedFieldsHint = lockedHint(periodBased, canChangeSessionCount, canChangePrice, canChangeFields);
   const priceChanged = Number(price) !== draftBase.totalPrice;
   const paid = preview?.amountPaid ?? current.amountPaid;
   const validPrice = /^\d+(?:\.\d{1,2})?$/.test(price) && Number.isFinite(Number(price));
@@ -264,7 +267,7 @@ export default function PackageManagementModal({ clientId, packageData, onClose,
       {notice ? <p role="status" className="mt-4 text-sm text-tertiary-light">{notice}</p> : null}
       {!preview && !error ? <p className="mt-4" role="status">Sprawdzanie dostępnych działań…</p> : null}
       {!preview && error ? <Button className="mt-3" variant="secondary" disabled={busy} onClick={() => void retryContext()}>Odśwież dane pakietu</Button> : null}
-      {preview ? <div className="mt-4 space-y-2 text-sm text-on-surface-variant">{(preview.blockers || []).map((blocker, index) => <p key={index}>{getPackageBlockerLabel(blocker)}</p>)}</div> : null}
+      {preview ? <div className="mt-4 space-y-2 text-sm text-on-surface-variant">{visibleBlockers.map((blocker, index) => <p key={index}>{getPackageBlockerLabel(blocker)}</p>)}</div> : null}
       {mode === "overview" && preview ? <div className="mt-5 space-y-3">
         <PackageSummary packageData={current} amountDue={preview.amountDue} remaining={preview.remainingSessions} balance={balance} />
         <div className="flex flex-wrap gap-3">
@@ -272,18 +275,18 @@ export default function PackageManagementModal({ clientId, packageData, onClose,
           {preview.canClose ? <><Button disabled={busy} variant="secondary" onClick={() => void begin("close")}>{periodBased ? "Zamknij usługę" : "Zamknij pakiet"}</Button>{!periodBased ? <Button disabled={busy} variant="secondary" onClick={() => void begin("close", true)}>Zmień pakiet</Button> : null}</> : null}
           {preview.canDelete ? <Button disabled={busy} variant="danger" onClick={() => void begin("delete")}>Usuń</Button> : null}
         </div>
-        {!canEditPackage(preview) && !(preview.blockers || []).length ? <p className="text-xs text-on-surface-muted">Edycja tego pakietu jest obecnie niedostępna.</p> : null}
+        {!canEditPackage(preview) && !visibleBlockers.length ? <p className="text-xs text-on-surface-muted">Edycja tego pakietu jest obecnie niedostępna.</p> : null}
         {!preview.canDelete && preview.deleteBlockReason ? <p className="text-sm">{getPackageBlockerLabel(preview.deleteBlockReason)}</p> : null}
       </div> : null}
       {mode === "correct" ? <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); void save(); }}>
         <fieldset disabled={busy} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {!periodBased ? <label className="text-sm">Wszystkie wejścia<input className={inputClass} type="number" disabled={!canChangeFields} min={current.usedSessions} step="1" required value={sessions} onChange={(event) => setSessions(event.target.value)} /></label> : null}
+          {!periodBased ? <label className="text-sm">Wszystkie wejścia<input className={inputClass} type="number" disabled={!canChangeSessionCount} min={current.usedSessions} step="1" required value={sessions} onChange={(event) => setSessions(event.target.value)} /></label> : null}
           <label className="text-sm">Kwota za pakiet ({current.currency || "PLN"})<input className={inputClass} type="number" disabled={!canChangePrice} min="0" step="0.01" required aria-describedby="package-price-hint" value={price} onChange={(event) => setPrice(event.target.value)} /><span id="package-price-hint" className="mt-1 block text-xs text-on-surface-muted">Należność klienta za ten pakiet po uwzględnieniu salda, a nie cena z katalogu.</span></label>
           <label className="text-sm">Ważny do — data i godzina<NativeDateInput className={inputClass} type="datetime-local" disabled={!canChangeFields} required={Boolean(current.validUntil)} value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label>
           <label className="text-sm">Termin płatności<NativeDateInput className={inputClass} type="date" disabled={!canChangeFields} required={Boolean(current.paymentDueDate)} value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
         </fieldset>
         <p className="text-xs text-on-surface-muted">Ważność kończy się o wskazanej godzinie w Twojej lokalnej strefie czasowej. Korekta nie usuwa wcześniej ustawionych dat.</p>
-        {!canChangeFields && canChangePrice ? <p className="text-sm text-on-surface-muted">Możesz zmienić kwotę za pakiet. {periodBased ? "Daty pozostają" : "Liczba wejść i daty pozostają"} zablokowane.</p> : null}
+        {lockedFieldsHint ? <p className="text-sm text-on-surface-muted">{lockedFieldsHint}</p> : null}
         {zeroesRemaining ? <div role="alert" className="space-y-2 rounded-lg bg-surface-container-lowest p-3 text-sm"><p className="text-error-light">{zeroRemainingMessage}</p>{preview?.canClose ? <Button type="button" variant="secondary" disabled={busy} onClick={() => void begin("close")}>Przejdź do zamknięcia pakietu</Button> : null}</div> : null}
         {surplus > 0 ? <fieldset disabled={busy} className="space-y-3 rounded-lg bg-surface-container-lowest p-4"><legend className="px-1 font-semibold">Co zrobić z nadwyżką?</legend>
           <Decision checked={surplusDisposition === "ToBalance"} name="surplus" onChange={() => setSurplusDisposition("ToBalance")} label="Przenieś na saldo klienta" description="Klient wykorzysta nadwyżkę przy kolejnych płatnościach." />
@@ -334,7 +337,7 @@ function PackageSummary({ packageData, amountDue, remaining, balance }: { packag
   const fields = [
     ...(periodBased ? [["Okres usługi", periodRangeLabel(packageData.periodStartsAt, packageData.validUntil)], ["Status okresu", periodStatusLabel(packageData.periodStatus)]] : [
       ["Ważny do", formatPackageInstant(packageData.validUntil)],
-      ["Wykorzystane wejścia", `${packageData.usedSessions} / ${packageData.totalSessions}`],
+      ["Wykorzystane wejścia", `${getConsumedSessions(packageData, remaining)} / ${packageData.totalSessions}`],
       ["Pozostałe wejścia", remaining === undefined ? "Niedostępne" : String(remaining)],
     ]),
     ["Opłacono", formatMoney(packageData.amountPaid, packageData.currency)],
@@ -348,7 +351,22 @@ function PackageSummary({ packageData, amountDue, remaining, balance }: { packag
 
 
 function canEditPackage(preview: PackageManagementPreview) {
-  return preview.canEdit === true || preview.canCorrect === true || preview.canCorrectPrice === true;
+  return canChangeDates(preview) || canChangeSessions(preview) || preview.canCorrectPrice === true;
+}
+
+function canChangeDates(preview: PackageManagementPreview) {
+  return preview.canEdit === true || preview.canCorrect === true;
+}
+
+function canChangeSessions(preview: PackageManagementPreview) {
+  return typeof preview.canCorrectSessions === "boolean" ? preview.canCorrectSessions : canChangeDates(preview);
+}
+
+function lockedHint(periodBased: boolean, sessions: boolean, price: boolean, dates: boolean) {
+  if (dates || (!sessions && !price)) return "";
+  const editable = [!periodBased && sessions ? "liczbę wejść" : "", price ? "kwotę za pakiet" : ""].filter(Boolean).join(" i ");
+  const locked = periodBased || sessions ? "Daty pozostają zablokowane" : "Liczba wejść i daty pozostają zablokowane";
+  return `${editable ? `Możesz zmienić ${editable}. ` : ""}${locked}.`;
 }
 
 function withPreviewAmounts(item: ClientPackageBilling, preview: PackageManagementPreview): ClientPackageBilling {
