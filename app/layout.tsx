@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
 import { AppToaster } from "@/app/components/app-toaster";
+import { getOrganizationIcons } from "@/app/lib/organization-theme";
 
 const inter = Inter({
   variable: "--font-body",
@@ -16,6 +17,7 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: "Atlas",
   description: "ATLAS — treningi, grafik i rozliczenia studia",
+  icons: getOrganizationIcons("atlas"),
 };
 
 export default function RootLayout({

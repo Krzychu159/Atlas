@@ -3,7 +3,8 @@
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Menu, X, Dumbbell, CircleUserRound, Bell, LogOut, Settings } from "lucide-react";
+import { Menu, X, CircleUserRound, Bell, LogOut, Settings } from "lucide-react";
+import { AtlasLogo } from "@/app/components/atlas-logo";
 import { getUnreadNotificationCount, notifyNotificationsChanged, NOTIFICATIONS_CHANGED_EVENT, type NotificationsChange } from "@/app/lib/notifications";
 import { SidebarNav } from "@/app/components/sidebar-nav";
 import { Header } from "@/app/components/header";
@@ -133,17 +134,7 @@ export function AppShell({ children, role, theme = "atlas" }: AppShellProps) {
           ].join(" ")}
         >
           <div className="mb-4 flex shrink-0 items-center justify-between gap-3 pt-2">
-            <div data-atlas-platform-brand className="flex items-center gap-3">
-              <div className="rounded bg-primary p-3 text-on-primary">
-                <Dumbbell className="h-6 w-6" />
-              </div>
-              <div className="flex flex-col justify-between">
-                <h1 className="font-display text-headline-sm font-bold leading-tight tracking-widest text-primary-light">
-                  Atlas
-                </h1>
-                <p className="text-label text-on-surface-muted">{subtitle}</p>
-              </div>
-            </div>
+            <AtlasLogo />
 
             <button
               type="button"
@@ -188,17 +179,9 @@ export function AppShell({ children, role, theme = "atlas" }: AppShellProps) {
 
         <aside className="hidden md:block">
           <div className="sticky top-0 flex h-screen flex-col bg-surface-container-low px-4 py-4">
-            <div data-atlas-platform-brand className="mb-10 mt-4 flex items-center gap-3 pt-2">
-              <div className="rounded bg-primary p-3 text-on-primary">
-                <Dumbbell className="h-6 w-6" />
-              </div>
-              <div className="flex flex-col justify-between">
-                <h1 className="font-display text-2xl font-bold leading-tight tracking-widest text-primary-light">
-                  Atlas
-                </h1>
-                <p className="text-label text-on-surface-muted">{subtitle}</p>
-              </div>
-            </div>
+            <Link href={`/${role}`} prefetch={false} aria-label="Atlas, strona główna" className="mb-10 mt-4 block rounded-lg px-2 pt-2 outline-offset-4">
+              <AtlasLogo subtitle={subtitle} />
+            </Link>
 
             <div className="min-h-0 flex-1 overflow-y-auto">
               <SidebarNav items={navItems} />
@@ -232,9 +215,7 @@ export function AppShell({ children, role, theme = "atlas" }: AppShellProps) {
                   <Menu className="h-7 w-7" />
                 )}
               </button>
-              <p data-atlas-platform-brand className={`font-bold uppercase text-primary-light ${theme === "bsworkout" ? "text-xl tracking-wider" : "text-2xl tracking-widest"}`}>
-                Atlas
-              </p>
+              <AtlasLogo size="sm" />
             </div>
             {theme === "bsworkout" ? <BsworkoutLogo className="ml-auto h-6 w-16 min-w-12 shrink" /> : null}
             <div className="flex shrink-0 items-center gap-1">

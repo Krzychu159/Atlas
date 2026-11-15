@@ -4,7 +4,8 @@ import { getErrorMessage } from "@/app/lib/backend";
 
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { CheckCircle2, Dumbbell, LoaderCircle, Mail, TriangleAlert } from "lucide-react";
+import { CheckCircle2, LoaderCircle, Mail, TriangleAlert } from "lucide-react";
+import { AtlasLogo } from "@/app/components/atlas-logo";
 import { Button } from "@/app/components/ui/button";
 import { TextField } from "@/app/components/ui/input";
 import {
@@ -74,11 +75,8 @@ export default function VerifyEmailView({ token }: { token: string }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-surface px-4 py-10 text-on-surface">
       <div className="w-full max-w-xl rounded-[32px] border border-white/10 bg-surface-container p-6 shadow-ambient sm:p-10">
-        <Link href="/classes" className="inline-flex items-center gap-3 font-display text-xl font-bold">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-gradient text-white">
-            <Dumbbell size={18} />
-          </span>
-          Atlas
+        <Link href="/classes" className="inline-flex">
+          <AtlasLogo size="sm" />
         </Link>
 
         <div className="mt-10 text-center" role="status" aria-live="polite">

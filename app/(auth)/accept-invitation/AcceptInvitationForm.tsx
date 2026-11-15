@@ -9,7 +9,6 @@ import {
   ArrowRight,
   AtSign,
   Check,
-  Dumbbell,
   Eye,
   EyeOff,
   LoaderCircle,
@@ -20,6 +19,7 @@ import {
   UserRound,
 } from "lucide-react";
 import TermsAcceptance from "@/app/components/legal/TermsAcceptance";
+import { AtlasLogo } from "@/app/components/atlas-logo";
 import {
   acceptInvitation,
   type InvitationDetails,
@@ -141,13 +141,8 @@ export default function AcceptInvitationForm({
         <section className="relative hidden overflow-hidden border-r border-white/10 bg-surface-container-lowest p-12 lg:flex lg:flex-col lg:justify-between">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(74,109,255,0.22),transparent_43%)]" />
           <div className="relative">
-            <Link href="/login" className="inline-flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-gradient shadow-ambient">
-                <Dumbbell size={20} className="text-white" />
-              </span>
-              <span className="font-display text-2xl font-bold tracking-tight text-on-surface">
-                Atlas
-              </span>
+            <Link href="/login" className="inline-flex">
+              <AtlasLogo />
             </Link>
 
             <p className="mt-20 text-xs font-bold uppercase tracking-[0.12em] text-primary-light">
@@ -171,13 +166,8 @@ export default function AcceptInvitationForm({
 
         <section className="flex min-h-[640px] flex-col p-5 sm:p-8 lg:p-12">
           <div className="mb-10 flex items-center justify-between lg:hidden">
-            <Link href="/login" className="inline-flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-gradient">
-                <Dumbbell size={18} className="text-white" />
-              </span>
-              <span className="font-display text-xl font-bold text-on-surface">
-                Atlas
-              </span>
+            <Link href="/login" className="inline-flex">
+              <AtlasLogo size="sm" />
             </Link>
             <span className="rounded-full bg-primary/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-primary-light">
               Aktywacja konta

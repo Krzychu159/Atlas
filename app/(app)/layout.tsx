@@ -1,15 +1,28 @@
 import type { ReactNode } from "react";
+import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/app/components/app-shell";
 import { CurrentUserProvider } from "@/app/components/current-user-provider";
-import { getOrganizationTheme } from "@/app/lib/organization-theme";
+import { getOrganizationIcons, getOrganizationTheme } from "@/app/lib/organization-theme";
 import { normalizeUser, type CurrentUser } from "@/app/lib/auth/user";
 import {
   verifyBackendSession,
   VERIFIED_USER_HEADER,
   isValidAppRole,
 } from "@/app/lib/server/session";
+
+// Uses only the proxy-verified header; without it the default ATLAS icon stays.
+export async function generateMetadata(): Promise<Metadata> {
+  const forwardedUser = (await headers()).get(VERIFIED_USER_HEADER);
+  if (!forwardedUser) return {};
+  try {
+    const user = normalizeUser(JSON.parse(decodeURIComponent(forwardedUser)));
+    return { icons: getOrganizationIcons(getOrganizationTheme(user)) };
+  } catch {
+    return {};
+  }
+}
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const cookieStore = await cookies();

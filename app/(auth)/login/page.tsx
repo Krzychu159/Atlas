@@ -14,10 +14,10 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  Dumbbell,
   KeyRound,
   MailCheck,
 } from "lucide-react";
+import { AtlasLogo, AtlasMark } from "@/app/components/atlas-logo";
 
 type AuthMode = "login" | "forgot" | "reset";
 
@@ -90,9 +90,7 @@ function LoginLoadingOverlay({ mode }: { mode: AuthMode }) {
         <div className="relative flex flex-col items-center text-center">
           <div className="relative flex h-20 w-20 items-center justify-center rounded-[28px] bg-surface-container-lowest">
             <div className="absolute h-20 w-20 animate-spin rounded-[28px] border-[3px] border-white/10 border-t-primary-light" />
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-gradient shadow-ambient">
-              <Dumbbell size={20} className="text-white" />
-            </div>
+            <AtlasMark className="h-12 w-12" />
           </div>
 
           <p className="mt-7 text-label uppercase tracking-[0.08em] text-primary-light">
@@ -302,15 +300,7 @@ export default function LoginPage() {
 
         <div className="hidden min-h-dvh flex-col lg:flex">
           <header className="relative z-10 px-9 pt-7">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary shadow-soft">
-                <Dumbbell size={18} className="text-on-primary" />
-              </div>
-
-              <p className="text-[1.75rem] font-semibold leading-none tracking-tight">
-                ATLAS
-              </p>
-            </div>
+            <AtlasLogo />
           </header>
 
           <main className="relative z-10 flex flex-1 items-center justify-center px-9 py-6">
@@ -679,14 +669,8 @@ export default function LoginPage() {
         </div>
 
         <div className="relative mx-auto flex min-h-dvh w-full max-w-[440px] flex-col px-5 pb-6 pt-6 sm:px-6 sm:pt-10 lg:hidden">
-          <header className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-soft">
-              <Dumbbell size={16} className="text-on-primary" />
-            </div>
-
-            <p className="text-[1.5rem] font-semibold leading-none tracking-tight">
-              ATLAS
-            </p>
+          <header className="flex items-center">
+            <AtlasLogo size="sm" />
           </header>
 
           <main className="flex flex-1 flex-col pt-8 sm:justify-center sm:pt-6">
