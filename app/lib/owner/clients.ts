@@ -7,7 +7,7 @@ import {
 } from "../backend";
 import type { PagedResult } from "./billing";
 
-export type OwnerClientsQuery = { page: number; pageSize: number; search?: string; trainerId?: number; locationId?: number | null; isArchived?: boolean; status?: "New" | "Active" | "Inactive"; packageStatus?: "active" | "none"; hasAmountDue?: boolean; sort?: "createdDesc" | "created" | "name" | "nameDesc" | "packageUsage" | "packageUsageDesc" | "balance" | "balanceDesc" | "trainer" | "trainerDesc" | "archivedAt" | "archivedAtDesc" | "amountDue" | "amountDueDesc"; order?: "asc" | "desc" };
+export type OwnerClientsQuery = { page: number; pageSize: number; search?: string; trainerId?: number; locationId?: number | null; isArchived?: boolean; status?: "New" | "Active" | "Inactive"; packageStatus?: "active" | "none"; hasAmountDue?: boolean; hasPendingReward?: boolean; sort?: "createdDesc" | "created" | "name" | "nameDesc" | "packageUsage" | "packageUsageDesc" | "balance" | "balanceDesc" | "trainer" | "trainerDesc" | "archivedAt" | "archivedAtDesc" | "amountDue" | "amountDueDesc" | "rewardsPending" | "rewardsPendingDesc" | "rewardsClaimed" | "rewardsClaimedDesc"; order?: "asc" | "desc" };
 export type OwnerClientsPage = PagedResult<Client> & { summary?: { activeClientsCount?: number; withActivePackageCount?: number } | null };
 export async function getOwnerClients(query: OwnerClientsQuery, signal?: AbortSignal) {
   const result = await backendGet<OwnerClientsPage>("clients", query, signal);
@@ -80,6 +80,10 @@ export type Client = {
   // Unpaid remainder of all client packages (sum of max(0, price - paid)); sent by GET /clients.
   totalAmountDue?: number | null;
   amountDueCurrency?: string | null;
+  // Milestone rewards computed by the client lists: reached active milestones, rewards handed out, rewards still to hand out.
+  milestonesAchieved?: number | null;
+  milestoneRewardsClaimed?: number | null;
+  milestoneRewardsPending?: number | null;
   // Calendar day supplied by ClientDto; do not interpret it as a UTC instant.
   trainingStartDate: string | null;
   nextSessionAt: string | null;

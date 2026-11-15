@@ -10,6 +10,7 @@ import {
   Check,
   ChevronDown,
   CreditCard,
+  Gift,
   MailPlus,
   Package,
   UserPlus,
@@ -39,6 +40,7 @@ function getIcon(item: AppNotification) {
     case "trainers": return <Building2 size={17} />;
     case "group_classes": return <Users size={17} />;
     case "registrations": return <UserPlus size={17} />;
+    case "milestones": return <Gift size={17} />;
     default: return <BellRing size={17} />;
   }
 }

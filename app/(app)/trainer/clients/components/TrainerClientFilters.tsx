@@ -6,17 +6,21 @@ import { FilterSearchField, FilterToolbar } from "@/app/components/ui/list/Filte
 import type { ClientPackageFilter } from "@/app/components/clients/client-list-display";
 
 // Only sorts supported by the trainer's client list.
-export type TrainerClientSort = "package-usage" | "newest" | "name" | "balance-desc" | "balance-asc";
+export type TrainerClientSort = "package-usage" | "newest" | "name" | "amount-due-desc" | "amount-due-asc" | "rewards-pending-desc" | "rewards-claimed-desc";
 
 export type TrainerClientFiltersValue = {
   search: string;
   packageFilter: ClientPackageFilter;
+  amountDueOnly: boolean;
+  pendingRewardOnly: boolean;
   sort: TrainerClientSort;
 };
 
 export const defaultTrainerClientFilters: TrainerClientFiltersValue = {
   search: "",
   packageFilter: "all",
+  amountDueOnly: false,
+  pendingRewardOnly: false,
   sort: "package-usage",
 };
 
@@ -45,19 +49,35 @@ export default function TrainerClientFilters({ value, onChange }: TrainerClientF
       gridClassName="md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_240px_auto_auto]"
       advancedId="trainer-client-advanced-filters"
       advancedOpen={advancedOpen}
-      advancedActiveCount={value.packageFilter !== defaultTrainerClientFilters.packageFilter ? 1 : 0}
+      advancedActiveCount={(value.packageFilter !== defaultTrainerClientFilters.packageFilter ? 1 : 0) + (value.amountDueOnly ? 1 : 0) + (value.pendingRewardOnly ? 1 : 0)}
       onAdvancedOpenChange={setAdvancedOpen}
       advanced={
-        <CustomSelect
-          label="Pakiet"
-          value={value.packageFilter}
-          onChange={(nextValue) => update("packageFilter", nextValue as ClientPackageFilter)}
-          options={packageOptions}
-        />
+        <>
+          <CustomSelect
+            label="Pakiet"
+            value={value.packageFilter}
+            onChange={(nextValue) => update("packageFilter", nextValue as ClientPackageFilter)}
+            options={packageOptions}
+          />
+          <CustomSelect
+            label="Płatności"
+            value={value.amountDueOnly ? "due" : "all"}
+            onChange={(nextValue) => update("amountDueOnly", nextValue === "due")}
+            options={amountDueOptions}
+          />
+          <CustomSelect
+            label="Nagrody"
+            value={value.pendingRewardOnly ? "pending" : "all"}
+            onChange={(nextValue) => update("pendingRewardOnly", nextValue === "pending")}
+            options={rewardOptions}
+          />
+        </>
       }
       canClear={
         value.search !== defaultTrainerClientFilters.search ||
         value.packageFilter !== defaultTrainerClientFilters.packageFilter ||
+        value.amountDueOnly !== defaultTrainerClientFilters.amountDueOnly ||
+        value.pendingRewardOnly !== defaultTrainerClientFilters.pendingRewardOnly ||
         value.sort !== defaultTrainerClientFilters.sort
       }
       onClear={() => onChange(defaultTrainerClientFilters)}
@@ -78,10 +98,22 @@ const packageOptions = [
   { value: "inactive-package", label: "Bez aktywnego" },
 ];
 
+const amountDueOptions = [
+  { value: "all", label: "Wszyscy" },
+  { value: "due", label: "Z kwotą do zapłaty" },
+];
+
+const rewardOptions = [
+  { value: "all", label: "Wszyscy" },
+  { value: "pending", label: "Z nagrodą do wydania" },
+];
+
 const sortOptions = [
   { value: "package-usage", label: "Wykorzystanie pakietu" },
   { value: "newest", label: "Najnowsi" },
   { value: "name", label: "Alfabetycznie" },
-  { value: "balance-desc", label: "Saldo: najwyższe" },
-  { value: "balance-asc", label: "Saldo: najniższe" },
+  { value: "amount-due-desc", label: "Do zapłaty: najwięcej" },
+  { value: "amount-due-asc", label: "Do zapłaty: najmniej" },
+  { value: "rewards-pending-desc", label: "Nagrody do wydania" },
+  { value: "rewards-claimed-desc", label: "Wydane nagrody: najwięcej" },
 ];

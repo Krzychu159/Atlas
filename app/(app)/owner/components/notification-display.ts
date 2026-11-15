@@ -8,6 +8,7 @@ const categoryLabels: Record<string, string> = {
   trainers: "Trenerzy",
   group_classes: "Zajęcia grupowe",
   registrations: "Zapisy",
+  milestones: "Nagrody",
   system: "System",
 };
 

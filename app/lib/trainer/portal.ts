@@ -181,6 +181,12 @@ export type TrainerPortalClient = {
   billingBalance?: number | null;
   currency?: string | null;
   balanceCurrency?: string | null;
+  // Unpaid remainder of all client packages, same value as on the owner's list.
+  totalAmountDue?: number | null;
+  amountDueCurrency?: string | null;
+  milestonesAchieved?: number | null;
+  milestoneRewardsClaimed?: number | null;
+  milestoneRewardsPending?: number | null;
   trainingStartDate: string | null;
   locationName: string | null;
   createdAt: string;

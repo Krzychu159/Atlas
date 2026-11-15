@@ -1,16 +1,18 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { ChevronRight, WalletCards } from "lucide-react";
+import { ChevronRight, Gift, WalletCards } from "lucide-react";
 import type { ClientListItem } from "@/app/lib/owner/clients";
 import { getClientName } from "@/app/(app)/owner/clients/components/client-display";
 import {
   clientPackageSummary,
+  clientRewardSummary,
   clientStatus,
   clientTrainerLabel,
   sessionDots,
   type ClientAmount,
   type ClientAmountTone,
   type ClientPackageSummary,
+  type ClientRewardSummary,
   type ClientStatusTone,
 } from "./client-list-display";
 
@@ -38,6 +40,7 @@ export default function ClientListRow({ client, detailsHref, amountLabel, amount
   const status = clientStatus(client);
   const trainer = clientTrainerLabel(client);
   const pkg = clientPackageSummary(client);
+  const reward = clientRewardSummary(client);
   const gridStyle = clientListGridStyle(showTrainer);
 
   return (
@@ -71,8 +74,9 @@ export default function ClientListRow({ client, detailsHref, amountLabel, amount
         ) : null}
         <PackageCell summary={pkg} />
         <p className={`truncate text-sm font-semibold tabular-nums ${amountTone[amount.tone]}`}>{amount.label}</p>
-        <div className="min-w-0">
+        <div className="flex min-w-0 flex-col items-start gap-1">
           <StatusBadge tone={status.tone} label={status.label} />
+          {reward ? <RewardSummary summary={reward} /> : null}
         </div>
         <ProfileLink href={profileHref} fullName={fullName} />
       </div>
@@ -99,6 +103,7 @@ export default function ClientListRow({ client, detailsHref, amountLabel, amount
         <div className="mt-2.5 flex items-end justify-between gap-4 border-t border-white/5 pt-2.5">
           <div className="min-w-0 flex-1">
             <PackageCell summary={pkg} />
+            {reward ? <div className="mt-1.5"><RewardSummary summary={reward} /></div> : null}
           </div>
           <div className="shrink-0 text-right">
             <p className="flex items-center justify-end gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-on-surface-muted">
@@ -209,6 +214,21 @@ function StatusBadge({ tone, label }: { tone: ClientStatusTone; label: string })
   return (
     <span className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusBadge[tone]}`}>
       {label}
+    </span>
+  );
+}
+
+// A reward waiting to be handed out stands out; otherwise only the claimed count is shown, quietly.
+function RewardSummary({ summary }: { summary: ClientRewardSummary }) {
+  return (
+    <span title={summary.title} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+      {summary.pending > 0 ? (
+        <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-warning-container/45 px-2 py-0.5 text-[11px] font-semibold text-warning-light">
+          <Gift size={12} aria-hidden />
+          {summary.pending} do wydania
+        </span>
+      ) : null}
+      {summary.label ? <span className="truncate text-xs text-on-surface-muted">{summary.label}</span> : null}
     </span>
   );
 }

@@ -150,6 +150,9 @@ function matchNotificationUrl(notification: AppNotification, role: NotificationR
   const candidate = `/${role}${domainPath}`;
   if (notificationRoutes[role].test(candidate)) return `${candidate}${suffix}`;
 
+  // The client workspace (e.g. a reward to hand out) is the client profile, whose header shows rewards.
+  const workspace = domainPath.match(/^\/clients\/([1-9]\d*)\/workspace$/);
+  if (workspace) return role === "client" ? `/client/rewards${suffix}` : `/${role}/clients/${workspace[1]}${suffix}`;
   const client = domainPath.match(/^\/clients\/([1-9]\d*)(?:\/(payments|billing|packages|subscriptions)(?:\/[1-9]\d*)?)?$/);
   if (client) {
     if (role === "client") return `/client/${client[2] ? "payments" : "settings"}${suffix}`;

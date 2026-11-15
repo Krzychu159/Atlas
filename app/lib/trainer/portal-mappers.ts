@@ -159,6 +159,11 @@ export function trainerPortalClientsToListItems(
       activeClientPackageId: source.activeClientPackageId,
       hasActivePackage: source.hasActivePackage,
       isPackageActive: source.isPackageActive,
+      totalAmountDue: source.totalAmountDue ?? null,
+      amountDueCurrency: source.amountDueCurrency ?? null,
+      milestonesAchieved: source.milestonesAchieved,
+      milestoneRewardsClaimed: source.milestoneRewardsClaimed,
+      milestoneRewardsPending: source.milestoneRewardsPending,
     };
   });
 }

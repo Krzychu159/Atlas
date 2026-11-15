@@ -1,7 +1,6 @@
 import { countLabel } from "@/app/lib/formatters/plural";
 import type { ClientListItem } from "@/app/lib/owner/clients";
 import {
-  getClientBalance,
   getClientPackageUsage,
   hasActiveClientPackage,
 } from "@/app/(app)/owner/clients/components/client-display";
@@ -89,13 +88,6 @@ export function clientAmountDue(client: Pick<ClientListItem, "totalAmountDue" | 
   return { label: formatAmount(value, client.amountDueCurrency), tone: value > 0 ? "due" : "settled" };
 }
 
-// The trainer's client list has no amount due, only the balance; it is shown without a debt/credit judgement.
-export function clientBalance(client: ClientListItem): ClientAmount {
-  const value = getClientBalance(client, true);
-  if (value === null || !Number.isFinite(value)) return { label: "Brak danych", tone: "missing" };
-  return { label: formatAmount(value, client.balanceCurrency || client.currency), tone: "settled" };
-}
-
 function formatAmount(value: number, currencyCode: string | null | undefined) {
   const currency = currencyCode?.trim() || "PLN";
   const digits = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
@@ -104,6 +96,28 @@ function formatAmount(value: number, currencyCode: string | null | undefined) {
   } catch {
     return `${new Intl.NumberFormat("pl-PL", digits).format(value)} ${currency}`;
   }
+}
+
+export type ClientRewardSummary = { pending: number; label: string | null; title: string };
+
+function rewardCount(value: number | null | undefined) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+// "Nagrody: 2/3" plus the number still to hand out. Missing counts show nothing; they never become zero.
+export function clientRewardSummary(client: Pick<ClientListItem, "milestonesAchieved" | "milestoneRewardsClaimed" | "milestoneRewardsPending">): ClientRewardSummary | null {
+  const achieved = rewardCount(client.milestonesAchieved);
+  const claimed = rewardCount(client.milestoneRewardsClaimed);
+  const pending = rewardCount(client.milestoneRewardsPending) ?? 0;
+  if (achieved === null || claimed === null || (achieved === 0 && claimed === 0 && pending === 0)) return null;
+  // Rewards from milestones switched off later still count as handed out, so claimed can exceed achieved.
+  const label = claimed > achieved ? `Nagrody: wydane ${claimed}` : achieved > 0 ? `Nagrody: ${claimed}/${achieved}` : null;
+  const title = [
+    `Wydane nagrody: ${claimed}`,
+    `osiągnięte progi: ${achieved}`,
+    pending > 0 ? `do wydania: ${pending}` : null,
+  ].filter(Boolean).join(", ");
+  return { pending, label, title };
 }
 
 // Masculine-personal noun: "2 klientów" (dwóch klientów), so only 1 is singular.

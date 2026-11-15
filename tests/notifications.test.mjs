@@ -183,6 +183,14 @@ test('destinations preserve full app paths and normalize only known legacy route
   assert.equal(api.getNotificationDestination({ actionUrl: '/schedule' }, 'trainer'), '/trainer/schedule');
 });
 
+test('milestone reward notifications open the client profile with its rewards', () => {
+  const api = load('app/lib/notifications.ts');
+  const item = { type: 'MilestoneRewardPending', category: 'milestones', relatedEntityType: 'client', relatedEntityId: 12, actionUrl: '/clients/12/workspace' };
+  assert.equal(api.getNotificationDestination(item, 'trainer'), '/trainer/clients/12');
+  assert.equal(api.getNotificationDestination(item, 'owner'), '/owner/clients/12');
+  assert.equal(api.getNotificationDestination({ ...item, actionUrl: null }, 'trainer'), '/trainer/clients/12');
+});
+
 test('payment notifications for a known client open that client payments tab', () => {
   const api = load('app/lib/notifications.ts');
   for (const [raw, role, expected] of [

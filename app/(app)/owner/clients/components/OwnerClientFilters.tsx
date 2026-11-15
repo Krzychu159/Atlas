@@ -6,13 +6,14 @@ import { FilterSearchField, FilterToolbar } from "@/app/components/ui/list/Filte
 import { OwnerRemoteSelect } from "../../components/OwnerRemoteSelect";
 import type { ClientPackageFilter } from "@/app/components/clients/client-list-display";
 
-export type OwnerClientSort = "newest" | "name" | "trainer" | "package-usage" | "amount-due-desc" | "amount-due-asc";
+export type OwnerClientSort = "newest" | "name" | "trainer" | "package-usage" | "amount-due-desc" | "amount-due-asc" | "rewards-pending-desc" | "rewards-claimed-desc";
 
 export type OwnerClientFiltersValue = {
   search: string;
   packageFilter: ClientPackageFilter;
   trainerFilter: string;
   amountDueOnly: boolean;
+  pendingRewardOnly: boolean;
   sort: OwnerClientSort;
 };
 
@@ -21,6 +22,7 @@ export const defaultOwnerClientFilters: OwnerClientFiltersValue = {
   packageFilter: "all",
   trainerFilter: "all",
   amountDueOnly: false,
+  pendingRewardOnly: false,
   sort: "newest",
 };
 
@@ -38,7 +40,8 @@ export default function OwnerClientFilters({ value, locationId, onChange }: Owne
   ) => onChange({ ...value, [key]: nextValue });
   const advancedActiveCount =
     (value.packageFilter !== defaultOwnerClientFilters.packageFilter ? 1 : 0) +
-    (value.amountDueOnly ? 1 : 0);
+    (value.amountDueOnly ? 1 : 0) +
+    (value.pendingRewardOnly ? 1 : 0);
 
   return (
     <FilterToolbar
@@ -68,6 +71,12 @@ export default function OwnerClientFilters({ value, locationId, onChange }: Owne
             onChange={(nextValue) => update("amountDueOnly", nextValue === "due")}
             options={amountDueOptions}
           />
+          <CustomSelect
+            label="Nagrody"
+            value={value.pendingRewardOnly ? "pending" : "all"}
+            onChange={(nextValue) => update("pendingRewardOnly", nextValue === "pending")}
+            options={rewardOptions}
+          />
         </>
       }
       canClear={
@@ -75,6 +84,7 @@ export default function OwnerClientFilters({ value, locationId, onChange }: Owne
         value.packageFilter !== defaultOwnerClientFilters.packageFilter ||
         value.trainerFilter !== defaultOwnerClientFilters.trainerFilter ||
         value.amountDueOnly !== defaultOwnerClientFilters.amountDueOnly ||
+        value.pendingRewardOnly !== defaultOwnerClientFilters.pendingRewardOnly ||
         value.sort !== defaultOwnerClientFilters.sort
       }
       onClear={() => onChange(defaultOwnerClientFilters)}
@@ -101,6 +111,11 @@ const amountDueOptions = [
   { value: "due", label: "Z kwotą do zapłaty" },
 ];
 
+const rewardOptions = [
+  { value: "all", label: "Wszyscy" },
+  { value: "pending", label: "Z nagrodą do wydania" },
+];
+
 const sortOptions = [
   { value: "package-usage", label: "Wykorzystanie pakietu" },
   { value: "newest", label: "Najnowsi" },
@@ -108,4 +123,6 @@ const sortOptions = [
   { value: "trainer", label: "Po trenerze" },
   { value: "amount-due-desc", label: "Do zapłaty: najwięcej" },
   { value: "amount-due-asc", label: "Do zapłaty: najmniej" },
+  { value: "rewards-pending-desc", label: "Nagrody do wydania" },
+  { value: "rewards-claimed-desc", label: "Wydane nagrody: najwięcej" },
 ];

@@ -94,10 +94,25 @@ test("missing period dates never produce a fake validity", () => {
   assert.equal(summary.detail, "Okres ważności niedostępny");
 });
 
-test("trainer balance column never turns missing data into zero and never marks a balance as debt", () => {
-  assert.deepEqual({ ...display.clientBalance({ ...base }) }, { label: "Brak danych", tone: "missing" });
-  const negative = display.clientBalance({ ...base, currentBalance: -150, currency: "PLN" });
-  assert.equal(negative.label.replace(/\s/g, " "), "-150,00 zł");
-  assert.equal(negative.tone, "settled");
-  assert.equal(display.clientBalance({ ...base, currentBalance: 0 }).tone, "settled");
+test("trainer client list shows amount due from the portal list, not the balance", () => {
+  const source = fs.readFileSync("app/(app)/trainer/clients/page.tsx", "utf8");
+  assert.match(source, /amount=\{clientAmountDue\(client\)\}/);
+  assert.doesNotMatch(source, /clientBalance|"balance(Desc)?"/);
+  assert.match(source, /"amount-due-desc": "amountDueDesc"/);
+  assert.match(source, /HasAmountDue: amountDueOnly \? true : undefined/);
+  const mappers = fs.readFileSync("app/lib/trainer/portal-mappers.ts", "utf8");
+  assert.match(mappers, /totalAmountDue: source\.totalAmountDue \?\? null/);
+  assert.match(mappers, /amountDueCurrency: source\.amountDueCurrency \?\? null/);
+});
+
+test("milestone rewards show claimed out of reached, flag pending and never invent zeros", () => {
+  const reward = (achieved, claimed, pending) => display.clientRewardSummary({ milestonesAchieved: achieved, milestoneRewardsClaimed: claimed, milestoneRewardsPending: pending });
+  assert.deepEqual({ ...reward(3, 2, 1) }, { pending: 1, label: "Nagrody: 2/3", title: "Wydane nagrody: 2, osiągnięte progi: 3, do wydania: 1" });
+  assert.equal(reward(2, 2, 0).label, "Nagrody: 2/2");
+  assert.equal(reward(2, 2, 0).pending, 0);
+  // A reward from a milestone switched off later still counts as handed out.
+  assert.equal(reward(1, 2, 0).label, "Nagrody: wydane 2");
+  assert.equal(reward(0, 0, 0), null);
+  assert.equal(display.clientRewardSummary({}), null);
+  assert.equal(reward(-1, 0, 0), null);
 });

@@ -27,7 +27,9 @@ export function getTrainerBillingTotals(id: number, signal?: AbortSignal) {
 export type TrainerClientsQuery = {
   Page: number; PageSize: number; Search?: string; LocationId?: number;
   HasActivePackage?: boolean;
-  Sort?: "name" | "nameDesc" | "created" | "createdDesc" | "balance" | "balanceDesc" | "packageUsage" | "packageUsageDesc";
+  HasPendingReward?: boolean;
+  HasAmountDue?: boolean;
+  Sort?: "name" | "nameDesc" | "created" | "createdDesc" | "balance" | "balanceDesc" | "packageUsage" | "packageUsageDesc" | "amountDue" | "amountDueDesc" | "rewardsPending" | "rewardsPendingDesc" | "rewardsClaimed" | "rewardsClaimedDesc";
 };
 export function getTrainerClientsPage(query: TrainerClientsQuery, signal?: AbortSignal) {
   return backendGet<PagedResult<TrainerPortalClient>>("trainer-portal/clients/page", query, signal);
