@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PackageOpen, Plus, SearchX } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { ModalFooter, ModalHeader, ModalOverlay } from "@/app/components/ui/modal";
@@ -28,13 +29,21 @@ import PackageListFilters, {
   type PackageListFiltersValue,
 } from "@/app/components/packages/PackageListFilters";
 import { pluralizePackages } from "@/app/components/packages/package-list-display";
+import { PACKAGE_URL_KEYS, packageFiltersFromUrl, packageFiltersToUrl } from "@/app/components/packages/package-list-url";
 import { showOwnerError, showOwnerSuccess } from "../components/owner-toast";
+import { useListUrlSync } from "../components/list-url-state";
 
 export default function PackagesPage() {
+  return <Suspense><PackagesContent /></Suspense>;
+}
+
+function PackagesContent() {
+  const searchParams = useSearchParams();
   const { selectedLocationId } = useOwnerLocationFilter();
   const [packages, setPackages] = useState<Package[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [filters, setFilters] = useState<PackageListFiltersValue>(defaultPackageListFilters);
+  const [filters, setFilters] = useState<PackageListFiltersValue>(() => packageFiltersFromUrl(searchParams));
+  useListUrlSync(packageFiltersToUrl(filters), PACKAGE_URL_KEYS);
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);

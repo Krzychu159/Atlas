@@ -9,7 +9,7 @@ import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 import { PaymentPagination } from "@/app/components/payments/PaymentPagination";
 import { getClientName, getPortalAccessLabel } from "../components/client-display";
 import { useOwnerRead } from "../../components/use-owner-read";
-import { listUrlKey, readPositiveInt, useListScrollRestoration, useListUrlSync } from "../../components/list-url-state";
+import { listUrlKey, readPositiveInt, useListReturnHref, useListScrollRestoration, useListUrlSync } from "../../components/list-url-state";
 
 const URL_KEYS = ["q", "page"] as const;
 export default function ArchivedClientsPage() {
@@ -36,10 +36,11 @@ function ArchivedClientsContent() {
   const url = { q: search.trim() || null, page: page > 1 ? String(page) : null };
   useListUrlSync(url, URL_KEYS);
   useListScrollRestoration(listUrlKey("archived-clients", url), Boolean(result) && !list.loading);
+  const clientsHref = useListReturnHref("/owner/clients");
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 pb-10">
       <div>
-        <Link href="/owner/clients" className="inline-flex items-center gap-2 text-sm font-semibold text-primary-light"><ArrowLeft size={18} />Aktywni klienci</Link>
+        <Link href={clientsHref} className="inline-flex items-center gap-2 text-sm font-semibold text-primary-light"><ArrowLeft size={18} />Aktywni klienci</Link>
         <div className="mt-5 flex items-center gap-3">
           <h1 className="font-display text-[1.75rem] md:text-[2.25rem] font-semibold leading-[0.95] tracking-tight">Archiwum klientów</h1>
           <span className="rounded-full bg-surface-container px-3 py-1 text-sm text-on-surface-variant">{result?.totalCount ?? "—"}</span>

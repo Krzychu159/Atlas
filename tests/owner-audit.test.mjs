@@ -163,6 +163,7 @@ test("disabled storage keeps the location filter and same-tab synchronization us
 test("unavailable package clients display unknown counts and usage instead of zero", () => {
   const Hero = load("app/components/packages/PackageDetailsHero.tsx", {
     "@/app/lib/period-packages": { isPeriodPackage: () => false },
+    "@/app/(app)/owner/components/list-url-state": { useListReturnHref: (href) => href },
     "@/app/components/ui/profile-hero": {
       ProfileChip: ({ children }) => React.createElement("span", null, children),
       ProfileInfoStat: ({ label, children }) => React.createElement("div", null, label, children),

@@ -2,6 +2,7 @@
 
 import { getOutlookColor } from "@/app/lib/calendar/outlook-colors";
 import Link from "next/link";
+import { useListReturnHref } from "../../components/list-url-state";
 import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 import {
   ArrowLeft,
@@ -79,13 +80,14 @@ export default function TrainerProfileHeader({
     selectedLocationId == null ? "" : `?locationId=${selectedLocationId}`
   }`;
   const status = trainerStatus(trainer);
+  const trainersHref = useListReturnHref("/owner/trainers");
   const locationNames = trainer.locationNames?.filter(Boolean) ?? [];
   const bio = trainer.bio?.trim();
 
   return (
     <section className="card-shell p-4 md:p-6">
       <Link
-        href="/owner/trainers"
+        href={trainersHref}
         className="inline-flex items-center gap-1.5 text-xs font-semibold text-on-surface-muted transition hover:text-primary-light"
       >
         <ArrowLeft size={14} />

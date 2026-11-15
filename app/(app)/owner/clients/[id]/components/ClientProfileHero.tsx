@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useListReturnHref } from "@/app/(app)/owner/components/list-url-state";
 import {
   ArrowLeft,
   Archive,
@@ -113,7 +114,7 @@ export default function ClientProfileHero({
   const portalBase = milestoneAccess === "trainer" ? "/trainer" : "/owner";
   const profileHref = `${portalBase}/clients/${client.id}`;
   const resolvedPaymentsHref = paymentsHref || `${profileHref}/payments`;
-  const resolvedBackHref = backHref || `${portalBase}/clients`;
+  const resolvedBackHref = useListReturnHref(backHref || `${portalBase}/clients`);
   const status = clientStatus(client);
   const showPortalStatus = Boolean(client.portalAccessStatus) && Boolean(client.isArchived || onPortalAction);
   const showTabs = !client.isArchived;

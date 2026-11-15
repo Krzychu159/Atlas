@@ -19,9 +19,13 @@ import {
   defaultTrainerListFilters,
   filterTrainers,
   pluralizeTrainers,
+  TRAINER_URL_KEYS,
+  trainerFiltersFromUrl,
+  trainerFiltersToUrl,
   trainerStatus,
   type TrainerListFiltersValue,
 } from "./trainer-list-display";
+import { useListUrlSync } from "../components/list-url-state";
 
 export default function TrainersPage() {
   return <Suspense><TrainersContent /></Suspense>;
@@ -33,7 +37,8 @@ function TrainersContent() {
   const showInvitations = searchParams.get("invitations") === "true";
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const { selectedLocationId } = useOwnerLocationFilter();
-  const [filters, setFilters] = useState<TrainerListFiltersValue>(defaultTrainerListFilters);
+  const [filters, setFilters] = useState<TrainerListFiltersValue>(() => trainerFiltersFromUrl(searchParams));
+  useListUrlSync(trainerFiltersToUrl(filters), TRAINER_URL_KEYS);
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);

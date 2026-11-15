@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 export type ListUrlParams = Record<string, string | null | undefined>;
 
@@ -40,10 +40,36 @@ export function useListUrlSync(params: ListUrlParams, managedKeys: readonly stri
       if (value) next.set(key, value);
       else next.delete(key);
     }
-    if (next.toString() === current.toString()) return;
     const query = next.toString();
-    window.history.replaceState(window.history.state, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+    const href = `${window.location.pathname}${query ? `?${query}` : ""}`;
+    rememberListHref(window.location.pathname, href);
+    if (query === current.toString()) return;
+    window.history.replaceState(window.history.state, "", href);
   }, [enabled, keys, serialized]);
+}
+
+const RETURN_KEY_PREFIX = "atlas-list-return:";
+
+function rememberListHref(pathname: string, href: string) {
+  try {
+    window.sessionStorage.setItem(RETURN_KEY_PREFIX + pathname, href);
+  } catch { /* Returning to the filtered list is optional. */ }
+}
+
+function readListHref(pathname: string) {
+  try {
+    const saved = window.sessionStorage.getItem(RETURN_KEY_PREFIX + pathname);
+    return saved?.startsWith(`${pathname}?`) ? saved : pathname;
+  } catch {
+    return pathname;
+  }
+}
+
+const subscribeNoop = () => () => {};
+
+/** Link back to a list with the filters last used there in this browser tab; falls back to the plain list. */
+export function useListReturnHref(pathname: string) {
+  return useSyncExternalStore(subscribeNoop, () => readListHref(pathname), () => pathname);
 }
 
 const SCROLL_KEY_PREFIX = "atlas-list-scroll:";

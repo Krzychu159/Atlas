@@ -16,6 +16,28 @@ export const defaultTrainerListFilters: TrainerListFiltersValue = {
   sort: "name-asc",
 };
 
+const TRAINER_STATUS_FILTERS: readonly TrainerStatusFilter[] = ["all", "active", "inactive", "paused"];
+const TRAINER_SORTS: readonly TrainerSort[] = ["name-asc", "name-desc", "sessions-desc", "experience-desc", "newest"];
+export const TRAINER_URL_KEYS = ["q", "status", "sort"] as const;
+
+export function trainerFiltersFromUrl(params: { get(key: string): string | null }): TrainerListFiltersValue {
+  const status = params.get("status");
+  const sort = params.get("sort");
+  return {
+    search: (params.get("q") ?? "").slice(0, 100),
+    status: TRAINER_STATUS_FILTERS.find((item) => item === status) ?? defaultTrainerListFilters.status,
+    sort: TRAINER_SORTS.find((item) => item === sort) ?? defaultTrainerListFilters.sort,
+  };
+}
+
+export function trainerFiltersToUrl(filters: TrainerListFiltersValue) {
+  return {
+    q: filters.search.trim() || null,
+    status: filters.status === defaultTrainerListFilters.status ? null : filters.status,
+    sort: filters.sort === defaultTrainerListFilters.sort ? null : filters.sort,
+  };
+}
+
 // Status values match the options of EditTrainerModal (Active / Inactive / Paused).
 export function trainerStatus(trainer: Pick<Trainer, "status">): TrainerStatus {
   const normalized = (trainer.status || "").trim().toLowerCase();

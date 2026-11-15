@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useListReturnHref } from "@/app/(app)/owner/components/list-url-state";
 import {
   ArrowLeft,
   CalendarDays,
@@ -40,11 +41,12 @@ export default function PackageDetailsHero({
   onEdit?: () => void;
 }) {
   const periodBased = isPeriodPackage(item);
+  const returnHref = useListReturnHref(backHref);
 
   return (
     <section className="card-shell p-4 md:p-6">
       <Link
-        href={backHref}
+        href={returnHref}
         className="inline-flex items-center gap-1.5 text-xs font-semibold text-on-surface-muted transition hover:text-primary-light"
       >
         <ArrowLeft size={14} />

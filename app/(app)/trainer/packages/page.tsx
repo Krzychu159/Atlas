@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useListUrlSync } from "@/app/(app)/owner/components/list-url-state";
+import { PACKAGE_URL_KEYS, packageFiltersFromUrl, packageFiltersToUrl } from "@/app/components/packages/package-list-url";
 import { PackageOpen, SearchX } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { ListSection } from "@/app/components/ui/list/ListSection";
@@ -17,8 +20,18 @@ import { getTrainerPackages, type TrainerPackage } from "@/app/lib/trainer/packa
 import { trainerPaymentError } from "@/app/lib/trainer/payment-errors";
 
 export default function TrainerPackagesPage() {
+  return <Suspense><TrainerPackagesContent /></Suspense>;
+}
+
+function TrainerPackagesContent() {
+  const searchParams = useSearchParams();
   const [packages, setPackages] = useState<TrainerPackage[]>([]);
-  const [filters, setFilters] = useState<PackageListFiltersValue>(defaultPackageListFilters);
+  const [filters, setFilters] = useState<PackageListFiltersValue>(() => {
+    // The trainer list already contains only active offers, so the activity filter is not offered here.
+    const fromUrl = packageFiltersFromUrl(searchParams);
+    return { ...fromUrl, activityFilter: defaultPackageListFilters.activityFilter };
+  });
+  useListUrlSync(packageFiltersToUrl(filters), PACKAGE_URL_KEYS);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
