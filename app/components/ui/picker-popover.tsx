@@ -33,6 +33,14 @@ export function useNativePickerPreference() {
   return useSyncExternalStore(subscribePointer, prefersNativePicker, () => false);
 }
 
+// On touch devices the native input lies transparent over the whole field, so the tap itself opens
+// the system picker. iOS Safari ignores showPicker() on a hidden input (without throwing), so a
+// programmatic open alone is not enough there.
+export const nativePickerOverlayClassName = "absolute inset-0 z-[1] h-full w-full cursor-pointer opacity-0";
+export const hiddenNativeInputClassName = "pointer-events-none absolute bottom-0 left-4 h-px w-px opacity-0";
+// Overrides the global min-height of date fields, which would stick out of compact fields.
+export const nativePickerOverlayStyle = { minHeight: 0 } as const;
+
 // Opens the native picker of a hidden input. Returns false when the browser cannot do it.
 export function openNativePicker(input: HTMLInputElement | null) {
   if (!input || input.disabled || input.readOnly || typeof input.showPicker !== "function") return false;

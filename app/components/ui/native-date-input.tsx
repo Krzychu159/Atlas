@@ -20,7 +20,15 @@ import {
   splitDateTimeValue,
 } from "@/app/lib/formatters/date-input";
 import { DatePickerPanel } from "./date-picker-panel";
-import { openNativePicker, PickerPanel, useNativePickerPreference, usePickerPopover } from "./picker-popover";
+import {
+  hiddenNativeInputClassName,
+  nativePickerOverlayClassName,
+  nativePickerOverlayStyle,
+  openNativePicker,
+  PickerPanel,
+  useNativePickerPreference,
+  usePickerPopover,
+} from "./picker-popover";
 
 type DateFieldProps = InputHTMLAttributes<HTMLInputElement>;
 
@@ -156,7 +164,8 @@ const DateTextField = forwardRef<HTMLInputElement, DateFieldProps>(function Date
         required={native ? required : undefined}
         min={native ? min : undefined}
         max={native ? max : undefined}
-        className="pointer-events-none absolute bottom-0 left-4 h-px w-px opacity-0"
+        className={native && !locked ? nativePickerOverlayClassName : hiddenNativeInputClassName}
+        style={native && !locked ? nativePickerOverlayStyle : undefined}
       />
       <button type="button" aria-label="Otwórz kalendarz" aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? panelId : undefined}
         disabled={locked}
