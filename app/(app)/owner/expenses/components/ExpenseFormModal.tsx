@@ -31,6 +31,7 @@ import {
 } from "@/app/components/ui/modal";
 import { formatMoney } from "@/app/lib/formatters/money";
 import type { Location } from "@/app/lib/owner/locations";
+import { getLocalDateValue } from "@/app/lib/owner/expense-monthly-report";
 import {
   createExpense,
   updateExpense,
@@ -745,7 +746,7 @@ function createEmptyForm(
   legalEntities: LegalEntityOption[] = [],
   defaultRecurring = false,
 ): ExpenseForm {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateValue();
   return {
     legalEntityId: legalEntities[0] ? String(legalEntities[0].id) : "",
     locationId: "",

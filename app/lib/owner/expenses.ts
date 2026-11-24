@@ -6,6 +6,10 @@ import {
   backendPost,
   backendPut,
 } from "@/app/lib/backend";
+import {
+  parsePacketDocumentCount,
+  parseSkippedPacketDocuments,
+} from "./expense-monthly-report";
 
 export type CompanyExpense = {
   id: number;
@@ -215,4 +219,89 @@ export function downloadExpenseAttachment(id: number) {
 
 export function deleteExpenseAttachment(id: number) {
   return backendDelete<CompanyExpense | void>(`expenses/${id}/attachment`);
+}
+
+export type ExpenseMonthlyReportQuery = {
+  locationId: number;
+  year: number;
+  month: number;
+};
+
+/** What happens to a document in the monthly PDF: Pdf, Image, Unsupported or NotStored. */
+export type ExpenseReportDocumentStatus = "Pdf" | "Image" | "Unsupported" | "NotStored";
+
+export type ExpenseReportDocument = {
+  /** null = the expense's main document. */
+  attachmentId: number | null;
+  kind: number;
+  fileName: string | null;
+  contentType: string | null;
+  status: string;
+};
+
+export type ExpenseReportBreakdown = {
+  key: string;
+  label: string;
+  count: number;
+  netAmount: number;
+  vatAmount: number;
+  grossAmount: number;
+  paidGrossAmount: number;
+  unpaidGrossAmount: number;
+};
+
+export type ExpenseMonthlyReportExpense = {
+  id: number;
+  issueDate: string;
+  paidAt: string | null;
+  category: number;
+  paymentStatus: number;
+  legalEntityId: number;
+  legalEntityName: string | null;
+  vendorName: string;
+  vendorNip: string | null;
+  invoiceNumber: string | null;
+  description: string | null;
+  netAmount: number;
+  vatAmount: number;
+  grossAmount: number;
+  currency: string;
+  documents: ExpenseReportDocument[] | null;
+};
+
+export type ExpenseMonthlyReport = {
+  locationId: number;
+  locationName: string | null;
+  year: number;
+  month: number;
+  from: string;
+  to: string;
+  expenseCount: number;
+  netAmount: number;
+  vatAmount: number;
+  grossAmount: number;
+  paidGrossAmount: number;
+  unpaidGrossAmount: number;
+  currencies: string[] | null;
+  documentCount: number;
+  skippedDocumentCount: number;
+  missingDocumentCount: number;
+  byCategory: ExpenseReportBreakdown[] | null;
+  byLegalEntity: ExpenseReportBreakdown[] | null;
+  expenses: ExpenseMonthlyReportExpense[] | null;
+};
+
+export function getExpenseMonthlyReport(query: ExpenseMonthlyReportQuery, signal?: AbortSignal) {
+  return backendGet<ExpenseMonthlyReport>("expenses/monthly-report", query, signal);
+}
+
+export async function downloadExpenseMonthlyReportPdf(query: ExpenseMonthlyReportQuery) {
+  const { blob, fileName, headers } = await backendDownload("expenses/monthly-report/pdf", query);
+
+  return {
+    blob,
+    fileName,
+    documentCount: parsePacketDocumentCount(headers.get("X-Expense-Packet-Documents")),
+    skipped: parseSkippedPacketDocuments(headers.get("X-Expense-Packet-Skipped")),
+  };
 }

@@ -133,6 +133,11 @@ async function handler(req: NextRequest, context: RouteContext) {
     nextResponse.headers.set("Content-Disposition", contentDisposition);
   }
 
+  for (const name of RELAYED_RESPONSE_HEADERS) {
+    const value = response.headers.get(name);
+    if (value !== null) nextResponse.headers.set(name, value);
+  }
+
   if (response.status === 401 || expiredPublicSession) {
     expireAuthCookies(nextResponse);
   }
@@ -142,6 +147,9 @@ async function handler(req: NextRequest, context: RouteContext) {
 
   return nextResponse;
 }
+
+// Monthly expense packet: how many documents went into the PDF and which were skipped.
+const RELAYED_RESPONSE_HEADERS = ["X-Expense-Packet-Documents", "X-Expense-Packet-Skipped"];
 
 function jsonError(message: string, status: number) {
   const response = NextResponse.json({ message }, { status });

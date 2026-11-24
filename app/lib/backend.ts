@@ -18,6 +18,7 @@ type ApiErrorOptions = {
 export type BackendDownload = {
   blob: Blob;
   fileName: string | null;
+  headers: Headers;
 };
 
 let authRedirectStarted = false;
@@ -223,6 +224,7 @@ export async function backendDownload(
   return {
     blob,
     fileName: getDownloadFileName(response.headers.get("content-disposition")),
+    headers: response.headers,
   };
 }
 

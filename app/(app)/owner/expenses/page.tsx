@@ -3,7 +3,7 @@
 import { useOwnerLocationFilter } from "@/app/lib/owner/location-filter";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, Repeat2, ReceiptText } from "lucide-react";
+import { Files, Plus, RefreshCw, Repeat2, ReceiptText } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { CustomSelect } from "@/app/components/ui/custom-select";
 import { getLocations, type Location } from "@/app/lib/owner/locations";
@@ -29,12 +29,15 @@ import ExpenseFilters, {
   type ExpenseFiltersValue,
 } from "./components/ExpenseFilters";
 import ExpenseFormModal from "./components/ExpenseFormModal";
+import ExpenseMonthlyReportModal from "./components/ExpenseMonthlyReportModal";
 import ExpensesList from "./components/ExpensesList";
 import ExpenseStats from "./components/ExpenseStats";
 import { useOwnerRead } from "../components/use-owner-read";
 import { OwnerReadState } from "../components/OwnerReadState";
+import { getInitialReportMonth } from "@/app/lib/owner/expense-monthly-report";
 import {
   deriveLegalEntities,
+  downloadBlob,
   fallbackCategories,
   fallbackPaymentStatuses,
   fallbackRecurrenceEditScopes,
@@ -87,6 +90,9 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
   const [paymentStatuses, setPaymentStatuses] = useState<DictionaryOption[]>(fallbackPaymentStatuses);
   const [recurrenceEditScopes, setRecurrenceEditScopes] = useState<DictionaryOption[]>(fallbackRecurrenceEditScopes);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [allLocations, setAllLocations] = useState<Location[]>([]);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportRevision, setReportRevision] = useState(0);
   const [legalEntities, setLegalEntities] = useState<LegalEntityOption[]>([]);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -163,6 +169,7 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
         if (locationsResult.status === "fulfilled") {
           const activeLocations = locationsResult.value.filter((location) => location.isActive);
           setLocations(activeLocations);
+          setAllLocations(locationsResult.value);
           setLegalEntities((current) =>
             mergeLegalEntities(current, deriveLegalEntities([], null, activeLocations)),
           );
@@ -192,10 +199,10 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
     setPage(1);
   }
 
-  async function handleOpenEdit(expense: CompanyExpense) {
+  async function handleOpenEdit(expenseId: number) {
     try {
-      setLoadingExpenseId(expense.id);
-      const current = await getExpense(expense.id);
+      setLoadingExpenseId(expenseId);
+      const current = await getExpense(expenseId);
       setEditingExpense(current);
       setLegalEntities((known) =>
         mergeLegalEntities(known, [
@@ -208,7 +215,7 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
       setFormOpen(true);
     } catch (error) {
       showOwnerError(error, "Nie udało się pobrać szczegółów wydatku.", {
-        id: `expense-details-error-${expense.id}`,
+        id: `expense-details-error-${expenseId}`,
       });
     } finally {
       setLoadingExpenseId(null);
@@ -298,7 +305,16 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
             Kontroluj koszty, terminy płatności i dokumenty przypisane do firm oraz lokalizacji.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            icon={<Files size={17} />}
+            onClick={() => setReportOpen(true)}
+            className="order-last w-full sm:order-none sm:w-auto"
+          >
+            Dokumenty dla księgowej
+          </Button>
           <Button
             type="button"
             variant="secondary"
@@ -384,7 +400,7 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
           setEditingExpense(null);
           setFormOpen(true);
         }}
-        onEdit={(expense) => void handleOpenEdit(expense)}
+        onEdit={(expense) => void handleOpenEdit(expense.id)}
         onMarkPaid={(expense) => void handleMarkPaid(expense)}
         onDownload={(expense) => void handleDownload(expense)}
         onDelete={(expense) => {
@@ -396,6 +412,20 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
           setDeleteTarget({ type: "attachment", expense });
         }}
       /> : null}
+
+      {/* Sekcja: Dokumenty dla księgowej */}
+      {reportOpen ? (
+        <ExpenseMonthlyReportModal
+          locations={allLocations}
+          initialLocationId={locationId}
+          initialMonth={getInitialReportMonth(filters.from, filters.to)}
+          categories={categories}
+          paymentStatuses={paymentStatuses}
+          revision={reportRevision}
+          onEditExpense={(expenseId) => void handleOpenEdit(expenseId)}
+          onClose={() => setReportOpen(false)}
+        />
+      ) : null}
 
       {/* Sekcja: Formularz i potwierdzenia */}
       <ExpenseFormModal
@@ -411,7 +441,10 @@ function OwnerExpensesPageContent({ locationId }: { locationId: number | null })
           setFormOpen(false);
           setEditingExpense(null);
         }}
-        onSaved={() => void loadData()}
+        onSaved={() => {
+          setReportRevision((current) => current + 1);
+          void loadData();
+        }}
       />
       <ExpenseConfirmModal
         open={deleteTarget !== null}
@@ -491,15 +524,4 @@ function mergeLegalEntities(current: LegalEntityOption[], incoming: LegalEntityO
   return Array.from(merged, ([id, name]) => ({ id, name })).sort((a, b) =>
     a.name.localeCompare(b.name, "pl"),
   );
-}
-
-function downloadBlob(blob: Blob, fileName: string) {
-  const objectUrl = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = objectUrl;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
 }
