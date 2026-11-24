@@ -11,11 +11,14 @@ import {
   toMonthValue,
 } from "@/app/lib/formatters/month";
 import {
+  hiddenNativeInputClassName,
+  nativePickerOverlayClassName,
+  nativePickerOverlayStyle,
   openNativePicker,
   pickerFooterButtonClassName,
   pickerNavButtonClassName,
   PickerPanel,
-  prefersNativePicker,
+  useNativePickerPreference,
   usePickerPopover,
 } from "./picker-popover";
 
@@ -44,6 +47,7 @@ function currentMonthValue() {
 export function MonthPicker({ value, onChange, ariaLabel, min, max, id, disabled = false, align = "start", className, icon }: MonthPickerProps) {
   const { open, host, show, close, rootRef, triggerRef } = usePickerPopover();
   const nativeRef = useRef<HTMLInputElement>(null);
+  const native = useNativePickerPreference();
   const [cursor, setCursor] = useState(value);
   const focusCursor = useRef(false);
   const dialogId = useId();
@@ -66,7 +70,7 @@ export function MonthPicker({ value, onChange, ariaLabel, min, max, id, disabled
   function toggle() {
     if (disabled) return;
     if (open) { close(); return; }
-    if (prefersNativePicker() && openNativePicker(nativeRef.current)) return;
+    if (native && openNativePicker(nativeRef.current)) return;
     focusCursor.current = true;
     setCursor(initialCursor());
     show();
@@ -125,7 +129,8 @@ export function MonthPicker({ value, onChange, ariaLabel, min, max, id, disabled
         max={max}
         disabled={disabled}
         onChange={(event) => { if (isMonthInRange(event.target.value, min, max) && event.target.value !== value) onChange(event.target.value); }}
-        className="pointer-events-none absolute bottom-0 left-0 h-px w-px opacity-0"
+        className={native && !disabled ? nativePickerOverlayClassName : hiddenNativeInputClassName}
+        style={native && !disabled ? nativePickerOverlayStyle : undefined}
       />
       {host ? (
         <PickerPanel host={host} anchorRef={rootRef} id={dialogId} label={ariaLabel} align={align} onClose={close} className="w-[288px]">
