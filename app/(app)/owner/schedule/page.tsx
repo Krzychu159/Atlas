@@ -4,7 +4,7 @@ import { ApiError } from "@/app/lib/backend";
 import { userMessage } from "@/app/lib/user-messages";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CircleAlert, Plus, RefreshCw } from "lucide-react";
 import { useOwnerRead } from "../components/use-owner-read";
 import { OwnerReadState } from "../components/OwnerReadState";
@@ -29,7 +29,9 @@ import {
   type SessionRecurrence,
 } from "@/app/lib/owner/sessions";
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
-import { DateNavigator, ViewSwitch } from "./components/ScheduleControls";
+import { DateNavigator, ScheduleModeSwitch, ViewSwitch, type ScheduleMode } from "./components/ScheduleControls";
+import { OwnerAvailabilityView } from "./components/availability/OwnerAvailabilityView";
+import { isIsoDate } from "@/app/lib/availability-time";
 import ScheduleFilters, { countScheduleFilters, ScheduleFiltersToggle } from "./components/ScheduleFilters";
 import { OutlookRequiredState } from "./components/ScheduleStates";
 import { DaySchedule, WeekSchedule } from "./components/ScheduleViews";
@@ -63,10 +65,36 @@ const EMPTY_CLIENTS: Client[] = [];
 const EMPTY_SESSIONS: OwnerSession[] = [];
 const ISSUES_SECTION_ID = "problemy-z-kalendarzem";
 
+// Links from availability notifications: ?mode=availability&week=yyyy-MM-dd.
+function weekParamDate(value: string | null) {
+  return isIsoDate(value) ? new Date(`${value}T12:00:00`) : null;
+}
+
 export default function SchedulePage() {
   const [view, setView] = useState<ScheduleView>("week");
   const { selectedLocationId } = useOwnerLocationFilter();
-  const [anchorDate, setAnchorDate] = useState(() => new Date());
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const mode: ScheduleMode = searchParams.get("mode") === "availability" ? "availability" : "sessions";
+  const weekParam = searchParams.get("week");
+  const [anchorDate, setAnchorDate] = useState(() => weekParamDate(weekParam) ?? new Date());
+  const [availabilityRevision, setAvailabilityRevision] = useState(0);
+  const appliedWeekParam = useRef(weekParam);
+  useEffect(() => {
+    if (appliedWeekParam.current === weekParam) return;
+    appliedWeekParam.current = weekParam;
+    const date = weekParamDate(weekParam);
+    if (date) void Promise.resolve().then(() => { setAnchorDate(date); setView("week"); });
+  }, [weekParam]);
+  function setMode(next: ScheduleMode) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "availability") params.set("mode", "availability");
+    else params.delete("mode");
+    params.delete("week");
+    const query = params.toString();
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
+  }
   const outlook = useOwnerRead("outlook", getOutlookStatus, "Nie udało się sprawdzić połączenia z Outlookiem.");
   const connected = Boolean(outlook.data?.isConnected);
   const loadResources = useCallback(async (signal: AbortSignal) => {
@@ -100,7 +128,7 @@ export default function SchedulePage() {
   const calendarRevision = useSessionCorrectionRevision();
   const [sessionRevision, setSessionRevision] = useState(0);
 
-  const period = useMemo(() => getPeriod(view, anchorDate), [anchorDate, view]);
+  const period = useMemo(() => getPeriod(view, anchorDate, mode === "availability"), [anchorDate, view, mode]);
   const scopedTrainers = useMemo(
     () =>
       trainers.filter((trainer) =>
@@ -138,13 +166,15 @@ export default function SchedulePage() {
     locationId: selectedLocationId ?? undefined, status: backendStatus,
   }), [period.fromIso, period.toIso, effectiveTrainerFilter, selectedLocationId, backendStatus]);
   const readSessions = useCallback((signal: AbortSignal) => getOwnerSessions(sessionQuery, signal), [sessionQuery]);
-  const sessionList = useOwnerRead(JSON.stringify(sessionQuery), readSessions, "Nie udało się pobrać sesji.", calendarRevision, 0, connected);
+  const sessionList = useOwnerRead(JSON.stringify(sessionQuery), readSessions, "Nie udało się pobrać sesji.", calendarRevision, 0, connected && mode === "sessions");
   const sessions = sessionList.data ?? EMPTY_SESSIONS;
-  const isSessionsLoading = sessionList.loading;
+  const isSessionsLoading = mode === "sessions" && sessionList.loading;
   const isResourcesLoading = resources.loading;
   const detailRead = useRef<AbortController | null>(null);
   useEffect(() => () => detailRead.current?.abort(), [sessionQuery]);
   async function loadSessions() {
+    // Sessions also shape the availability view (busy time and free windows).
+    setAvailabilityRevision((value) => value + 1);
     try { await sessionList.reload(); } catch { /* The section displays its read error. */ }
   }
 
@@ -194,13 +224,15 @@ export default function SchedulePage() {
 
   // Calendar issues in settings and session notifications link here with ?sessionId=…,
   // also while the schedule is already open.
-  const requestedSessionParam = useSearchParams().get("sessionId");
+  const requestedSessionParam = searchParams.get("sessionId");
   useEffect(() => {
     if (!requestedSessionParam) { requestedSessionHandled.current = null; return; }
     if (!connected || requestedSessionHandled.current === requestedSessionParam) return;
     requestedSessionHandled.current = requestedSessionParam;
     const sessionId = Number(requestedSessionParam);
-    window.history.replaceState(window.history.state, "", window.location.pathname);
+    const rest = new URLSearchParams(window.location.search);
+    rest.delete("sessionId");
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${rest.size ? `?${rest}` : ""}`);
     if (!/^\d+$/.test(requestedSessionParam) || !Number.isSafeInteger(sessionId) || sessionId <= 0) return;
     void openEditModal({ id: sessionId });
   }, [connected, requestedSessionParam]);
@@ -359,10 +391,12 @@ export default function SchedulePage() {
             <div className="min-w-0">
               <p className="text-label text-primary-light max-md:hidden">Grafik</p>
               <h1 className="font-display text-[1.5rem] font-semibold leading-[0.95] tracking-tight md:mt-2 md:text-[2.25rem]">
-                Sesje treningowe
+                {mode === "availability" ? "Dyspozycje trenerów" : "Sesje treningowe"}
               </h1>
               <p className="mt-3 max-w-[680px] text-sm leading-6 text-on-surface-variant max-md:hidden">
-                Planuj sesje i zarządzaj nimi. Grafik jest połączony z kalendarzem Microsoft Outlook.
+                {mode === "availability"
+                  ? "Kiedy trenerzy mogą prowadzić zajęcia, co mają już zaplanowane i gdzie mają wolne okna na konsultację."
+                  : "Planuj sesje i zarządzaj nimi. Grafik jest połączony z kalendarzem Microsoft Outlook."}
               </p>
             </div>
             {connected ? (
@@ -380,16 +414,21 @@ export default function SchedulePage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <div className="flex gap-2 max-md:order-2">
               <div className="min-w-0 flex-1 [&>div]:h-full">
+                <ScheduleModeSwitch value={mode} onChange={setMode} />
+              </div>
+              <div className="min-w-0 flex-1 [&>div]:h-full">
                 <ViewSwitch value={view} onChange={setView} />
               </div>
+            </div>
+            <div className="flex gap-2 max-md:order-3 md:hidden">
               {connected ? (
                 <>
-                  <ScheduleFiltersToggle open={filtersOpen} activeCount={activeFilterCount} onOpenChange={setFiltersOpen} />
-                  <CalendarIssuesButton count={issueCount} className="md:hidden" />
+                  {mode === "sessions" ? <ScheduleFiltersToggle open={filtersOpen} activeCount={activeFilterCount} onOpenChange={setFiltersOpen} /> : null}
+                  {mode === "sessions" ? <CalendarIssuesButton count={issueCount} /> : null}
                   <Button
                     variant="secondary"
                     size="icon"
-                    className="h-12 w-12 shrink-0 md:hidden"
+                    className="h-12 w-12 shrink-0"
                     icon={<RefreshCw size={16} className={isSessionsLoading ? "animate-spin" : ""} />}
                     onClick={loadSessions}
                     disabled={isSessionsLoading}
@@ -408,7 +447,7 @@ export default function SchedulePage() {
             />
             {connected ? (
               <div className="hidden gap-2 md:ml-auto md:flex 2xl:ml-0">
-                <CalendarIssuesButton count={issueCount} />
+                {mode === "sessions" ? <CalendarIssuesButton count={issueCount} /> : null}
                 <Button
                   variant="secondary"
                   size="icon"
@@ -437,7 +476,7 @@ export default function SchedulePage() {
           </div>
         </div>
 
-        {connected ? (
+        {connected && mode === "sessions" ? (
           <ScheduleFilters
             statusFilter={statusFilter}
             trainerFilter={trainerFilter}
@@ -456,7 +495,7 @@ export default function SchedulePage() {
         <OwnerReadState loading={false} error={outlook.error} retry={outlook.retry} label="Sprawdzanie połączenia..." />
         {connected ? <>
           <OwnerReadState loading={false} error={resources.error} retry={resources.retry} label="Ładowanie danych grafiku..." />
-          <OwnerReadState loading={false} error={sessionList.error} retry={sessionList.retry} label="Ładowanie sesji..." />
+          {mode === "sessions" ? <OwnerReadState loading={false} error={sessionList.error} retry={sessionList.retry} label="Ładowanie sesji..." /> : null}
         </> : null}
         {outlook.loading ? (
           <div className="card-shell p-6 text-on-surface-variant">
@@ -464,6 +503,18 @@ export default function SchedulePage() {
           </div>
         ) : !connected ? (
           outlook.error ? null : <OutlookRequiredState />
+        ) : mode === "availability" ? (
+          <OwnerAvailabilityView
+            view={view}
+            anchorDate={anchorDate}
+            locationId={selectedLocationId}
+            trainerFilter={effectiveTrainerFilter}
+            onTrainerFilterChange={setTrainerFilter}
+            locations={scopedLocations}
+            revision={availabilityRevision + calendarRevision}
+            onSelectSession={(id) => void openEditModal({ id })}
+            onSessionsChanged={() => { notifySessionCorrected(); }}
+          />
         ) : view === "week" ? (
           <WeekSchedule
             days={weekDays}
@@ -485,7 +536,7 @@ export default function SchedulePage() {
             onCreateSession={openCreateModal}
           />
         )}
-        {connected ? <OutlookIssuesPanel id={ISSUES_SECTION_ID} onCountChange={setIssueCount} onOpenSession={id => void openEditModal({ id })} /> : null}
+        {connected && mode === "sessions" ? <OutlookIssuesPanel id={ISSUES_SECTION_ID} onCountChange={setIssueCount} onOpenSession={id => void openEditModal({ id })} /> : null}
       </div>
 
       <SessionEditorModal

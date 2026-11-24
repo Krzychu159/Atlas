@@ -183,6 +183,19 @@ test('destinations preserve full app paths and normalize only known legacy route
   assert.equal(api.getNotificationDestination({ actionUrl: '/schedule' }, 'trainer'), '/trainer/schedule');
 });
 
+test('availability notifications open the availability screen, not the trainer profile', () => {
+  const api = load('app/lib/notifications.ts');
+  const reminder = { type: 'AvailabilityWeekReminder', category: 'trainers', relatedEntityType: null, relatedEntityId: null, actionUrl: null };
+  assert.equal(api.getNotificationDestination(reminder, 'trainer'), '/trainer/availability');
+  const decided = { type: 'AvailabilityChangeDecided', category: 'trainers', relatedEntityType: 'TrainerAvailabilityChangeRequest', relatedEntityId: 4, actionUrl: null };
+  assert.equal(api.getNotificationDestination(decided, 'trainer'), '/trainer/availability');
+  assert.equal(api.getNotificationDestination({ ...decided, type: 'AvailabilityChangeRequested' }, 'owner'), '/owner/schedule?mode=availability');
+  assert.equal(api.getNotificationDestination({ ...decided, type: 'AvailabilityChangeRequested', actionUrl: '/owner/schedule?mode=availability&week=2026-11-30' }, 'owner'), '/owner/schedule?mode=availability&week=2026-11-30');
+  assert.equal(api.getNotificationDestination({ ...reminder, actionUrl: '/trainer/availability?week=2026-11-30' }, 'trainer'), '/trainer/availability?week=2026-11-30');
+  assert.equal(api.getNotificationDestination({ actionUrl: '/availability/weeks/2026-11-23' }, 'trainer'), '/trainer/availability?week=2026-11-23');
+  assert.equal(api.getNotificationDestination({ actionUrl: '/trainer/availability?week=2026-11-30' }, 'trainer'), '/trainer/availability?week=2026-11-30');
+});
+
 test('milestone reward notifications open the client profile with its rewards', () => {
   const api = load('app/lib/notifications.ts');
   const item = { type: 'MilestoneRewardPending', category: 'milestones', relatedEntityType: 'client', relatedEntityId: 12, actionUrl: '/clients/12/workspace' };

@@ -13,16 +13,20 @@ import type { ScheduleView } from "../types";
 const segmentClassName =
   "h-10 rounded-[var(--radius-default)] px-4 text-sm font-semibold transition focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--color-primary-light)]";
 
-export function ViewSwitch({
+function SegmentSwitch<T extends string>({
+  label,
+  options,
   value,
   onChange,
 }: {
-  value: ScheduleView;
-  onChange: (value: ScheduleView) => void;
+  label: string;
+  options: readonly (readonly [T, string])[];
+  value: T;
+  onChange: (value: T) => void;
 }) {
   return (
-    <div role="group" aria-label="Widok grafiku" className="flex items-center gap-1 rounded-[var(--radius-lg)] bg-surface-container p-1">
-      {(["day", "week"] as const).map((item) => (
+    <div role="group" aria-label={label} className="flex items-center gap-1 rounded-[var(--radius-lg)] bg-surface-container p-1">
+      {options.map(([item, text]) => (
         <button
           key={item}
           type="button"
@@ -36,11 +40,25 @@ export function ViewSwitch({
               : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
           ].join(" ")}
         >
-          {item === "day" ? "Dzień" : "Tydzień"}
+          {text}
         </button>
       ))}
     </div>
   );
+}
+
+const VIEW_OPTIONS = [["day", "Dzień"], ["week", "Tydzień"]] as const;
+
+export function ViewSwitch({ value, onChange }: { value: ScheduleView; onChange: (value: ScheduleView) => void }) {
+  return <SegmentSwitch label="Widok grafiku" options={VIEW_OPTIONS} value={value} onChange={onChange} />;
+}
+
+export type ScheduleMode = "sessions" | "availability";
+const MODE_OPTIONS = [["sessions", "Sesje"], ["availability", "Dyspozycje"]] as const;
+
+/** Switches the schedule between planned sessions and trainers' availability. */
+export function ScheduleModeSwitch({ value, onChange }: { value: ScheduleMode; onChange: (value: ScheduleMode) => void }) {
+  return <SegmentSwitch label="Co pokazać w grafiku" options={MODE_OPTIONS} value={value} onChange={onChange} />;
 }
 
 export function DateNavigator({
