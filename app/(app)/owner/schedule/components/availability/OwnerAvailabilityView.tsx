@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { MessageSquareText, PencilLine } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MessageSquareText, PencilLine, UserRound } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { showAppSuccess } from "@/app/components/ui/app-toast";
 import { OwnerReadState } from "../../../components/OwnerReadState";
@@ -39,6 +39,8 @@ export function OwnerAvailabilityView({
   onTrainerFilterChange,
   locations,
   revision,
+  selfTrainerId,
+  openSelfRequest,
   onSelectSession,
   onSessionsChanged,
 }: {
@@ -49,6 +51,10 @@ export function OwnerAvailabilityView({
   onTrainerFilterChange: (value: string) => void;
   locations: Location[];
   revision: number;
+  /** The owner's own trainer profile, when the owner also trains. */
+  selfTrainerId: number | null;
+  /** Changes when a link (e.g. a reminder to confirm) asks to open the owner's own availability. */
+  openSelfRequest: string | null;
   onSelectSession: (sessionId: number) => void;
   /** A consultation was added, so the session list behind this view is stale. */
   onSessionsChanged: () => void;
@@ -56,8 +62,17 @@ export function OwnerAvailabilityView({
   const [localRevision, setLocalRevision] = useState(0);
   const [freeTarget, setFreeTarget] = useState<FreeTarget | null>(null);
   const [requestsOpen, setRequestsOpen] = useState(false);
-  const [editing, setEditing] = useState<AvailabilityScheduleTrainer | null>(null);
+  const [editing, setEditing] = useState<{ trainerId: number; name: string } | null>(null);
   const refresh = useCallback(() => setLocalRevision((value) => value + 1), []);
+  const openSelf = useCallback(() => {
+    if (selfTrainerId) setEditing({ trainerId: selfTrainerId, name: "Moja dyspozycja" });
+  }, [selfTrainerId]);
+  const handledSelfRequest = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openSelfRequest || !selfTrainerId || handledSelfRequest.current === openSelfRequest) return;
+    handledSelfRequest.current = openSelfRequest;
+    void Promise.resolve().then(openSelf);
+  }, [openSelf, openSelfRequest, selfTrainerId]);
   const today = studioToday();
   const anchor = toDateInputValue(anchorDate);
   const weekStart = mondayOf(anchor);
@@ -91,6 +106,9 @@ export function OwnerAvailabilityView({
   const colors = useMemo(() => Object.fromEntries(allTrainers.map((trainer) => [trainer.trainerId, trainer.outlookCategoryColor])), [allTrainers]);
   const selected = trainerFilter ? allTrainers.find((trainer) => String(trainer.trainerId) === trainerFilter) ?? null : null;
 
+  const selfWeekOpen = allTrainers.find((trainer) => trainer.trainerId === selfTrainerId)?.weeks
+    .some((week) => week.weekStart === weekStart && !week.isLocked && week.status === "Open") ?? false;
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
@@ -103,9 +121,15 @@ export function OwnerAvailabilityView({
           {schedule.loading && !allTrainers.length ? <span className="h-9 w-64 animate-pulse rounded-full bg-surface-container" aria-hidden="true" /> : null}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          {selected ? (
-            <Button type="button" variant="secondary" size="sm" icon={<PencilLine size={15} className="text-primary-light" />} onClick={() => setEditing(selected)}>
+          {selected && selected.trainerId !== selfTrainerId ? (
+            <Button type="button" variant="secondary" size="sm" icon={<PencilLine size={15} className="text-primary-light" />}
+              onClick={() => setEditing({ trainerId: selected.trainerId, name: selected.name })}>
               Edytuj dyspozycję
+            </Button>
+          ) : null}
+          {selfTrainerId ? (
+            <Button type="button" variant="secondary" size="sm" icon={<UserRound size={15} className="text-primary-light" />} onClick={openSelf}>
+              Moja dyspozycja{selfWeekOpen ? " · do potwierdzenia" : ""}
             </Button>
           ) : null}
           <Button type="button" variant={pending.length ? "primary" : "secondary"} size="sm" icon={<MessageSquareText size={15} />} onClick={() => setRequestsOpen(true)}>
@@ -143,8 +167,10 @@ export function OwnerAvailabilityView({
         <ChangeRequestsPanel requests={pending} colors={colors} onClose={() => setRequestsOpen(false)} onDecided={refresh} />
       ) : null}
       {editing ? (
-        <TrainerWeekDrawer trainerId={editing.trainerId} trainerName={editing.name} initialWeek={weekStart}
-          onClose={() => setEditing(null)} onChanged={refresh} />
+        <TrainerWeekDrawer trainerId={editing.trainerId} trainerName={editing.name}
+          // The current week is already locked; their own form opens on the next week to confirm.
+          initialWeek={editing.trainerId === selfTrainerId && weekStart <= mondayOf(today) ? addDaysIso(mondayOf(today), 7) : weekStart}
+          isSelf={editing.trainerId === selfTrainerId} onClose={() => setEditing(null)} onChanged={refresh} />
       ) : null}
     </div>
   );

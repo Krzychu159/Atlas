@@ -129,12 +129,19 @@ function invitationDestination(notification: AppNotification, role: Notification
 }
 
 // Trainers fill in their availability on their own screen; owners review it in the schedule.
-function availabilityDestination(role: NotificationRole, domainPath = "") {
+// An owner who also trains gets the trainer's reminders; `own` opens their own availability.
+function availabilityDestination(role: NotificationRole, domainPath = "", params?: URLSearchParams, own = false) {
   if (role === "client") return null;
-  if (role === "owner") return "/owner/schedule?mode=availability";
-  const week = domainPath.match(/\/weeks\/(\d{4}-\d{2}-\d{2})$/)?.[1];
-  return `/trainer/availability${week ? `?week=${week}` : ""}`;
+  const requested = params?.get("week") ?? domainPath.match(/\/weeks\/(\d{4}-\d{2}-\d{2})$/)?.[1];
+  const week = requested && /^\d{4}-\d{2}-\d{2}$/.test(requested) ? requested : null;
+  if (role === "trainer") return `/trainer/availability${week ? `?week=${week}` : ""}`;
+  const query = new URLSearchParams({ mode: "availability" });
+  if (week) query.set("week", week);
+  if (own) query.set("mine", "1");
+  return `/owner/schedule?${query}`;
 }
+
+const OWN_AVAILABILITY_TYPES = /^(AvailabilityWeekReminder|AvailabilityChangeDecided)$/;
 
 function matchNotificationUrl(notification: AppNotification, role: NotificationRole | null) {
   const safe = getSafeNotificationUrl(notification.actionUrl);
@@ -170,7 +177,9 @@ function matchNotificationUrl(notification: AppNotification, role: NotificationR
   const session = domainPath.match(/^\/sessions\/([1-9]\d*)(?:\/workspace)?$/);
   if (session && role !== "client") return `/${role}/schedule?sessionId=${session[1]}`;
   if (/^\/(sessions|schedule|group-classes)(?:\/[1-9]\d*(?:\/workspace)?)?$/.test(domainPath)) return `/${role}/schedule${suffix}`;
-  if (/^\/availability(?:\/|$)/.test(domainPath)) return availabilityDestination(role, domainPath);
+  if (/^\/availability(?:\/|$)/.test(domainPath)) {
+    return availabilityDestination(role, domainPath, url.searchParams, path.startsWith("/trainer/") || OWN_AVAILABILITY_TYPES.test(notification.type ?? ""));
+  }
   if (/^\/(payments|billing)(?:\/[1-9]\d*)?$/.test(domainPath)) return `/${role}/payments${suffix}`;
   if (/^\/(client-packages|subscriptions)(?:\/[1-9]\d*)?$/.test(domainPath)) return `/${role}/payments${suffix}`;
   if (/^\/packages(?:\/[1-9]\d*)?$/.test(domainPath)) {
@@ -197,7 +206,9 @@ export function getNotificationDestination(notification: AppNotification, reques
   const entity = notification.relatedEntityType?.toLowerCase() ?? "";
   const id = notification.relatedEntityId;
   const validId = typeof id === "number" && Number.isSafeInteger(id) && id > 0;
-  if (/availability/i.test(`${entity} ${notification.type ?? ""}`)) return availabilityDestination(role);
+  if (/availability/i.test(`${entity} ${notification.type ?? ""}`)) {
+    return availabilityDestination(role, "", undefined, OWN_AVAILABILITY_TYPES.test(notification.type ?? ""));
+  }
   const kind = /settlement/i.test(`${entity} ${notification.type ?? ""}`) ? "settlement" : getNotificationKind(notification);
   if (kind === "invitation") return invitationDestination(notification, role);
   if (kind === "session") return entity === "session" && validId && role !== "client" ? `/${role}/schedule?sessionId=${id}` : `/${role}/schedule`;

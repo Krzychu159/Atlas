@@ -41,6 +41,7 @@ export function AvailabilityWeekEditor({
   hasTemplate = true,
   onOpenTemplate,
   ownerMode = false,
+  isSelf = false,
   onChanged,
 }: {
   weekStart: string;
@@ -49,6 +50,8 @@ export function AvailabilityWeekEditor({
   onOpenTemplate?: () => void;
   /** The owner edits a trainer's week: locked weeks change directly, without requests or confirmation. */
   ownerMode?: boolean;
+  /** With `ownerMode`: the owner edits their own hours (an owner who also trains). */
+  isSelf?: boolean;
   /** Called after every saved change, e.g. to refresh a schedule behind the editor. */
   onChanged?: () => void;
 }) {
@@ -212,8 +215,9 @@ export function AvailabilityWeekEditor({
       <AvailabilityWeekBanner
         week={week}
         ownerMode={ownerMode}
+        isSelf={isSelf}
         decision={lockedWithoutRequest ? decision : null}
-        canConfirm={!ownerMode && editable && week.canSubmit}
+        canConfirm={editable && !week.isLocked && week.canSubmit}
         onConfirm={() => {
           if (unsaved) return showAppInfo("Popraw godziny w zaznaczonych dniach, zanim potwierdzisz tydzień.");
           setSubmitError(null);
@@ -282,7 +286,11 @@ export function AvailabilityWeekEditor({
       {confirmOpen ? (
         <ConfirmDialog
           title="Potwierdzić tydzień?"
-          description="Po potwierdzeniu zmiany w tym tygodniu zgłosisz już tylko właścicielowi."
+          description={!ownerMode
+            ? "Po potwierdzeniu zmiany w tym tygodniu zgłosisz już tylko właścicielowi."
+            : isSelf
+              ? "W grafiku będzie widać, że te godziny są aktualne. Jako właściciel nadal możesz je zmieniać."
+              : "Tydzień trenera będzie potwierdzony, a trener zmieni go już tylko przez prośbę. Ty nadal możesz go zmieniać."}
           confirmLabel="Potwierdź tydzień"
           busyLabel="Potwierdzam…"
           icon={<CalendarCheck2 size={20} />}

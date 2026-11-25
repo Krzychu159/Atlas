@@ -34,6 +34,7 @@ function PendingRequestSummary({ week }: { week: AvailabilityWeek }) {
 export function AvailabilityWeekBanner({
   week,
   ownerMode,
+  isSelf,
   decision,
   canConfirm,
   onConfirm,
@@ -42,6 +43,8 @@ export function AvailabilityWeekBanner({
 }: {
   week: AvailabilityWeek;
   ownerMode: boolean;
+  /** The owner looks at their own hours (an owner who also trains). */
+  isSelf: boolean;
   /** The owner's latest decision on a request for this week. */
   decision: AvailabilityChangeRequest | null;
   canConfirm: boolean;
@@ -84,16 +87,17 @@ export function AvailabilityWeekBanner({
       : "Do czasu decyzji właściciela obowiązują godziny poniżej.";
   }
   if (ownerMode) {
+    // The owner may still change a locked week; for their own hours the wording stays personal.
     const submitted = formatStudioDateTime(week.submittedAt);
-    const direct = "Twoje zmiany zapiszą się od razu, a trener je zobaczy.";
+    const direct = isSelf ? "Jako właściciel nadal możesz go zmieniać." : "Twoje zmiany zapiszą się od razu, a trener je zobaczy.";
     if (!week.isLocked) {
-      title = "Trener jeszcze nie potwierdził tygodnia";
-      text = `${deadline ? `Termin: ${deadline}. ` : ""}Możesz zmienić godziny, trener zobaczy je w swoim formularzu.`;
+      title = isSelf ? "Potwierdź ten tydzień" : "Trener jeszcze nie potwierdził tygodnia";
+      text = `${deadline ? `Termin: ${deadline}. ` : ""}${isSelf ? "Potwierdzenie pokazuje w grafiku, że te godziny są aktualne." : "Możesz zmienić godziny albo potwierdzić tydzień za trenera."}`;
     } else if (week.status === "Submitted") {
-      title = "Trener potwierdził ten tydzień";
+      title = isSelf ? "Tydzień potwierdzony" : "Trener potwierdził ten tydzień";
       text = `${submitted ? `Potwierdzono: ${submitted}. ` : ""}${direct}`;
     } else {
-      title = "Trener nie potwierdził tygodnia na czas";
+      title = isSelf ? "Termin potwierdzenia minął" : "Trener nie potwierdził tygodnia na czas";
       text = `Obowiązują godziny poniżej. ${direct}`;
     }
     if (pending) {
@@ -125,15 +129,16 @@ export function AvailabilityWeekBanner({
           {pending ? <PendingRequestSummary week={week} /> : null}
         </div>
       </div>
-      <div className={`flex shrink-0 flex-wrap gap-2 ${ownerMode ? "hidden" : ""}`}>
+      <div className="flex shrink-0 flex-wrap gap-2 empty:hidden">
         {canConfirm ? (
           <Button type="button" icon={<CalendarCheck2 size={16} />} onClick={onConfirm}>
-            Potwierdź tydzień
+            {ownerMode && !isSelf ? "Potwierdź za trenera" : "Potwierdź tydzień"}
           </Button>
         ) : null}
-        {pending && week.canRequestChange ? <Button type="button" variant="secondary" onClick={onRequestChange}>Zmień prośbę</Button> : null}
-        {pending && week.pendingChangeRequest?.id ? <Button type="button" variant="ghost" onClick={onCancelRequest}>Wycofaj prośbę</Button> : null}
-        {!pending && week.isLocked && week.canRequestChange ? (
+        {/* The owner changes locked weeks directly, so requests are the trainer's tools only. */}
+        {!ownerMode && pending && week.canRequestChange ? <Button type="button" variant="secondary" onClick={onRequestChange}>Zmień prośbę</Button> : null}
+        {!ownerMode && pending && week.pendingChangeRequest?.id ? <Button type="button" variant="ghost" onClick={onCancelRequest}>Wycofaj prośbę</Button> : null}
+        {!ownerMode && !pending && week.isLocked && week.canRequestChange ? (
           <Button type="button" variant="secondary" icon={<MessageSquareText size={16} className="text-primary-light" />} onClick={onRequestChange}>
             Poproś o zmianę
           </Button>

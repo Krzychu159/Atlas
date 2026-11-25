@@ -192,6 +192,9 @@ test('availability notifications open the availability screen, not the trainer p
   assert.equal(api.getNotificationDestination({ ...decided, type: 'AvailabilityChangeRequested' }, 'owner'), '/owner/schedule?mode=availability');
   assert.equal(api.getNotificationDestination({ ...decided, type: 'AvailabilityChangeRequested', actionUrl: '/owner/schedule?mode=availability&week=2026-11-30' }, 'owner'), '/owner/schedule?mode=availability&week=2026-11-30');
   assert.equal(api.getNotificationDestination({ ...reminder, actionUrl: '/trainer/availability?week=2026-11-30' }, 'trainer'), '/trainer/availability?week=2026-11-30');
+  // An owner who also trains gets the trainer's reminder and lands on their own availability.
+  assert.equal(api.getNotificationDestination({ ...reminder, actionUrl: '/trainer/availability?week=2026-11-30' }, 'owner'), '/owner/schedule?mode=availability&week=2026-11-30&mine=1');
+  assert.equal(api.getNotificationDestination(reminder, 'owner'), '/owner/schedule?mode=availability&mine=1');
   assert.equal(api.getNotificationDestination({ actionUrl: '/availability/weeks/2026-11-23' }, 'trainer'), '/trainer/availability?week=2026-11-23');
   assert.equal(api.getNotificationDestination({ actionUrl: '/trainer/availability?week=2026-11-30' }, 'trainer'), '/trainer/availability?week=2026-11-30');
 });

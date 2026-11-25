@@ -59,12 +59,18 @@ function dateLabel(iso: string, currentYear: string) {
 export function AvailabilityTemplateEditor({
   data,
   trainerId,
+  isSelf = true,
   onSaved,
 }: {
   data: AvailabilityTemplates;
   trainerId?: number;
+  /** false when the owner sets another trainer's regular schedule. */
+  isSelf?: boolean;
   onSaved: (data: AvailabilityTemplates) => void;
 }) {
+  const copy = isSelf
+    ? { heading: "Twoje stałe godziny", none: "Nie masz jeszcze stałego grafiku.", outlook: "w Twoim kalendarzu Outlook", ended: "nie masz stałego grafiku", endInfo: "nie będziesz mieć stałych godzin — każdy tydzień uzupełnisz wtedy sam" }
+    : { heading: "Stałe godziny trenera", none: "Trener nie ma jeszcze stałego grafiku.", outlook: "w kalendarzu Outlook trenera", ended: "trener nie ma stałego grafiku", endInfo: "trener nie będzie mieć stałych godzin — każdy tydzień trzeba będzie uzupełnić osobno" };
   const [form, setForm] = useState<Form>(() => formFor(data, initialTemplate(data)));
   const [dialog, setDialog] = useState<"save" | "end" | null>(null);
   const [saving, setSaving] = useState(false);
@@ -116,7 +122,7 @@ export function AvailabilityTemplateEditor({
       });
       setDialog(null);
       if (end) {
-        showAppInfo(`Od ${dateLabel(form.validFrom, year)} nie masz stałego grafiku`);
+        showAppInfo(`Od ${dateLabel(form.validFrom, year)} ${copy.ended}`);
         setForm(formFor(next, null));
       } else {
         showAppSuccess(`Stały grafik obowiązuje od ${dateLabel(form.validFrom, year)}`);
@@ -136,7 +142,7 @@ export function AvailabilityTemplateEditor({
           <div className="flex gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-primary/10 text-primary-light"><Repeat size={20} aria-hidden="true" /></span>
             <div>
-              <h2 className="text-base font-semibold text-on-surface">Twoje stałe godziny</h2>
+              <h2 className="text-base font-semibold text-on-surface">{copy.heading}</h2>
               <p className="mt-1 text-sm leading-6 text-on-surface-variant">
                 Powtarzają się co tydzień. Każdy tydzień i tak możesz dopasować przed potwierdzeniem.
               </p>
@@ -243,11 +249,11 @@ export function AvailabilityTemplateEditor({
           </ul>
         ) : (
           <p className="mt-3 text-sm leading-6 text-on-surface-variant">
-            Nie masz jeszcze stałego grafiku. Ustaw godziny obok i zapisz — od wybranego tygodnia będą podstawą każdego tygodnia.
+            {copy.none} Ustaw godziny obok i zapisz — od wybranego tygodnia będą podstawą każdego tygodnia.
           </p>
         )}
         <p className="mt-4 text-xs leading-5 text-on-surface-muted">
-          Dyspozycja pojawia się też w Twoim kalendarzu Outlook jako szare wydarzenia „Dyspozycja”.
+          Dyspozycja pojawia się też {copy.outlook} jako szare wydarzenia „Dyspozycja”.
         </p>
       </aside>
 
@@ -267,7 +273,7 @@ export function AvailabilityTemplateEditor({
       {dialog === "end" ? (
         <ConfirmDialog
           title="Zakończyć stały grafik?"
-          description={`Od ${dateLabel(form.validFrom, year)} nie będziesz mieć stałych godzin — każdy tydzień uzupełnisz wtedy sam. Tygodnie już potwierdzone zostają bez zmian.`}
+          description={`Od ${dateLabel(form.validFrom, year)} ${copy.endInfo}. Tygodnie już potwierdzone zostają bez zmian.`}
           confirmLabel="Zakończ grafik"
           busyLabel="Zapisuję…"
           tone="danger"

@@ -512,6 +512,8 @@ export default function SchedulePage() {
             onTrainerFilterChange={setTrainerFilter}
             locations={scopedLocations}
             revision={availabilityRevision + calendarRevision}
+            selfTrainerId={defaultTrainerId}
+            openSelfRequest={searchParams.get("mine") === "1" ? `mine:${weekParam ?? ""}` : null}
             onSelectSession={(id) => void openEditModal({ id })}
             onSessionsChanged={() => { notifySessionCorrected(); }}
           />
