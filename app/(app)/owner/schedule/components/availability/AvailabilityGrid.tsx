@@ -148,8 +148,8 @@ export function AvailabilityGrid({
       )}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-white/[0.06] px-4 py-2.5 text-xs text-on-surface-muted">
-        <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-[3px] bg-on-surface-muted/30" />Dyspozycja (jasny kolor trenera)</span>
-        <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-[3px] border border-dashed border-white/60" />Wolne okno — kliknij, aby dodać konsultację</span>
+        <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-[3px] bg-on-surface-muted/30" />Dyspozycja (kolor trenera)</span>
+        <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-[3px] border border-dashed border-white/60" />Przerywana ramka — kliknij, aby dodać konsultację</span>
         <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-[3px] bg-on-surface-muted ring-1 ring-white/20" />Sesja (pełny kolor)</span>
       </div>
     </section>
@@ -190,7 +190,7 @@ function TrainerLane({
       })}
       {day?.free.map((slot) => {
         const { top, height } = position(slot.start, slot.end);
-        const label = `${trainer.name} · wolne ${formatTime(slot.start)}–${formatTime(slot.end)}`;
+        const label = `${trainer.name} · dyspozycja ${formatTime(slot.start)}–${formatTime(slot.end)}`;
         return (
           <button key={`f-${slot.startAt}`} type="button" title={label} aria-label={`${label}. Dodaj konsultację`}
             onClick={() => onSelectFree(trainer, date, slot)}
@@ -198,7 +198,7 @@ function TrainerLane({
             style={{ top: top + 2, height: height - 4 }}>
             {roomy && height > 30 ? (
               <span className="px-2 py-1 text-[11px] font-semibold tabular-nums text-white/80 group-hover:text-on-surface">
-                Wolne {formatTime(slot.start)}–{formatTime(slot.end)}
+                Dyspozycja {formatTime(slot.start)}–{formatTime(slot.end)}
               </span>
             ) : null}
           </button>

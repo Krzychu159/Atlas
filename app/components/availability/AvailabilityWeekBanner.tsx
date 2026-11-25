@@ -6,11 +6,11 @@ import type { AvailabilityChangeRequest, AvailabilityWeek, AvailabilityWeekDay }
 import { formatDayLabel, formatRanges, formatStudioDateTime } from "@/app/lib/availability-time";
 import { draftRanges } from "@/app/lib/availability-days";
 
-/** The requested days of a pending request, as "czw 26 lis: 8:00–12:00 (teraz: wolne)". */
+/** The requested days of a pending request, as "czw 26 lis: 8:00–12:00 (teraz: brak dyspozycji)". */
 function PendingRequestSummary({ week }: { week: AvailabilityWeek }) {
   const request = week.pendingChangeRequest;
   if (!request?.days.length) return null;
-  const hours = (ranges: AvailabilityWeekDay["ranges"]) => (ranges.length ? formatRanges(ranges) : "wolne");
+  const hours = (ranges: AvailabilityWeekDay["ranges"]) => (ranges.length ? formatRanges(ranges) : "brak dyspozycji");
   return (
     <div className="mt-3 space-y-1 rounded-[var(--radius-lg)] bg-surface-container-low p-3 text-sm">
       {request.days.map((change) => {

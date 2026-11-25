@@ -1,7 +1,7 @@
 import type { AvailabilityDayMode, AvailabilityRange, AvailabilityWeekDay } from "./availability";
 import { rangesAreValid, sameRanges, sortRanges } from "./availability-time";
 
-/** What a day is set to in a form: "jak zwykle", own hours or "wolne". */
+/** What a day is set to in a form: "jak zwykle", own hours or "brak dyspozycji". */
 export type DayDraft = { mode: AvailabilityDayMode; ranges: AvailabilityRange[] };
 
 /** A day can be saved once its own hours are complete; "Inne godziny" needs at least one valid range. */

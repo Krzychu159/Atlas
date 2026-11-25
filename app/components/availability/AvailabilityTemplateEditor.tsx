@@ -201,7 +201,7 @@ export function AvailabilityTemplateEditor({
           <Button
             type="button"
             onClick={() => {
-              if (incomplete) return setError("Popraw godziny w zaznaczonych dniach albo ustaw je jako „Wolne”.");
+              if (incomplete) return setError("Popraw godziny w zaznaczonych dniach albo ustaw je jako „Brak dyspozycji”.");
               if (!hasHours) return setError("Dodaj godziny przynajmniej w jednym dniu.");
               setError(null);
               setDialog("save");
@@ -233,7 +233,7 @@ export function AvailabilityTemplateEditor({
                       return (
                         <li key={dayOfWeek} className="flex justify-between gap-2">
                           <span>{weekdayName(dayOfWeek, true)}</span>
-                          <span className={`text-right tabular-nums ${ranges.length ? "" : "text-on-surface-muted"}`}>{ranges.length ? formatRanges(ranges) : "wolne"}</span>
+                          <span className={`text-right tabular-nums ${ranges.length ? "" : "text-on-surface-muted"}`}>{ranges.length ? formatRanges(ranges) : "brak dyspozycji"}</span>
                         </li>
                       );
                     })}

@@ -90,7 +90,7 @@ export function ConsultationModal({
           <ModalHeader
             eyebrow={`${trainer.name} · ${formatIsoDate(date)}`}
             title="Dodaj konsultację"
-            description={`Wolne okno: ${formatTime(slot.start)}–${formatTime(slot.end)}. Konsultacja trafi do grafiku i kalendarza trenera.`}
+            description={`Dyspozycja: ${formatTime(slot.start)}–${formatTime(slot.end)}. Konsultacja trafi do grafiku i kalendarza trenera.`}
             icon={<CalendarPlus size={20} />}
             onClose={onClose}
           />

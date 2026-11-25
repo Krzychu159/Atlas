@@ -23,7 +23,7 @@ type BusyByDate = Record<string, AvailabilityBusy[]>;
 
 function requestedLabel(change: AvailabilityDayChange) {
   if (change.mode === "Template") return "jak zwykle (stały grafik)";
-  return change.mode === "Off" || !change.ranges.length ? "wolne" : formatRanges(change.ranges);
+  return change.mode === "Off" || !change.ranges.length ? "brak dyspozycji" : formatRanges(change.ranges);
 }
 
 /** Sessions that would no longer fit in the requested hours. Unknown for "jak zwykle", so not checked there. */
@@ -156,7 +156,7 @@ function RequestCard({
             <li key={change.date} className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2">
               <span className="text-on-surface-variant">{label.weekday} {label.day} {label.month}</span>
               <span className="min-w-0">
-                <span className="text-on-surface-muted line-through decoration-on-surface-muted/60">{current.length ? formatRanges(current) : "wolne"}</span>
+                <span className="text-on-surface-muted line-through decoration-on-surface-muted/60">{current.length ? formatRanges(current) : "brak dyspozycji"}</span>
                 <span aria-hidden="true" className="mx-1.5 text-on-surface-muted">→</span>
                 <span className="font-semibold tabular-nums text-on-surface">{requestedLabel(change)}</span>
               </span>

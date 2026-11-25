@@ -13,12 +13,12 @@ export type DayModeOption = { value: AvailabilityDayMode; label: string };
 export const WEEK_DAY_MODES: readonly DayModeOption[] = [
   { value: "Template", label: "Jak zwykle" },
   { value: "Custom", label: "Inne godziny" },
-  { value: "Off", label: "Wolne" },
+  { value: "Off", label: "Brak dyspozycji" },
 ];
 
 export const TEMPLATE_DAY_MODES: readonly DayModeOption[] = [
   { value: "Custom", label: "Godziny" },
-  { value: "Off", label: "Wolne" },
+  { value: "Off", label: "Brak dyspozycji" },
 ];
 
 /** Placed in a row's `action` slot: copies that day's setting onto the following days. */
@@ -187,7 +187,7 @@ export function AvailabilityDayRow({
             >
               <Plus size={15} aria-hidden="true" /> Dodaj godziny
             </button>
-            {!draft.ranges.length ? <p className="w-full text-xs text-warning-light">Dodaj godziny albo wybierz „Wolne”.</p> : null}
+            {!draft.ranges.length ? <p className="w-full text-xs text-warning-light">Dodaj godziny albo wybierz „Brak dyspozycji”.</p> : null}
           </div>
         ) : (
           <ReadOnlyRanges ranges={shownRanges} mode={draft.mode} readOnly={readOnly} />
@@ -203,7 +203,7 @@ function ReadOnlyRanges({ ranges, mode, readOnly }: { ranges: AvailabilityRange[
   if (!ranges.length) {
     return (
       <p className="flex min-h-10 items-center text-sm text-on-surface-muted">
-        {mode === "Template" && !readOnly ? "Brak godzin w stałym grafiku" : "Wolne"}
+        {mode === "Template" && !readOnly ? "Brak godzin w stałym grafiku" : "Brak dyspozycji"}
       </p>
     );
   }

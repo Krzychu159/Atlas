@@ -307,7 +307,7 @@ export function AvailabilityWeekEditor({
                 <li key={day.date} className="flex justify-between gap-3">
                   <span className="text-on-surface-variant">{label.weekday} {label.day} {label.month}</span>
                   <span className={`text-right tabular-nums ${ranges.length ? "font-semibold text-on-surface" : "text-on-surface-muted"}`}>
-                    {ranges.length ? formatRanges(ranges) : "Wolne"}
+                    {ranges.length ? formatRanges(ranges) : "Brak dyspozycji"}
                   </span>
                 </li>
               );
