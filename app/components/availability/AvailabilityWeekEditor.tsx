@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarCheck2, Repeat } from "lucide-react";
+import { CalendarCheck2, Repeat, Undo2 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { ConfirmDialog } from "@/app/components/ui/confirm-dialog";
 import { RetryNotice } from "@/app/components/ui/retry-notice";
@@ -16,11 +16,12 @@ import {
   getAvailabilityWeek,
   saveAvailabilityWeek,
   submitAvailabilityWeek,
+  unsubmitAvailabilityWeek,
   type AvailabilityChangeRequest,
   type AvailabilityWeek,
   type AvailabilityWeekDay,
 } from "@/app/lib/availability";
-import { formatDayLabel, formatRanges, studioToday } from "@/app/lib/availability-time";
+import { formatDayLabel, formatRanges, formatStudioDateTime, studioToday } from "@/app/lib/availability-time";
 import { dayDraft, draftRanges, isDraftComplete, sameDraft, toDayPayload, type DayDraft } from "@/app/lib/availability-days";
 import { AvailabilityDayRow, CopyToNextDaysButton, WEEK_DAY_MODES } from "./AvailabilityDayRow";
 import { AvailabilityChangeRequestModal } from "./AvailabilityChangeRequestModal";
@@ -68,6 +69,9 @@ export function AvailabilityWeekEditor({
   const [requestOpen, setRequestOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [unsubmitOpen, setUnsubmitOpen] = useState(false);
+  const [unsubmitting, setUnsubmitting] = useState(false);
+  const [unsubmitError, setUnsubmitError] = useState<string | null>(null);
   const weekRef = useRef<AvailabilityWeek | null>(null);
   const queueRef = useRef<Promise<void>>(Promise.resolve());
   const mountedRef = useRef(true);
@@ -193,6 +197,25 @@ export function AvailabilityWeekEditor({
     }
   }
 
+  async function unsubmitWeek() {
+    setUnsubmitting(true);
+    setUnsubmitError(null);
+    try {
+      applyWeek(await unsubmitAvailabilityWeek(weekStart, trainerId));
+      setDrafts({});
+      setUnsubmitOpen(false);
+      showAppSuccess("Potwierdzenie cofnięte. Popraw tydzień i potwierdź go ponownie przed terminem.");
+      onChangedRef.current?.();
+    } catch (error) {
+      // After the deadline or an owner's change the week can no longer be reopened; show its current state.
+      const known = getAvailabilityErrorMessage(error);
+      setUnsubmitError(known ?? getErrorMessage(error, "Nie udało się cofnąć potwierdzenia. Spróbuj ponownie."));
+      if (known) void reload();
+    } finally {
+      setUnsubmitting(false);
+    }
+  }
+
   async function cancelRequest() {
     const id = week?.pendingChangeRequest?.id;
     if (!id) return;
@@ -225,6 +248,7 @@ export function AvailabilityWeekEditor({
         }}
         onRequestChange={() => setRequestOpen(true)}
         onCancelRequest={() => setCancelOpen(true)}
+        onUnsubmit={() => { setUnsubmitError(null); setUnsubmitOpen(true); }}
       />
 
       {!hasTemplate && editable && onOpenTemplate ? (
@@ -322,6 +346,20 @@ export function AvailabilityWeekEditor({
           today={today}
           onClose={() => setRequestOpen(false)}
           onSent={() => { setRequestOpen(false); void reload(); }}
+        />
+      ) : null}
+
+      {unsubmitOpen ? (
+        <ConfirmDialog
+          title="Cofnąć potwierdzenie?"
+          description={`Tydzień znów będzie otwarty do zmian. Pamiętaj, żeby potwierdzić go ponownie przed terminem${week.deadlineAt ? `: ${formatStudioDateTime(week.deadlineAt)}` : ""}.`}
+          confirmLabel="Cofnij potwierdzenie"
+          busyLabel="Cofam…"
+          icon={<Undo2 size={20} />}
+          busy={unsubmitting}
+          error={unsubmitError}
+          onConfirm={() => void unsubmitWeek()}
+          onClose={() => setUnsubmitOpen(false)}
         />
       ) : null}
 

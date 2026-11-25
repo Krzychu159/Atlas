@@ -125,6 +125,8 @@ export function getDefaultFormValues({
   locations,
   defaultTrainerId,
   startAt,
+  endAt,
+  defaultLocationId,
 }: {
   session: SessionEditorSession | null;
   date: Date;
@@ -133,6 +135,9 @@ export function getDefaultFormValues({
   defaultTrainerId?: number | null;
   /** A time slot picked in the calendar; the session then lasts the default 60 minutes. */
   startAt?: Date | null;
+  /** The end chosen together with `startAt`, e.g. from a trainer's free time. */
+  endAt?: Date | null;
+  defaultLocationId?: number | null;
 }): SessionFormValues {
   if (session) {
     return {
@@ -161,8 +166,9 @@ export function getDefaultFormValues({
 
   const start = new Date(startAt ?? date);
   if (!startAt) start.setHours(10, 0, 0, 0);
-  const end = new Date(start);
-  end.setHours(start.getHours() + 1);
+  const end = startAt && endAt && endAt > startAt ? new Date(endAt) : new Date(start);
+  if (!(startAt && endAt && endAt > startAt)) end.setHours(start.getHours() + 1);
+  const defaultLocation = locations.find((location) => location.id === defaultLocationId);
   const defaultTrainer = trainers.find(
     (trainer) => trainer.id === defaultTrainerId,
   );
@@ -180,7 +186,7 @@ export function getDefaultFormValues({
       : trainers[0]?.id
         ? String(trainers[0].id)
         : "",
-    locationId: locations[0]?.id ? String(locations[0].id) : "",
+    locationId: defaultLocation ? String(defaultLocation.id) : locations[0]?.id ? String(locations[0].id) : "",
     status: "",
     plannedSessionType: "",
     outlookCategories: "",

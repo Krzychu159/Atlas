@@ -67,10 +67,14 @@ export type AvailabilityWeek = {
   isLocked: boolean;
   deadlineAt: string;
   submittedAt: string | null;
+  /** Confirmed only after the Sunday 20:00 deadline. */
+  submittedAfterDeadline: boolean;
   changedAfterLockAt: string | null;
   hasPendingChangeRequest: boolean;
   canEdit: boolean;
   canSubmit: boolean;
+  /** The confirmation may still be taken back: before the deadline and while the owner has not changed the week. */
+  canUnsubmit: boolean;
   canRequestChange: boolean;
   pendingChangeRequest: AvailabilityChangeRequest | null;
   days: AvailabilityWeekDay[];
@@ -145,10 +149,12 @@ export function asAvailabilityWeek(raw: unknown, weekStart?: string): Availabili
     isLocked: raw.isLocked === true,
     deadlineAt: text(raw.deadlineAt) ?? "",
     submittedAt: text(raw.submittedAt),
+    submittedAfterDeadline: raw.submittedAfterDeadline === true,
     changedAfterLockAt: text(raw.changedAfterLockAt),
     hasPendingChangeRequest: raw.hasPendingChangeRequest === true,
     canEdit: raw.canEdit === true,
     canSubmit: raw.canSubmit === true,
+    canUnsubmit: raw.canUnsubmit === true,
     canRequestChange: raw.canRequestChange === true,
     pendingChangeRequest: normalizeChangeRequest(raw.pendingChangeRequest),
     days,
@@ -214,6 +220,11 @@ export async function submitAvailabilityWeek(weekStart: string, trainerId?: numb
   return weekOrThrow(await backendPost<unknown>(`${base}/weeks/${weekStart}/submit`, trainerId ? { trainerId } : {}), weekStart);
 }
 
+/** Takes a confirmation back, so the week is open for changes again. */
+export async function unsubmitAvailabilityWeek(weekStart: string, trainerId?: number) {
+  return weekOrThrow(await backendPost<unknown>(`${base}/weeks/${weekStart}/unsubmit`, trainerId ? { trainerId } : {}), weekStart);
+}
+
 export async function getAvailabilityChangeRequests(query: { status?: AvailabilityChangeRequestStatus; trainerId?: number } = {}, signal?: AbortSignal) {
   const result = await backendGet<unknown>(`${base}/change-requests`, query, signal);
   return (Array.isArray(result) ? result : []).flatMap((item) => normalizeChangeRequest(item) ?? []);
@@ -273,6 +284,7 @@ export type AvailabilityWeekState = {
   isLocked: boolean;
   deadlineAt: string | null;
   submittedAt: string | null;
+  submittedAfterDeadline: boolean;
   changedAfterLockAt: string | null;
   hasPendingChangeRequest: boolean;
 };
@@ -301,6 +313,7 @@ function weekState(raw: Raw): AvailabilityWeekState | null {
     isLocked: raw.isLocked === true,
     deadlineAt: text(raw.deadlineAt),
     submittedAt: text(raw.submittedAt),
+    submittedAfterDeadline: raw.submittedAfterDeadline === true,
     changedAfterLockAt: text(raw.changedAfterLockAt),
     hasPendingChangeRequest: raw.hasPendingChangeRequest === true,
   };
@@ -363,7 +376,8 @@ export function normalizeAvailabilitySchedule(raw: unknown): AvailabilitySchedul
 }
 
 /** At most 42 days per request. */
-export async function getAvailabilitySchedule(query: { from: string; to: string; trainerId?: number; locationId?: number }, signal?: AbortSignal) {
+/** `trainerIds` narrows the answer to chosen trainers; a trainer only ever gets colleagues from their own locations. */
+export async function getAvailabilitySchedule(query: { from: string; to: string; trainerId?: number; trainerIds?: number[]; locationId?: number }, signal?: AbortSignal) {
   return normalizeAvailabilitySchedule(await backendGet<unknown>(`${base}/schedule`, query, signal));
 }
 

@@ -14,12 +14,21 @@ import { formatIsoDate, formatTime, fromMinutes, toMinutes, validateRanges } fro
 import { getOutlookColor } from "@/app/lib/calendar/outlook-colors";
 import type { Location } from "@/app/lib/owner/locations";
 
+/** What the regular session form starts from when a training is planned in a trainer's free time. */
+export type TrainingDraft = { trainerId: number; locationId: number | null; startAt: Date; endAt: Date };
+
+type Kind = "consultation" | "training";
+
 /** A UTC instant for a studio time on the slot's day, counted from the slot's own start (no time zone math here). */
 function instantFor(slot: AvailabilitySlot, time: string) {
   const offset = (toMinutes(time) ?? 0) - (toMinutes(slot.start) ?? 0);
   return new Date(Date.parse(slot.startAt) + offset * 60_000).toISOString();
 }
 
+/**
+ * Clicked free time: a consultation is booked here (with the outside-availability warning); a training,
+ * e.g. a substitute, continues in the regular session form so packages, billing and Outlook work as usual.
+ */
 export function ConsultationModal({
   trainer,
   date,
@@ -27,6 +36,7 @@ export function ConsultationModal({
   locations,
   onClose,
   onCreated,
+  onCreateTraining,
 }: {
   trainer: AvailabilityScheduleTrainer;
   date: string;
@@ -34,7 +44,9 @@ export function ConsultationModal({
   locations: Location[];
   onClose: () => void;
   onCreated: () => void;
+  onCreateTraining: (draft: TrainingDraft) => void;
 }) {
+  const [kind, setKind] = useState<Kind>("consultation");
   const options = locations
     .filter((location) => trainer.locationIds.includes(location.id))
     .map((location) => ({ value: String(location.id), label: location.name ?? "Lokalizacja" }));
@@ -50,6 +62,16 @@ export function ConsultationModal({
   const [warning, setWarning] = useState<string | null>(null);
   const timeError = validateRanges([{ start, end }])[0];
   const color = getOutlookColor(trainer.outlookCategoryColor);
+
+  function continueToTraining() {
+    if (timeError) return setError(timeError);
+    onCreateTraining({
+      trainerId: trainer.trainerId,
+      locationId: locationId ? Number(locationId) : null,
+      startAt: new Date(instantFor(slot, start)),
+      endAt: new Date(instantFor(slot, end)),
+    });
+  }
 
   async function save(confirmOutsideAvailability: boolean) {
     if (!locationId) return setError("Wybierz lokalizację konsultacji.");
@@ -84,16 +106,30 @@ export function ConsultationModal({
 
   return (
     <ModalOverlay onClose={saving ? undefined : onClose} closeDisabled={saving}>
-      <div role="dialog" aria-modal="true" aria-label="Dodaj konsultację"
+      <div role="dialog" aria-modal="true" aria-label="Dodaj zajęcia w dyspozycji"
         className="relative z-10 w-full max-w-lg overflow-hidden rounded-[var(--radius-xl)] bg-surface-container shadow-ambient">
         <div className="space-y-4 p-5 md:p-6">
           <ModalHeader
             eyebrow={`${trainer.name} · ${formatIsoDate(date)}`}
-            title="Dodaj konsultację"
-            description={`Dyspozycja: ${formatTime(slot.start)}–${formatTime(slot.end)}. Konsultacja trafi do grafiku i kalendarza trenera.`}
+            title={kind === "consultation" ? "Dodaj konsultację" : "Dodaj trening"}
+            description={`Dyspozycja: ${formatTime(slot.start)}–${formatTime(slot.end)}. ${kind === "consultation"
+              ? "Konsultacja trafi do grafiku i kalendarza trenera."
+              : "Np. zastępstwo. W następnym kroku wybierzesz rodzaj treningu i klientów."}`}
             icon={<CalendarPlus size={20} />}
             onClose={onClose}
           />
+          <div role="group" aria-label="Rodzaj zajęć" className="flex gap-1 rounded-[var(--radius-lg)] bg-surface-container-low p-1">
+            {([["consultation", "Konsultacja"], ["training", "Trening"]] as const).map(([value, label]) => (
+              <button key={value} type="button" aria-pressed={kind === value} disabled={saving}
+                onClick={() => { setKind(value); setWarning(null); setError(null); }}
+                className={[
+                  "h-10 flex-1 rounded-[var(--radius-default)] text-sm font-semibold transition focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--color-primary-light)]",
+                  kind === value ? "bg-primary text-on-primary shadow-soft" : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
+                ].join(" ")}>
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center gap-2 rounded-[var(--radius-lg)] bg-surface-container-low px-3 py-2 text-sm">
             <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ background: color.bg }} />
             <span className="font-semibold text-on-surface">{trainer.name}</span>
@@ -109,13 +145,17 @@ export function ConsultationModal({
           <div role="group" aria-labelledby="consultation-hours">
             <span id="consultation-hours" className={compactFieldLabelClassName}>Godziny</span>
             <div className="mt-1.5 flex items-center gap-2">
-              <TimeField label="Początek konsultacji" value={start} invalid={Boolean(timeError)} onChange={changeTime(setStart)} />
+              <TimeField label="Początek zajęć" value={start} invalid={Boolean(timeError)} onChange={changeTime(setStart)} />
               <span aria-hidden="true" className="text-on-surface-muted">–</span>
-              <TimeField label="Koniec konsultacji" value={end} invalid={Boolean(timeError)} onChange={changeTime(setEnd)} />
+              <TimeField label="Koniec zajęć" value={end} invalid={Boolean(timeError)} onChange={changeTime(setEnd)} />
             </div>
           </div>
-          <TextField label="Tytuł (opcjonalnie)" value={title} onChange={setTitle} placeholder="Konsultacja" maxLength={200} />
-          <TextArea label="Notatka (opcjonalnie)" value={note} onChange={setNote} rows={2} maxLength={1000} />
+          {kind === "consultation" ? (
+            <>
+              <TextField label="Tytuł (opcjonalnie)" value={title} onChange={setTitle} placeholder="Konsultacja" maxLength={200} />
+              <TextArea label="Notatka (opcjonalnie)" value={note} onChange={setNote} rows={2} maxLength={1000} />
+            </>
+          ) : null}
 
           {warning ? (
             <div role="alert" className="flex gap-3 rounded-[var(--radius-lg)] bg-warning-container/40 p-3 text-sm leading-6 text-warning-light">
@@ -129,10 +169,14 @@ export function ConsultationModal({
           <Button type="button" variant="secondary" disabled={saving} onClick={warning ? () => setWarning(null) : onClose}>
             {warning ? "Zmień termin" : "Anuluj"}
           </Button>
-          <Button type="button" disabled={saving || !options.length} icon={saving ? <Loader2 size={16} className="animate-spin" /> : undefined}
-            onClick={() => void save(Boolean(warning))}>
-            {saving ? "Dodaję…" : warning ? "Dodaj mimo to" : "Dodaj konsultację"}
-          </Button>
+          {kind === "training" ? (
+            <Button type="button" disabled={!options.length} onClick={continueToTraining}>Dalej: szczegóły treningu</Button>
+          ) : (
+            <Button type="button" disabled={saving || !options.length} icon={saving ? <Loader2 size={16} className="animate-spin" /> : undefined}
+              onClick={() => void save(Boolean(warning))}>
+              {saving ? "Dodaję…" : warning ? "Dodaj mimo to" : "Dodaj konsultację"}
+            </Button>
+          )}
         </ModalFooter>
       </div>
     </ModalOverlay>

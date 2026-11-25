@@ -10,8 +10,9 @@ import { getErrorMessage, isAbortError, isNotFoundError } from "@/app/lib/backen
 import { getAvailabilityTemplates, type AvailabilityTemplates } from "@/app/lib/availability";
 import { isIsoDate, mondayOf, studioToday } from "@/app/lib/availability-time";
 import { WeekStepper } from "@/app/components/availability/WeekStepper";
+import { TeamAvailabilityView } from "./components/TeamAvailabilityView";
 
-type Tab = "week" | "template";
+type Tab = "week" | "template" | "team";
 
 export default function TrainerAvailabilityPage() {
   return <Suspense><TrainerAvailabilityContent /></Suspense>;
@@ -21,7 +22,8 @@ function TrainerAvailabilityContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const tab: Tab = searchParams.get("tab") === "template" ? "template" : "week";
+  const requestedTab = searchParams.get("tab");
+  const tab: Tab = requestedTab === "template" || requestedTab === "team" ? requestedTab : "week";
   const requestedWeek = searchParams.get("week");
   const [data, setData] = useState<AvailabilityTemplates | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +73,7 @@ function TrainerAvailabilityContent() {
           </p>
         </div>
         <div role="tablist" aria-label="Widok dyspozycji" hidden={unavailable} className="flex gap-1 rounded-[var(--radius-lg)] bg-surface-container p-1">
-          {([["week", "Tydzień"], ["template", "Stały grafik"]] as const).map(([value, label]) => (
+          {([["week", "Tydzień"], ["template", "Stały grafik"], ["team", "Zespół"]] as const).map(([value, label]) => (
             <button
               key={value}
               type="button"
@@ -122,6 +124,7 @@ function TrainerAvailabilityContent() {
       ) : null}
 
       {data && tab === "template" ? <AvailabilityTemplateEditor data={data} onSaved={setData} /> : null}
+      {data && tab === "team" ? <TeamAvailabilityView /> : null}
     </div>
   );
 }

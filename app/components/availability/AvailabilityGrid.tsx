@@ -41,8 +41,9 @@ export function AvailabilityGrid({
   trainers: AvailabilityScheduleTrainer[];
   isLoading: boolean;
   today: string;
-  onSelectSession: (sessionId: number) => void;
-  onSelectFree: (trainer: AvailabilityScheduleTrainer, date: string, slot: AvailabilitySlot) => void;
+  /** Without the handlers the calendar is read-only (the trainer's view of the team). */
+  onSelectSession?: (sessionId: number) => void;
+  onSelectFree?: (trainer: AvailabilityScheduleTrainer, date: string, slot: AvailabilitySlot) => void;
 }) {
   const isWeek = days.length > 1;
   const [mobileDay, setMobileDay] = useState<string | null>(null);
@@ -149,7 +150,9 @@ export function AvailabilityGrid({
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-white/[0.06] px-4 py-2.5 text-xs text-on-surface-muted">
         <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-[3px] bg-on-surface-muted/30" />Dyspozycja (kolor trenera)</span>
-        <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-[3px] border border-dashed border-white/60" />Przerywana ramka — kliknij, aby dodać konsultację</span>
+        <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-[3px] border border-dashed border-white/60" />
+          {onSelectFree ? "Przerywana ramka — kliknij, aby dodać zajęcia" : "Przerywana ramka — czas w dyspozycji bez zajęć"}
+        </span>
         <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-[3px] bg-on-surface-muted ring-1 ring-white/20" />Sesja (pełny kolor)</span>
       </div>
     </section>
@@ -168,8 +171,8 @@ function TrainerLane({
   date: string;
   startHour: number;
   roomy: boolean;
-  onSelectSession: (sessionId: number) => void;
-  onSelectFree: (trainer: AvailabilityScheduleTrainer, date: string, slot: AvailabilitySlot) => void;
+  onSelectSession?: (sessionId: number) => void;
+  onSelectFree?: (trainer: AvailabilityScheduleTrainer, date: string, slot: AvailabilitySlot) => void;
 }) {
   const day = trainer.days.find((item) => item.date === date);
   const color = getOutlookColor(trainer.outlookCategoryColor);
@@ -191,35 +194,47 @@ function TrainerLane({
       {day?.free.map((slot) => {
         const { top, height } = position(slot.start, slot.end);
         const label = `${trainer.name} · dyspozycja ${formatTime(slot.start)}–${formatTime(slot.end)}`;
-        return (
-          <button key={`f-${slot.startAt}`} type="button" title={label} aria-label={`${label}. Dodaj konsultację`}
+        const style = { top: top + 2, height: height - 4 };
+        const content = roomy && height > 30 ? (
+          <span className="px-2 py-1 text-[11px] font-semibold tabular-nums text-white/80 group-hover:text-on-surface">
+            Dyspozycja {formatTime(slot.start)}–{formatTime(slot.end)}
+          </span>
+        ) : null;
+        const shape = "group absolute inset-x-[3px] flex items-start justify-start overflow-hidden rounded-[6px] border border-dashed border-white/55 text-left";
+        return onSelectFree ? (
+          <button key={`f-${slot.startAt}`} type="button" title={label} aria-label={`${label}. Dodaj zajęcia`}
             onClick={() => onSelectFree(trainer, date, slot)}
-            className="group absolute inset-x-[3px] flex items-start justify-start overflow-hidden rounded-[6px] border border-dashed border-white/55 text-left transition hover:border-primary-light hover:bg-primary/20 focus-visible:border-primary-light focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--color-primary-light)]"
-            style={{ top: top + 2, height: height - 4 }}>
-            {roomy && height > 30 ? (
-              <span className="px-2 py-1 text-[11px] font-semibold tabular-nums text-white/80 group-hover:text-on-surface">
-                Dyspozycja {formatTime(slot.start)}–{formatTime(slot.end)}
-              </span>
-            ) : null}
+            className={`${shape} transition hover:border-primary-light hover:bg-primary/20 focus-visible:border-primary-light focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--color-primary-light)]`}
+            style={style}>
+            {content}
           </button>
+        ) : (
+          <div key={`f-${slot.startAt}`} title={label} className={shape} style={style}>{content}</div>
         );
       })}
       {day?.busy.map((busy) => {
         const { top, height } = position(busy.start, busy.end);
+        // Another trainer's session comes without a title, so a colleague only sees that the time is taken.
         const title = busy.title ?? "Zajęte";
-        return (
-          <button key={`b-${busy.sessionId}`} type="button" title={`${trainer.name} · ${formatTime(busy.start)}–${formatTime(busy.end)} · ${title}`}
+        const hint = `${trainer.name} · ${formatTime(busy.start)}–${formatTime(busy.end)} · ${title}`;
+        const style = { top: top + 1, height: height - 2, background: color.bg, boxShadow: "inset 0 0 0 1px rgb(255 255 255 / 0.18)" };
+        const content = roomy && height > 18 ? (
+          <>
+            <span className="block truncate pl-1 font-semibold">{title}</span>
+            {height > 34 ? <span className="block pl-1 tabular-nums text-white/70">{formatTime(busy.start)}–{formatTime(busy.end)}</span> : null}
+          </>
+        ) : null;
+        const shape = "absolute inset-x-[3px] z-[1] overflow-hidden rounded-[6px] px-1.5 py-0.5 text-left text-[11px] leading-4 text-white";
+        return onSelectSession ? (
+          <button key={`b-${busy.sessionId}`} type="button" title={hint}
             aria-label={`${trainer.name}, ${formatTime(busy.start)}–${formatTime(busy.end)}: ${title}`}
             onClick={() => onSelectSession(busy.sessionId)}
-            className="absolute inset-x-[3px] z-[1] overflow-hidden rounded-[6px] px-1.5 py-0.5 text-left text-[11px] leading-4 text-white transition hover:brightness-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-light"
-            style={{ top: top + 1, height: height - 2, background: color.bg, boxShadow: "inset 0 0 0 1px rgb(255 255 255 / 0.18)" }}>
-            {roomy && height > 18 ? (
-              <>
-                <span className="block truncate pl-1 font-semibold">{title}</span>
-                {height > 34 ? <span className="block pl-1 tabular-nums text-white/70">{formatTime(busy.start)}–{formatTime(busy.end)}</span> : null}
-              </>
-            ) : null}
+            className={`${shape} transition hover:brightness-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-light`}
+            style={style}>
+            {content}
           </button>
+        ) : (
+          <div key={`b-${busy.sessionId}`} title={hint} className={shape} style={style}>{content}</div>
         );
       })}
     </div>

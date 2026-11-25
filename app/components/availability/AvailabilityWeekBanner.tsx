@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarCheck2, CheckCircle2, Clock3, Lock, MessageSquareText } from "lucide-react";
+import { CalendarCheck2, CheckCircle2, Clock3, Lock, MessageSquareText, Undo2 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import type { AvailabilityChangeRequest, AvailabilityWeek, AvailabilityWeekDay } from "@/app/lib/availability";
 import { formatDayLabel, formatRanges, formatStudioDateTime } from "@/app/lib/availability-time";
@@ -38,6 +38,7 @@ export function AvailabilityWeekBanner({
   decision,
   canConfirm,
   onConfirm,
+  onUnsubmit,
   onRequestChange,
   onCancelRequest,
 }: {
@@ -49,9 +50,13 @@ export function AvailabilityWeekBanner({
   decision: AvailabilityChangeRequest | null;
   canConfirm: boolean;
   onConfirm: () => void;
+  onUnsubmit: () => void;
   onRequestChange: () => void;
   onCancelRequest: () => void;
 }) {
+  // Until the deadline a confirmation can simply be taken back, so a change request is not needed then.
+  const canUnsubmit = week.canUnsubmit;
+  const submittedLabel = week.submittedAfterDeadline ? "Potwierdzono po terminie" : "Potwierdzono";
   const deadline = formatStudioDateTime(week.deadlineAt);
   const decidedAt = formatStudioDateTime(decision?.decidedAt);
   // An approved request also sets `changedAfterLockAt`; mention the owner's own change only when it came later.
@@ -74,7 +79,9 @@ export function AvailabilityWeekBanner({
     icon = <CheckCircle2 size={20} aria-hidden="true" />;
     title = "Tydzień potwierdzony";
     const submitted = formatStudioDateTime(week.submittedAt);
-    text = `${submitted ? `Potwierdzono: ${submitted}. ` : ""}Zmianę godzin możesz zgłosić właścicielowi.`;
+    text = `${submitted ? `${submittedLabel}: ${submitted}. ` : ""}${canUnsubmit
+      ? `Do terminu${deadline ? ` (${deadline})` : ""} możesz cofnąć potwierdzenie i poprawić tydzień sam.`
+      : "Zmianę godzin możesz zgłosić właścicielowi."}`;
   } else if (week.status === "Missed") {
     title = "Termin potwierdzenia minął";
     text = "Tydzień jest zablokowany z godzinami jak poniżej. Zmianę możesz zgłosić właścicielowi.";
@@ -95,7 +102,7 @@ export function AvailabilityWeekBanner({
       text = `${deadline ? `Termin: ${deadline}. ` : ""}${isSelf ? "Potwierdzenie pokazuje w grafiku, że te godziny są aktualne." : "Możesz zmienić godziny albo potwierdzić tydzień za trenera."}`;
     } else if (week.status === "Submitted") {
       title = isSelf ? "Tydzień potwierdzony" : "Trener potwierdził ten tydzień";
-      text = `${submitted ? `Potwierdzono: ${submitted}. ` : ""}${direct}`;
+      text = `${submitted ? `${submittedLabel}: ${submitted}. ` : ""}${direct}`;
     } else {
       title = isSelf ? "Termin potwierdzenia minął" : "Trener nie potwierdził tygodnia na czas";
       text = `Obowiązują godziny poniżej. ${direct}`;
@@ -135,10 +142,15 @@ export function AvailabilityWeekBanner({
             {ownerMode && !isSelf ? "Potwierdź za trenera" : "Potwierdź tydzień"}
           </Button>
         ) : null}
+        {canUnsubmit ? (
+          <Button type="button" variant="secondary" icon={<Undo2 size={16} className="text-primary-light" />} onClick={onUnsubmit}>
+            Cofnij potwierdzenie
+          </Button>
+        ) : null}
         {/* The owner changes locked weeks directly, so requests are the trainer's tools only. */}
         {!ownerMode && pending && week.canRequestChange ? <Button type="button" variant="secondary" onClick={onRequestChange}>Zmień prośbę</Button> : null}
         {!ownerMode && pending && week.pendingChangeRequest?.id ? <Button type="button" variant="ghost" onClick={onCancelRequest}>Wycofaj prośbę</Button> : null}
-        {!ownerMode && !pending && week.isLocked && week.canRequestChange ? (
+        {!ownerMode && !pending && !canUnsubmit && week.isLocked && week.canRequestChange ? (
           <Button type="button" variant="secondary" icon={<MessageSquareText size={16} className="text-primary-light" />} onClick={onRequestChange}>
             Poproś o zmianę
           </Button>

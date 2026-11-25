@@ -31,6 +31,7 @@ import {
 import { getTrainers, type Trainer } from "@/app/lib/owner/trainers";
 import { DateNavigator, ScheduleModeSwitch, ViewSwitch, type ScheduleMode } from "./components/ScheduleControls";
 import { OwnerAvailabilityView } from "./components/availability/OwnerAvailabilityView";
+import type { TrainingDraft } from "./components/availability/ConsultationModal";
 import { isIsoDate } from "@/app/lib/availability-time";
 import ScheduleFilters, { countScheduleFilters, ScheduleFiltersToggle } from "./components/ScheduleFilters";
 import { OutlookRequiredState } from "./components/ScheduleStates";
@@ -119,6 +120,8 @@ export default function SchedulePage() {
   );
   const [createSessionDate, setCreateSessionDate] = useState(() => new Date());
   const [createSessionStartAt, setCreateSessionStartAt] = useState<Date | null>(null);
+  // A training planned from a trainer's free time starts with that trainer, place and hours.
+  const [createPreset, setCreatePreset] = useState<TrainingDraft | null>(null);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [pendingSessionId, setPendingSessionId] = useState<number | null>(null);
   const [isSavingSession, setIsSavingSession] = useState(false);
@@ -213,12 +216,13 @@ export default function SchedulePage() {
     );
   }
 
-  function openCreateModal(date = anchorDate, startAt?: Date) {
+  function openCreateModal(date = anchorDate, startAt?: Date, preset: TrainingDraft | null = null) {
     detailRead.current?.abort();
     setPendingSessionId(null);
     setSelectedSession(null);
     setCreateSessionDate(date);
     setCreateSessionStartAt(startAt ?? null);
+    setCreatePreset(preset);
     setIsSessionModalOpen(true);
   }
 
@@ -508,13 +512,13 @@ export default function SchedulePage() {
             view={view}
             anchorDate={anchorDate}
             locationId={selectedLocationId}
-            trainerFilter={effectiveTrainerFilter}
-            onTrainerFilterChange={setTrainerFilter}
+            initialTrainerId={effectiveTrainerFilter ? Number(effectiveTrainerFilter) : null}
             locations={scopedLocations}
             revision={availabilityRevision + calendarRevision}
             selfTrainerId={defaultTrainerId}
             openSelfRequest={searchParams.get("mine") === "1" ? `mine:${weekParam ?? ""}` : null}
             onSelectSession={(id) => void openEditModal({ id })}
+            onCreateTraining={(draft) => openCreateModal(draft.startAt, draft.startAt, draft)}
             onSessionsChanged={() => { notifySessionCorrected(); }}
           />
         ) : view === "week" ? (
@@ -549,18 +553,20 @@ export default function SchedulePage() {
           isSessionModalOpen
             ? selectedSession
               ? `session-${selectedSession.id}-${sessionRevision}`
-              : `new-${toDateInputValue(createSessionDate)}`
+              : `new-${toDateInputValue(createSessionDate)}${createPreset ? `-${createPreset.trainerId}-${createPreset.startAt.getTime()}` : ""}`
             : "closed"
         }
         open={isSessionModalOpen}
         session={selectedSession}
         anchorDate={selectedSession ? anchorDate : createSessionDate}
         defaultStartAt={selectedSession ? null : createSessionStartAt}
+        defaultEndAt={selectedSession ? null : createPreset?.endAt ?? null}
+        defaultLocationId={selectedSession ? null : createPreset?.locationId ?? null}
         trainers={modalTrainers}
         locations={scopedLocations}
         clients={clients}
         loadClientOptions={loadClientOptions}
-        defaultTrainerId={defaultTrainerId}
+        defaultTrainerId={createPreset?.trainerId ?? defaultTrainerId}
         isSaving={isSavingSession}
         saveError={typeof sessionError === "string" ? sessionError : null}
         settlementError={sessionError && typeof sessionError === "object" ? sessionError : null}

@@ -38,6 +38,17 @@ test("a week with null lists is read as empty lists, not a crash", () => {
   assert.deepEqual(plain(week.days[0].ranges), []);
   assert.deepEqual(plain(week.pendingChangeRequest.days), [{ date: "2026-12-02", mode: "Off", ranges: [] }]);
   assert.deepEqual(plain(week.pendingChangeRequest.currentDays), []);
+  assert.equal(week.canUnsubmit, false);
+  assert.equal(week.submittedAfterDeadline, false);
+});
+
+test("a confirmed week may still be taken back, and a late confirmation is kept", () => {
+  const week = api.asAvailabilityWeek({
+    weekStart: "2026-11-30", status: "Submitted", isLocked: true, canUnsubmit: true, submittedAfterDeadline: true,
+    days: [{ date: "2026-11-30", dayOfWeek: 1, mode: "Locked", ranges: [], templateRanges: [] }],
+  }, "2026-11-30");
+  assert.equal(week.canUnsubmit, true);
+  assert.equal(week.submittedAfterDeadline, true);
 });
 
 test("something that is not the requested week is rejected", () => {

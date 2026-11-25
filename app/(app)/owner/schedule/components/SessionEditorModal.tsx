@@ -55,6 +55,8 @@ export default function SessionEditorModal({
   session,
   anchorDate,
   defaultStartAt,
+  defaultEndAt,
+  defaultLocationId,
   trainers,
   locations,
   clients,
@@ -77,6 +79,9 @@ export default function SessionEditorModal({
   session: SessionEditorSession | null;
   anchorDate: Date;
   defaultStartAt?: Date | null;
+  /** With `defaultStartAt`: the end picked together with it (otherwise one hour later). */
+  defaultEndAt?: Date | null;
+  defaultLocationId?: number | null;
   trainers: Trainer[];
   locations: Location[];
   clients: Client[];
@@ -102,6 +107,8 @@ export default function SessionEditorModal({
       session,
       date: anchorDate,
       startAt: defaultStartAt,
+      endAt: defaultEndAt,
+      defaultLocationId,
       trainers,
       locations,
       defaultTrainerId,
